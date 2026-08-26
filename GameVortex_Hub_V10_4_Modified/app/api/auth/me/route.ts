@@ -1,0 +1,1 @@
+import {NextResponse} from 'next/server';import {requireUser} from '../../../../lib/auth';export async function GET(){try{const u=await requireUser();return NextResponse.json({id:u.id,email:u.email,username:u.username,role:u.role,points:u.points});}catch{return NextResponse.json({error:'UNAUTHORIZED'},{status:401});}}
