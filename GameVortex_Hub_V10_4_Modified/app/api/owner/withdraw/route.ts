@@ -3,11 +3,13 @@ import { db } from '../../../../lib/prisma';
 import { requireOwner } from '../../../../lib/auth';
 import { validateOwnerWithdrawal, OWNER_POINTS_PER_USD } from '../../../../lib/owner-points';
 import { guardMutation } from '../../../../lib/api';
+import { logSystemError } from '../../../../lib/observability';
 
 export async function POST(req: NextRequest) {
   const blocked = await guardMutation(req, 'owner:withdraw', 10); if (blocked) return blocked;
+  let ownerId: string | undefined;
   try {
-    const owner = await requireOwner(); const body = await req.json(); const points = Number(body.points);
+    const owner = await requireOwner(); ownerId = owner.id; const body = await req.json(); const points = Number(body.points);
     const key = String(req.headers.get('idempotency-key') ?? body.idempotencyKey ?? '');
     if (!key || key.length > 200) return NextResponse.json({ error: 'IDEMPOTENCY_KEY_REQUIRED' }, { status: 400 });
     const usd = validateOwnerWithdrawal(points);
@@ -24,5 +26,15 @@ export async function POST(req: NextRequest) {
       return w;
     });
     return NextResponse.json(result, { status: 201 });
-  } catch (e) { const msg = e instanceof Error ? e.message : 'INTERNAL_ERROR'; const status = ['FORBIDDEN','UNAUTHORIZED'].includes(msg) ? 403 : 400; return NextResponse.json({ error: msg }, { status }); }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'INTERNAL_ERROR';
+    const status = ['FORBIDDEN', 'UNAUTHORIZED'].includes(msg) ? 403 : 400;
+    if (!['FORBIDDEN', 'UNAUTHORIZED', 'MINIMUM_WITHDRAWAL_NOT_MET', 'IDEMPOTENCY_KEY_REQUIRED'].includes(msg)) {
+      // Real, unexpected failures around money movement (wallet not found,
+      // insufficient points state mismatch, DB errors) get persisted;
+      // routine validation rejections do not need to clutter the log.
+      await logSystemError('owner:withdraw', e, { statusCode: status, userId: ownerId });
+    }
+    return NextResponse.json({ error: msg }, { status });
+  }
 }
