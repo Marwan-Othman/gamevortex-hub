@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
+import { guardRead } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,12 @@ function configurationStatus() {
 }
 
 export async function GET(request: NextRequest) {
+  // Kept generous (uptime monitors ping this every 30-60s) but capped so a
+  // public, unauthenticated endpoint that touches the database can't be
+  // turned into a free DoS lever against Postgres.
+  const blocked = await guardRead(request, "health", 120);
+  if (blocked) return blocked;
+
   const administrativeCheck = request.headers.get("x-admin-health") === "1";
   if (administrativeCheck) {
     try {
