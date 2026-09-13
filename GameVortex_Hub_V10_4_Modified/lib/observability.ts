@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "./prisma";
 
 export function logEvent(event: string, data: Record<string, unknown> = {}) {
@@ -34,7 +35,16 @@ export async function logSystemError(
         message,
         statusCode: options.statusCode ?? null,
         userId: options.userId ?? null,
-        metadata: options.metadata ? sanitizeMetadata(options.metadata) : undefined,
+        // sanitizeMetadata() builds a plain, JSON-safe object at runtime
+        // (only strings/numbers/booleans/null/nested objects survive it),
+        // but its TypeScript return type is Record<string, unknown> since
+        // the input itself is untyped. Prisma's generated Json field type
+        // (Prisma.InputJsonValue) doesn't accept `unknown` values even
+        // though the actual data is always JSON-compatible, so this cast
+        // is safe and required for `tsc --noEmit` / the Vercel build to pass.
+        metadata: options.metadata
+          ? (sanitizeMetadata(options.metadata) as Prisma.InputJsonValue)
+          : undefined,
       },
     });
   } catch (persistError) {
