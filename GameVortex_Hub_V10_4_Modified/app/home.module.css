@@ -1,0 +1,326 @@
+/* ============================================================
+   GameVortex Hub — Home page visual theme (02-home.png)
+   Deep navy/purple neon palette, horizontally-scrollable rows,
+   mobile-first single column.
+   ============================================================ */
+
+.page {
+  background:
+    radial-gradient(ellipse 700px 420px at 15% 0%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(ellipse 600px 500px at 90% 15%, rgba(56, 189, 248, 0.14), transparent 60%),
+    #060714;
+  color: #eef0fb;
+  padding: 16px 14px 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* ---- hero carousel ---- */
+.hero {
+  position: relative;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 20px;
+  overflow: hidden;
+  min-height: 240px;
+  background: linear-gradient(135deg, #1a1030, #0c0a1e 60%);
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+}
+.heroSlide {
+  position: relative;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  padding: 26px 22px;
+  overflow: hidden;
+}
+.heroSlide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--slide-bg);
+  opacity: 0.9;
+}
+.heroSlide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(6, 7, 20, 0.85) 15%, rgba(6, 7, 20, 0.15) 75%);
+}
+.heroContent {
+  position: relative;
+  z-index: 1;
+  max-width: 78%;
+}
+.heroContent h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+.heroContent p {
+  font-size: 12.5px;
+  color: #c6c9e6;
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+.heroCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+}
+.heroArrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 8, 24, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  cursor: pointer;
+}
+.heroArrow.prev { inset-inline-start: 12px; }
+.heroArrow.next { inset-inline-end: 12px; }
+.heroDots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+.heroDots button {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.35);
+  padding: 0;
+  cursor: pointer;
+}
+.heroDots button[aria-current="true"] {
+  background: #a78bfa;
+  width: 18px;
+  border-radius: 4px;
+}
+
+/* ---- shared section styles ---- */
+.section {
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 18px;
+  background: rgba(20, 16, 40, 0.4);
+  padding: 16px 14px;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.sectionHead h2 {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sectionHead a {
+  font-size: 12px;
+  color: #a78bfa;
+}
+
+.hscroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  margin: 0 -4px;
+  padding-inline: 4px;
+}
+.hscroll::-webkit-scrollbar { display: none; }
+
+/* ---- platform row ---- */
+.platformTile {
+  flex: 0 0 76px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.platformIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #eef0fb;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.platformTile:hover .platformIcon,
+.platformTile:focus-visible .platformIcon {
+  border-color: #a78bfa;
+  box-shadow: 0 0 18px rgba(167, 139, 250, 0.35);
+}
+.platformTile span {
+  font-size: 11px;
+  color: #c6c9e6;
+  text-align: center;
+}
+
+/* ---- game cards ---- */
+.gameCard {
+  flex: 0 0 150px;
+  scroll-snap-align: start;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+.gameCoverWrap {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: #14112a;
+}
+.gameCoverWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.platformBadge {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(6, 7, 20, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.gameInfo { padding: 8px 9px 10px; }
+.gameRating {
+  font-size: 11px;
+  color: #ffc65c;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+.gameTitle {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- categories row ---- */
+.categoryTile {
+  flex: 0 0 78px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.categoryIcon {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cat-color, rgba(139, 92, 246, 0.4));
+  background: color-mix(in srgb, var(--cat-color, #8b5cf6) 14%, transparent);
+  color: var(--cat-color, #a78bfa);
+}
+.categoryTile span {
+  font-size: 11px;
+  color: #c6c9e6;
+}
+
+/* ---- VIP banner ---- */
+.vip {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 198, 92, 0.4);
+  background: linear-gradient(135deg, #241a3d, #120c24 60%);
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.vipText h2 {
+  font-size: 15px;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffd27a;
+}
+.vipText p {
+  font-size: 11.5px;
+  color: #c6c9e6;
+  margin: 0 0 12px;
+}
+.vipBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 9px 16px;
+  border-radius: 999px;
+}
+.vipBadge {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffe6a8, #ffc65c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #241500;
+  font-weight: 800;
+  font-size: 11px;
+  box-shadow: 0 0 24px rgba(255, 198, 92, 0.4);
+}
+
+@media (min-width: 720px) {
+  .page { padding: 24px 32px 40px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .hero, .heroSlide { min-height: 320px; }
+}
