@@ -51,3 +51,37 @@ html[dir="ltr"] .glitch:before,html[dir="ltr"] .glitch:after{direction:ltr;left:
 .referral-table th{color:var(--muted);font-weight:800}
 .draw-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 @media(max-width:600px){.referral-copy{grid-template-columns:1fr}}
+/* ============================================================
+   Site-wide mobile polish
+   - stop accidental horizontal scroll everywhere
+   - prevent iOS auto-zoom on form focus (16px min font-size)
+   - respect safe-area insets (notch / home-indicator devices)
+   - bigger, easier-to-tap bottom nav icons+labels
+   - visible focus rings for keyboard/assistive users
+   ============================================================ */
+html, body { overflow-x: hidden; max-width: 100%; }
+* { -webkit-tap-highlight-color: transparent; }
+button, a, input, select, textarea { touch-action: manipulation; }
+
+.mobile-bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+.mobile-bottom-nav a span { font-size: 10px; }
+
+@media (max-width: 600px) {
+  input, select, textarea, button { font-size: 16px; }
+  .mobile-bottom-nav {
+    padding-bottom: max(7px, env(safe-area-inset-bottom));
+  }
+  body { padding-bottom: calc(75px + env(safe-area-inset-bottom)); }
+}
+
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--a);
+  outline-offset: 2px;
+}
