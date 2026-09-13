@@ -217,6 +217,17 @@ model AuditLog {
   @@index([actorUserId, createdAt])
   @@index([createdAt])
 }
+model SystemError {
+  id String @id @default(cuid())
+  scope String
+  message String
+  statusCode Int?
+  userId String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([scope, createdAt])
+  @@index([createdAt])
+}
 model QuranReciter {
   id String @id @default(cuid())
   nameAr String
