@@ -3,6 +3,8 @@ import { DeliveryType, DigitalKeyStatus, Prisma, ProductKind } from "@prisma/cli
 import { db } from "@/lib/prisma";
 import { ConfiguredPaymentProvider } from "@/lib/payments";
 import { qualifyReferralOnFirstOrder } from "@/lib/referrals";
+import { rateLimitAsync, clientKey } from "@/lib/security";
+import { logSystemError } from "@/lib/observability";
 
 export const runtime = "nodejs";
 
@@ -141,6 +143,20 @@ async function deliverGameKeys(transaction: Prisma.TransactionClient, order: {
 }
 
 export async function POST(request: NextRequest) {
+  // Payment provider webhooks are called server-to-server (Stripe/PayPal),
+  // so they never carry a same-origin browser Origin header — the CSRF
+  // check used on user-facing mutations (guardMutation) does not apply
+  // here. Authenticity instead comes from the signature check below.
+  // We still rate-limit by IP to blunt flooding/abuse against this
+  // publicly reachable endpoint.
+  const limited = await rateLimitAsync(clientKey(request, "payments:webhook"), 120, 60_000);
+  if (!limited.allowed) {
+    return NextResponse.json(
+      { error: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfter) } }
+    );
+  }
+
   const rawBody = await request.text();
   const signature = request.headers.get("stripe-signature") || request.headers.get("x-payment-signature") || "";
   const provider = new ConfiguredPaymentProvider();
@@ -211,6 +227,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "WEBHOOK_PROCESSING_FAILED";
     const status = message === "ORDER_NOT_FOUND" ? 404 : 400;
+    await logSystemError("payments:webhook", error, { statusCode: status });
     return NextResponse.json({ error: message }, { status });
   }
 }
