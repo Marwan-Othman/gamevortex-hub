@@ -7,7 +7,7 @@ const ready = (value: boolean) => value ? "جاهز" : "غير مفعّل";
 
 export default async function Admin() {
   const owner = await requireOwner();
-  const [games, reciters, activeReciters, withdrawals, users, orders, reports, revenue, pendingOrders, openDraws, pendingReferrals] = await Promise.all([
+  const [games, reciters, activeReciters, withdrawals, users, orders, reports, revenue, pendingOrders, openDraws, pendingReferrals, recentErrors] = await Promise.all([
     db.game.count(),
     db.quranReciter.count(),
     db.quranReciter.count({ where: { active: true, sourceVerificationStatus: "VERIFIED" } }),
@@ -19,6 +19,7 @@ export default async function Admin() {
     db.order.count({ where: { status: "PENDING" } }),
     db.raffle.count({ where: { status: "OPEN" } }),
     db.referral.count({ where: { status: "PENDING" } }),
+    db.systemError.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
   ]);
 
   const operational = [
@@ -45,6 +46,7 @@ export default async function Admin() {
           <Link className="btn" href="/admin/games">🎮 إدارة الألعاب</Link><Link className="btn" href="/admin/quran">🎙️ إدارة القرآن</Link>
           <Link className="btn" href="/admin/draws">🎁 إدارة السحوبات</Link>
           <Link className="btn secondary" href="/admin/moderation">🛡️ المراجعة والمحتوى</Link>
+          <Link className="btn secondary" href="/admin/errors">🧯 سجل الأخطاء</Link>
           <Link className="btn secondary" href="/ai">🤖 مركز AI</Link>
         </div>
       </section>
@@ -55,7 +57,8 @@ export default async function Admin() {
           [pendingOrders, "طلبات قيد المعالجة"], [withdrawals, "سحوبات معلقة"],
           [reports, "بلاغات معلقة"], [`${((revenue._sum.totalCents || 0) / 100).toFixed(2)} USD`, "حجم المبيعات المدفوعة"],
           [`${activeReciters}/${reciters}`, "قراء القرآن المنشورون"],
-          [openDraws, "سحوبات مفتوحة"], [pendingReferrals, "إحالات بانتظار التأهل"]
+          [openDraws, "سحوبات مفتوحة"], [pendingReferrals, "إحالات بانتظار التأهل"],
+          [recentErrors, "أخطاء آخر 24 ساعة"]
         ].map(([value, label]) => (
           <div className="glass card" key={String(label)}>
             <strong>{value}</strong><span className="muted">{label}</span>
