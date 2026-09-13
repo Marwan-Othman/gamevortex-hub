@@ -5,6 +5,7 @@ import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { guardMutation } from "@/lib/api";
 import { ConfiguredPaymentProvider } from "@/lib/payments";
+import { logSystemError } from "@/lib/observability";
 
 function checkoutUrlFrom(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -45,8 +46,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const blocked = await guardMutation(request, "orders:checkout", 10);
   if (blocked) return blocked;
 
+  let userId: string | undefined;
   try {
     const user = await requireUser();
+    userId = user.id;
     const { id: rawId } = await params;
     const id = z.string().cuid().parse(rawId);
     const order = await db.order.findFirst({
@@ -131,7 +134,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_ORDER_ID" }, { status: 400 });
     if (error instanceof Error && error.message === "PAYMENT_PROVIDER_NOT_CONFIGURED") {
+      await logSystemError("orders:checkout", error, { statusCode: 503, userId });
       return NextResponse.json({ error: "PAYMENT_PROVIDER_NOT_CONFIGURED" }, { status: 503 });
+    }
+    if (error instanceof Error && error.message !== "UNAUTHORIZED") {
+      // A failed checkout attempt that reaches the payment provider (rather
+      // than a routine "not found"/"already paid" business rejection) is
+      // worth keeping a record of, since money may be involved.
+      await logSystemError("orders:checkout", error, { statusCode: 400, userId });
     }
     return NextResponse.json({ error: "CHECKOUT_FAILED" }, { status: 400 });
   }
