@@ -1,7 +1,45 @@
-export const dynamic='force-dynamic';
-import Link from 'next/link';import {db} from '../lib/prisma';import {vortexScore} from '../lib/game-score';
-import GlitchLoader from '@/components/ui/GlitchLoader';
-import NotificationJoke from '@/components/ui/NotificationJoke';
-function GameCard({game}:{game:any}){return <Link href={`/games/${game.slug}`} className="card game-card"><>{game.coverUrl?<img className="cover" src={game.coverUrl} alt={game.titleEn} loading="lazy"/>:<div className="cover"/>}</><div className="card-top"><span className="badge">VORTEX {vortexScore(game)}</span><span className="muted">★ {game.ratingAverage.toFixed(1)}</span></div><h3>{game.titleAr}</h3><p className="muted">{game.platform||'Multi-platform'} · {game.genre||'Gaming'}</p></Link>}
-export default async function Home(){const [rated,played,newest,totals]=await Promise.all([db.game.findMany({where:{published:true},orderBy:[{ratingAverage:'desc'},{ratingCount:'desc'}],take:6}),db.game.findMany({where:{published:true},orderBy:[{playCount:'desc'},{viewCount:'desc'}],take:6}),db.game.findMany({where:{published:true},orderBy:{createdAt:'desc'},take:6}),Promise.all([db.game.count({where:{published:true}}),db.user.count(),db.gameProduct.count({where:{active:true}}),db.quranReciter.count({where:{active:true,sourceVerificationStatus:'VERIFIED'}})])]);return <main className="wrap"><NotificationJoke /><section className="hero hero-home"><div><div className="eyebrow">GAMEVORTEX / INDEPENDENT PLATFORM</div><GlitchLoader /><h1>عالم ألعاب صُمم من الصفر.</h1><p>اكتشف، اشترِ، اجمع، نافس واصنع مكتبتك. GameVortex ليس واجهة لمتجر آخر؛ إنه نظام ألعاب مستقل بهوية وتجربة خاصة.</p><div className="actions"><Link className="btn" href="/games">استكشف الألعاب</Link><Link className="btn secondary" href="/marketplace">ادخل المتجر</Link><Link className="btn secondary" href="/rewards">نظام المكافآت</Link></div></div><div className="vortex-core" aria-hidden="true"/></section><section className="stats"><div className="stat"><strong>{totals[0]}</strong><span className="muted">ألعاب منشورة</span></div><div className="stat"><strong>{totals[1]}</strong><span className="muted">لاعبون</span></div><div className="stat"><strong>{totals[2]}</strong><span className="muted">منتجات رقمية</span></div><div className="stat"><strong>{totals[3]}</strong><span className="muted">قراء موثقون</span></div></section><section className="feature-grid"><div className="card feature"><div className="icon">◈</div><h2>متجر Vortex</h2><p className="muted">ألعاب رقمية، مفاتيح، بطاقات، شحن واشتراكات ضمن نموذج متجر واحد مستقل.</p></div><div className="card feature"><div className="icon">◇</div><h2>Vortex Rewards</h2><p className="muted">XP، مستويات VIP، نقاط، إحالات، مهام وسحوبات مرتبطة بأحداث حقيقية.</p></div><div className="card feature"><div className="icon">△</div><h2>Vortex Arena</h2><p className="muted">ترتيب، نشاط اجتماعي، مكتبة شخصية وتجربة لاعب مستمرة بدل متجر تقليدي فقط.</p></div></section><Section title="الأعلى تقييمًا" href="/games?sort=rating" games={rated}/><Section title="الأكثر لعبًا" href="/games?sort=popular" games={played}/><Section title="وصل حديثًا" href="/games?sort=newest" games={newest}/></main>}
-function Section({title,href,games}:{title:string;href:string;games:any[]}){return <section><div className="section-head"><h2>{title}</h2><Link className="muted" href={href}>عرض الكل →</Link></div><div className="grid">{games.map(g=><GameCard key={g.id} game={g}/>)}{!games.length&&<div className="card muted">لا توجد بيانات حقيقية كافية حاليًا.</div>}</div></section>}
+export const dynamic = "force-dynamic";
+import { db } from "../lib/prisma";
+import styles from "./home.module.css";
+import HeroCarousel from "@/components/home/HeroCarousel";
+import PlatformRow from "@/components/home/PlatformRow";
+import CategoriesRow from "@/components/home/CategoriesRow";
+import VipBanner from "@/components/home/VipBanner";
+import GameRow from "@/components/home/GameRow";
+
+const NewestIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 3" />
+  </svg>
+);
+const RatedIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <path d="m12 2 2.9 6 6.6.9-4.8 4.6 1.1 6.5-6-3.1-6 3.1 1.1-6.5L2 8.9l6.6-.9z" />
+  </svg>
+);
+const PopularIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M13 2 4 14h6l-1 8 9-12h-6z" />
+  </svg>
+);
+
+export default async function Home() {
+  const [newest, rated, played] = await Promise.all([
+    db.game.findMany({ where: { published: true }, orderBy: { createdAt: "desc" }, take: 10 }),
+    db.game.findMany({ where: { published: true }, orderBy: [{ ratingAverage: "desc" }, { ratingCount: "desc" }], take: 10 }),
+    db.game.findMany({ where: { published: true }, orderBy: [{ playCount: "desc" }, { viewCount: "desc" }], take: 10 }),
+  ]);
+
+  return (
+    <main className={styles.page}>
+      <HeroCarousel />
+      <PlatformRow />
+      <GameRow title="أحدث الألعاب" icon={NewestIcon} href="/games?sort=newest" games={newest} />
+      <CategoriesRow />
+      <VipBanner />
+      <GameRow title="الأعلى تقييمًا" icon={RatedIcon} href="/games?sort=rating" games={rated} />
+      <GameRow title="الأكثر لعبًا" icon={PopularIcon} href="/games?sort=popular" games={played} />
+    </main>
+  );
+}
