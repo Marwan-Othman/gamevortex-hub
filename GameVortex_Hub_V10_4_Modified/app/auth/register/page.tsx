@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import RegisterForm from "@/components/auth/RegisterForm";
+import AuthShell from "@/components/auth/AuthShell";
 
 export const metadata = {
   title: "إنشاء حساب | GameVortex Hub",
@@ -8,15 +9,10 @@ export const metadata = {
 
 export default function RegisterPage() {
   return (
-    <main className="wrap auth-wrap">
-      <section className="hero">
-        <div className="eyebrow">GAMEVORTEX ACCOUNT</div>
-        <h1>إنشاء حساب جديد</h1>
-        <p className="muted">انضم إلى GameVortex لبناء مكتبتك، كسب XP والنقاط، ودخول السحوبات.</p>
-      </section>
+    <AuthShell heading="مرحباً بعودتك!" subtitle="سجل دخولك أو أنشئ حساب جديد للاستمتاع بتجربة الألعاب الأكثر تميزًا">
       <Suspense fallback={<div className="card">جارٍ التحميل…</div>}>
         <RegisterForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
