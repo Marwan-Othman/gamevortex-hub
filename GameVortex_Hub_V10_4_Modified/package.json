@@ -25,7 +25,8 @@
     "db:backup": "sh scripts/backup-postgres.sh",
     "payouts:process": "node scripts/process-withdrawals.mjs",
     "production:bootstrap": "node scripts/bootstrap-production.mjs",
-    "test:source": "node scripts/source-integrity-check.mjs"
+    "test:source": "node scripts/source-integrity-check.mjs",
+    "fix:owner": "node scripts/fix-owner-conflict.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.12.0",
@@ -47,5 +48,3 @@
     "npm": ">=10.0.0"
   }
 }
-"test:source": "node scripts/source-integrity-check.mjs",
-    "fix:owner": "node scripts/fix-owner-conflict.mjs"
