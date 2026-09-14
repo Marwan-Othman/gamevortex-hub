@@ -47,3 +47,5 @@
     "npm": ">=10.0.0"
   }
 }
+"test:source": "node scripts/source-integrity-check.mjs",
+    "fix:owner": "node scripts/fix-owner-conflict.mjs"
