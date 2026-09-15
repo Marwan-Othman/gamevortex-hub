@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { db } from "@/lib/prisma";
-import { requireOwner } from "@/lib/auth";
+import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import CreateDrawForm from "@/components/draws/CreateDrawForm";
 import DrawActions from "@/components/draws/DrawActions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDraws() {
-  await requireOwner();
+  const gate = await getOwnerOrAccessScreen();
+  if ("screen" in gate) return gate.screen;
   const raffles = await db.raffle.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
