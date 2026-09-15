@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { db } from "../../../lib/prisma";
-import { requireOwner } from "../../../lib/auth";
+import { getOwnerOrAccessScreen } from "../../../lib/admin-access";
 
 export default async function AdminGames() {
-  await requireOwner();
+  const gate = await getOwnerOrAccessScreen();
+  if ("screen" in gate) return gate.screen;
   const games = await db.game.findMany({
     orderBy: { updatedAt: "desc" }, take: 100,
     select: { id:true, slug:true, titleAr:true, titleEn:true, published:true, featured:true, sourceStatus:true, updatedAt:true }
