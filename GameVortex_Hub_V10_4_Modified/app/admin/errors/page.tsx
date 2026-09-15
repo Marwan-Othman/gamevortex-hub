@@ -20,7 +20,30 @@ export default async function AdminErrors({
 }: {
   searchParams: Promise<{ scope?: string }>;
 }) {
-  await requireOwner();
+  try {
+    await requireOwner();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "FORBIDDEN";
+    return (
+      <main className="wrap" dir="rtl">
+        <section className="glass card" style={{ textAlign: "center", padding: 60, margin: "40px auto", maxWidth: 480 }}>
+          {message === "UNAUTHORIZED" ? (
+            <>
+              <h1>سجّل الدخول للوصول لسجل الأخطاء</h1>
+              <p className="muted" style={{ margin: "10px 0 20px" }}>تحتاج لتسجيل الدخول بحساب المالك.</p>
+              <Link href="/auth/login" className="btn">تسجيل الدخول</Link>
+            </>
+          ) : (
+            <>
+              <h1>ليس لديك صلاحية الوصول</h1>
+              <p className="muted" style={{ margin: "10px 0 20px" }}>هذه الصفحة مخصصة لحساب المالك فقط.</p>
+              <Link href="/" className="btn">العودة للرئيسية</Link>
+            </>
+          )}
+        </section>
+      </main>
+    );
+  }
   const { scope } = await searchParams;
   const cleanScope = (scope || "").trim().slice(0, 120);
 
