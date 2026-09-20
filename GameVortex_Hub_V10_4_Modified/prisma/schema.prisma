@@ -12,6 +12,7 @@ enum Role {
   STAFF
   USER
 }
+
 enum SourceStatus {
   VERIFIED
   NEEDS_SOURCE
@@ -21,12 +22,14 @@ enum SourceStatus {
   NEEDS_LICENSE
   STREAM_ONLY
 }
+
 enum LibraryStatus {
   WANT
   PLAYING
   BEATEN
   ARCHIVED
 }
+
 enum WithdrawalStatus {
   REQUESTED
   PENDING
@@ -38,6 +41,7 @@ enum WithdrawalStatus {
   CANCELLED
   REVERSED
 }
+
 enum LedgerType {
   CREDIT_POINTS
   CREDIT_REVENUE
@@ -57,226 +61,241 @@ enum LedgerType {
 }
 
 model User {
-  id String @id @default(cuid())
-  email String @unique
-  username String? @unique
-  role Role @default(USER)
-  passwordHash String?
-  sessionVersion Int @default(1)
+  id              String            @id @default(cuid())
+  email           String            @unique
+  username        String?           @unique
+  role            Role              @default(USER)
+  passwordHash    String?
+  sessionVersion  Int               @default(1)
   emailVerifiedAt DateTime?
-  points Int @default(0)
-  ownerPoints Int @default(0)
-  vipTier VipTier @default(BRONZE)
-  referralCode String? @unique
-  wallet Wallet?
-  ownerWallet OwnerWallet?
-  library GameLibraryItem[]
-  reviews Review[]
-  favorites FavoriteGame[]
-  wishlist WishlistGame[]
-  auditLogs AuditLog[]
+  points          Int               @default(0)
+  ownerPoints     Int               @default(0)
+  vipTier         VipTier           @default(BRONZE)
+  referralCode    String?           @unique
+  wallet          Wallet?
+  ownerWallet     OwnerWallet?
+  library         GameLibraryItem[]
+  reviews         Review[]
+  favorites       FavoriteGame[]
+  wishlist        WishlistGame[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  gamerProfile      GamerProfile?
+  following         UserFollow[]       @relation("Following")
+  followers         UserFollow[]       @relation("Followers")
+  activities        Activity[]
+  notifications     Notification[]
+  orders            Order[]
+  referralsMade     Referral[]         @relation("ReferralReferrer")
+  referralReceived  Referral?          @relation("ReferralReferred")
+  raffleEntries     RaffleEntry[]
+  raffleWins        Raffle[]           @relation("RaffleWinner")
+  entitlements      Entitlement[]
+  reportsFiled      ContentReport[]    @relation("ReporterReports")
+  moderationActions ModerationAction[]
+  reportsModerated  ContentReport[]    @relation("ModeratorReports")
+}
+
+model Wallet {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  balance        Decimal @default(0) @db.Decimal(18, 2)
+  pendingBalance Decimal @default(0) @db.Decimal(18, 2)
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OwnerWallet {
+  id              String              @id @default(cuid())
+  ownerId         String              @unique
+  availablePoints Int                 @default(0)
+  pendingPoints   Int                 @default(0)
+  owner           User                @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  ledger          OwnerLedger[]
+  withdrawals     WithdrawalRequest[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+model OwnerLedger {
+  id                    String      @id @default(cuid())
+  walletId              String
+  type                  LedgerType
+  points                Int         @default(0)
+  usdAmount             Decimal?    @db.Decimal(18, 2)
+  currency              String?
+  conversionRate        Int?
+  withdrawalId          String?
+  provider              String?
+  providerTransactionId String?
+  transactionHash       String?
+  idempotencyKey        String      @unique
+  metadata              Json?
+  createdAt             DateTime    @default(now())
+  wallet                OwnerWallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+}
+
+model Game {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  titleAr         String
+  titleEn         String
+  description     String?
+  platform        String?
+  genre           String?
+  priceCents      Int               @default(0)
+  discountPercent Int               @default(0)
+  coverUrl        String?
+  officialUrl     String?
+  downloadSource  String?
+  sourceStatus    SourceStatus      @default(NEEDS_SOURCE)
+  ratingAverage   Float             @default(0)
+  ratingCount     Int               @default(0)
+  playCount       Int               @default(0)
+  viewCount       Int               @default(0)
+  downloadCount   Int               @default(0)
+  published       Boolean           @default(false)
+  featured        Boolean           @default(false)
+  reviews         Review[]
+  libraryItems    GameLibraryItem[]
+  activities      Activity[]
+  products        GameProduct[]
+  entitlements    Entitlement[]
+  favorites       FavoriteGame[]
+  wishlists       WishlistGame[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String
+  rating    Int
+  text      String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  gamerProfile GamerProfile?
-  following UserFollow[] @relation("Following")
-  followers UserFollow[] @relation("Followers")
-  activities Activity[]
-  notifications Notification[]
-  orders Order[]
-  referralsMade Referral[] @relation("ReferralReferrer")
-  referralReceived Referral? @relation("ReferralReferred")
-  raffleEntries RaffleEntry[]
-  raffleWins Raffle[] @relation("RaffleWinner")
-  entitlements Entitlement[]
-  reportsFiled ContentReport[] @relation("ReporterReports")
-  moderationActions ModerationAction[]
-  reportsModerated ContentReport[] @relation("ModeratorReports")
-}
-model Wallet {
-  id String @id @default(cuid())
-  userId String @unique
-  balance Decimal @default(0) @db.Decimal(18,2)
-  pendingBalance Decimal @default(0) @db.Decimal(18,2)
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-}
-model OwnerWallet {
-  id String @id @default(cuid())
-  ownerId String @unique
-  availablePoints Int @default(0)
-  pendingPoints Int @default(0)
-  owner User @relation(fields:[ownerId], references:[id], onDelete:Restrict)
-  ledger OwnerLedger[]
-  withdrawals WithdrawalRequest[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model OwnerLedger {
-  id String @id @default(cuid())
-  walletId String
-  type LedgerType
-  points Int @default(0)
-  usdAmount Decimal? @db.Decimal(18,2)
-  currency String?
-  conversionRate Int?
-  withdrawalId String?
-  provider String?
-  providerTransactionId String?
-  transactionHash String?
-  idempotencyKey String @unique
-  metadata Json?
-  createdAt DateTime @default(now())
-  wallet OwnerWallet @relation(fields:[walletId], references:[id], onDelete:Restrict)
-}
-model Game {
-  id String @id @default(cuid())
-  slug String @unique
-  titleAr String
-  titleEn String
-  description String?
-  platform String?
-  genre String?
-  priceCents Int @default(0)
-  discountPercent Int @default(0)
-  coverUrl String?
-  officialUrl String?
-  downloadSource String?
-  sourceStatus SourceStatus @default(NEEDS_SOURCE)
-  ratingAverage Float @default(0)
-  ratingCount Int @default(0)
-  playCount Int @default(0)
-  viewCount Int @default(0)
-  downloadCount Int @default(0)
-  published Boolean @default(false)
-  featured Boolean @default(false)
-  reviews Review[]
-  libraryItems GameLibraryItem[]
-  activities Activity[]
-  products GameProduct[]
-  entitlements Entitlement[]
-  favorites FavoriteGame[]
-  wishlists WishlistGame[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-model Review {
-  id String @id @default(cuid())
-  userId String
-  gameId String
-  rating Int
-  text String?
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  game Game @relation(fields:[gameId], references:[id], onDelete:Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([userId,gameId])
+  @@unique([userId, gameId])
   @@index([gameId, rating])
   @@index([userId, createdAt])
 }
+
 model GameLibraryItem {
-  id String @id @default(cuid())
-  userId String
-  gameId String
-  status LibraryStatus @default(WANT)
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  game Game @relation(fields:[gameId], references:[id], onDelete:Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([userId,gameId])
+  id        String        @id @default(cuid())
+  userId    String
+  gameId    String
+  status    LibraryStatus @default(WANT)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([userId, gameId])
   @@index([userId, status, updatedAt])
   @@index([gameId, status])
 }
+
 model WithdrawalRequest {
-  id String @id @default(cuid())
-  ownerWalletId String
-  points Int
-  usdAmount Decimal @db.Decimal(18,2)
-  conversionRate Int @default(30)
-  currency String @default("USD")
-  provider String?
+  id                    String           @id @default(cuid())
+  ownerWalletId         String
+  points                Int
+  usdAmount             Decimal          @db.Decimal(18, 2)
+  conversionRate        Int              @default(30)
+  currency              String           @default("USD")
+  provider              String?
   providerTransactionId String?
-  transactionHash String?
-  status WithdrawalStatus @default(REQUESTED)
-  failureReason String?
-  idempotencyKey String @unique
-  createdAt DateTime @default(now())
-  processedAt DateTime?
-  ownerWallet OwnerWallet @relation(fields:[ownerWalletId], references:[id], onDelete:Restrict)
+  transactionHash       String?
+  status                WithdrawalStatus @default(REQUESTED)
+  failureReason         String?
+  idempotencyKey        String           @unique
+  createdAt             DateTime         @default(now())
+  processedAt           DateTime?
+  ownerWallet           OwnerWallet      @relation(fields: [ownerWalletId], references: [id], onDelete: Restrict)
 }
+
 model AuditLog {
-  id String @id @default(cuid())
+  id          String   @id @default(cuid())
   actorUserId String?
-  action String
-  entityType String
-  entityId String?
-  ip String?
-  metadata Json?
-  createdAt DateTime @default(now())
-  actor User? @relation(fields:[actorUserId], references:[id], onDelete:SetNull)
-  @@index([entityType,entityId])
+  action      String
+  entityType  String
+  entityId    String?
+  ip          String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
   @@index([actorUserId, createdAt])
   @@index([createdAt])
 }
+
 model SystemError {
-  id String @id @default(cuid())
-  scope String
-  message String
+  id         String   @id @default(cuid())
+  scope      String
+  message    String
   statusCode Int?
-  userId String?
-  metadata Json?
-  createdAt DateTime @default(now())
+  userId     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
   @@index([scope, createdAt])
   @@index([createdAt])
 }
+
 model QuranReciter {
-  id String @id @default(cuid())
-  nameAr String
-  nameEn String
-  riwayah String?
-  style String?
-  quality String?
-  provider String
-  legalSourceUrl String
-  licenseUrl String?
-  licenseStatus String
+  id                       String       @id @default(cuid())
+  nameAr                   String
+  nameEn                   String
+  riwayah                  String?
+  style                    String?
+  quality                  String?
+  provider                 String
+  legalSourceUrl           String
+  licenseUrl               String?
+  licenseStatus            String
   sourceVerificationStatus SourceStatus @default(PENDING_REVIEW)
-  verificationDate DateTime?
-  verifiedBy String?
-  audioBaseUrl String
-  availableSurahs Json?
-  notes String?
-  sortOrder Int @default(0)
-  active Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  verificationDate         DateTime?
+  verifiedBy               String?
+  audioBaseUrl             String
+  availableSurahs          Json?
+  notes                    String?
+  sortOrder                Int          @default(0)
+  active                   Boolean      @default(false)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
   @@index([active, sourceVerificationStatus, sortOrder])
 }
 
-
 model FavoriteGame {
-  id String @id @default(cuid())
-  userId String
-  gameId String
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String
   createdAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  game Game @relation(fields:[gameId], references:[id], onDelete:Cascade)
-  @@unique([userId,gameId])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
   @@index([gameId])
   @@index([userId, createdAt])
 }
 
 model WishlistGame {
-  id String @id @default(cuid())
-  userId String
-  gameId String
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String
   createdAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  game Game @relation(fields:[gameId], references:[id], onDelete:Cascade)
-  @@unique([userId,gameId])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
   @@index([gameId])
   @@index([userId, createdAt])
 }
-
 
 // GameVortex Gamer Progress System
 enum AchievementRarity {
@@ -287,22 +306,23 @@ enum AchievementRarity {
 }
 
 model GamerProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  displayName     String?
-  bio             String?
-  avatarUrl       String?
-  bannerUrl       String?
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  displayName      String?
+  bio              String?
+  avatarUrl        String?
+  bannerUrl        String?
   favoritePlatform String?
-  country         String?
-  level           Int      @default(1)
-  xp              Int      @default(0)
-  totalPlayMinutes Int     @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  achievements    UserAchievement[]
-  xpEvents        XpEvent[]
+  country          String?
+  level            Int               @default(1)
+  xp               Int               @default(0)
+  totalPlayMinutes Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievements     UserAchievement[]
+  xpEvents         XpEvent[]
+
   @@index([level])
   @@index([xp])
 }
@@ -320,12 +340,13 @@ model Achievement {
 }
 
 model UserAchievement {
-  id            String      @id @default(cuid())
+  id            String       @id @default(cuid())
   profileId     String
   achievementId String
-  unlockedAt    DateTime    @default(now())
+  unlockedAt    DateTime     @default(now())
   profile       GamerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   achievement   Achievement  @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
   @@unique([profileId, achievementId])
   @@index([profileId])
 }
@@ -338,9 +359,9 @@ model XpEvent {
   sourceId  String?
   createdAt DateTime     @default(now())
   profile   GamerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
   @@index([profileId, createdAt])
 }
-
 
 enum ActivityType {
   FAVORITED_GAME
@@ -360,8 +381,9 @@ model UserFollow {
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
-  follower    User @relation("Following", fields:[followerId], references:[id], onDelete:Cascade)
-  following   User @relation("Followers", fields:[followingId], references:[id], onDelete:Cascade)
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
   @@unique([followerId, followingId])
   @@index([followingId, createdAt])
   @@index([followerId, createdAt])
@@ -375,25 +397,26 @@ model Activity {
   message   String?
   metadata  Json?
   createdAt DateTime     @default(now())
-  user      User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  game      Game? @relation(fields:[gameId], references:[id], onDelete:SetNull)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game?        @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
   @@index([userId, createdAt])
   @@index([gameId, createdAt])
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   type      String
   title     String
   body      String?
   readAt    DateTime?
   metadata  Json?
-  createdAt DateTime @default(now())
-  user      User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, readAt, createdAt])
 }
-
 
 enum ProductKind {
   GAME_KEY
@@ -403,6 +426,7 @@ enum ProductKind {
   SUBSCRIPTION
   DIGITAL_ITEM
 }
+
 enum DeliveryType {
   CODE
   ACCOUNT_TOPUP
@@ -415,6 +439,7 @@ enum DigitalKeyStatus {
   DELIVERED
   REVOKED
 }
+
 enum VipTier {
   BRONZE
   SILVER
@@ -423,12 +448,14 @@ enum VipTier {
   DIAMOND
   APEX
 }
+
 enum ReferralStatus {
   PENDING
   QUALIFIED
   REWARDED
   REJECTED
 }
+
 enum RaffleStatus {
   DRAFT
   OPEN
@@ -445,6 +472,7 @@ enum OrderStatus {
   CANCELLED
   FAILED
 }
+
 enum PaymentStatus {
   CREATED
   REQUIRES_ACTION
@@ -452,6 +480,7 @@ enum PaymentStatus {
   FAILED
   REFUNDED
 }
+
 enum ModerationStatus {
   PENDING
   APPROVED
@@ -470,181 +499,191 @@ enum ReportReason {
 }
 
 model GameProduct {
-  id String @id @default(cuid())
-  gameId String
-  sku String @unique
-  title String
-  description String?
-  priceCents Int
-  currency String @default("USD")
-  active Boolean @default(true)
-  inventory Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  kind ProductKind @default(GAME_KEY)
-  deliveryType DeliveryType @default(CODE)
-  region String?
-  country String?
-  denominationCents Int?
-  provider String?
+  id                     String       @id @default(cuid())
+  gameId                 String
+  sku                    String       @unique
+  title                  String
+  description            String?
+  priceCents             Int
+  currency               String       @default("USD")
+  active                 Boolean      @default(true)
+  inventory              Int?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  kind                   ProductKind  @default(GAME_KEY)
+  deliveryType           DeliveryType @default(CODE)
+  region                 String?
+  country                String?
+  denominationCents      Int?
+  provider               String?
   redemptionInstructions String?
-  sourceUrl String?
-  supplierVerified Boolean @default(false)
-  game Game @relation(fields:[gameId], references:[id], onDelete:Cascade)
-  orderItems OrderItem[]
-  digitalKeys DigitalKey[]
+  sourceUrl              String?
+  supplierVerified       Boolean      @default(false)
+  game                   Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  orderItems             OrderItem[]
+  digitalKeys            DigitalKey[]
+
   @@index([gameId, active])
 }
 
 model Order {
-  id String @id @default(cuid())
-  userId String
-  status OrderStatus @default(PENDING)
-  subtotalCents Int
-  totalCents Int
-  currency String @default("USD")
-  paymentStatus PaymentStatus @default(CREATED)
+  id              String        @id @default(cuid())
+  userId          String
+  status          OrderStatus   @default(PENDING)
+  subtotalCents   Int
+  totalCents      Int
+  currency        String        @default("USD")
+  paymentStatus   PaymentStatus @default(CREATED)
   paymentProvider String?
   providerOrderId String?
-  idempotencyKey String @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id], onDelete:Restrict)
-  items OrderItem[]
-  payments Payment[]
+  idempotencyKey  String        @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items           OrderItem[]
+  payments        Payment[]
+
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
 
 model OrderItem {
-  id String @id @default(cuid())
-  orderId String
-  productId String
-  quantity Int @default(1)
+  id             String       @id @default(cuid())
+  orderId        String
+  productId      String
+  quantity       Int          @default(1)
   unitPriceCents Int
-  order Order @relation(fields:[orderId], references:[id], onDelete:Cascade)
-  product GameProduct @relation(fields:[productId], references:[id], onDelete:Restrict)
-  digitalKeys DigitalKey[]
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        GameProduct  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  digitalKeys    DigitalKey[]
+
   @@index([productId])
 }
 
 model DigitalKey {
-  id String @id @default(cuid())
-  productId String
+  id          String           @id @default(cuid())
+  productId   String
   orderItemId String?
-  ciphertext String
-  fingerprint String @unique
-  status DigitalKeyStatus @default(AVAILABLE)
+  ciphertext  String
+  fingerprint String           @unique
+  status      DigitalKeyStatus @default(AVAILABLE)
   deliveredAt DateTime?
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  product GameProduct @relation(fields:[productId], references:[id], onDelete:Restrict)
-  orderItem OrderItem? @relation(fields:[orderItemId], references:[id], onDelete:SetNull)
+  revokedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  product     GameProduct      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  orderItem   OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
   @@index([productId, status, createdAt])
   @@index([orderItemId, status])
 }
 
 model Payment {
-  id String @id @default(cuid())
-  orderId String
-  provider String
+  id                String        @id @default(cuid())
+  orderId           String
+  provider          String
   providerPaymentId String?
-  status PaymentStatus @default(CREATED)
-  amountCents Int
-  currency String @default("USD")
-  rawEvent Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  order Order @relation(fields:[orderId], references:[id], onDelete:Restrict)
+  status            PaymentStatus @default(CREATED)
+  amountCents       Int
+  currency          String        @default("USD")
+  rawEvent          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
   @@unique([provider, providerPaymentId])
   @@index([orderId, createdAt])
 }
 
 model Entitlement {
-  id String @id @default(cuid())
-  userId String
-  gameId String
+  id          String    @id @default(cuid())
+  userId      String
+  gameId      String
   orderItemId String?
-  grantedAt DateTime @default(now())
-  revokedAt DateTime?
-  user User @relation(fields:[userId], references:[id], onDelete:Restrict)
-  game Game @relation(fields:[gameId], references:[id], onDelete:Restrict)
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  game        Game      @relation(fields: [gameId], references: [id], onDelete: Restrict)
+
   @@unique([userId, gameId])
   @@index([userId, revokedAt])
 }
 
 model ContentReport {
-  id String @id @default(cuid())
-  reporterId String
-  targetType String
-  targetId String
-  reason ReportReason
-  details String?
-  status ModerationStatus @default(PENDING)
-  moderatorId String?
+  id             String           @id @default(cuid())
+  reporterId     String
+  targetType     String
+  targetId       String
+  reason         ReportReason
+  details        String?
+  status         ModerationStatus @default(PENDING)
+  moderatorId    String?
   resolutionNote String?
-  createdAt DateTime @default(now())
-  resolvedAt DateTime?
-  reporter User @relation("ReporterReports", fields:[reporterId], references:[id], onDelete:Restrict)
-  moderator User? @relation("ModeratorReports", fields:[moderatorId], references:[id], onDelete:SetNull)
+  createdAt      DateTime         @default(now())
+  resolvedAt     DateTime?
+  reporter       User             @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Restrict)
+  moderator      User?            @relation("ModeratorReports", fields: [moderatorId], references: [id], onDelete: SetNull)
+
   @@index([status, createdAt])
   @@index([targetType, targetId])
 }
 
 model ModerationAction {
-  id String @id @default(cuid())
+  id          String   @id @default(cuid())
   moderatorId String
-  targetType String
-  targetId String
-  action String
-  reason String?
-  createdAt DateTime @default(now())
-  moderator User @relation(fields:[moderatorId], references:[id], onDelete:Restrict)
+  targetType  String
+  targetId    String
+  action      String
+  reason      String?
+  createdAt   DateTime @default(now())
+  moderator   User     @relation(fields: [moderatorId], references: [id], onDelete: Restrict)
+
   @@index([targetType, targetId, createdAt])
 }
 
-
 model Referral {
-  id String @id @default(cuid())
-  referrerId String
-  referredId String @unique
-  status ReferralStatus @default(PENDING)
-  rewardPoints Int @default(0)
-  qualifiedAt DateTime?
-  rewardedAt DateTime?
-  createdAt DateTime @default(now())
-  referrer User @relation("ReferralReferrer", fields:[referrerId], references:[id], onDelete:Restrict)
-  referred User @relation("ReferralReferred", fields:[referredId], references:[id], onDelete:Restrict)
+  id           String         @id @default(cuid())
+  referrerId   String
+  referredId   String         @unique
+  status       ReferralStatus @default(PENDING)
+  rewardPoints Int            @default(0)
+  qualifiedAt  DateTime?
+  rewardedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  referrer     User           @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Restrict)
+  referred     User           @relation("ReferralReferred", fields: [referredId], references: [id], onDelete: Restrict)
+
   @@index([referrerId, status, createdAt])
 }
 
 model Raffle {
-  id String @id @default(cuid())
-  title String
+  id          String        @id @default(cuid())
+  title       String
   description String?
-  prize String
-  ticketCost Int @default(0)
-  maxEntries Int?
-  status RaffleStatus @default(DRAFT)
-  drawAt DateTime?
-  winnerId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  entries RaffleEntry[]
-  winner User? @relation("RaffleWinner", fields:[winnerId], references:[id], onDelete:SetNull)
+  prize       String
+  ticketCost  Int           @default(0)
+  maxEntries  Int?
+  status      RaffleStatus  @default(DRAFT)
+  drawAt      DateTime?
+  winnerId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  entries     RaffleEntry[]
+  winner      User?         @relation("RaffleWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
   @@index([status, drawAt])
   @@index([winnerId])
 }
 
 model RaffleEntry {
-  id String @id @default(cuid())
-  raffleId String
-  userId String
-  tickets Int @default(1)
+  id        String   @id @default(cuid())
+  raffleId  String
+  userId    String
+  tickets   Int      @default(1)
   createdAt DateTime @default(now())
-  raffle Raffle @relation(fields:[raffleId], references:[id], onDelete:Cascade)
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  raffle    Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([raffleId, userId])
   @@index([userId, createdAt])
 }
