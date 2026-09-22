@@ -12,17 +12,10 @@ import {
 
 import { z } from "zod";
 
-import {
-  getOptionalUser,
-} from "@/lib/auth";
+import { getOptionalUser } from "@/lib/auth";
+import { guardMutation } from "@/lib/api";
 
-import {
-  guardMutation,
-} from "@/lib/api";
-
-import {
-  aiChat,
-} from "@/lib/ai";
+import { aiChat } from "@/lib/ai";
 
 import {
   openaiRespondStream,
@@ -35,13 +28,9 @@ import {
   releaseAiCredits,
 } from "@/lib/vip-credits";
 
-import {
-  logSystemError,
-} from "@/lib/observability";
+import { logSystemError } from "@/lib/observability";
 
-import {
-  db,
-} from "@/lib/prisma";
+import { db } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -188,13 +177,6 @@ function getErrorStatus(
   }
 }
 
-/**
- * Public error code.
- *
- * We keep the stable machine-readable error code,
- * while the actual provider message is returned
- * separately as "details".
- */
 function toPublicError(
   error: unknown,
 ): string {
@@ -231,11 +213,6 @@ function toPublicError(
   }
 }
 
-/**
- * We never return API keys or environment variables.
- *
- * This function only returns the provider's error text.
- */
 function getSafeErrorDetails(
   error: unknown,
 ): string {
@@ -247,10 +224,6 @@ function getSafeErrorDetails(
     return "The AI provider returned an unknown error.";
   }
 
-  /*
-   * Remove common secret-looking patterns
-   * before returning the message to the client.
-   */
   return message
     .replace(
       /sk-[A-Za-z0-9_-]+/g,
@@ -274,9 +247,7 @@ function buildErrorResponse(
     getOpenAiErrorCode(error);
 
   const status =
-    getErrorStatus(
-      errorCode,
-    );
+    getErrorStatus(errorCode);
 
   const details =
     getSafeErrorDetails(error);
@@ -310,7 +281,11 @@ async function logAiFailure(
     {
       statusCode,
       userId,
-      conversationId,
+
+      metadata: {
+        conversationId:
+          conversationId ?? null,
+      },
     },
   );
 }
@@ -337,6 +312,7 @@ async function getOwnedConversation(
       select: {
         id: true,
         title: true,
+
         messages: {
           orderBy: {
             createdAt: "asc",
@@ -362,12 +338,10 @@ async function getOwnedConversation(
   return conversation;
 }
 
-/**
- * Converts database messages into OpenAI messages.
- *
- * We intentionally ignore incomplete/failed messages
- * when building the provider context.
- */
+/* =========================================================
+ * BUILD PROVIDER CONTEXT
+ * ======================================================= */
+
 function buildConversationMessages(
   conversation: Awaited<
     ReturnType<
@@ -422,10 +396,10 @@ function buildConversationMessages(
   return messages;
 }
 
-/**
- * Creates a conversation if the client did not
- * provide one.
- */
+/* =========================================================
+ * ENSURE CONVERSATION
+ * ======================================================= */
+
 async function ensureConversation(
   userId: string,
   conversationId: string | undefined,
@@ -463,6 +437,7 @@ async function ensureConversation(
   return db.conversation.create({
     data: {
       userId,
+
       title:
         generatedTitle ||
         "New Chat",
@@ -475,9 +450,10 @@ async function ensureConversation(
   });
 }
 
-/**
- * Saves a user message.
- */
+/* =========================================================
+ * CREATE USER MESSAGE
+ * ======================================================= */
+
 async function createUserMessage(
   conversationId: string,
   content: string,
@@ -485,9 +461,13 @@ async function createUserMessage(
   return db.message.create({
     data: {
       conversationId,
-      role: ChatMessageRole.USER,
+
+      role:
+        ChatMessageRole.USER,
+
       status:
         ChatMessageStatus.COMPLETE,
+
       content,
     },
 
@@ -502,18 +482,23 @@ async function createUserMessage(
   });
 }
 
-/**
- * Creates the assistant message as PENDING.
- */
+/* =========================================================
+ * CREATE ASSISTANT MESSAGE
+ * ======================================================= */
+
 async function createAssistantMessage(
   conversationId: string,
 ) {
   return db.message.create({
     data: {
       conversationId,
-      role: ChatMessageRole.ASSISTANT,
+
+      role:
+        ChatMessageRole.ASSISTANT,
+
       status:
         ChatMessageStatus.PENDING,
+
       content: "",
     },
 
@@ -528,9 +513,10 @@ async function createAssistantMessage(
   });
 }
 
-/**
- * Marks assistant message as complete.
- */
+/* =========================================================
+ * COMPLETE ASSISTANT MESSAGE
+ * ======================================================= */
+
 async function completeAssistantMessage(
   messageId: string,
   content: string,
@@ -543,6 +529,7 @@ async function completeAssistantMessage(
     data: {
       status:
         ChatMessageStatus.COMPLETE,
+
       content,
     },
 
@@ -558,9 +545,10 @@ async function completeAssistantMessage(
   });
 }
 
-/**
- * Marks assistant message as ERROR.
- */
+/* =========================================================
+ * FAIL ASSISTANT MESSAGE
+ * ======================================================= */
+
 async function failAssistantMessage(
   messageId: string,
   content: string,
@@ -574,30 +562,7 @@ async function failAssistantMessage(
       data: {
         status:
           ChatMessageStatus.ERROR,
-        content,
-      },
-    });
-  } catch {
-    return null;
-  }
-}
 
-/**
- * Marks assistant message as STOPPED.
- */
-async function stopAssistantMessage(
-  messageId: string,
-  content: string,
-) {
-  try {
-    return await db.message.update({
-      where: {
-        id: messageId,
-      },
-
-      data: {
-        status:
-          ChatMessageStatus.STOPPED,
         content,
       },
     });
@@ -613,10 +578,6 @@ async function stopAssistantMessage(
 export async function POST(
   request: NextRequest,
 ) {
-  /*
-   * Authentication and rate limiting happen
-   * before contacting OpenAI.
-   */
   const blocked =
     await guardMutation(
       request,
@@ -642,7 +603,7 @@ export async function POST(
 
   try {
     /* -----------------------------------------------------
-     * AUTHENTICATION
+     * AUTH
      * --------------------------------------------------- */
 
     const user =
@@ -651,7 +612,8 @@ export async function POST(
     if (!user) {
       return NextResponse.json(
         {
-          error: "UNAUTHORIZED",
+          error:
+            "UNAUTHORIZED",
         },
         {
           status: 401,
@@ -662,7 +624,7 @@ export async function POST(
     userId = user.id;
 
     /* -----------------------------------------------------
-     * REQUEST VALIDATION
+     * VALIDATE REQUEST
      * --------------------------------------------------- */
 
     const body =
@@ -692,32 +654,23 @@ export async function POST(
     activeConversationId =
       conversation.id;
 
-    /*
-     * Load the existing conversation BEFORE adding
-     * the new user message, so the provider receives
-     * the previous context exactly once.
-     */
     const existingConversation =
       await getOwnedConversation(
         user.id,
         conversation.id,
       );
 
-    /*
-     * --------------------------------------------------
+    /* -----------------------------------------------------
      * IDEMPOTENCY
-     * --------------------------------------------------
-     */
+     * --------------------------------------------------- */
 
     const idempotencyKey =
       requestedIdempotencyKey ??
       randomUUID();
 
-    /*
-     * --------------------------------------------------
-     * RESERVE AI CREDIT
-     * --------------------------------------------------
-     */
+    /* -----------------------------------------------------
+     * AI CREDIT
+     * --------------------------------------------------- */
 
     await consumeChatCredits({
       userId: user.id,
@@ -732,24 +685,19 @@ export async function POST(
       },
     });
 
-    /*
-     * --------------------------------------------------
+    /* -----------------------------------------------------
      * SAVE USER MESSAGE
-     * --------------------------------------------------
-     */
+     * --------------------------------------------------- */
 
     await createUserMessage(
       conversation.id,
       message,
     );
 
-    /*
-     * Build provider context:
-     *
-     * SYSTEM
-     * previous USER / ASSISTANT messages
-     * current USER message
-     */
+    /* -----------------------------------------------------
+     * PROVIDER CONTEXT
+     * --------------------------------------------------- */
+
     const providerMessages =
       buildConversationMessages(
         existingConversation,
@@ -760,11 +708,9 @@ export async function POST(
       content: message,
     });
 
-    /*
-     * ==================================================
-     * NON-STREAMING MODE
-     * ==================================================
-     */
+    /* =====================================================
+     * NON STREAMING
+     * =================================================== */
 
     if (!stream) {
       try {
@@ -773,9 +719,6 @@ export async function POST(
             providerMessages,
           );
 
-        /*
-         * Save assistant response.
-         */
         const assistantMessage =
           await db.message.create({
             data: {
@@ -819,10 +762,6 @@ export async function POST(
           idempotencyKey,
         });
       } catch (error) {
-        /*
-         * Provider failed, so return the reserved
-         * credit to the user.
-         */
         try {
           await releaseAiCredits(
             idempotencyKey,
@@ -860,12 +799,6 @@ export async function POST(
             error:
               publicError,
 
-            /*
-             * IMPORTANT:
-             * This is the real provider error.
-             *
-             * It does not contain the API key.
-             */
             details,
 
             provider:
@@ -886,11 +819,9 @@ export async function POST(
       }
     }
 
-    /*
-     * ==================================================
-     * STREAMING MODE
-     * ==================================================
-     */
+    /* =====================================================
+     * STREAMING
+     * =================================================== */
 
     const assistantMessage =
       await createAssistantMessage(
@@ -908,31 +839,38 @@ export async function POST(
     let accumulatedText = "";
 
     const streamBody =
-      new ReadableStream<Uint8Array>({
+      new ReadableStream<
+        Uint8Array
+      >({
         async start(controller) {
           try {
-            /*
-             * Tell the browser which conversation
-             * and message it is receiving.
-             */
+            /* ---------------------------------------------
+             * META
+             * ----------------------------------------- */
+
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "meta",
+
                   conversationId:
                     conversation.id,
+
                   messageId:
                     assistantMessage.id,
+
                   idempotencyKey,
+
                   provider:
                     "OpenAI",
                 })}\n\n`,
               ),
             );
 
-            /*
-             * OpenAI streaming.
-             */
+            /* ---------------------------------------------
+             * OPENAI STREAM
+             * ----------------------------------------- */
+
             for await (
               const delta of openaiRespondStream(
                 providerMessages,
@@ -951,9 +889,10 @@ export async function POST(
               );
             }
 
-            /*
-             * Provider completed successfully.
-             */
+            /* ---------------------------------------------
+             * SUCCESS
+             * ----------------------------------------- */
+
             completed = true;
 
             await completeAssistantMessage(
@@ -965,11 +904,15 @@ export async function POST(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "done",
+
                   conversationId:
                     conversation.id,
+
                   messageId:
                     assistantMessage.id,
+
                   idempotencyKey,
+
                   provider:
                     "OpenAI",
                 })}\n\n`,
@@ -978,16 +921,10 @@ export async function POST(
 
             controller.close();
           } catch (error) {
-            /*
-             * Provider failed.
-             *
-             * IMPORTANT:
-             * We send the actual safe provider
-             * message through SSE so the UI no longer
-             * only displays:
-             *
-             * AI_PROVIDER_ERROR
-             */
+            /* -------------------------------------------
+             * PROVIDER ERROR
+             * --------------------------------------- */
+
             const {
               publicError,
               errorCode,
@@ -1000,10 +937,6 @@ export async function POST(
                 userId,
               );
 
-            /*
-             * Mark the database assistant message
-             * as failed.
-             */
             if (assistantMessageId) {
               await failAssistantMessage(
                 assistantMessageId,
@@ -1011,12 +944,6 @@ export async function POST(
               );
             }
 
-            /*
-             * Return the reserved AI credit.
-             *
-             * We only do this when the provider
-             * did not successfully complete.
-             */
             if (!completed) {
               try {
                 await releaseAiCredits(
@@ -1092,16 +1019,10 @@ export async function POST(
       },
     );
   } catch (error) {
-    /*
-     * -----------------------------------------------------
-     * TOP-LEVEL ERROR
-     * --------------------------------------------------- */
+    /* =====================================================
+     * TOP LEVEL ERROR
+     * =================================================== */
 
-    /*
-     * If an assistant message was already created
-     * and something failed outside the provider stream,
-     * mark it as failed.
-     */
     if (assistantMessageId) {
       const details =
         getSafeErrorDetails(
@@ -1121,9 +1042,10 @@ export async function POST(
           ? error.message
           : "AI_FAILED";
 
-    /*
-     * Special AI credit exhaustion.
-     */
+    /* -----------------------------------------------------
+     * AI CREDITS
+     * --------------------------------------------------- */
+
     if (
       rawErrorCode ===
       "AI_CREDITS_EXHAUSTED"
@@ -1139,9 +1061,10 @@ export async function POST(
       );
     }
 
-    /*
-     * Invalid request.
-     */
+    /* -----------------------------------------------------
+     * INVALID MESSAGE
+     * --------------------------------------------------- */
+
     if (
       rawErrorCode ===
       "INVALID_MESSAGE"
@@ -1157,9 +1080,10 @@ export async function POST(
       );
     }
 
-    /*
-     * Conversation access error.
-     */
+    /* -----------------------------------------------------
+     * CONVERSATION ACCESS
+     * --------------------------------------------------- */
+
     if (
       rawErrorCode ===
       "CONVERSATION_ACCESS_DENIED"
@@ -1175,9 +1099,10 @@ export async function POST(
       );
     }
 
-    /*
-     * Conversation missing.
-     */
+    /* -----------------------------------------------------
+     * CONVERSATION NOT FOUND
+     * --------------------------------------------------- */
+
     if (
       rawErrorCode ===
       "CONVERSATION_NOT_FOUND"
@@ -1192,6 +1117,10 @@ export async function POST(
         },
       );
     }
+
+    /* -----------------------------------------------------
+     * PROVIDER ERROR
+     * --------------------------------------------------- */
 
     const {
       publicError,
