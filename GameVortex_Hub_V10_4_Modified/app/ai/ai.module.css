@@ -560,8 +560,23 @@
 }
 
 @media (max-width: 760px) {
+  /*
+   * Mobile Bottom Navigation is fixed to the viewport.
+   * The previous 55px bottom padding was not enough,
+   * so the last AI content could be hidden underneath it.
+   *
+   * Keep enough safe space below the page content.
+   */
   .page {
-    padding: 18px 14px 55px;
+    padding: 18px 14px 155px;
+  }
+
+  /*
+   * Keep the chat section safely scrollable above
+   * the fixed mobile navigation.
+   */
+  .chatSection {
+    scroll-margin-bottom: 155px;
   }
 
   .hero {
@@ -648,9 +663,19 @@
 }
 
 @media (max-width: 430px) {
+  /*
+   * Small phones need slightly more bottom safe space
+   * because the fixed mobile navigation occupies a
+   * significant portion of the viewport.
+   */
   .page {
     padding-left: 10px;
     padding-right: 10px;
+    padding-bottom: 165px;
+  }
+
+  .chatSection {
+    scroll-margin-bottom: 165px;
   }
 
   .hero {
