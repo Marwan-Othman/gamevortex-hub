@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  ChatMessageRole,
+  ChatMessageStatus,
+} from "@prisma/client";
+
+import {
   NextRequest,
   NextResponse,
 } from "next/server";
@@ -22,6 +27,7 @@ import {
 import {
   openaiRespondStream,
   OpenAiError,
+  type OpenAiMessage,
 } from "@/lib/ai/openai";
 
 import {
@@ -33,42 +39,48 @@ import {
   logSystemError,
 } from "@/lib/observability";
 
-import { db } from "@/lib/prisma";
-
 import {
-  ChatMessageRole,
-  ChatMessageStatus,
-} from "@prisma/client";
+  db,
+} from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 export const dynamic = "force-dynamic";
 
-const schema =
-  z.object({
-    message:
-      z.string()
-        .trim()
-        .min(1)
-        .max(4000),
+/* =========================================================
+ * REQUEST VALIDATION
+ * ======================================================= */
 
-    conversationId:
-      z.string()
-        .cuid()
-        .optional(),
+const schema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(1)
+    .max(4000),
 
-    idempotencyKey:
-      z.string()
-        .trim()
-        .min(1)
-        .max(255)
-        .optional(),
+  conversationId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional(),
 
-    stream:
-      z.boolean()
-        .optional()
-        .default(false),
-  });
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(1)
+    .max(255)
+    .optional(),
+
+  stream: z
+    .boolean()
+    .optional()
+    .default(false),
+});
+
+/* =========================================================
+ * SYSTEM PROMPT
+ * ======================================================= */
 
 const SYSTEM_PROMPT = `
 أنت GameVortex AI، المساعد الذكي الرسمي داخل منصة GameVortex Hub.
@@ -86,41 +98,46 @@ const SYSTEM_PROMPT = `
 - كن واضحًا ومفيدًا ومختصرًا قدر الإمكان.
 `.trim();
 
-const MAX_HISTORY_MESSAGES = 50;
-
-const MAX_HISTORY_MESSAGE_LENGTH = 4000;
-
-function cleanHistoryContent(
-  value: string,
-): string {
-  return value
-    .replace(
-      /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,
-      "",
-    )
-    .trim()
-    .slice(
-      0,
-      MAX_HISTORY_MESSAGE_LENGTH,
-    );
-}
+/* =========================================================
+ * ERROR HELPERS
+ * ======================================================= */
 
 function getOpenAiErrorCode(
   error: unknown,
 ): string {
-  if (
-    error instanceof OpenAiError
-  ) {
+  if (error instanceof OpenAiError) {
     return error.code;
   }
 
-  if (
-    error instanceof Error
-  ) {
+  if (error instanceof Error) {
     return error.message;
   }
 
   return "AI_FAILED";
+}
+
+function getOpenAiErrorMessage(
+  error: unknown,
+): string {
+  if (error instanceof OpenAiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "AI_FAILED";
+}
+
+function getOpenAiRequestId(
+  error: unknown,
+): string | undefined {
+  if (error instanceof OpenAiError) {
+    return error.requestId;
+  }
+
+  return undefined;
 }
 
 function getErrorStatus(
@@ -154,23 +171,30 @@ function getErrorStatus(
     case "AI_CREDITS_EXHAUSTED":
       return 400;
 
-    case "CONVERSATION_NOT_FOUND":
-      return 404;
-
     case "UNAUTHORIZED":
       return 401;
 
     case "INVALID_MESSAGE":
       return 400;
 
-    case "INVALID_CONVERSATION_ID":
-      return 400;
+    case "CONVERSATION_NOT_FOUND":
+      return 404;
+
+    case "CONVERSATION_ACCESS_DENIED":
+      return 403;
 
     default:
       return 500;
   }
 }
 
+/**
+ * Public error code.
+ *
+ * We keep the stable machine-readable error code,
+ * while the actual provider message is returned
+ * separately as "details".
+ */
 function toPublicError(
   error: unknown,
 ): string {
@@ -207,10 +231,78 @@ function toPublicError(
   }
 }
 
+/**
+ * We never return API keys or environment variables.
+ *
+ * This function only returns the provider's error text.
+ */
+function getSafeErrorDetails(
+  error: unknown,
+): string {
+  const message =
+    getOpenAiErrorMessage(error)
+      .trim();
+
+  if (!message) {
+    return "The AI provider returned an unknown error.";
+  }
+
+  /*
+   * Remove common secret-looking patterns
+   * before returning the message to the client.
+   */
+  return message
+    .replace(
+      /sk-[A-Za-z0-9_-]+/g,
+      "[REDACTED]",
+    )
+    .replace(
+      /Bearer\s+[A-Za-z0-9._-]+/gi,
+      "Bearer [REDACTED]",
+    )
+    .slice(0, 1000);
+}
+
+function buildErrorResponse(
+  error: unknown,
+  userId?: string,
+) {
+  const publicError =
+    toPublicError(error);
+
+  const errorCode =
+    getOpenAiErrorCode(error);
+
+  const status =
+    getErrorStatus(
+      errorCode,
+    );
+
+  const details =
+    getSafeErrorDetails(error);
+
+  const requestId =
+    getOpenAiRequestId(error);
+
+  return {
+    publicError,
+    errorCode,
+    status,
+    details,
+    requestId,
+    userId,
+  };
+}
+
+/* =========================================================
+ * LOGGING
+ * ======================================================= */
+
 async function logAiFailure(
   error: unknown,
   statusCode: number,
   userId?: string,
+  conversationId?: string,
 ) {
   await logSystemError(
     "ai:chat",
@@ -218,53 +310,132 @@ async function logAiFailure(
     {
       statusCode,
       userId,
+      conversationId,
     },
   );
 }
 
-function toAiMessages(
-  messages: Array<{
-    role: ChatMessageRole;
-    content: string;
-  }>,
-) {
-  return messages
-    .filter(
-      (message) =>
-        message.role ===
-          ChatMessageRole.USER ||
-        message.role ===
-          ChatMessageRole.ASSISTANT,
-    )
-    .map((message) => ({
-      role:
-        message.role ===
-        ChatMessageRole.USER
-          ? ("user" as const)
-          : ("assistant" as const),
+/* =========================================================
+ * CONVERSATION HELPERS
+ * ======================================================= */
 
-      content:
-        cleanHistoryContent(
-          message.content,
-        ),
-    }))
-    .filter(
-      (message) =>
-        message.content.length > 0,
+async function getOwnedConversation(
+  userId: string,
+  conversationId?: string,
+) {
+  if (!conversationId) {
+    return null;
+  }
+
+  const conversation =
+    await db.conversation.findFirst({
+      where: {
+        id: conversationId,
+        userId,
+      },
+
+      select: {
+        id: true,
+        title: true,
+        messages: {
+          orderBy: {
+            createdAt: "asc",
+          },
+
+          select: {
+            id: true,
+            role: true,
+            status: true,
+            content: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+  if (!conversation) {
+    throw new Error(
+      "CONVERSATION_ACCESS_DENIED",
     );
+  }
+
+  return conversation;
 }
 
-async function getOrCreateConversation(
+/**
+ * Converts database messages into OpenAI messages.
+ *
+ * We intentionally ignore incomplete/failed messages
+ * when building the provider context.
+ */
+function buildConversationMessages(
+  conversation: Awaited<
+    ReturnType<
+      typeof getOwnedConversation
+    >
+  >,
+): OpenAiMessage[] {
+  const messages: OpenAiMessage[] = [
+    {
+      role: "system",
+      content: SYSTEM_PROMPT,
+    },
+  ];
+
+  if (!conversation) {
+    return messages;
+  }
+
+  for (const message of conversation.messages) {
+    if (
+      message.status ===
+        ChatMessageStatus.ERROR ||
+      message.status ===
+        ChatMessageStatus.PENDING
+    ) {
+      continue;
+    }
+
+    if (
+      message.role ===
+      ChatMessageRole.USER
+    ) {
+      messages.push({
+        role: "user",
+        content: message.content,
+      });
+
+      continue;
+    }
+
+    if (
+      message.role ===
+      ChatMessageRole.ASSISTANT
+    ) {
+      messages.push({
+        role: "assistant",
+        content: message.content,
+      });
+    }
+  }
+
+  return messages;
+}
+
+/**
+ * Creates a conversation if the client did not
+ * provide one.
+ */
+async function ensureConversation(
   userId: string,
-  requestedConversationId:
-    | string
-    | undefined,
+  conversationId: string | undefined,
+  message: string,
 ) {
-  if (requestedConversationId) {
-    const conversation =
+  if (conversationId) {
+    const existing =
       await db.conversation.findFirst({
         where: {
-          id: requestedConversationId,
+          id: conversationId,
           userId,
         },
 
@@ -274,19 +445,27 @@ async function getOrCreateConversation(
         },
       });
 
-    if (!conversation) {
+    if (!existing) {
       throw new Error(
-        "CONVERSATION_NOT_FOUND",
+        "CONVERSATION_ACCESS_DENIED",
       );
     }
 
-    return conversation;
+    return existing;
   }
+
+  const generatedTitle =
+    message
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80);
 
   return db.conversation.create({
     data: {
       userId,
-      title: "New Chat",
+      title:
+        generatedTitle ||
+        "New Chat",
     },
 
     select: {
@@ -296,84 +475,147 @@ async function getOrCreateConversation(
   });
 }
 
-async function loadConversationMessages(
+/**
+ * Saves a user message.
+ */
+async function createUserMessage(
+  conversationId: string,
+  content: string,
+) {
+  return db.message.create({
+    data: {
+      conversationId,
+      role: ChatMessageRole.USER,
+      status:
+        ChatMessageStatus.COMPLETE,
+      content,
+    },
+
+    select: {
+      id: true,
+      conversationId: true,
+      role: true,
+      status: true,
+      content: true,
+      createdAt: true,
+    },
+  });
+}
+
+/**
+ * Creates the assistant message as PENDING.
+ */
+async function createAssistantMessage(
   conversationId: string,
 ) {
-  const messages =
-    await db.message.findMany({
+  return db.message.create({
+    data: {
+      conversationId,
+      role: ChatMessageRole.ASSISTANT,
+      status:
+        ChatMessageStatus.PENDING,
+      content: "",
+    },
+
+    select: {
+      id: true,
+      conversationId: true,
+      role: true,
+      status: true,
+      content: true,
+      createdAt: true,
+    },
+  });
+}
+
+/**
+ * Marks assistant message as complete.
+ */
+async function completeAssistantMessage(
+  messageId: string,
+  content: string,
+) {
+  return db.message.update({
+    where: {
+      id: messageId,
+    },
+
+    data: {
+      status:
+        ChatMessageStatus.COMPLETE,
+      content,
+    },
+
+    select: {
+      id: true,
+      conversationId: true,
+      role: true,
+      status: true,
+      content: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
+/**
+ * Marks assistant message as ERROR.
+ */
+async function failAssistantMessage(
+  messageId: string,
+  content: string,
+) {
+  try {
+    return await db.message.update({
       where: {
-        conversationId,
+        id: messageId,
       },
 
-      orderBy: {
-        createdAt: "desc",
-      },
-
-      take:
-        MAX_HISTORY_MESSAGES,
-
-      select: {
-        role: true,
-        content: true,
+      data: {
+        status:
+          ChatMessageStatus.ERROR,
+        content,
       },
     });
-
-  return messages.reverse();
-}
-
-async function maybeUpdateConversationTitle(
-  conversationId: string,
-  currentTitle: string,
-  userMessage: string,
-) {
-  if (
-    currentTitle !==
-    "New Chat"
-  ) {
-    return;
+  } catch {
+    return null;
   }
-
-  const title =
-    userMessage
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 60);
-
-  if (!title) {
-    return;
-  }
-
-  await db.conversation.update({
-    where: {
-      id: conversationId,
-    },
-
-    data: {
-      title,
-    },
-  });
 }
 
-async function touchConversation(
-  conversationId: string,
+/**
+ * Marks assistant message as STOPPED.
+ */
+async function stopAssistantMessage(
+  messageId: string,
+  content: string,
 ) {
-  await db.conversation.update({
-    where: {
-      id: conversationId,
-    },
+  try {
+    return await db.message.update({
+      where: {
+        id: messageId,
+      },
 
-    data: {
-      updatedAt: new Date(),
-    },
-  });
+      data: {
+        status:
+          ChatMessageStatus.STOPPED,
+        content,
+      },
+    });
+  } catch {
+    return null;
+  }
 }
+
+/* =========================================================
+ * POST /api/ai/chat
+ * ======================================================= */
 
 export async function POST(
   request: NextRequest,
 ) {
   /*
-   * Authentication and rate limiting happen before
-   * contacting OpenAI.
+   * Authentication and rate limiting happen
+   * before contacting OpenAI.
    */
   const blocked =
     await guardMutation(
@@ -390,24 +632,26 @@ export async function POST(
     | string
     | undefined;
 
-  let reservedCreditKey:
+  let activeConversationId:
+    | string
+    | undefined;
+
+  let assistantMessageId:
     | string
     | undefined;
 
   try {
-    /*
-     * --------------------------------------------------
+    /* -----------------------------------------------------
      * AUTHENTICATION
-     * --------------------------------------------------
-     */
+     * --------------------------------------------------- */
+
     const user =
       await getOptionalUser();
 
     if (!user) {
       return NextResponse.json(
         {
-          error:
-            "UNAUTHORIZED",
+          error: "UNAUTHORIZED",
         },
         {
           status: 401,
@@ -417,11 +661,10 @@ export async function POST(
 
     userId = user.id;
 
-    /*
-     * --------------------------------------------------
-     * VALIDATE REQUEST
-     * --------------------------------------------------
-     */
+    /* -----------------------------------------------------
+     * REQUEST VALIDATION
+     * --------------------------------------------------- */
+
     const body =
       await request.json();
 
@@ -435,124 +678,104 @@ export async function POST(
     } =
       schema.parse(body);
 
-    /*
-     * --------------------------------------------------
+    /* -----------------------------------------------------
      * CONVERSATION
-     * --------------------------------------------------
-     *
-     * The server decides which conversation belongs
-     * to the authenticated user.
-     *
-     * A client can never access another user's
-     * conversation simply by changing the id.
-     */
+     * --------------------------------------------------- */
+
     const conversation =
-      await getOrCreateConversation(
+      await ensureConversation(
         user.id,
         requestedConversationId,
+        message,
       );
 
+    activeConversationId =
+      conversation.id;
+
     /*
-     * --------------------------------------------------
-     * LOAD HISTORY
-     * --------------------------------------------------
-     *
-     * The current user message has not been stored yet,
-     * so history contains only previous messages.
+     * Load the existing conversation BEFORE adding
+     * the new user message, so the provider receives
+     * the previous context exactly once.
      */
-    const history =
-      await loadConversationMessages(
+    const existingConversation =
+      await getOwnedConversation(
+        user.id,
         conversation.id,
       );
 
-    const aiMessages = [
-      {
-        role: "system" as const,
-        content: SYSTEM_PROMPT,
+    /*
+     * --------------------------------------------------
+     * IDEMPOTENCY
+     * --------------------------------------------------
+     */
+
+    const idempotencyKey =
+      requestedIdempotencyKey ??
+      randomUUID();
+
+    /*
+     * --------------------------------------------------
+     * RESERVE AI CREDIT
+     * --------------------------------------------------
+     */
+
+    await consumeChatCredits({
+      userId: user.id,
+      amount: 1,
+      idempotencyKey,
+
+      metadata: {
+        source: "ai:chat",
+        provider: "openai",
+        conversationId:
+          conversation.id,
       },
-      ...toAiMessages(
-        history,
-      ),
-      {
-        role: "user" as const,
-        content: message,
-      },
-    ];
+    });
 
     /*
      * --------------------------------------------------
      * SAVE USER MESSAGE
      * --------------------------------------------------
      */
-    const userMessage =
-      await db.message.create({
-        data: {
-          conversationId:
-            conversation.id,
 
-          role:
-            ChatMessageRole.USER,
-
-          status:
-            ChatMessageStatus.COMPLETE,
-
-          content: message,
-        },
-
-        select: {
-          id: true,
-          createdAt: true,
-        },
-      });
-
-    await maybeUpdateConversationTitle(
+    await createUserMessage(
       conversation.id,
-      conversation.title,
       message,
     );
 
-    await touchConversation(
-      conversation.id,
-    );
-
     /*
-     * --------------------------------------------------
-     * AI CREDIT RESERVATION
-     * --------------------------------------------------
+     * Build provider context:
+     *
+     * SYSTEM
+     * previous USER / ASSISTANT messages
+     * current USER message
      */
-    const idempotencyKey =
-      requestedIdempotencyKey ??
-      randomUUID();
+    const providerMessages =
+      buildConversationMessages(
+        existingConversation,
+      );
 
-    reservedCreditKey =
-      idempotencyKey;
-
-    await consumeChatCredits({
-      userId: user.id,
-      amount: 1,
-      idempotencyKey,
-      metadata: {
-        source: "ai:chat",
-        provider: "openai",
-        conversationId:
-          conversation.id,
-        userMessageId:
-          userMessage.id,
-      },
+    providerMessages.push({
+      role: "user",
+      content: message,
     });
 
     /*
-     * --------------------------------------------------
+     * ==================================================
      * NON-STREAMING MODE
-     * --------------------------------------------------
+     * ==================================================
      */
+
     if (!stream) {
       try {
         const answer =
           await aiChat(
-            aiMessages,
+            providerMessages,
           );
 
+        /*
+         * Save assistant response.
+         */
         const assistantMessage =
           await db.message.create({
             data: {
@@ -570,55 +793,66 @@ export async function POST(
 
             select: {
               id: true,
+              conversationId: true,
+              role: true,
+              status: true,
+              content: true,
               createdAt: true,
             },
           });
 
-        await touchConversation(
-          conversation.id,
-        );
-
         return NextResponse.json({
           answer,
-          authenticated: true,
-          provider: "OpenAI",
-          idempotencyKey,
+
+          authenticated:
+            true,
+
+          provider:
+            "OpenAI",
+
           conversationId:
             conversation.id,
-          userMessageId:
-            userMessage.id,
-          assistantMessageId:
+
+          messageId:
             assistantMessage.id,
+
+          idempotencyKey,
         });
       } catch (error) {
-        await releaseAiCredits(
-          idempotencyKey,
-        );
+        /*
+         * Provider failed, so return the reserved
+         * credit to the user.
+         */
+        try {
+          await releaseAiCredits(
+            idempotencyKey,
+          );
+        } catch (releaseError) {
+          await logAiFailure(
+            releaseError,
+            500,
+            userId,
+            activeConversationId,
+          );
+        }
 
-        reservedCreditKey =
-          undefined;
-
-        const publicError =
-          toPublicError(error);
-
-        const status =
-          getErrorStatus(
-            publicError ===
-              "AI_PROVIDER_NOT_CONFIGURED"
-              ? "OPENAI_NOT_CONFIGURED"
-              : publicError ===
-                  "AI_TIMEOUT"
-                ? "OPENAI_TIMEOUT"
-                : publicError ===
-                    "AI_PROVIDER_RATE_LIMITED"
-                  ? "OPENAI_RATE_LIMITED"
-                  : publicError,
+        const {
+          publicError,
+          errorCode,
+          status,
+          details,
+          requestId,
+        } =
+          buildErrorResponse(
+            error,
+            userId,
           );
 
         await logAiFailure(
           error,
           status,
           userId,
+          activeConversationId,
         );
 
         return NextResponse.json(
@@ -626,11 +860,24 @@ export async function POST(
             error:
               publicError,
 
+            /*
+             * IMPORTANT:
+             * This is the real provider error.
+             *
+             * It does not contain the API key.
+             */
+            details,
+
+            provider:
+              "OpenAI",
+
+            providerCode:
+              errorCode,
+
+            requestId,
+
             conversationId:
               conversation.id,
-
-            userMessageId:
-              userMessage.id,
           },
           {
             status,
@@ -640,54 +887,58 @@ export async function POST(
     }
 
     /*
-     * --------------------------------------------------
+     * ==================================================
      * STREAMING MODE
-     * --------------------------------------------------
-     *
-     * Create the assistant message before streaming.
-     * It starts as STREAMING and becomes COMPLETE only
-     * after the complete OpenAI response has arrived.
+     * ==================================================
      */
+
     const assistantMessage =
-      await db.message.create({
-        data: {
-          conversationId:
-            conversation.id,
+      await createAssistantMessage(
+        conversation.id,
+      );
 
-          role:
-            ChatMessageRole.ASSISTANT,
-
-          status:
-            ChatMessageStatus.STREAMING,
-
-          content: "",
-        },
-
-        select: {
-          id: true,
-        },
-      });
-
-    await touchConversation(
-      conversation.id,
-    );
+    assistantMessageId =
+      assistantMessage.id;
 
     const encoder =
       new TextEncoder();
 
     let completed = false;
-    let assistantText = "";
+
+    let accumulatedText = "";
 
     const streamBody =
       new ReadableStream<Uint8Array>({
         async start(controller) {
           try {
+            /*
+             * Tell the browser which conversation
+             * and message it is receiving.
+             */
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "meta",
+                  conversationId:
+                    conversation.id,
+                  messageId:
+                    assistantMessage.id,
+                  idempotencyKey,
+                  provider:
+                    "OpenAI",
+                })}\n\n`,
+              ),
+            );
+
+            /*
+             * OpenAI streaming.
+             */
             for await (
               const delta of openaiRespondStream(
-                aiMessages,
+                providerMessages,
               )
             ) {
-              assistantText +=
+              accumulatedText +=
                 delta;
 
               controller.enqueue(
@@ -701,60 +952,26 @@ export async function POST(
             }
 
             /*
-             * Do not allow an empty successful
-             * assistant message to be stored.
+             * Provider completed successfully.
              */
-            if (
-              !assistantText.trim()
-            ) {
-              throw new Error(
-                "OPENAI_INVALID_RESPONSE",
-              );
-            }
-
-            /*
-             * --------------------------------------------------
-             * SAVE COMPLETED ASSISTANT MESSAGE
-             * --------------------------------------------------
-             */
-            await db.message.update({
-              where: {
-                id:
-                  assistantMessage.id,
-              },
-
-              data: {
-                content:
-                  assistantText
-                    .trim()
-                    .slice(
-                      0,
-                      20_000,
-                    ),
-
-                status:
-                  ChatMessageStatus.COMPLETE,
-              },
-            });
-
-            await touchConversation(
-              conversation.id,
-            );
-
             completed = true;
+
+            await completeAssistantMessage(
+              assistantMessage.id,
+              accumulatedText,
+            );
 
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "done",
-                  idempotencyKey,
-                  provider: "OpenAI",
                   conversationId:
                     conversation.id,
-                  userMessageId:
-                    userMessage.id,
-                  assistantMessageId:
+                  messageId:
                     assistantMessage.id,
+                  idempotencyKey,
+                  provider:
+                    "OpenAI",
                 })}\n\n`,
               ),
             );
@@ -762,170 +979,94 @@ export async function POST(
             controller.close();
           } catch (error) {
             /*
-             * If the AI request fails, the reserved
-             * credit is released.
+             * Provider failed.
+             *
+             * IMPORTANT:
+             * We send the actual safe provider
+             * message through SSE so the UI no longer
+             * only displays:
+             *
+             * AI_PROVIDER_ERROR
              */
-            if (
-              !completed &&
-              reservedCreditKey
-            ) {
+            const {
+              publicError,
+              errorCode,
+              status,
+              details,
+              requestId,
+            } =
+              buildErrorResponse(
+                error,
+                userId,
+              );
+
+            /*
+             * Mark the database assistant message
+             * as failed.
+             */
+            if (assistantMessageId) {
+              await failAssistantMessage(
+                assistantMessageId,
+                details,
+              );
+            }
+
+            /*
+             * Return the reserved AI credit.
+             *
+             * We only do this when the provider
+             * did not successfully complete.
+             */
+            if (!completed) {
               try {
                 await releaseAiCredits(
-                  reservedCreditKey,
+                  idempotencyKey,
                 );
-
-                reservedCreditKey =
-                  undefined;
-              } catch (
-                releaseError
-              ) {
+              } catch (releaseError) {
                 await logAiFailure(
                   releaseError,
                   500,
                   userId,
+                  activeConversationId,
                 );
               }
             }
-
-            /*
-             * Mark the assistant message as ERROR.
-             *
-             * The partial text is preserved so the
-             * conversation is not silently destroyed.
-             */
-            try {
-              await db.message.update({
-                where: {
-                  id:
-                    assistantMessage.id,
-                },
-
-                data: {
-                  status:
-                    ChatMessageStatus.ERROR,
-
-                  content:
-                    assistantText
-                      .trim()
-                      .slice(
-                        0,
-                        20_000,
-                      ),
-                },
-              });
-
-              await touchConversation(
-                conversation.id,
-              );
-            } catch (
-              databaseError
-            ) {
-              await logAiFailure(
-                databaseError,
-                500,
-                userId,
-              );
-            }
-
-            const publicError =
-              toPublicError(error);
-
-            const status =
-              getErrorStatus(
-                publicError ===
-                  "AI_PROVIDER_NOT_CONFIGURED"
-                  ? "OPENAI_NOT_CONFIGURED"
-                  : publicError ===
-                      "AI_TIMEOUT"
-                    ? "OPENAI_TIMEOUT"
-                    : publicError ===
-                        "AI_PROVIDER_RATE_LIMITED"
-                      ? "OPENAI_RATE_LIMITED"
-                      : publicError,
-              );
 
             await logAiFailure(
               error,
               status,
               userId,
+              activeConversationId,
             );
 
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "error",
-                  error: publicError,
+
+                  error:
+                    publicError,
+
+                  details,
+
+                  provider:
+                    "OpenAI",
+
+                  providerCode:
+                    errorCode,
+
+                  requestId,
+
                   conversationId:
                     conversation.id,
-                  userMessageId:
-                    userMessage.id,
-                  assistantMessageId:
+
+                  messageId:
                     assistantMessage.id,
                 })}\n\n`,
               ),
             );
 
             controller.close();
-          }
-        },
-
-        async cancel() {
-          /*
-           * The browser can cancel the stream.
-           * The currently generated text is preserved
-           * and the message is marked STOPPED.
-           *
-           * The actual provider request is aborted by
-           * stream cancellation at the fetch layer.
-           */
-          if (
-            completed ||
-            !assistantText.trim()
-          ) {
-            return;
-          }
-
-          try {
-            await db.message.update({
-              where: {
-                id:
-                  assistantMessage.id,
-              },
-
-              data: {
-                status:
-                  ChatMessageStatus.STOPPED,
-
-                content:
-                  assistantText
-                    .trim()
-                    .slice(
-                      0,
-                      20_000,
-                    ),
-              },
-            });
-
-            await touchConversation(
-              conversation.id,
-            );
-
-            if (
-              reservedCreditKey
-            ) {
-              await releaseAiCredits(
-                reservedCreditKey,
-              );
-
-              reservedCreditKey =
-                undefined;
-            }
-          } catch (error) {
-            await logAiFailure(
-              error,
-              500,
-              userId,
-            );
           }
         },
       });
@@ -952,43 +1093,39 @@ export async function POST(
     );
   } catch (error) {
     /*
-     * If a credit was reserved but the request failed
-     * before streaming started, release it.
+     * -----------------------------------------------------
+     * TOP-LEVEL ERROR
+     * --------------------------------------------------- */
+
+    /*
+     * If an assistant message was already created
+     * and something failed outside the provider stream,
+     * mark it as failed.
      */
-    if (
-      reservedCreditKey
-    ) {
-      try {
-        await releaseAiCredits(
-          reservedCreditKey,
+    if (assistantMessageId) {
+      const details =
+        getSafeErrorDetails(
+          error,
         );
-      } catch (
-        releaseError
-      ) {
-        await logAiFailure(
-          releaseError,
-          500,
-          userId,
-        );
-      }
+
+      await failAssistantMessage(
+        assistantMessageId,
+        details,
+      );
     }
 
-    const errorCode =
-      error instanceof
-      z.ZodError
+    const rawErrorCode =
+      error instanceof z.ZodError
         ? "INVALID_MESSAGE"
-        : error instanceof
-            Error
+        : error instanceof Error
           ? error.message
           : "AI_FAILED";
 
-    const status =
-      getErrorStatus(
-        errorCode,
-      );
-
+    /*
+     * Special AI credit exhaustion.
+     */
     if (
-      errorCode ===
+      rawErrorCode ===
       "AI_CREDITS_EXHAUSTED"
     ) {
       return NextResponse.json(
@@ -1002,8 +1139,11 @@ export async function POST(
       );
     }
 
+    /*
+     * Invalid request.
+     */
     if (
-      errorCode ===
+      rawErrorCode ===
       "INVALID_MESSAGE"
     ) {
       return NextResponse.json(
@@ -1017,8 +1157,29 @@ export async function POST(
       );
     }
 
+    /*
+     * Conversation access error.
+     */
     if (
-      errorCode ===
+      rawErrorCode ===
+      "CONVERSATION_ACCESS_DENIED"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "CONVERSATION_ACCESS_DENIED",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    /*
+     * Conversation missing.
+     */
+    if (
+      rawErrorCode ===
       "CONVERSATION_NOT_FOUND"
     ) {
       return NextResponse.json(
@@ -1032,16 +1193,42 @@ export async function POST(
       );
     }
 
+    const {
+      publicError,
+      errorCode,
+      status,
+      details,
+      requestId,
+    } =
+      buildErrorResponse(
+        error,
+        userId,
+      );
+
     await logAiFailure(
       error,
       status,
       userId,
+      activeConversationId,
     );
 
     return NextResponse.json(
       {
         error:
-          toPublicError(error),
+          publicError,
+
+        details,
+
+        provider:
+          "OpenAI",
+
+        providerCode:
+          errorCode,
+
+        requestId,
+
+        conversationId:
+          activeConversationId,
       },
       {
         status,
