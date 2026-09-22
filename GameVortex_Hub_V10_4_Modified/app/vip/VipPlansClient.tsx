@@ -198,12 +198,42 @@ function getDurationLabel(plan: Plan) {
   return `${plan.durationMonths} أشهر`;
 }
 
+/**
+ * Owner VIP يستخدم قيمة رقمية كبيرة داخليًا لتمثيل
+ * الاستخدام غير المحدود. لا نعرض هذه القيمة للمستخدم.
+ */
+function formatCredits(
+  value: number,
+  unlimited = false,
+) {
+  if (unlimited) {
+    return "∞";
+  }
+
+  if (!Number.isFinite(value) || value < 0) {
+    return "0";
+  }
+
+  return value.toLocaleString("en-US");
+}
+
 function getFeatures(plan: Plan) {
+  const isOwner = plan.code === "OWNER";
+
   return [
     `مضاعف النقاط ×${plan.pointsMultiplier}`,
-    `${plan.chatCredits.toLocaleString("en-US")} رصيد AI Chat`,
-    `${plan.imageCredits.toLocaleString("en-US")} رصيد AI Image`,
-    `${plan.videoCredits.toLocaleString("en-US")} رصيد AI Video`,
+    `${formatCredits(
+      plan.chatCredits,
+      isOwner,
+    )} رصيد AI Chat`,
+    `${formatCredits(
+      plan.imageCredits,
+      isOwner,
+    )} رصيد AI Image`,
+    `${formatCredits(
+      plan.videoCredits,
+      isOwner,
+    )} رصيد AI Video`,
     "مزايا VIP الحصرية",
   ];
 }
@@ -230,7 +260,8 @@ export default function VipPlansClient() {
             }),
           ]);
 
-        const plansJson = await plansResponse.json();
+        const plansJson =
+          await plansResponse.json();
 
         if (!plansResponse.ok) {
           throw new Error(
@@ -296,7 +327,9 @@ export default function VipPlansClient() {
     );
   }, [plans]);
 
-  async function checkout(planCode: string) {
+  async function checkout(
+    planCode: string,
+  ) {
     setError(null);
     setBusyPlan(planCode);
 
@@ -332,7 +365,8 @@ export default function VipPlansClient() {
       }
 
       if (
-        typeof data.checkoutUrl === "string" &&
+        typeof data.checkoutUrl ===
+          "string" &&
         data.checkoutUrl.length > 0
       ) {
         window.location.assign(
@@ -358,8 +392,12 @@ export default function VipPlansClient() {
   if (loading) {
     return (
       <main className={styles.page}>
-        <section className={styles.loadingCard}>
-          <div className={styles.loadingOrb}>
+        <section
+          className={styles.loadingCard}
+        >
+          <div
+            className={styles.loadingOrb}
+          >
             <CrownIcon />
           </div>
 
@@ -386,8 +424,12 @@ export default function VipPlansClient() {
       dir="rtl"
     >
       <section className={styles.hero}>
-        <div className={styles.heroGlowOne} />
-        <div className={styles.heroGlowTwo} />
+        <div
+          className={styles.heroGlowOne}
+        />
+        <div
+          className={styles.heroGlowTwo}
+        />
 
         <div className={styles.heroContent}>
           <div className={styles.heroBadge}>
@@ -406,7 +448,9 @@ export default function VipPlansClient() {
             GameVortex أكثر تميزًا.
           </p>
 
-          <div className={styles.heroActions}>
+          <div
+            className={styles.heroActions}
+          >
             <a
               href="#vip-plans"
               className={`${styles.primaryButton} ${styles.largeButton}`}
@@ -430,11 +474,15 @@ export default function VipPlansClient() {
             <CrownIcon />
           </div>
 
-          <div className={styles.heroCrownTitle}>
+          <div
+            className={styles.heroCrownTitle}
+          >
             VIP
           </div>
 
-          <div className={styles.heroCrownText}>
+          <div
+            className={styles.heroCrownText}
+          >
             MORE REWARDS
             <br />
             MORE AI
@@ -449,9 +497,12 @@ export default function VipPlansClient() {
           <div className={styles.benefitIcon}>
             <PointsIcon />
           </div>
+
           <div>
             <strong>نقاط أكثر</strong>
-            <span>مضاعف نقاط حسب الباقة</span>
+            <span>
+              مضاعف نقاط حسب الباقة
+            </span>
           </div>
         </div>
 
@@ -459,6 +510,7 @@ export default function VipPlansClient() {
           <div className={styles.benefitIcon}>
             <AiIcon />
           </div>
+
           <div>
             <strong>AI Credits أكبر</strong>
             <span>Chat و Image و Video</span>
@@ -469,6 +521,7 @@ export default function VipPlansClient() {
           <div className={styles.benefitIcon}>
             <GiftIcon />
           </div>
+
           <div>
             <strong>مكافآت حصرية</strong>
             <span>عروض ومكافآت VIP</span>
@@ -479,9 +532,12 @@ export default function VipPlansClient() {
           <div className={styles.benefitIcon}>
             <SparkIcon />
           </div>
+
           <div>
             <strong>تجربة مميزة</strong>
-            <span>مزايا خاصة لأعضاء VIP</span>
+            <span>
+              مزايا خاصة لأعضاء VIP
+            </span>
           </div>
         </div>
       </section>
@@ -497,10 +553,16 @@ export default function VipPlansClient() {
       ) : null}
 
       {status ? (
-        <section className={styles.accountCard}>
-          <div className={styles.accountHeader}>
+        <section
+          className={styles.accountCard}
+        >
+          <div
+            className={styles.accountHeader}
+          >
             <div>
-              <span className={styles.smallLabel}>
+              <span
+                className={styles.smallLabel}
+              >
                 عضويتك الحالية
               </span>
 
@@ -530,38 +592,49 @@ export default function VipPlansClient() {
             </span>
           </div>
 
-          <div className={styles.accountStats}>
+          <div
+            className={styles.accountStats}
+          >
             <div>
               <strong>
                 ×{status.pointsMultiplier}
               </strong>
-              <span>مضاعف النقاط</span>
+
+              <span>
+                مضاعف النقاط
+              </span>
             </div>
 
             <div>
               <strong>
-                {status.chatCredits.toLocaleString(
-                  "en-US",
+                {formatCredits(
+                  status.chatCredits,
+                  status.isOwner,
                 )}
               </strong>
+
               <span>Chat Credits</span>
             </div>
 
             <div>
               <strong>
-                {status.imageCredits.toLocaleString(
-                  "en-US",
+                {formatCredits(
+                  status.imageCredits,
+                  status.isOwner,
                 )}
               </strong>
+
               <span>Image Credits</span>
             </div>
 
             <div>
               <strong>
-                {status.videoCredits.toLocaleString(
-                  "en-US",
+                {formatCredits(
+                  status.videoCredits,
+                  status.isOwner,
                 )}
               </strong>
+
               <span>Video Credits</span>
             </div>
           </div>
@@ -572,9 +645,13 @@ export default function VipPlansClient() {
         id="vip-plans"
         className={styles.plansSection}
       >
-        <div className={styles.sectionHeading}>
+        <div
+          className={styles.sectionHeading}
+        >
           <div>
-            <span className={styles.sectionKicker}>
+            <span
+              className={styles.sectionKicker}
+            >
               VIP PLANS
             </span>
 
@@ -625,7 +702,9 @@ export default function VipPlansClient() {
                   </div>
                 ) : null}
 
-                <div className={styles.planTop}>
+                <div
+                  className={styles.planTop}
+                >
                   <div
                     className={
                       styles.planIcon
@@ -672,9 +751,7 @@ export default function VipPlansClient() {
                   </strong>
 
                   <span>
-                    {getDurationLabel(
-                      plan,
-                    )}
+                    {getDurationLabel(plan)}
                   </span>
                 </div>
 
@@ -751,8 +828,12 @@ export default function VipPlansClient() {
           <CrownIcon />
         </div>
 
-        <div className={styles.ownerContent}>
-          <div className={styles.ownerTitleRow}>
+        <div
+          className={styles.ownerContent}
+        >
+          <div
+            className={styles.ownerTitleRow}
+          >
             <span>OWNER VIP</span>
             <small>SPECIAL</small>
           </div>
@@ -767,7 +848,9 @@ export default function VipPlansClient() {
             إلى صلاحيات المالك والميزات الخاصة.
           </p>
 
-          <div className={styles.ownerFeatures}>
+          <div
+            className={styles.ownerFeatures}
+          >
             <span>♾ استخدام AI</span>
             <span>♾ VIP دائم</span>
             <span>👑 جميع المزايا</span>
@@ -775,7 +858,9 @@ export default function VipPlansClient() {
           </div>
         </div>
 
-        <div className={styles.ownerAccess}>
+        <div
+          className={styles.ownerAccess}
+        >
           <strong>مجاني</strong>
 
           <span>
@@ -787,9 +872,13 @@ export default function VipPlansClient() {
       </section>
 
       <section className={styles.whySection}>
-        <div className={styles.sectionHeading}>
+        <div
+          className={styles.sectionHeading}
+        >
           <div>
-            <span className={styles.sectionKicker}>
+            <span
+              className={styles.sectionKicker}
+            >
               WHY VIP?
             </span>
 
@@ -802,7 +891,9 @@ export default function VipPlansClient() {
         <div className={styles.whyGrid}>
           <div className={styles.whyCard}>
             <PointsIcon />
+
             <h3>اكسب أكثر</h3>
+
             <p>
               احصل على مضاعف نقاط أعلى
               حسب باقتك.
@@ -811,7 +902,9 @@ export default function VipPlansClient() {
 
           <div className={styles.whyCard}>
             <AiIcon />
+
             <h3>AI أقوى</h3>
+
             <p>
               رصيد أكبر لـ Chat وImage
               وVideo.
@@ -820,7 +913,9 @@ export default function VipPlansClient() {
 
           <div className={styles.whyCard}>
             <GiftIcon />
+
             <h3>مكافآت خاصة</h3>
+
             <p>
               عروض ومكافآت مخصصة لأعضاء
               VIP.
@@ -829,7 +924,9 @@ export default function VipPlansClient() {
 
           <div className={styles.whyCard}>
             <SparkIcon />
+
             <h3>تجربة مميزة</h3>
+
             <p>
               مزايا حصرية داخل GameVortex
               Hub.
