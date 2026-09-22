@@ -12,6 +12,8 @@ type Me = {
 
 const NAV_LINKS = [
   { href: "/games", label: "الألعاب", icon: GameIcon },
+  { href: "/vip", label: "VIP", icon: CrownIcon },
+  { href: "/ai", label: "AI", icon: AIIcon },
   { href: "/marketplace", label: "المتجر", icon: StoreIcon },
   { href: "/library", label: "مكتبتي", icon: LibraryIcon },
   { href: "/rewards", label: "المكافآت", icon: GiftIcon },
@@ -43,6 +45,27 @@ function GameIcon() {
       <rect x="3" y="7" width="18" height="11" rx="4" />
       <path d="M7 11v4M5 13h4" />
       <path d="M16 12h.01M19 14h.01" />
+    </Icon>
+  );
+}
+
+function CrownIcon() {
+  return (
+    <Icon>
+      <path d="m4 8 3 3 5-7 5 7 3-3-2 11H6L4 8Z" />
+      <path d="M6 19h12" />
+      <path d="M8 15h8" />
+    </Icon>
+  );
+}
+
+function AIIcon() {
+  return (
+    <Icon>
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <path d="M9 9h.01M15 9h.01" />
+      <path d="M8 14c1.2 1.4 2.8 2 4 2s2.8-.6 4-2" />
+      <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2" />
     </Icon>
   );
 }
@@ -223,7 +246,10 @@ export default function SiteHeader() {
       return pathname === "/";
     }
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
   };
 
   const profileHref = "/profile/gamer";
@@ -290,7 +316,9 @@ export default function SiteHeader() {
                   key={link.href}
                   href={link.href}
                   className={`gv-nav-link ${
-                    isActive(link.href) ? "is-active" : ""
+                    isActive(link.href)
+                      ? "is-active"
+                      : ""
                   }`}
                 >
                   <IconComponent />
@@ -324,7 +352,10 @@ export default function SiteHeader() {
               aria-label="حسابي"
             >
               <span className="gv-profile-avatar">
-                {me?.username?.trim()?.charAt(0)?.toUpperCase() || "G"}
+                {me?.username
+                  ?.trim()
+                  ?.charAt(0)
+                  ?.toUpperCase() || "G"}
               </span>
 
               <span className="gv-profile-label">
@@ -344,7 +375,9 @@ export default function SiteHeader() {
       />
 
       <aside
-        className={`gv-drawer ${isOpen ? "is-open" : ""}`}
+        className={`gv-drawer ${
+          isOpen ? "is-open" : ""
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label="القائمة الرئيسية"
@@ -413,7 +446,9 @@ export default function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={`gv-drawer-link ${
-                  isActive(link.href) ? "is-active" : ""
+                  isActive(link.href)
+                    ? "is-active"
+                    : ""
                 }`}
                 onClick={() => setIsOpen(false)}
               >
