@@ -135,6 +135,8 @@ model User {
   vipPurchases VipPurchase[]
 
   conversations Conversation[]
+
+  userWithdrawalRequests UserWithdrawalRequest[]
 }
 
 model PointLedger {
@@ -338,6 +340,43 @@ model WithdrawalRequest {
   processedAt DateTime?
 
   ownerWallet OwnerWallet @relation(fields: [ownerWalletId], references: [id], onDelete: Restrict)
+}
+
+/*
+ * GameVortex Points Withdrawal — VIP and regular users.
+ * The Owner uses the separate WithdrawalRequest/OwnerWallet flow above.
+ * tier is captured at request time ("VIP" or "USER") so historical
+ * requests keep the conversion rate/minimum that applied when created,
+ * even if the user's VIP status changes later.
+ */
+model UserWithdrawalRequest {
+  id String @id @default(cuid())
+
+  userId String
+  tier String
+
+  points Int
+  usdAmount Decimal @db.Decimal(18,2)
+
+  conversionRate Int
+  currency String @default("USD")
+
+  provider String?
+  providerTransactionId String?
+
+  status WithdrawalStatus @default(REQUESTED)
+
+  failureReason String?
+
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model AuditLog {

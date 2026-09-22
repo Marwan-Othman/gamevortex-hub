@@ -12,6 +12,10 @@ import { qualifyReferralOnFirstOrder } from "@/lib/referrals";
 import { rateLimitAsync, clientKey } from "@/lib/security";
 import { logSystemError } from "@/lib/observability";
 import { processVipPaymentWebhook } from "@/lib/vip-payment-webhook";
+import {
+  computeBuyerPurchasePoints,
+  FREE_PRODUCT_POINTS,
+} from "@/lib/points-economy";
 
 export const runtime = "nodejs";
 
@@ -251,6 +255,92 @@ async function deliverGameKeys(
       },
     });
   }
+}
+
+/*
+ * Master Task Plan Section 3, item 5 — نظام النقاط للمنتجات (المشتري).
+ * Additive to the existing rewardOwnerPoints() below: does not change
+ * owner reward behavior at all, only adds the buyer-side reward that
+ * did not exist before. Runs inside the same DB transaction as the
+ * rest of the order-completion flow, so it can never be credited
+ * without the order itself being marked COMPLETED (and vice versa).
+ */
+async function awardBuyerPoints(
+  transaction: Prisma.TransactionClient,
+  order: {
+    id: string;
+    userId: string;
+    totalCents: number;
+  },
+  provider: string,
+  paymentId: string,
+) {
+  const points = computeBuyerPurchasePoints(
+    order.totalCents,
+  );
+
+  if (points <= 0) {
+    return;
+  }
+
+  const idempotencyKey =
+    `buyer-points:${order.id}:${provider}:${paymentId}`;
+
+  const existing =
+    await transaction.pointLedger.findUnique({
+      where: { idempotencyKey },
+    });
+
+  if (existing) {
+    return;
+  }
+
+  await transaction.user.update({
+    where: { id: order.userId },
+    data: {
+      points: {
+        increment: points,
+      },
+    },
+  });
+
+  const user = await transaction.user.findUnique({
+    where: { id: order.userId },
+    select: { points: true },
+  });
+
+  if (!user) {
+    throw new Error("BUYER_ACCOUNT_NOT_FOUND");
+  }
+
+  await transaction.pointLedger.create({
+    data: {
+      userId: order.userId,
+      type: "CREDIT",
+      amount: points,
+      balanceAfter: user.points,
+      reason:
+        order.totalCents > 0
+          ? "PURCHASE_REWARD"
+          : "FREE_PRODUCT_REWARD",
+      sourceId: order.id,
+      idempotencyKey,
+      metadata: {
+        orderId: order.id,
+        provider,
+        paymentId,
+        totalCents: order.totalCents,
+        isFree: order.totalCents === 0,
+        rewardConfig:
+          order.totalCents === 0
+            ? {
+                type: "flat",
+                points: FREE_PRODUCT_POINTS.USER,
+              }
+            : { type: "scaled" },
+      },
+    },
+  });
 }
 
 async function rewardOwnerPoints(
@@ -874,6 +964,16 @@ export async function POST(request: NextRequest) {
            * Default: 1000 points.
            */
           await rewardOwnerPoints(
+            transaction,
+            order,
+            event.provider,
+            event.paymentId,
+          );
+
+          /*
+           * Buyer purchase points (Section 3, item 5).
+           */
+          await awardBuyerPoints(
             transaction,
             order,
             event.provider,
