@@ -3,11 +3,6 @@ import { randomUUID } from "node:crypto";
 import { logEvent } from "@/lib/observability";
 
 import {
-  executeAiTool,
-  getAiToolNames,
-} from "./registry";
-
-import {
   openaiConfig,
   type ReasoningEffort,
 } from "@/lib/ai/config";
@@ -49,8 +44,8 @@ export type GameVortexToolChatOptions = {
   timeoutMs?: number;
 
   /**
-   * Maximum number of tool rounds allowed for
-   * a single AI request.
+   * Maximum number of tool rounds allowed
+   * for a single AI request.
    */
   maxToolRounds?: number;
 };
@@ -71,33 +66,16 @@ export type GameVortexToolChatResult = {
 
 const DEFAULT_MAX_TOOL_ROUNDS = 4;
 
+const MAX_TOOL_CALLS = 8;
+
+const MAX_TOOL_ARGUMENT_LENGTH = 20_000;
+
 const MAX_TOOL_RESULT_LENGTH = 8_000;
 
 const MAX_FINAL_OUTPUT_LENGTH = 20_000;
 
 /* =========================================================
- * OPENAI TOOL SCHEMAS
- *
- * These schemas are provider-facing descriptions.
- *
- * IMPORTANT:
- *
- * They are NOT the security boundary.
- *
- * The actual security boundary remains:
- *
- * OpenAI
- *   ↓
- * executeAiTool()
- *   ↓
- * Registry validation
- *   ↓
- * Tool authentication
- *   ↓
- * Prisma
- *
- * Therefore a malicious model cannot bypass Zod
- * validation by sending arbitrary arguments.
+ * OPENAI TOOL DEFINITIONS
  * ======================================================= */
 
 const TOOL_DEFINITIONS: Record<
@@ -106,7 +84,6 @@ const TOOL_DEFINITIONS: Record<
 > = {
   searchGames: {
     type: "function",
-
     name: "searchGames",
 
     description:
@@ -131,6 +108,7 @@ const TOOL_DEFINITIONS: Record<
             "string",
             "null",
           ],
+
           description:
             "Optional platform filter such as PC, PLAYSTATION, XBOX, NINTENDO, ANDROID, IOS, MAC, LINUX, STEAM_DECK, or WEB.",
         },
@@ -140,6 +118,7 @@ const TOOL_DEFINITIONS: Record<
             "string",
             "null",
           ],
+
           description:
             "Optional game genre.",
         },
@@ -186,7 +165,6 @@ const TOOL_DEFINITIONS: Record<
 
   getGame: {
     type: "function",
-
     name: "getGame",
 
     description:
@@ -203,6 +181,7 @@ const TOOL_DEFINITIONS: Record<
             "string",
             "null",
           ],
+
           description:
             "Game id.",
         },
@@ -212,6 +191,7 @@ const TOOL_DEFINITIONS: Record<
             "string",
             "null",
           ],
+
           description:
             "Game slug.",
         },
@@ -228,7 +208,6 @@ const TOOL_DEFINITIONS: Record<
 
   getPlatformGames: {
     type: "function",
-
     name: "getPlatformGames",
 
     description:
@@ -297,7 +276,6 @@ const TOOL_DEFINITIONS: Record<
 
   searchApps: {
     type: "function",
-
     name: "searchApps",
 
     description:
@@ -371,7 +349,6 @@ const TOOL_DEFINITIONS: Record<
 
   searchMarketplace: {
     type: "function",
-
     name: "searchMarketplace",
 
     description:
@@ -463,7 +440,6 @@ const TOOL_DEFINITIONS: Record<
 
   getProduct: {
     type: "function",
-
     name: "getProduct",
 
     description:
@@ -501,7 +477,6 @@ const TOOL_DEFINITIONS: Record<
 
   searchLibrary: {
     type: "function",
-
     name: "searchLibrary",
 
     description:
@@ -579,18 +554,23 @@ const TOOL_DEFINITIONS: Record<
  * ENABLED TOOLS
  * ======================================================= */
 
-function getEnabledToolDefinitions():
-  OpenAiToolDefinition[] {
-  const registered =
-    new Set(
-      getAiToolNames(),
-    );
+function getEnabledToolDefinitions(): OpenAiToolDefinition[] {
+  const registeredTools =
+    new Set<string>([
+      "searchGames",
+      "getGame",
+      "getPlatformGames",
+      "searchApps",
+      "searchMarketplace",
+      "getProduct",
+      "searchLibrary",
+    ]);
 
   return Object.values(
     TOOL_DEFINITIONS,
   ).filter(
     (tool) =>
-      registered.has(
+      registeredTools.has(
         tool.name,
       ),
   );
@@ -613,7 +593,7 @@ function parseToolArguments(
 
   if (
     rawArguments.length >
-    20_000
+    MAX_TOOL_ARGUMENT_LENGTH
   ) {
     throw new Error(
       "AI_TOOL_ARGUMENTS_TOO_LARGE",
@@ -632,7 +612,7 @@ function parseToolArguments(
 }
 
 /* =========================================================
- * TOOL RESULT
+ * TOOL RESULT SERIALIZATION
  * ======================================================= */
 
 function serializeToolResult(
@@ -642,11 +622,14 @@ function serializeToolResult(
 
   try {
     serialized =
-      JSON.stringify(value);
+      JSON.stringify(
+        value,
+      );
   } catch {
     serialized =
       JSON.stringify({
         ok: false,
+
         error: {
           code:
             "AI_TOOL_RESULT_SERIALIZATION_FAILED",
@@ -667,6 +650,7 @@ function serializeToolResult(
     error: {
       code:
         "AI_TOOL_RESULT_TOO_LARGE",
+
       message:
         "The tool returned more data than the AI context allows.",
     },
@@ -674,7 +658,7 @@ function serializeToolResult(
 }
 
 /* =========================================================
- * RESPONSE HELPERS
+ * OUTPUT TEXT
  * ======================================================= */
 
 function extractOutputText(
@@ -684,8 +668,7 @@ function extractOutputText(
     typeof response.output_text ===
     "string"
   ) {
-    return response.output_text
-      .trim();
+    return response.output_text.trim();
   }
 
   const output =
@@ -695,8 +678,7 @@ function extractOutputText(
       ? response.output
       : [];
 
-  const chunks: string[] =
-    [];
+  const chunks: string[] = [];
 
   for (
     const item of output
@@ -761,6 +743,10 @@ function extractOutputText(
     .trim();
 }
 
+/* =========================================================
+ * FUNCTION CALL EXTRACTION
+ * ======================================================= */
+
 function extractFunctionCalls(
   response: OpenAiResponse,
 ): OpenAiFunctionCall[] {
@@ -810,7 +796,7 @@ function extractFunctionCalls(
 }
 
 /* =========================================================
- * OPENAI REQUEST
+ * MESSAGE CONVERSION
  * ======================================================= */
 
 function toResponsesInput(
@@ -837,26 +823,35 @@ function toResponsesInput(
   );
 }
 
+/* =========================================================
+ * OPENAI REQUEST
+ * ======================================================= */
+
 async function requestOpenAi(
-  input: unknown,
+  input: unknown[],
   options: GameVortexToolChatOptions,
-  stream = false,
 ): Promise<{
   response: OpenAiResponse;
   requestId: string;
-  openaiRequestId:
-    | string
-    | null;
+  openaiRequestId: string | null;
   latencyMs: number;
 }> {
-  const requestId =
+  /*
+   * IMPORTANT:
+   *
+   * Explicit `string` annotation prevents TypeScript from
+   * preserving the UUID template-literal type returned by
+   * randomUUID().
+   *
+   * This fixes the Vercel TS2322 error.
+   */
+  const requestId: string =
     randomUUID();
 
-  const key =
-    process.env
-      .OPENAI_API_KEY;
+  const apiKey =
+    process.env.OPENAI_API_KEY;
 
-  if (!key) {
+  if (!apiKey) {
     throw new OpenAiError(
       "OPENAI_API_KEY is not configured",
       "OPENAI_NOT_CONFIGURED",
@@ -871,10 +866,11 @@ async function requestOpenAi(
   const controller =
     new AbortController();
 
-  const timer =
+  const timeout =
     setTimeout(
-      () =>
-        controller.abort(),
+      () => {
+        controller.abort();
+      },
       timeoutMs,
     );
 
@@ -890,44 +886,32 @@ async function requestOpenAi(
 
           headers: {
             Authorization:
-              `Bearer ${key}`,
+              `Bearer ${apiKey}`,
 
             "Content-Type":
               "application/json",
-
-            ...(stream
-              ? {
-                  Accept:
-                    "text/event-stream",
-                }
-              : {}),
           },
 
           body:
-            JSON.stringify(
-              {
-                model:
-                  openaiConfig.model,
+            JSON.stringify({
+              model:
+                openaiConfig.model,
 
-                input,
+              input,
 
-                max_output_tokens:
-                  options.maxOutputTokens ??
-                  openaiConfig.maxOutputTokens,
+              tools:
+                getEnabledToolDefinitions(),
 
-                reasoning: {
-                  effort:
-                    options.reasoningEffort ??
-                    openaiConfig.reasoningEffort,
-                },
+              max_output_tokens:
+                options.maxOutputTokens ??
+                openaiConfig.maxOutputTokens,
 
-                ...(stream
-                  ? {
-                      stream: true,
-                    }
-                  : {}),
+              reasoning: {
+                effort:
+                  options.reasoningEffort ??
+                  openaiConfig.reasoningEffort,
               },
-            ),
+            }),
 
           signal:
             controller.signal,
@@ -955,8 +939,7 @@ async function requestOpenAi(
           };
 
         if (
-          typeof body
-            ?.error
+          typeof body?.error
             ?.message ===
           "string"
         ) {
@@ -992,25 +975,12 @@ async function requestOpenAi(
       );
     }
 
-    if (!response.body) {
-      throw new OpenAiError(
-        "OpenAI returned an empty response body.",
-        "OPENAI_INVALID_RESPONSE",
-        requestId,
-      );
-    }
-
-    if (stream) {
-      throw new Error(
-        "STREAM_RESPONSE_REQUIRES_STREAM_READER",
-      );
-    }
-
     const data =
       (await response.json()) as OpenAiResponse;
 
     return {
-      response: data,
+      response:
+        data,
 
       requestId,
 
@@ -1046,24 +1016,16 @@ async function requestOpenAi(
         Error
         ? error.message
         : "OPENAI_NETWORK_ERROR",
+
       "OPENAI_NETWORK_ERROR",
+
       requestId,
     );
   } finally {
-    clearTimeout(timer);
+    clearTimeout(
+      timeout,
+    );
   }
-}
-
-/* =========================================================
- * TOOL INPUT BUILDER
- * ======================================================= */
-
-function buildToolEnabledInput(
-  messages: OpenAiMessage[],
-) {
-  return toResponsesInput(
-    messages,
-  );
 }
 
 /* =========================================================
@@ -1082,8 +1044,7 @@ async function executeFunctionCalls(
     output: string;
   }> = [];
 
-  const toolNames: string[] =
-    [];
+  const toolNames: string[] = [];
 
   for (
     const call of calls
@@ -1126,6 +1087,20 @@ async function executeFunctionCalls(
     }
 
     try {
+      /*
+       * IMPORTANT:
+       *
+       * The model never receives Prisma access.
+       *
+       * All tool execution goes through the central
+       * GameVortex registry.
+       */
+      const {
+        executeAiTool,
+      } = await import(
+        "./registry"
+      );
+
       const result =
         await executeAiTool(
           call.name,
@@ -1175,7 +1150,7 @@ async function executeFunctionCalls(
 }
 
 /* =========================================================
- * MAIN TOOL CHAT
+ * MAIN GAMEVORTEX TOOL CHAT
  * ======================================================= */
 
 export async function aiChatWithGameVortexTools(
@@ -1190,8 +1165,10 @@ export async function aiChatWithGameVortexTools(
       Math.max(
         options.maxToolRounds ??
           DEFAULT_MAX_TOOL_ROUNDS,
+
         1,
       ),
+
       DEFAULT_MAX_TOOL_ROUNDS,
     );
 
@@ -1199,20 +1176,25 @@ export async function aiChatWithGameVortexTools(
     getEnabledToolDefinitions();
 
   if (
-    tools.length === 0
+    tools.length ===
+    0
   ) {
+    const requestId: string =
+      randomUUID();
+
     throw new OpenAiError(
       "No GameVortex AI tools are registered.",
+
       "OPENAI_INVALID_RESPONSE",
-      randomUUID(),
+
+      requestId,
     );
   }
 
-  let input:
-    | unknown[]
-    = buildToolEnabledInput(
-        messages,
-      );
+  let input: unknown[] =
+    toResponsesInput(
+      messages,
+    );
 
   let totalToolCalls =
     0;
@@ -1220,7 +1202,13 @@ export async function aiChatWithGameVortexTools(
   const usedToolNames =
     new Set<string>();
 
-  let lastRequestId =
+  /*
+   * Explicit string annotation is important.
+   *
+   * randomUUID() returns a UUID template-literal type,
+   * while OpenAiResult.requestId is intentionally a string.
+   */
+  let lastRequestId: string =
     randomUUID();
 
   let lastOpenAiRequestId:
@@ -1228,7 +1216,7 @@ export async function aiChatWithGameVortexTools(
     | null =
     null;
 
-  let lastModel =
+  let lastModel: string =
     openaiConfig.model;
 
   for (
@@ -1239,14 +1227,18 @@ export async function aiChatWithGameVortexTools(
     const request =
       await requestOpenAi(
         input,
-        {
-          ...options,
-        },
-        false,
+        options,
       );
 
+    /*
+     * Explicit String conversion keeps this assignment
+     * compatible even if the provider implementation later
+     * changes the inferred requestId type.
+     */
     lastRequestId =
-      request.requestId;
+      String(
+        request.requestId,
+      );
 
     lastOpenAiRequestId =
       request.openaiRequestId;
@@ -1259,6 +1251,10 @@ export async function aiChatWithGameVortexTools(
         request.response,
       );
 
+    /*
+     * No tool call means the model has produced
+     * the final answer.
+     */
     if (
       functionCalls.length ===
       0
@@ -1271,16 +1267,28 @@ export async function aiChatWithGameVortexTools(
       if (!text) {
         throw new OpenAiError(
           "GameVortex AI returned an empty response.",
+
           "OPENAI_INVALID_RESPONSE",
-          request.requestId,
+
+          String(
+            request.requestId,
+          ),
         );
       }
+
+      const finalText =
+        text.slice(
+          0,
+          MAX_FINAL_OUTPUT_LENGTH,
+        );
 
       logEvent(
         "gamevortex_ai_tools_success",
         {
           requestId:
-            request.requestId,
+            String(
+              request.requestId,
+            ),
 
           openaiRequestId:
             request.openaiRequestId,
@@ -1304,10 +1312,7 @@ export async function aiChatWithGameVortexTools(
 
       return {
         text:
-          text.slice(
-            0,
-            MAX_FINAL_OUTPUT_LENGTH,
-          ),
+          finalText,
 
         toolCalls:
           totalToolCalls,
@@ -1318,7 +1323,9 @@ export async function aiChatWithGameVortexTools(
           ),
 
         requestId:
-          request.requestId,
+          String(
+            request.requestId,
+          ),
 
         openaiRequestId:
           request.openaiRequestId,
@@ -1335,14 +1342,22 @@ export async function aiChatWithGameVortexTools(
     totalToolCalls +=
       functionCalls.length;
 
+    /*
+     * Global protection against a model repeatedly
+     * calling tools in one request.
+     */
     if (
       totalToolCalls >
-      8
+      MAX_TOOL_CALLS
     ) {
       throw new OpenAiError(
         "GameVortex AI exceeded the maximum number of tool calls.",
+
         "OPENAI_BAD_REQUEST",
-        request.requestId,
+
+        String(
+          request.requestId,
+        ),
       );
     }
 
@@ -1360,6 +1375,13 @@ export async function aiChatWithGameVortexTools(
       );
     }
 
+    /*
+     * Responses API tool-calling protocol:
+     *
+     * 1. Preserve the model output items.
+     * 2. Append function_call_output items.
+     * 3. Send the combined input back to OpenAI.
+     */
     const responseOutput =
       Array.isArray(
         request.response
@@ -1370,34 +1392,43 @@ export async function aiChatWithGameVortexTools(
 
     input = [
       ...input,
+
       ...responseOutput,
+
       ...execution.outputs,
     ];
   }
 
   throw new OpenAiError(
     "GameVortex AI reached the maximum tool-call depth.",
+
     "OPENAI_BAD_REQUEST",
-    lastRequestId,
+
+    String(
+      lastRequestId,
+    ),
   );
 }
 
 /* =========================================================
- * STREAMING TOOL CHAT
- *
- * Tool execution happens first.
- *
- * Once the model has finished using GameVortex Tools,
- * the final answer is streamed to the client in chunks.
- *
- * This deliberately keeps the existing /api/ai/chat SSE
- * contract unchanged.
+ * STREAMING COMPATIBILITY
  * ======================================================= */
 
+/**
+ * Tool execution must complete before the final answer
+ * is exposed to the existing chat stream.
+ *
+ * This keeps the current /api/ai/chat response contract
+ * stable while Task 8 is being integrated.
+ */
 export async function* aiChatWithGameVortexToolsStream(
   messages: OpenAiMessage[],
   options: GameVortexToolChatOptions = {},
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<
+  string,
+  void,
+  unknown
+> {
   const result =
     await aiChatWithGameVortexTools(
       messages,
@@ -1407,8 +1438,11 @@ export async function* aiChatWithGameVortexToolsStream(
   const text =
     result.text;
 
-  const chunkSize =
-    80;
+  /*
+   * Small chunks preserve the existing streaming UX
+   * without changing the route's SSE format.
+   */
+  const chunkSize = 80;
 
   for (
     let index = 0;
