@@ -61,11 +61,13 @@ export default function AIChat() {
       const assistantMessage: Message = {
         role: "assistant",
         content:
-          typeof data?.message === "string"
-            ? data.message
-            : typeof data?.content === "string"
-              ? data.content
-              : "لم أتمكن من الحصول على رد من المساعد.",
+          typeof data?.answer === "string"
+            ? data.answer
+            : typeof data?.message === "string"
+              ? data.message
+              : typeof data?.content === "string"
+                ? data.content
+                : "لم أتمكن من الحصول على رد من المساعد.",
       };
 
       setMessages((current) => [
