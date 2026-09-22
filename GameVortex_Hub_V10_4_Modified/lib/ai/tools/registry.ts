@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import {
+  aiToolErrorResult,
+  parseAiToolInput,
+} from "./core";
+
+import {
   getGame,
   searchGames,
 } from "./games";
@@ -26,16 +31,17 @@ export type AiToolDefinition = {
 };
 
 /**
- * Central registry for all GameVortex AI Tools.
+ * Central registry for GameVortex AI Tools.
  *
- * This registry does NOT give the AI direct database access.
- * Every executor remains responsible for:
+ * This registry is only a routing layer.
  *
+ * It does NOT grant direct database access.
+ *
+ * Every Tool remains responsible for:
  * - Authentication
  * - Authorization
- * - Input validation
  * - Safe Prisma queries
- * - Minimal response data
+ * - Minimal returned data
  */
 export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
   [
@@ -293,7 +299,7 @@ export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
   ] as const;
 
 /**
- * Get a Tool definition by its public name.
+ * Find a registered AI Tool.
  */
 export function getAiTool(
   name: string,
@@ -304,7 +310,7 @@ export function getAiTool(
 }
 
 /**
- * Return only the public Tool names.
+ * Return only public Tool names.
  */
 export function getAiToolNames(): string[] {
   return AI_TOOL_REGISTRY.map(
@@ -313,28 +319,70 @@ export function getAiToolNames(): string[] {
 }
 
 /**
- * Execute one registered GameVortex Tool.
+ * Validate the Tool name before execution.
+ */
+function validateToolName(
+  name: unknown,
+): string {
+  if (
+    typeof name !== "string" ||
+    name.length === 0 ||
+    name.length > 100
+  ) {
+    throw new Error(
+      "Invalid AI Tool name.",
+    );
+  }
+
+  return name;
+}
+
+/**
+ * Execute one registered GameVortex AI Tool.
  *
- * The Tool itself remains responsible for its own
- * authentication, authorization and validation.
+ * Security flow:
+ *
+ * 1. Validate Tool name.
+ * 2. Find Tool in the allowlisted registry.
+ * 3. Validate input against the registry schema.
+ * 4. Execute the Tool.
+ * 5. Never expose internal exceptions.
+ *
+ * Authentication and authorization are still performed
+ * by the individual Tool implementation.
  */
 export async function executeAiTool(
   name: string,
   input: unknown,
 ): Promise<unknown> {
-  const tool =
-    getAiTool(name);
+  try {
+    const validatedName =
+      validateToolName(name);
 
-  if (!tool) {
-    return {
-      ok: false,
-      error: {
-        code: "UNKNOWN_AI_TOOL",
-        message:
-          "The requested GameVortex AI tool does not exist.",
-      },
-    };
+    const tool =
+      getAiTool(validatedName);
+
+    if (!tool) {
+      return {
+        ok: false,
+        error: {
+          code: "UNKNOWN_AI_TOOL",
+          message:
+            "The requested GameVortex AI tool does not exist.",
+        },
+      };
+    }
+
+    const validatedInput =
+      parseAiToolInput(
+        tool.inputSchema,
+        input,
+      );
+
+    return await tool.execute(
+      validatedInput,
+    );
+  } catch (error) {
+    return aiToolErrorResult(error);
   }
-
-  return tool.execute(input);
 }
