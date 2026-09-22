@@ -205,6 +205,7 @@ export default async function Admin() {
           <Link href="/admin/quran" className={styles.actionBtn}><IconQuran /> إدارة القرآن</Link>
           <Link href="/admin/draws" className={styles.actionBtn}><IconDraws /> إدارة السحوبات</Link>
           <Link href="/admin/moderation" className={styles.actionBtn}><IconShield /> المراجعة والمحتوى</Link>
+          <Link href="/admin/gift-cards" className={styles.actionBtn}><IconCards /> جلب البطاقات</Link>
         </div>
       </section>
 
@@ -292,3 +293,4 @@ function IconFlag() { return <svg width="16" height="16" viewBox="0 0 24 24" fil
 function IconQuran() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z" /><path d="M18 4v16" /></svg>; }
 function IconDraws() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 7v14M12 7c-2 0-3-1.5-3-3s1-3 3-3 3 1.5 3 3-1 3-3 3zm0 0c2 0 3-1.5 3-3" /></svg>; }
 function IconShield() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 4 5v6c0 5 3.4 9 8 11 4.6-2 8-6 8-11V5z" /></svg>; }
+function IconCards() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>; }

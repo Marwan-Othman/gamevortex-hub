@@ -4,104 +4,84 @@ import styles from "../../app/home.module.css";
 const CATEGORIES = [
   {
     name: "أكشن",
-    genre: "Action",
-    color: "#ff4d6d",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M6 6l12 12M18 6 6 18" />
-      </svg>
-    ),
+    query: "Action",
+    symbol: "⚔",
   },
   {
     name: "مغامرات",
-    genre: "Adventure",
-    color: "#4f8fff",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="m14.5 9.5-2 5-5 2 2-5z" />
-      </svg>
-    ),
+    query: "Adventure",
+    symbol: "✦",
   },
   {
     name: "رياضة",
-    genre: "Sports",
-    color: "#3ddc84",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3c2.5 2.5 2.5 15.5 0 18M12 3C9.5 5.5 9.5 18.5 12 21" />
-      </svg>
-    ),
+    query: "Sports",
+    symbol: "◉",
   },
   {
-    name: "سباق",
-    genre: "Racing",
-    color: "#ffc94a",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 22 14 2l2 4-6 12h6l-8 4" />
-      </svg>
-    ),
+    name: "سباقات",
+    query: "Racing",
+    symbol: "ϟ",
   },
   {
     name: "رعب",
-    genre: "Horror",
-    color: "#9a5cff",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 2a8 8 0 0 0-8 8v6a2 2 0 0 0 2 2h1v-3l2 3h6l2-3v3h1a2 2 0 0 0 2-2v-6a8 8 0 0 0-8-8z" />
-        <circle cx="9" cy="11" r="1" fill="currentColor" />
-        <circle cx="15" cy="11" r="1" fill="currentColor" />
-      </svg>
-    ),
+    query: "Horror",
+    symbol: "☠",
   },
   {
     name: "استراتيجية",
-    genre: "Strategy",
-    color: "#34d8ff",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M6 20h12M8 20V10l-1-3h10l-1 3v10M9 7V4h6v3" />
-      </svg>
-    ),
+    query: "Strategy",
+    symbol: "♟",
+  },
+  {
+    name: "ألعاب RPG",
+    query: "RPG",
+    symbol: "✧",
   },
   {
     name: "المزيد",
-    genre: "",
-    color: "#a3a8c2",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <rect x="3" y="3" width="7" height="7" rx="1.5" />
-        <rect x="14" y="3" width="7" height="7" rx="1.5" />
-        <rect x="3" y="14" width="7" height="7" rx="1.5" />
-        <rect x="14" y="14" width="7" height="7" rx="1.5" />
-      </svg>
-    ),
+    query: "",
+    symbol: "＋",
   },
 ];
 
 export default function CategoriesRow() {
   return (
-    <section className={styles.section}>
+    <section className={styles.section} aria-labelledby="categories-title">
       <div className={styles.sectionHead}>
-        <h2>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="m12 2 2.5 6.5L21 9l-5 4 1.5 7-5.5-3.5L6.5 20 8 13 3 9l6.5-.5z" />
-          </svg>
-          التصنيفات الرئيسية
-        </h2>
-      </div>
-      <div className={styles.hscroll}>
-        {CATEGORIES.map((c) => (
-          <Link
-            key={c.name}
-            href={c.genre ? `/games?genre=${encodeURIComponent(c.genre)}` : "/categories"}
-            className={styles.categoryTile}
-            style={{ "--cat-color": c.color } as React.CSSProperties}
+        <h2 id="categories-title">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
           >
-            <span className={styles.categoryIcon}>{c.icon}</span>
-            <span>{c.name}</span>
+            <circle cx="7" cy="7" r="3" />
+            <circle cx="17" cy="7" r="3" />
+            <circle cx="7" cy="17" r="3" />
+            <circle cx="17" cy="17" r="3" />
+          </svg>
+          استكشف التصنيفات
+        </h2>
+
+        <Link href="/games">عرض الكل ←</Link>
+      </div>
+
+      <div className={styles.hscroll}>
+        {CATEGORIES.map((category) => (
+          <Link
+            key={category.name}
+            href={
+              category.query
+                ? `/games?genre=${encodeURIComponent(category.query)}`
+                : "/games"
+            }
+            className={styles.categoryTile}
+          >
+            <span className={styles.categoryIcon}>{category.symbol}</span>
+            <span>{category.name}</span>
           </Link>
         ))}
       </div>
