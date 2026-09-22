@@ -66,123 +66,178 @@ const WELCOME_MESSAGE: Message = {
     "مرحبًا بك في GameVortex AI 🎮\nأنا مساعدك الذكي داخل GameVortex Hub. كيف يمكنني مساعدتك؟",
 };
 
-function normalizeRole(role: MessageRole): "user" | "assistant" {
-  return role === "USER" || role === "user"
+function normalizeRole(
+  role: MessageRole,
+): "user" | "assistant" {
+  return role === "USER" ||
+    role === "user"
     ? "user"
     : "assistant";
 }
 
-function isAssistantMessage(message: Message) {
-  return normalizeRole(message.role) === "assistant";
+function isAssistantMessage(
+  message: Message,
+) {
+  return (
+    normalizeRole(message.role) ===
+    "assistant"
+  );
 }
 
-async function copyTextToClipboard(text: string) {
+async function copyTextToClipboard(
+  text: string,
+) {
   if (
     typeof navigator !== "undefined" &&
     navigator.clipboard &&
     window.isSecureContext
   ) {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(
+      text,
+    );
+
     return;
   }
 
-  /*
-   * Fallback for browsers/environments where the
-   * Clipboard API is unavailable.
-   */
-  const textarea = document.createElement("textarea");
+  const textarea =
+    document.createElement(
+      "textarea",
+    );
 
   textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  textarea.style.pointerEvents = "none";
+  textarea.setAttribute(
+    "readonly",
+    "",
+  );
 
-  document.body.appendChild(textarea);
+  textarea.style.position =
+    "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents =
+    "none";
+
+  document.body.appendChild(
+    textarea,
+  );
 
   textarea.focus();
   textarea.select();
-  textarea.setSelectionRange(0, textarea.value.length);
+  textarea.setSelectionRange(
+    0,
+    textarea.value.length,
+  );
 
-  const copied = document.execCommand("copy");
+  const copied =
+    document.execCommand(
+      "copy",
+    );
 
-  document.body.removeChild(textarea);
+  document.body.removeChild(
+    textarea,
+  );
 
   if (!copied) {
-    throw new Error("COPY_FAILED");
+    throw new Error(
+      "COPY_FAILED",
+    );
   }
 }
 
 export default function AIChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    WELCOME_MESSAGE,
-  ]);
+  const [messages, setMessages] =
+    useState<Message[]>([
+      WELCOME_MESSAGE,
+    ]);
 
-  const [input, setInput] = useState("");
+  const [input, setInput] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
-  const [stopping, setStopping] = useState(false);
+  const [stopping, setStopping] =
+    useState(false);
 
-  const [conversations, setConversations] = useState<
-    Conversation[]
-  >([]);
+  const [
+    regeneratingMessageId,
+    setRegeneratingMessageId,
+  ] = useState<string | null>(
+    null,
+  );
 
-  const [conversationId, setConversationId] = useState<
-    string | null
-  >(null);
+  const [
+    conversations,
+    setConversations,
+  ] = useState<Conversation[]>(
+    [],
+  );
 
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [
+    conversationId,
+    setConversationId,
+  ] = useState<string | null>(
+    null,
+  );
 
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [
+    historyLoading,
+    setHistoryLoading,
+  ] = useState(false);
 
-  const [copiedMessageId, setCopiedMessageId] = useState<
-    string | null
-  >(null);
+  const [
+    historyOpen,
+    setHistoryOpen,
+  ] = useState(false);
+
+  const [
+    copiedMessageId,
+    setCopiedMessageId,
+  ] = useState<string | null>(
+    null,
+  );
 
   const abortControllerRef =
-    useRef<AbortController | null>(null);
+    useRef<AbortController | null>(
+      null,
+    );
 
   const assistantMessageIdRef =
     useRef<string | null>(null);
 
-  const stoppedRef = useRef(false);
+  const stoppedRef =
+    useRef(false);
 
   const copyTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(
+    useRef<ReturnType<
+      typeof setTimeout
+    > | null>(null);
+
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(
       null,
     );
 
-  const messagesEndRef =
-    useRef<HTMLDivElement | null>(null);
-
-  /*
-   * Keep the chat scrolled to the newest message.
-   */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
+    messagesEndRef.current?.scrollIntoView(
+      {
+        behavior: "smooth",
+        block: "end",
+      },
+    );
   }, [messages, loading]);
 
-  /*
-   * Cleanup timers/controllers when the component
-   * is unmounted.
-   */
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
 
       if (copyTimerRef.current) {
-        clearTimeout(copyTimerRef.current);
+        clearTimeout(
+          copyTimerRef.current,
+        );
       }
     };
   }, []);
 
-  /*
-   * Load conversation history.
-   */
   const loadConversations =
     useCallback(async () => {
       try {
@@ -213,9 +268,7 @@ export default function AIChat() {
         }
       } catch {
         /*
-         * History is secondary UI.
-         * Do not break the chat if history
-         * cannot be loaded.
+         * Conversation history is secondary UI.
          */
       } finally {
         setHistoryLoading(false);
@@ -226,9 +279,6 @@ export default function AIChat() {
     void loadConversations();
   }, [loadConversations]);
 
-  /*
-   * Create a new conversation on the server.
-   */
   async function createConversation() {
     const response =
       await fetch(
@@ -253,7 +303,8 @@ export default function AIChat() {
       !data?.data?.id
     ) {
       throw new Error(
-        typeof data?.error === "string"
+        typeof data?.error ===
+          "string"
           ? data.error
           : "AI_CONVERSATION_CREATE_FAILED",
       );
@@ -262,34 +313,33 @@ export default function AIChat() {
     return data.data as Conversation;
   }
 
-  /*
-   * Start a completely new chat.
-   */
   async function startNewChat() {
-    if (loading || stopping) {
+    if (
+      loading ||
+      stopping ||
+      regeneratingMessageId
+    ) {
       return;
     }
 
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([
+      WELCOME_MESSAGE,
+    ]);
+
     setConversationId(null);
     setInput("");
     setCopiedMessageId(null);
     setHistoryOpen(false);
-
-    /*
-     * We intentionally do not create an empty database
-     * conversation here. It will be created when the
-     * user actually sends the first message.
-     */
   }
 
-  /*
-   * Load one conversation including its messages.
-   */
   async function loadConversation(
     id: string,
   ) {
-    if (loading || stopping) {
+    if (
+      loading ||
+      stopping ||
+      regeneratingMessageId
+    ) {
       return;
     }
 
@@ -312,7 +362,8 @@ export default function AIChat() {
 
       if (!response.ok) {
         throw new Error(
-          typeof data?.error === "string"
+          typeof data?.error ===
+            "string"
             ? data.error
             : "CONVERSATION_LOAD_FAILED",
         );
@@ -371,11 +422,6 @@ export default function AIChat() {
     }
   }
 
-  /*
-   * Copy a complete assistant response.
-   *
-   * This does not modify the message itself.
-   */
   async function copyMessage(
     message: Message,
     messageKey: string,
@@ -416,9 +462,150 @@ export default function AIChat() {
     }
   }
 
-  /*
-   * Stop the currently running generation.
-   */
+  async function regenerateMessage(
+    message: Message,
+  ) {
+    if (
+      !message.id ||
+      loading ||
+      stopping ||
+      regeneratingMessageId
+    ) {
+      return;
+    }
+
+    if (
+      !isAssistantMessage(
+        message,
+      )
+    ) {
+      return;
+    }
+
+    if (
+      message.status ===
+        "PENDING" ||
+      message.status ===
+        "STREAMING"
+    ) {
+      return;
+    }
+
+    const messageId =
+      message.id;
+
+    setRegeneratingMessageId(
+      messageId,
+    );
+
+    setCopiedMessageId(null);
+
+    try {
+      const response =
+        await fetch(
+          `/api/ai/messages/${encodeURIComponent(
+            messageId,
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              action:
+                "regenerate",
+            }),
+          },
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        const publicError =
+          typeof data?.error ===
+          "string"
+            ? data.error
+            : "AI_REGENERATE_FAILED";
+
+        throw new Error(
+          publicError,
+        );
+      }
+
+      const regenerated =
+        data?.message;
+
+      if (
+        !regenerated?.id
+      ) {
+        throw new Error(
+          "AI_REGENERATE_INVALID_RESPONSE",
+        );
+      }
+
+      setMessages(
+        (current) =>
+          current.map(
+            (item) =>
+              item.id ===
+              regenerated.id
+                ? {
+                    ...item,
+                    id:
+                      regenerated.id,
+                    role:
+                      regenerated.role,
+                    status:
+                      regenerated.status,
+                    content:
+                      regenerated.content,
+                    createdAt:
+                      regenerated.createdAt,
+                    updatedAt:
+                      regenerated.updatedAt,
+                  }
+                : item,
+          ),
+      );
+
+      await loadConversations();
+    } catch (error) {
+      console.error(
+        "AI_REGENERATE_ERROR",
+        error,
+      );
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "AI_REGENERATE_FAILED";
+
+      setMessages(
+        (current) =>
+          current.map(
+            (item) =>
+              item.id ===
+              messageId
+                ? {
+                    ...item,
+                    status:
+                      "ERROR",
+                    content:
+                      message.content +
+                      `\n\nتعذر إعادة التوليد: ${errorMessage}`,
+                  }
+                : item,
+          ),
+      );
+    } finally {
+      setRegeneratingMessageId(
+        null,
+      );
+    }
+  }
+
   async function stopGeneration() {
     if (
       !loading ||
@@ -433,11 +620,6 @@ export default function AIChat() {
     const messageId =
       assistantMessageIdRef.current;
 
-    /*
-     * Immediately update the UI so the user does not
-     * have to stare at a spinning button while the
-     * server catches up.
-     */
     setMessages(
       (current) => {
         const updated = [
@@ -474,10 +656,6 @@ export default function AIChat() {
       },
     );
 
-    /*
-     * Tell the server to mark the assistant message
-     * as STOPPED.
-     */
     if (messageId) {
       try {
         await fetch(
@@ -503,10 +681,8 @@ export default function AIChat() {
       }
     }
 
-    /*
-     * Abort the browser-side streaming request.
-     */
     abortControllerRef.current?.abort();
+
     abortControllerRef.current =
       null;
 
@@ -525,22 +701,25 @@ export default function AIChat() {
     if (
       !text ||
       loading ||
-      stopping
+      stopping ||
+      regeneratingMessageId
     ) {
       return;
     }
 
     stoppedRef.current = false;
+
     assistantMessageIdRef.current =
       null;
 
     setCopiedMessageId(null);
 
-    const userMessage: Message = {
-      role: "user",
-      content: text,
-      status: "COMPLETE",
-    };
+    const userMessage: Message =
+      {
+        role: "user",
+        content: text,
+        status: "COMPLETE",
+      };
 
     setMessages(
       (current) => [
@@ -553,10 +732,6 @@ export default function AIChat() {
     setLoading(true);
     setStopping(false);
 
-    /*
-     * Create a conversation only when the user
-     * actually sends the first message.
-     */
     let activeConversationId =
       conversationId;
 
@@ -573,16 +748,14 @@ export default function AIChat() {
         );
       }
 
-      /*
-       * Assistant placeholder.
-       */
       setMessages(
         (current) => [
           ...current,
           {
             role: "assistant",
             content: "",
-            status: "STREAMING",
+            status:
+              "STREAMING",
           },
         ],
       );
@@ -615,11 +788,6 @@ export default function AIChat() {
           },
         );
 
-      /*
-       * Authentication / validation / credit errors
-       * happen before streaming starts, so they arrive
-       * as normal JSON.
-       */
       if (!response.ok) {
         let data:
           | {
@@ -735,17 +903,12 @@ export default function AIChat() {
             continue;
           }
 
-          /*
-           * The server sends the database IDs once
-           * the assistant message has been created.
-           */
           if (
             eventData.type ===
             "meta"
           ) {
             if (
-              eventData
-                .conversationId
+              eventData.conversationId
             ) {
               activeConversationId =
                 eventData.conversationId;
@@ -756,8 +919,7 @@ export default function AIChat() {
             }
 
             if (
-              eventData
-                .assistantMessageId
+              eventData.assistantMessageId
             ) {
               assistantMessageIdRef.current =
                 eventData.assistantMessageId;
@@ -809,9 +971,6 @@ export default function AIChat() {
             eventData.type ===
             "delta"
           ) {
-            const delta =
-              eventData.text;
-
             if (
               stoppedRef.current
             ) {
@@ -855,7 +1014,7 @@ export default function AIChat() {
                     "STREAMING",
                   content:
                     last.content +
-                    delta,
+                    eventData.text,
                 };
 
                 return updated;
@@ -921,11 +1080,6 @@ export default function AIChat() {
         }
       }
 
-      /*
-       * If the stream ended normally without a done event,
-       * do not overwrite a message that the user intentionally
-       * stopped.
-       */
       if (
         !stoppedRef.current
       ) {
@@ -974,12 +1128,9 @@ export default function AIChat() {
 
       await loadConversations();
     } catch (error) {
-      /*
-       * Abort caused by the Stop button is expected.
-       * It is not an AI error.
-       */
       if (
-        error instanceof DOMException &&
+        error instanceof
+          DOMException &&
         error.name ===
           "AbortError"
       ) {
@@ -1034,13 +1185,10 @@ export default function AIChat() {
     } finally {
       abortControllerRef.current =
         null;
+
       setLoading(false);
       setStopping(false);
 
-      /*
-       * Refresh history after every completed request
-       * so titles/message counts remain current.
-       */
       void loadConversations();
     }
   }
@@ -1066,7 +1214,8 @@ export default function AIChat() {
         <div className="ai-status">
           <span
             className={`ai-status-dot ${
-              loading
+              loading ||
+              regeneratingMessageId
                 ? "ai-status-dot-active"
                 : ""
             }`}
@@ -1075,9 +1224,11 @@ export default function AIChat() {
           <span>
             {stopping
               ? "جارٍ الإيقاف"
-              : loading
-                ? "جاري التوليد"
-                : "متاح"}
+              : regeneratingMessageId
+                ? "جارٍ إعادة التوليد"
+                : loading
+                  ? "جاري التوليد"
+                  : "متاح"}
           </span>
         </div>
       </div>
@@ -1094,7 +1245,8 @@ export default function AIChat() {
           }
           disabled={
             loading ||
-            stopping
+            stopping ||
+            !!regeneratingMessageId
           }
         >
           ☰{" "}
@@ -1111,7 +1263,8 @@ export default function AIChat() {
           }
           disabled={
             loading ||
-            stopping
+            stopping ||
+            !!regeneratingMessageId
           }
         >
           ＋ محادثة جديدة
@@ -1173,7 +1326,8 @@ export default function AIChat() {
                     disabled={
                       loading ||
                       stopping ||
-                      historyLoading
+                      historyLoading ||
+                      !!regeneratingMessageId
                     }
                   >
                     <span className="gv-ai-history-title">
@@ -1223,6 +1377,23 @@ export default function AIChat() {
               message.status ===
               "STOPPED";
 
+            const isRegenerating =
+              regeneratingMessageId ===
+              message.id;
+
+            const canRegenerate =
+              isAssistant &&
+              !!message.id &&
+              message.content.trim()
+                .length > 0 &&
+              message.id !==
+                undefined &&
+              message.status !==
+                "PENDING" &&
+              message.status !==
+                "STREAMING" &&
+              !isRegenerating;
+
             return (
               <div
                 key={
@@ -1262,6 +1433,9 @@ export default function AIChat() {
                             messageKey,
                           )
                         }
+                        disabled={
+                          !!regeneratingMessageId
+                        }
                         aria-label={
                           isCopied
                             ? "تم نسخ الرد"
@@ -1272,8 +1446,34 @@ export default function AIChat() {
                           ? "✓ تم النسخ"
                           : "⧉ نسخ"}
                       </button>
+
+                      {canRegenerate && (
+                        <button
+                          type="button"
+                          className="gv-ai-regenerate"
+                          onClick={() =>
+                            void regenerateMessage(
+                              message,
+                            )
+                          }
+                          disabled={
+                            loading ||
+                            stopping ||
+                            !!regeneratingMessageId
+                          }
+                          aria-label="إعادة توليد الرد"
+                        >
+                          ↻ إعادة التوليد
+                        </button>
+                      )}
                     </div>
                   )}
+
+                {isRegenerating && (
+                  <div className="gv-ai-regenerating">
+                    جاري إعادة توليد الرد...
+                  </div>
+                )}
 
                 {isStopped && (
                   <div className="gv-ai-stopped">
@@ -1336,7 +1536,8 @@ export default function AIChat() {
           rows={3}
           disabled={
             loading ||
-            stopping
+            stopping ||
+            !!regeneratingMessageId
           }
           maxLength={4000}
         />
@@ -1361,7 +1562,8 @@ export default function AIChat() {
             type="submit"
             disabled={
               !input.trim() ||
-              stopping
+              stopping ||
+              !!regeneratingMessageId
             }
             className="btn"
           >
@@ -1388,10 +1590,17 @@ export default function AIChat() {
         .gv-ai-history-button,
         .gv-ai-new-chat,
         .gv-ai-history-close,
-        .gv-ai-copy {
+        .gv-ai-copy,
+        .gv-ai-regenerate {
           appearance: none;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(255, 255, 255, 0.045);
+          border: 1px solid
+            rgba(255, 255, 255, 0.12);
+          background: rgba(
+            255,
+            255,
+            255,
+            0.045
+          );
           color: #e2e8f0;
           cursor: pointer;
           transition:
@@ -1410,7 +1619,8 @@ export default function AIChat() {
 
         .gv-ai-history-button:hover,
         .gv-ai-new-chat:hover,
-        .gv-ai-copy:hover {
+        .gv-ai-copy:hover,
+        .gv-ai-regenerate:hover {
           border-color: rgba(
             34,
             211,
@@ -1446,7 +1656,8 @@ export default function AIChat() {
 
         .gv-ai-history-button:disabled,
         .gv-ai-new-chat:disabled,
-        .gv-ai-copy:disabled {
+        .gv-ai-copy:disabled,
+        .gv-ai-regenerate:disabled {
           opacity: 0.55;
           cursor: not-allowed;
           transform: none;
@@ -1561,10 +1772,13 @@ export default function AIChat() {
           display: flex;
           align-items: center;
           justify-content: flex-start;
+          flex-wrap: wrap;
+          gap: 7px;
           margin-top: 9px;
         }
 
-        .gv-ai-copy {
+        .gv-ai-copy,
+        .gv-ai-regenerate {
           min-height: 31px;
           padding: 0 10px;
           border-radius: 8px;
@@ -1585,6 +1799,33 @@ export default function AIChat() {
             94,
             0.1
           );
+        }
+
+        .gv-ai-regenerate {
+          border-color: rgba(
+            168,
+            85,
+            247,
+            0.35
+          );
+          background: rgba(
+            124,
+            58,
+            237,
+            0.08
+          );
+        }
+
+        .gv-ai-regenerating {
+          margin-top: 8px;
+          color: rgba(
+            168,
+            85,
+            247,
+            0.95
+          );
+          font-size: 12px;
+          font-weight: 700;
         }
 
         .gv-ai-stopped {
@@ -1643,7 +1884,12 @@ export default function AIChat() {
             font-size: 10px;
           }
 
-          .gv-ai-copy {
+          .gv-ai-message-actions {
+            gap: 6px;
+          }
+
+          .gv-ai-copy,
+          .gv-ai-regenerate {
             min-height: 34px;
             padding: 0 11px;
           }
@@ -1654,8 +1900,13 @@ export default function AIChat() {
             grid-template-columns: 1fr;
           }
 
-          .gv-ai-copy {
-            min-height: 36px;
+          .gv-ai-message-actions {
+            width: 100%;
+          }
+
+          .gv-ai-copy,
+          .gv-ai-regenerate {
+            flex: 1 1 auto;
           }
         }
       `}</style>
