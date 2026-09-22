@@ -133,6 +133,8 @@ model User {
   aiUsages AiUsage[]
   vipRewardClaims VipRewardClaim[]
   vipPurchases VipPurchase[]
+
+  conversations Conversation[]
 }
 
 model PointLedger {
@@ -704,6 +706,20 @@ enum AiUsageType {
   VIDEO
 }
 
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ChatMessageStatus {
+  PENDING
+  STREAMING
+  COMPLETE
+  STOPPED
+  ERROR
+}
+
 enum ModerationStatus {
   PENDING
   APPROVED
@@ -1125,6 +1141,42 @@ model AiUsage {
 
   @@index([userId, type, createdAt])
   @@index([subscriptionId, type, createdAt])
+}
+
+model Conversation {
+  id String @id @default(cuid())
+
+  userId String
+
+  title String @default("New Chat")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, createdAt])
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+
+  role ChatMessageRole
+  status ChatMessageStatus @default(COMPLETE)
+
+  content String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId, role, createdAt])
 }
 
 model VipReward {
