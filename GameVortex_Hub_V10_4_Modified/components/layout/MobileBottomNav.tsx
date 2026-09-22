@@ -63,6 +63,27 @@ function UserIcon() {
   );
 }
 
+function CrownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m4 8 3 3 5-7 5 7 3-3-2 11H6L4 8Z" />
+      <path d="M6 19h12" />
+      <path d="M8 15h8" />
+    </svg>
+  );
+}
+
+function AIIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <path d="M9 9h.01M15 9h.01" />
+      <path d="M8 14c1.2 1.4 2.8 2 4 2s2.8-.6 4-2" />
+      <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2" />
+    </svg>
+  );
+}
+
 const navigationItems = [
   {
     href: "/",
@@ -73,6 +94,16 @@ const navigationItems = [
     href: "/games",
     label: "الألعاب",
     Icon: GameIcon,
+  },
+  {
+    href: "/ai",
+    label: "AI",
+    Icon: AIIcon,
+  },
+  {
+    href: "/vip",
+    label: "VIP",
+    Icon: CrownIcon,
   },
   {
     href: "/library",
@@ -101,7 +132,10 @@ function isActivePath(pathname: string, href: string) {
     return pathname === "/";
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
 }
 
 export default function MobileBottomNav() {
@@ -111,7 +145,9 @@ export default function MobileBottomNav() {
     <nav
       className="gv-bottom-nav"
       aria-label="التنقل الرئيسي"
-      style={{ gridTemplateColumns: `repeat(${navigationItems.length}, 1fr)` }}
+      style={{
+        gridTemplateColumns: `repeat(${navigationItems.length}, 1fr)`,
+      }}
     >
       {navigationItems.map(({ href, label, Icon }) => {
         const active = isActivePath(pathname, href);
