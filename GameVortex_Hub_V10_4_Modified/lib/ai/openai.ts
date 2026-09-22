@@ -78,25 +78,158 @@ function classifyStatus(status: number): OpenAiErrorCode {
   return "OPENAI_BAD_REQUEST";
 }
 
-async function parseErrorBody(response: Response): Promise<string> {
+type ProviderError = {
+  message: string;
+  code: string | null;
+};
+
+async function parseErrorBody(
+  response: Response,
+): Promise<ProviderError> {
   try {
     const data: unknown = await response.json();
-    const message =
+    const errorObj =
       data &&
       typeof data === "object" &&
       "error" in data &&
       data.error &&
-      typeof data.error === "object" &&
-      "message" in data.error
-        ? (data.error as Record<string, unknown>).message
+      typeof data.error === "object"
+        ? (data.error as Record<string, unknown>)
         : null;
 
-    return typeof message === "string"
-      ? message.slice(0, 500)
-      : "OPENAI_ERROR";
+    const message = errorObj?.message;
+    const code = errorObj?.code;
+
+    return {
+      message:
+        typeof message === "string"
+          ? message.slice(0, 500)
+          : "OPENAI_ERROR",
+      code: typeof code === "string" ? code : null,
+    };
   } catch {
-    return "OPENAI_ERROR";
+    return { message: "OPENAI_ERROR", code: null };
   }
+}
+
+/**
+ * Maps an OpenAI-declared error `code` (and, as a fallback, the HTTP
+ * status) to one of our internal OpenAiErrorCode values. This is what
+ * decides both the HTTP status we return to the client and the public
+ * error string (see toPublicError() in the chat route) — so getting
+ * this right is what stops every failure from collapsing into the
+ * generic "AI_PROVIDER_ERROR" message.
+ */
+function mapProviderErrorCode(
+  rawCode: string | null | undefined,
+  httpStatus?: number,
+): OpenAiErrorCode {
+  const code = (rawCode ?? "").toLowerCase();
+
+  if (
+    httpStatus === 401 ||
+    httpStatus === 403 ||
+    code.includes("api_key") ||
+    code.includes("unauthorized") ||
+    code.includes("permission")
+  ) {
+    return "OPENAI_UNAUTHORIZED";
+  }
+
+  if (
+    httpStatus === 429 ||
+    code.includes("rate_limit") ||
+    code.includes("quota")
+  ) {
+    return "OPENAI_RATE_LIMITED";
+  }
+
+  if (
+    code.includes("invalid") ||
+    code.includes("unsupported") ||
+    code.includes("not_found") ||
+    code.includes("context_length") ||
+    code.includes("string_too_long") ||
+    (httpStatus !== undefined &&
+      httpStatus >= 400 &&
+      httpStatus < 500)
+  ) {
+    return "OPENAI_BAD_REQUEST";
+  }
+
+  if (httpStatus !== undefined && httpStatus >= 500) {
+    return "OPENAI_SERVER_ERROR";
+  }
+
+  // No HTTP status (mid-stream failure) and an unrecognized/missing
+  // code: default to a server-side classification rather than
+  // silently mislabeling a client-side problem as ours.
+  return "OPENAI_SERVER_ERROR";
+}
+
+/**
+ * Extracts the real error out of a mid-stream SSE event.
+ *
+ * The Responses API reports failures in three different shapes:
+ *   - `response.failed`  -> error lives at event.response.error
+ *   - `response.error`   -> error lives at event.error
+ *   - `error`            -> error lives at event.error, or sometimes
+ *                           as a bare top-level event.message
+ *
+ * The previous implementation only ever looked at `event.error`,
+ * which is `undefined` for `response.failed` (the most common
+ * failure event), so every such failure fell through to the generic
+ * "OPENAI_STREAM_FAILED" placeholder instead of the model's, or
+ * OpenAI's, actual error message.
+ */
+function extractStreamEventError(
+  event: Record<string, unknown>,
+): ProviderError {
+  const response = event.response;
+
+  if (response && typeof response === "object") {
+    const responseError = (response as Record<string, unknown>)
+      .error;
+
+    if (responseError && typeof responseError === "object") {
+      const message = (responseError as Record<string, unknown>)
+        .message;
+      const code = (responseError as Record<string, unknown>).code;
+
+      if (typeof message === "string") {
+        return {
+          message: message.slice(0, 500),
+          code: typeof code === "string" ? code : null,
+        };
+      }
+    }
+  }
+
+  const directError = event.error;
+
+  if (directError && typeof directError === "object") {
+    const message = (directError as Record<string, unknown>)
+      .message;
+    const code = (directError as Record<string, unknown>).code;
+
+    if (typeof message === "string") {
+      return {
+        message: message.slice(0, 500),
+        code: typeof code === "string" ? code : null,
+      };
+    }
+  }
+
+  const topLevelMessage = event.message;
+
+  if (typeof topLevelMessage === "string") {
+    return {
+      message: topLevelMessage.slice(0, 500),
+      code: null,
+    };
+  }
+
+  return { message: "OPENAI_STREAM_FAILED", code: null };
 }
 
 function toResponsesInput(messages: OpenAiMessage[]) {
@@ -233,11 +366,21 @@ export async function openaiRespond(
     const openaiRequestId = response.headers.get("x-request-id");
 
     if (!response.ok) {
-      const message = await parseErrorBody(response);
+      const { message, code } = await parseErrorBody(response);
+
+      logEvent("openai_error", {
+        requestId,
+        openaiRequestId,
+        model: openaiConfig.model,
+        httpStatus: response.status,
+        providerCode: code,
+      });
 
       throw new OpenAiError(
         message,
-        classifyStatus(response.status),
+        code
+          ? mapProviderErrorCode(code, response.status)
+          : classifyStatus(response.status),
         requestId,
         response.status,
       );
@@ -315,11 +458,21 @@ export async function* openaiRespondStream(
     const openaiRequestId = response.headers.get("x-request-id");
 
     if (!response.ok || !response.body) {
-      const message = await parseErrorBody(response);
+      const { message, code } = await parseErrorBody(response);
+
+      logEvent("openai_error", {
+        requestId,
+        openaiRequestId,
+        model: openaiConfig.model,
+        httpStatus: response.status,
+        providerCode: code,
+      });
 
       throw new OpenAiError(
         message,
-        classifyStatus(response.status),
+        code
+          ? mapProviderErrorCode(code, response.status)
+          : classifyStatus(response.status),
         requestId,
         response.status,
       );
@@ -375,22 +528,24 @@ export async function* openaiRespondStream(
           yield delta;
         } else if (
           eventType === "response.failed" ||
+          eventType === "response.error" ||
           eventType === "error"
         ) {
-          const failure = event as Record<string, unknown>;
+          const { message, code } = extractStreamEventError(
+            event as Record<string, unknown>,
+          );
 
-          const nestedError =
-            failure.error &&
-            typeof failure.error === "object"
-              ? (failure.error as Record<string, unknown>).message
-              : null;
+          logEvent("openai_error", {
+            requestId,
+            openaiRequestId,
+            model: openaiConfig.model,
+            eventType,
+            providerCode: code,
+          });
 
           throw new OpenAiError(
-            String(nestedError ?? "OPENAI_STREAM_FAILED").slice(
-              0,
-              500,
-            ),
-            "OPENAI_SERVER_ERROR",
+            message,
+            mapProviderErrorCode(code),
             requestId,
           );
         }
