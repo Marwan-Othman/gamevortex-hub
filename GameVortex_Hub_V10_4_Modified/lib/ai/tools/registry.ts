@@ -7,6 +7,7 @@ import {
 
 import {
   getGame,
+  getPlatformGames,
   searchGames,
 } from "./games";
 
@@ -131,6 +132,52 @@ export const AI_TOOL_REGISTRY:
 
       execute:
         getGame,
+    },
+
+    {
+      name:
+        "getPlatformGames",
+
+      description:
+        "Get published GameVortex games assigned to a specific platform.",
+
+      inputSchema:
+        z.object({
+          platform:
+            z.enum([
+              "PC",
+              "PLAYSTATION",
+              "XBOX",
+              "NINTENDO",
+              "ANDROID",
+              "IOS",
+              "MAC",
+              "LINUX",
+              "STEAM_DECK",
+              "WEB",
+            ]),
+
+          pagination:
+            z.object({
+              page: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .default(1),
+
+              limit: z
+                .number()
+                .int()
+                .min(1)
+                .max(25)
+                .default(10),
+            })
+              .optional(),
+        }),
+
+      execute:
+        getPlatformGames,
     },
 
     {
