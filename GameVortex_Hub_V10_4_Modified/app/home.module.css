@@ -611,6 +611,238 @@
 }
 
 /* =========================
+   AI + VIP HOME CARDS
+========================= */
+
+.aiVipSection {
+  position: relative;
+  width: min(1400px, calc(100% - 28px));
+  margin: 4px auto 38px;
+  overflow: hidden;
+}
+
+.aiVipGlow {
+  position: absolute;
+  width: 430px;
+  height: 240px;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(155, 92, 255, 0.12),
+      rgba(53, 231, 255, 0.08)
+    );
+  filter: blur(75px);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.aiVipGrid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.aiHomeCard,
+.vipHomeCard {
+  position: relative;
+  min-height: 185px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 25px 26px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+  color: #fff;
+  text-decoration: none;
+  box-shadow:
+    0 20px 55px rgba(0, 0, 0, 0.3),
+    inset 0 1px rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.aiHomeCard {
+  background:
+    radial-gradient(
+      circle at 85% 25%,
+      rgba(53, 231, 255, 0.13),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(22, 25, 57, 0.96),
+      rgba(9, 8, 23, 0.96)
+    );
+}
+
+.vipHomeCard {
+  background:
+    radial-gradient(
+      circle at 85% 25%,
+      rgba(255, 215, 106, 0.13),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(39, 25, 55, 0.96),
+      rgba(13, 8, 23, 0.96)
+    );
+}
+
+.aiHomeCard::before,
+.vipHomeCard::before {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -80px;
+  bottom: -100px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.aiHomeCard::before {
+  background: rgba(53, 231, 255, 0.13);
+  filter: blur(35px);
+}
+
+.vipHomeCard::before {
+  background: rgba(255, 215, 106, 0.13);
+  filter: blur(35px);
+}
+
+.aiHomeCard:hover,
+.vipHomeCard:hover {
+  transform: translateY(-5px);
+}
+
+.aiHomeCard:hover {
+  border-color: rgba(53, 231, 255, 0.28);
+  box-shadow:
+    0 28px 65px rgba(0, 0, 0, 0.38),
+    0 0 35px rgba(53, 231, 255, 0.07);
+}
+
+.vipHomeCard:hover {
+  border-color: rgba(255, 215, 106, 0.28);
+  box-shadow:
+    0 28px 65px rgba(0, 0, 0, 0.38),
+    0 0 35px rgba(255, 215, 106, 0.07);
+}
+
+.homeCardIcon {
+  position: relative;
+  z-index: 2;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.09),
+    0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.aiHomeCard .homeCardIcon {
+  color: var(--gv-cyan);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.09),
+    0 0 28px rgba(53, 231, 255, 0.08);
+}
+
+.vipHomeCard .homeCardIcon {
+  color: var(--gv-gold);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.09),
+    0 0 28px rgba(255, 215, 106, 0.08);
+}
+
+.homeCardIcon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.homeCardContent {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  flex: 1;
+}
+
+.homeCardLabel {
+  display: inline-block;
+  margin-bottom: 7px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.aiHomeCard .homeCardLabel {
+  color: #8eefff;
+}
+
+.vipHomeCard .homeCardLabel {
+  color: #ffe49a;
+}
+
+.homeCardContent h2 {
+  margin: 0 0 7px;
+  color: #faf7ff;
+  font-size: clamp(18px, 2.2vw, 25px);
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+}
+
+.homeCardContent p {
+  max-width: 480px;
+  margin: 0;
+  color: #aaa2b9;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.homeCardArrow {
+  position: relative;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 18px;
+  transition:
+    transform 180ms ease,
+    background 180ms ease;
+}
+
+.aiHomeCard:hover .homeCardArrow {
+  transform: translateX(-4px);
+  background: rgba(53, 231, 255, 0.1);
+}
+
+.vipHomeCard:hover .homeCardArrow {
+  transform: translateX(-4px);
+  background: rgba(255, 215, 106, 0.1);
+}
+
+/* =========================
    VIP
 ========================= */
 
@@ -793,7 +1025,8 @@
 
   .hero,
   .section,
-  .vip {
+  .vip,
+  .aiVipSection {
     width: min(1440px, calc(100% - 56px));
   }
 
@@ -821,6 +1054,17 @@
 
   .gameCard {
     flex-basis: 245px;
+  }
+
+  .aiHomeCard,
+  .vipHomeCard {
+    min-height: 205px;
+    padding: 30px;
+  }
+
+  .homeCardIcon {
+    width: 64px;
+    height: 64px;
   }
 }
 
@@ -956,6 +1200,62 @@
     font-size: 9px;
   }
 
+  /* =========================
+     AI + VIP MOBILE
+  ========================= */
+
+  .aiVipSection {
+    width: calc(100% - 20px);
+    margin: 0 auto 30px;
+  }
+
+  .aiVipGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .aiHomeCard,
+  .vipHomeCard {
+    min-height: 165px;
+    padding: 20px 18px;
+    gap: 13px;
+    border-radius: 20px;
+  }
+
+  .homeCardIcon {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+  }
+
+  .homeCardIcon svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .homeCardLabel {
+    margin-bottom: 5px;
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
+
+  .homeCardContent h2 {
+    margin-bottom: 5px;
+    font-size: 17px;
+    line-height: 1.35;
+  }
+
+  .homeCardContent p {
+    font-size: 10px;
+    line-height: 1.7;
+  }
+
+  .homeCardArrow {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+  }
+
   .vip {
     width: calc(100% - 20px);
     min-height: 210px;
@@ -984,6 +1284,44 @@
 }
 
 /* =========================
+   SMALL PHONES
+========================= */
+
+@media (max-width: 399px) {
+  .aiHomeCard,
+  .vipHomeCard {
+    min-height: 155px;
+    padding: 18px 15px;
+    gap: 10px;
+  }
+
+  .homeCardIcon {
+    width: 43px;
+    height: 43px;
+    border-radius: 13px;
+  }
+
+  .homeCardIcon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .homeCardContent h2 {
+    font-size: 15px;
+  }
+
+  .homeCardContent p {
+    font-size: 9px;
+  }
+
+  .homeCardArrow {
+    width: 29px;
+    height: 29px;
+    font-size: 13px;
+  }
+}
+
+/* =========================
    REDUCED MOTION
 ========================= */
 
@@ -998,7 +1336,10 @@
   .categoryTile,
   .gameCard,
   .gameCoverWrap img,
-  .vipBtn {
+  .vipBtn,
+  .aiHomeCard,
+  .vipHomeCard,
+  .homeCardArrow {
     transition: none;
   }
 }
