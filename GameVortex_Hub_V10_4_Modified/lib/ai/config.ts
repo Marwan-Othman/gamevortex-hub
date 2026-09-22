@@ -1,13 +1,8 @@
 /**
  * Central AI model configuration.
  *
- * This is the ONLY place the OpenAI model name is ever set.
- * Every other file must import `openaiConfig` from here — never
- * hardcode a model string (e.g. "gpt-6-astra") anywhere else.
- *
- * To change the model:
- *   - permanently: edit OPENAI_MODEL_DEFAULT below, or
- *   - without a code change: set the OPENAI_MODEL env var.
+ * The OpenAI API key is NEVER stored here.
+ * It is read only by the server-side OpenAI client.
  */
 
 export type ReasoningEffort =
@@ -26,19 +21,23 @@ const REASONING_EFFORTS: ReasoningEffort[] = [
 ];
 
 /**
- * OpenAI's current flagship model for hard end-to-end work
- * (reasoning, coding, computer use, research, document creation).
+ * Default GameVortex AI model.
+ *
+ * Can be overridden safely with OPENAI_MODEL.
  */
-const OPENAI_MODEL_DEFAULT = "gpt-6-astra";
+const OPENAI_MODEL_DEFAULT = "gpt-5.6-luna";
 
 const OPENAI_TIMEOUT_MS_DEFAULT = 60_000;
 const OPENAI_MAX_OUTPUT_TOKENS_DEFAULT = 2_000;
-const OPENAI_REASONING_EFFORT_DEFAULT: ReasoningEffort = "medium";
+const OPENAI_REASONING_EFFORT_DEFAULT: ReasoningEffort =
+  "medium";
 
 function readReasoningEffort(): ReasoningEffort {
   const value = process.env.OPENAI_REASONING_EFFORT;
 
-  return (REASONING_EFFORTS as string[]).includes(String(value))
+  return (REASONING_EFFORTS as string[]).includes(
+    String(value),
+  )
     ? (value as ReasoningEffort)
     : OPENAI_REASONING_EFFORT_DEFAULT;
 }
@@ -62,7 +61,6 @@ function readPositiveInt(
 }
 
 export const openaiConfig = {
-  /** Single source of truth for the model name used everywhere. */
   model:
     process.env.OPENAI_MODEL?.trim() ||
     OPENAI_MODEL_DEFAULT,
