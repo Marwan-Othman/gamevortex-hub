@@ -57,7 +57,26 @@ const getGameSchema = z.object({
   },
 );
 
-function normalizeOptional(value?: string): string | undefined {
+const getPlatformGamesSchema = z.object({
+  platform: z.enum([
+    "PC",
+    "PLAYSTATION",
+    "XBOX",
+    "NINTENDO",
+    "ANDROID",
+    "IOS",
+    "MAC",
+    "LINUX",
+    "STEAM_DECK",
+    "WEB",
+  ]),
+
+  pagination: aiToolPaginationSchema.optional(),
+});
+
+function normalizeOptional(
+  value?: string,
+): string | undefined {
   if (!value) {
     return undefined;
   }
@@ -392,6 +411,137 @@ export async function getGame(
           (item) => item.platform,
         ),
     });
+  } catch (error) {
+    return aiToolErrorResult(error);
+  }
+}
+
+/**
+ * GameVortex AI Tool:
+ * Get published games assigned to one GameVortex platform.
+ */
+export async function getPlatformGames(
+  rawInput: unknown,
+) {
+  try {
+    await requireAiToolUser();
+
+    const input = parseAiToolInput(
+      getPlatformGamesSchema,
+      rawInput,
+    );
+
+    const pagination = {
+      page:
+        input.pagination?.page ?? 1,
+
+      limit:
+        input.pagination?.limit ?? 10,
+    };
+
+    const { skip, take } =
+      getAiToolPagination(
+        pagination,
+      );
+
+    const where = {
+      published: true,
+
+      gamePlatforms: {
+        some: {
+          platform: input.platform,
+        },
+      },
+    };
+
+    const [games, total] =
+      await Promise.all([
+        db.game.findMany({
+          where,
+          orderBy: [
+            {
+              featured: "desc",
+            },
+            {
+              ratingAverage: "desc",
+            },
+            {
+              ratingCount: "desc",
+            },
+            {
+              titleEn: "asc",
+            },
+          ],
+          skip,
+          take,
+
+          select: {
+            id: true,
+            slug: true,
+            titleAr: true,
+            titleEn: true,
+            description: true,
+            platform: true,
+            genre: true,
+            priceCents: true,
+            discountPercent: true,
+            coverUrl: true,
+            officialUrl: true,
+            ratingAverage: true,
+            ratingCount: true,
+            featured: true,
+
+            gamePlatforms: {
+              select: {
+                platform: true,
+              },
+              orderBy: {
+                platform: "asc",
+              },
+            },
+          },
+        }),
+
+        db.game.count({
+          where,
+        }),
+      ]);
+
+    return aiToolResult(
+      games.map((game) => ({
+        id: game.id,
+        slug: game.slug,
+        titleAr: game.titleAr,
+        titleEn: game.titleEn,
+        description: game.description,
+        platform: game.platform,
+        genre: game.genre,
+        priceCents: game.priceCents,
+        discountPercent:
+          game.discountPercent,
+        coverUrl: game.coverUrl,
+        officialUrl: game.officialUrl,
+        ratingAverage:
+          game.ratingAverage,
+        ratingCount:
+          game.ratingCount,
+        featured: game.featured,
+
+        platforms:
+          game.gamePlatforms.map(
+            (item) => item.platform,
+          ),
+      })),
+
+      {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        returned: games.length,
+        hasMore:
+          skip + games.length < total,
+      },
+    );
   } catch (error) {
     return aiToolErrorResult(error);
   }
