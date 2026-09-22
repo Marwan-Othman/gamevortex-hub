@@ -20,6 +20,11 @@ import {
 } from "@/lib/ai";
 
 import {
+  openaiRespondStream,
+  OpenAiError,
+} from "@/lib/ai/openai";
+
+import {
   consumeChatCredits,
   releaseAiCredits,
 } from "@/lib/vip-credits";
@@ -28,8 +33,7 @@ import {
   logSystemError,
 } from "@/lib/observability";
 
-export const runtime =
-  "nodejs";
+export const runtime = "nodejs";
 
 const schema =
   z.object({
@@ -45,6 +49,11 @@ const schema =
         .min(1)
         .max(255)
         .optional(),
+
+    stream:
+      z.boolean()
+        .optional()
+        .default(false),
   });
 
 const SYSTEM_PROMPT = `
@@ -63,9 +72,124 @@ const SYSTEM_PROMPT = `
 - كن واضحًا ومفيدًا ومختصرًا قدر الإمكان.
 `.trim();
 
+function getOpenAiErrorCode(
+  error: unknown,
+): string {
+  if (
+    error instanceof OpenAiError
+  ) {
+    return error.code;
+  }
+
+  if (
+    error instanceof Error
+  ) {
+    return error.message;
+  }
+
+  return "AI_FAILED";
+}
+
+function getErrorStatus(
+  errorCode: string,
+): number {
+  switch (errorCode) {
+    case "OPENAI_NOT_CONFIGURED":
+      return 503;
+
+    case "OPENAI_TIMEOUT":
+      return 504;
+
+    case "OPENAI_RATE_LIMITED":
+      return 429;
+
+    case "OPENAI_UNAUTHORIZED":
+      return 502;
+
+    case "OPENAI_BAD_REQUEST":
+      return 400;
+
+    case "OPENAI_SERVER_ERROR":
+      return 502;
+
+    case "OPENAI_INVALID_RESPONSE":
+      return 502;
+
+    case "OPENAI_NETWORK_ERROR":
+      return 502;
+
+    case "AI_CREDITS_EXHAUSTED":
+      return 400;
+
+    case "UNAUTHORIZED":
+      return 401;
+
+    case "INVALID_MESSAGE":
+      return 400;
+
+    default:
+      return 500;
+  }
+}
+
+function toPublicError(
+  error: unknown,
+): string {
+  const code =
+    getOpenAiErrorCode(error);
+
+  switch (code) {
+    case "OPENAI_NOT_CONFIGURED":
+      return "AI_PROVIDER_NOT_CONFIGURED";
+
+    case "OPENAI_TIMEOUT":
+      return "AI_TIMEOUT";
+
+    case "OPENAI_RATE_LIMITED":
+      return "AI_PROVIDER_RATE_LIMITED";
+
+    case "OPENAI_UNAUTHORIZED":
+      return "AI_PROVIDER_UNAUTHORIZED";
+
+    case "OPENAI_BAD_REQUEST":
+      return "AI_PROVIDER_BAD_REQUEST";
+
+    case "OPENAI_SERVER_ERROR":
+      return "AI_PROVIDER_ERROR";
+
+    case "OPENAI_INVALID_RESPONSE":
+      return "AI_PROVIDER_INVALID_RESPONSE";
+
+    case "OPENAI_NETWORK_ERROR":
+      return "AI_PROVIDER_NETWORK_ERROR";
+
+    default:
+      return code;
+  }
+}
+
+async function logAiFailure(
+  error: unknown,
+  statusCode: number,
+  userId?: string,
+) {
+  await logSystemError(
+    "ai:chat",
+    error,
+    {
+      statusCode,
+      userId,
+    },
+  );
+}
+
 export async function POST(
   request: NextRequest,
 ) {
+  /*
+   * Authentication and rate limiting happen before
+   * contacting OpenAI.
+   */
   const blocked =
     await guardMutation(
       request,
@@ -82,14 +206,16 @@ export async function POST(
     | undefined;
 
   try {
+    /*
+     * Authentication.
+     */
     const user =
       await getOptionalUser();
 
     if (!user) {
       return NextResponse.json(
         {
-          error:
-            "UNAUTHORIZED",
+          error: "UNAUTHORIZED",
         },
         {
           status: 401,
@@ -97,9 +223,11 @@ export async function POST(
       );
     }
 
-    userId =
-      user.id;
+    userId = user.id;
 
+    /*
+     * Validate request body.
+     */
     const body =
       await request.json();
 
@@ -107,6 +235,7 @@ export async function POST(
       message,
       idempotencyKey:
         requestedIdempotencyKey,
+      stream,
     } =
       schema.parse(body);
 
@@ -115,122 +244,274 @@ export async function POST(
       randomUUID();
 
     /*
-     * Reserve one server-side chat credit before
-     * calling the external AI provider. If the provider
-     * fails, the reservation is released.
+     * Reserve one AI chat credit before
+     * contacting OpenAI.
+     *
+     * If OpenAI fails, the reservation is
+     * released below.
      */
     await consumeChatCredits({
-      userId:
-        user.id,
-
+      userId: user.id,
       amount: 1,
-
       idempotencyKey,
-
       metadata: {
-        source:
-          "ai:chat",
+        source: "ai:chat",
+        provider: "openai",
       },
     });
 
-    try {
-      const answer =
-        await aiChat([
+    /*
+     * --------------------------------------------------
+     * NON-STREAMING MODE
+     * --------------------------------------------------
+     */
+    if (!stream) {
+      try {
+        const answer =
+          await aiChat([
+            {
+              role: "system",
+              content: SYSTEM_PROMPT,
+            },
+            {
+              role: "user",
+              content: message,
+            },
+          ]);
+
+        return NextResponse.json({
+          answer,
+          authenticated: true,
+          provider: "OpenAI",
+          idempotencyKey,
+        });
+      } catch (error) {
+        await releaseAiCredits(
+          idempotencyKey,
+        );
+
+        const publicError =
+          toPublicError(error);
+
+        const status =
+          getErrorStatus(
+            publicError ===
+              "AI_PROVIDER_NOT_CONFIGURED"
+              ? "OPENAI_NOT_CONFIGURED"
+              : publicError ===
+                  "AI_TIMEOUT"
+                ? "OPENAI_TIMEOUT"
+                : publicError ===
+                    "AI_PROVIDER_RATE_LIMITED"
+                  ? "OPENAI_RATE_LIMITED"
+                  : publicError,
+          );
+
+        await logAiFailure(
+          error,
+          status,
+          userId,
+        );
+
+        return NextResponse.json(
           {
-            role:
-              "system",
-            content:
-              SYSTEM_PROMPT,
+            error: publicError,
           },
           {
-            role:
-              "user",
-            content:
-              message,
+            status,
           },
-        ]);
-
-      return NextResponse.json({
-        answer,
-        authenticated:
-          true,
-        provider:
-          "GameVortex AI",
-        idempotencyKey,
-      });
-    } catch (error) {
-      await releaseAiCredits(
-        idempotencyKey,
-      );
-
-      throw error;
+        );
+      }
     }
+
+    /*
+     * --------------------------------------------------
+     * STREAMING MODE
+     * --------------------------------------------------
+     *
+     * We use Server-Sent Events (SSE).
+     *
+     * The browser receives:
+     *
+     * data: {"type":"delta","text":"..."}
+     *
+     * and finally:
+     *
+     * data: {"type":"done"}
+     */
+    const encoder =
+      new TextEncoder();
+
+    let completed = false;
+
+    const streamBody =
+      new ReadableStream<Uint8Array>({
+        async start(controller) {
+          try {
+            for await (
+              const delta of openaiRespondStream(
+                [
+                  {
+                    role: "system",
+                    content:
+                      SYSTEM_PROMPT,
+                  },
+                  {
+                    role: "user",
+                    content: message,
+                  },
+                ],
+              )
+            ) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "delta",
+                    text: delta,
+                  })}\n\n`,
+                ),
+              );
+            }
+
+            completed = true;
+
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "done",
+                  idempotencyKey,
+                  provider: "OpenAI",
+                })}\n\n`,
+              ),
+            );
+
+            controller.close();
+          } catch (error) {
+            /*
+             * If OpenAI fails after the response has
+             * already started, we cannot replace it with
+             * a normal JSON response. We send an SSE
+             * error event instead.
+             */
+            if (!completed) {
+              try {
+                await releaseAiCredits(
+                  idempotencyKey,
+                );
+              } catch (releaseError) {
+                await logAiFailure(
+                  releaseError,
+                  500,
+                  userId,
+                );
+              }
+            }
+
+            const publicError =
+              toPublicError(error);
+
+            const status =
+              getErrorStatus(
+                publicError ===
+                  "AI_PROVIDER_NOT_CONFIGURED"
+                  ? "OPENAI_NOT_CONFIGURED"
+                  : publicError ===
+                      "AI_TIMEOUT"
+                    ? "OPENAI_TIMEOUT"
+                    : publicError ===
+                        "AI_PROVIDER_RATE_LIMITED"
+                      ? "OPENAI_RATE_LIMITED"
+                      : publicError,
+              );
+
+            await logAiFailure(
+              error,
+              status,
+              userId,
+            );
+
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: publicError,
+                })}\n\n`,
+              ),
+            );
+
+            controller.close();
+          }
+        },
+      });
+
+    return new Response(
+      streamBody,
+      {
+        status: 200,
+        headers: {
+          "Content-Type":
+            "text/event-stream; charset=utf-8",
+          "Cache-Control":
+            "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering":
+            "no",
+        },
+      },
+    );
   } catch (error) {
     const errorCode =
-      error instanceof
-      z.ZodError
+      error instanceof z.ZodError
         ? "INVALID_MESSAGE"
-        : error instanceof
-              Error &&
-            error.message ===
-              "UNAUTHORIZED"
-          ? "UNAUTHORIZED"
-          : error instanceof
-                Error &&
-              error.message ===
-                "AI_CREDITS_EXHAUSTED"
-            ? "AI_CREDITS_EXHAUSTED"
-            : error instanceof
-                  Error &&
-            error.message ===
-              "AI_PROVIDER_NOT_CONFIGURED"
-          ? "AI_PROVIDER_NOT_CONFIGURED"
-          : error instanceof
-                Error &&
-              error.message ===
-                "AI_PROVIDER_URL_INVALID"
-            ? "AI_PROVIDER_URL_INVALID"
-            : "AI_FAILED";
+        : error instanceof Error
+          ? error.message
+          : "AI_FAILED";
 
     const status =
-      errorCode ===
-        "AI_PROVIDER_NOT_CONFIGURED" ||
-      errorCode ===
-        "AI_PROVIDER_URL_INVALID"
-        ? 503
-        : errorCode ===
-            "UNAUTHORIZED"
-          ? 401
-          : errorCode ===
-              "INVALID_MESSAGE" ||
-            errorCode ===
-              "AI_CREDITS_EXHAUSTED"
-            ? 400
-            : 500;
+      getErrorStatus(
+        errorCode,
+      );
 
     if (
       errorCode ===
-        "AI_FAILED" ||
-      errorCode ===
-        "AI_PROVIDER_NOT_CONFIGURED" ||
-      errorCode ===
-        "AI_PROVIDER_URL_INVALID"
+        "AI_CREDITS_EXHAUSTED"
     ) {
-      await logSystemError(
-        "ai:chat",
-        error,
+      return NextResponse.json(
         {
-          statusCode:
-            status,
-          userId,
+          error:
+            "AI_CREDITS_EXHAUSTED",
+        },
+        {
+          status: 400,
         },
       );
     }
 
+    if (
+      errorCode ===
+      "INVALID_MESSAGE"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "INVALID_MESSAGE",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    await logAiFailure(
+      error,
+      status,
+      userId,
+    );
+
     return NextResponse.json(
       {
         error:
-          errorCode,
+          toPublicError(error),
       },
       {
         status,
