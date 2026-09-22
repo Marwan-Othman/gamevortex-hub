@@ -4,6 +4,7 @@ import {
   FormEvent,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -30,6 +31,14 @@ type Conversation = {
 };
 
 type StreamEvent =
+  | {
+      type: "meta";
+      idempotencyKey?: string;
+      provider?: string;
+      conversationId?: string;
+      userMessageId?: string;
+      assistantMessageId?: string;
+    }
   | {
       type: "delta";
       text: string;
@@ -160,6 +169,11 @@ export default function AIChat() {
   ] = useState(false);
 
   const [
+    stopping,
+    setStopping,
+  ] = useState(false);
+
+  const [
     historyLoading,
     setHistoryLoading,
   ] = useState(false);
@@ -178,9 +192,27 @@ export default function AIChat() {
 
   /*
    * =====================================================
+   * STREAM CONTROL
+   * =====================================================
+   */
+
+  const abortControllerRef =
+    useRef<AbortController | null>(
+      null,
+    );
+
+  const assistantMessageIdRef =
+    useRef<string | null>(null);
+
+  const stoppedRef =
+    useRef(false);
+
+  /*
+   * =====================================================
    * LOAD CONVERSATIONS
    * =====================================================
    */
+
   const loadConversations =
     useCallback(
       async () => {
@@ -259,6 +291,7 @@ export default function AIChat() {
    * OPEN EXISTING CONVERSATION
    * =====================================================
    */
+
   const openConversation =
     useCallback(
       async (
@@ -266,7 +299,8 @@ export default function AIChat() {
       ) => {
         if (
           loading ||
-          historyLoading
+          historyLoading ||
+          stopping
         ) {
           return;
         }
@@ -393,6 +427,7 @@ export default function AIChat() {
       [
         loading,
         historyLoading,
+        stopping,
       ],
     );
 
@@ -400,14 +435,13 @@ export default function AIChat() {
    * =====================================================
    * NEW CHAT
    * =====================================================
-   *
-   * We intentionally do not create the DB record here.
-   * The server creates it when the first message is sent.
    */
+
   function startNewChat() {
     if (
       loading ||
-      historyLoading
+      historyLoading ||
+      stopping
     ) {
       return;
     }
@@ -425,13 +459,131 @@ export default function AIChat() {
     setErrorMessage(
       null,
     );
+
+    assistantMessageIdRef.current =
+      null;
   }
+
+  /*
+   * =====================================================
+   * STOP CURRENT RESPONSE
+   * =====================================================
+   */
+
+  const stopGeneration =
+    useCallback(
+      async () => {
+        if (
+          !loading ||
+          stopping
+        ) {
+          return;
+        }
+
+        const assistantMessageId =
+          assistantMessageIdRef.current;
+
+        stoppedRef.current = true;
+
+        setStopping(true);
+        setErrorMessage(null);
+
+        /*
+         * Update the local UI immediately so the user
+         * does not have to wait for the network request.
+         */
+        setMessages(
+          (current) => {
+            const updated =
+              [...current];
+
+            const lastIndex =
+              updated.length -
+              1;
+
+            const last =
+              updated[
+                lastIndex
+              ];
+
+            if (
+              last?.role ===
+              "assistant"
+            ) {
+              updated[
+                lastIndex
+              ] = {
+                ...last,
+                status: "STOPPED",
+              };
+            }
+
+            return updated;
+          },
+        );
+
+        /*
+         * Tell the server to change the persisted message
+         * from PENDING/STREAMING to STOPPED.
+         */
+        if (
+          assistantMessageId
+        ) {
+          try {
+            const response =
+              await fetch(
+                `/api/ai/messages/${assistantMessageId}`,
+                {
+                  method: "PATCH",
+
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+
+                  body: JSON.stringify({
+                    action: "stop",
+                  }),
+                },
+              );
+
+            if (!response.ok) {
+              console.error(
+                "AI stop request failed:",
+                response.status,
+              );
+            }
+          } catch (error) {
+            console.error(
+              "AI stop request error:",
+              error,
+            );
+          }
+        }
+
+        /*
+         * Abort the browser-side stream.
+         */
+        abortControllerRef.current?.abort();
+
+        abortControllerRef.current =
+          null;
+
+        setLoading(false);
+        setStopping(false);
+      },
+      [
+        loading,
+        stopping,
+      ],
+    );
 
   /*
    * =====================================================
    * SEND MESSAGE
    * =====================================================
    */
+
   async function sendMessage(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -443,7 +595,8 @@ export default function AIChat() {
     if (
       !text ||
       loading ||
-      historyLoading
+      historyLoading ||
+      stopping
     ) {
       return;
     }
@@ -451,6 +604,18 @@ export default function AIChat() {
     setErrorMessage(
       null,
     );
+
+    stoppedRef.current =
+      false;
+
+    assistantMessageIdRef.current =
+      null;
+
+    const controller =
+      new AbortController();
+
+    abortControllerRef.current =
+      controller;
 
     const userMessage: Message =
       {
@@ -470,10 +635,10 @@ export default function AIChat() {
 
     setInput("");
     setLoading(true);
+    setStopping(false);
 
     /*
      * Create the assistant placeholder.
-     * Streaming tokens will be inserted into it.
      */
     setMessages(
       (current) => [
@@ -481,6 +646,7 @@ export default function AIChat() {
         {
           role: "assistant",
           content: "",
+          status: "STREAMING",
         },
       ],
     );
@@ -513,12 +679,14 @@ export default function AIChat() {
 
                 stream: true,
               }),
+
+            signal:
+              controller.signal,
           },
         );
 
       /*
-       * Errors that happen before Streaming starts
-       * are returned as JSON.
+       * Errors before streaming starts.
        */
       if (!response.ok) {
         let data:
@@ -558,8 +726,13 @@ export default function AIChat() {
       let finished = false;
       let receivedAssistantText =
         false;
+      let receivedDone =
+        false;
 
-      while (!finished) {
+      while (
+        !finished &&
+        !stoppedRef.current
+      ) {
         const {
           done,
           value,
@@ -589,6 +762,12 @@ export default function AIChat() {
         for (
           const eventBlock of events
         ) {
+          if (
+            stoppedRef.current
+          ) {
+            break;
+          }
+
           const dataLine =
             eventBlock
               .split("\n")
@@ -627,9 +806,76 @@ export default function AIChat() {
 
           /*
            * -----------------------------------------------
+           * STREAM META
+           * -----------------------------------------------
+           *
+           * The server sends the assistant message ID
+           * before the actual tokens. This ID is required
+           * by the Stop endpoint.
+           */
+          if (
+            eventData.type ===
+            "meta"
+          ) {
+            if (
+              eventData.conversationId
+            ) {
+              setCurrentConversationId(
+                eventData.conversationId,
+              );
+            }
+
+            if (
+              eventData.assistantMessageId
+            ) {
+              assistantMessageIdRef.current =
+                eventData.assistantMessageId;
+
+              setMessages(
+                (current) => {
+                  const updated =
+                    [...current];
+
+                  const lastIndex =
+                    updated.length -
+                    1;
+
+                  const last =
+                    updated[
+                      lastIndex
+                    ];
+
+                  if (
+                    last?.role ===
+                    "assistant"
+                  ) {
+                    updated[
+                      lastIndex
+                    ] = {
+                      ...last,
+
+                      id:
+                        eventData.assistantMessageId,
+
+                      status:
+                        "STREAMING",
+                    };
+                  }
+
+                  return updated;
+                },
+              );
+            }
+
+            continue;
+          }
+
+          /*
+           * -----------------------------------------------
            * STREAM DELTA
            * -----------------------------------------------
            */
+
           if (
             eventData.type ===
             "delta"
@@ -678,11 +924,16 @@ export default function AIChat() {
                   content:
                     last.content +
                     delta,
+
+                  status:
+                    "STREAMING",
                 };
 
                 return updated;
               },
             );
+
+            continue;
           }
 
           /*
@@ -690,6 +941,7 @@ export default function AIChat() {
            * STREAM ERROR
            * -----------------------------------------------
            */
+
           if (
             eventData.type ===
             "error"
@@ -705,15 +957,93 @@ export default function AIChat() {
            * STREAM COMPLETE
            * -----------------------------------------------
            */
+
           if (
             eventData.type ===
             "done"
           ) {
+            receivedDone =
+              true;
+
             if (
               eventData.conversationId
             ) {
               setCurrentConversationId(
                 eventData.conversationId,
+              );
+            }
+
+            if (
+              eventData.assistantMessageId
+            ) {
+              assistantMessageIdRef.current =
+                eventData.assistantMessageId;
+
+              setMessages(
+                (current) => {
+                  const updated =
+                    [...current];
+
+                  const lastIndex =
+                    updated.length -
+                    1;
+
+                  const last =
+                    updated[
+                      lastIndex
+                    ];
+
+                  if (
+                    last?.role ===
+                    "assistant"
+                  ) {
+                    updated[
+                      lastIndex
+                    ] = {
+                      ...last,
+
+                      id:
+                        eventData.assistantMessageId,
+
+                      status:
+                        "COMPLETE",
+                    };
+                  }
+
+                  return updated;
+                },
+              );
+            } else {
+              setMessages(
+                (current) => {
+                  const updated =
+                    [...current];
+
+                  const lastIndex =
+                    updated.length -
+                    1;
+
+                  const last =
+                    updated[
+                      lastIndex
+                    ];
+
+                  if (
+                    last?.role ===
+                    "assistant"
+                  ) {
+                    updated[
+                      lastIndex
+                    ] = {
+                      ...last,
+
+                      status:
+                        "COMPLETE",
+                    };
+                  }
+
+                  return updated;
+                },
               );
             }
 
@@ -726,11 +1056,57 @@ export default function AIChat() {
       }
 
       /*
+       * -------------------------------------------------
+       * STOPPED
+       * -------------------------------------------------
+       *
+       * Do not turn an intentional abort into an error.
+       */
+      if (
+        stoppedRef.current
+      ) {
+        setMessages(
+          (current) => {
+            const updated =
+              [...current];
+
+            const lastIndex =
+              updated.length -
+              1;
+
+            const last =
+              updated[
+                lastIndex
+              ];
+
+            if (
+              last?.role ===
+              "assistant"
+            ) {
+              updated[
+                lastIndex
+              ] = {
+                ...last,
+                status: "STOPPED",
+              };
+            }
+
+            return updated;
+          },
+        );
+
+        await loadConversations();
+
+        return;
+      }
+
+      /*
        * If the server closed the stream without sending
        * a valid assistant response.
        */
       if (
-        !receivedAssistantText
+        !receivedAssistantText &&
+        !receivedDone
       ) {
         setMessages(
           (current) => {
@@ -754,7 +1130,7 @@ export default function AIChat() {
               ];
 
             if (
-              last.role ===
+              last?.role ===
                 "assistant" &&
               !last.content.trim()
             ) {
@@ -762,6 +1138,9 @@ export default function AIChat() {
                 lastIndex
               ] = {
                 ...last,
+
+                status:
+                  "ERROR",
 
                 content:
                   "لم يصل رد من GameVortex AI.",
@@ -773,6 +1152,54 @@ export default function AIChat() {
         );
       }
     } catch (error) {
+      /*
+       * AbortController throws AbortError when Stop
+       * intentionally cancels the browser request.
+       */
+      if (
+        stoppedRef.current ||
+        (
+          error instanceof
+            DOMException &&
+          error.name ===
+            "AbortError"
+        )
+      ) {
+        setMessages(
+          (current) => {
+            const updated =
+              [...current];
+
+            const lastIndex =
+              updated.length -
+              1;
+
+            const last =
+              updated[
+                lastIndex
+              ];
+
+            if (
+              last?.role ===
+              "assistant"
+            ) {
+              updated[
+                lastIndex
+              ] = {
+                ...last,
+
+                status:
+                  "STOPPED",
+              };
+            }
+
+            return updated;
+          },
+        );
+
+        return;
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -810,6 +1237,9 @@ export default function AIChat() {
             ] = {
               ...last,
 
+              status:
+                "ERROR",
+
               content:
                 `تعذر تنفيذ الطلب: ${message}`,
             };
@@ -819,9 +1249,36 @@ export default function AIChat() {
         },
       );
     } finally {
+      if (
+        abortControllerRef.current ===
+        controller
+      ) {
+        abortControllerRef.current =
+          null;
+      }
+
       setLoading(false);
+      setStopping(false);
     }
   }
+
+  /*
+   * =====================================================
+   * CLEANUP
+   * =====================================================
+   */
+
+  useEffect(() => {
+    return () => {
+      stoppedRef.current =
+        true;
+
+      abortControllerRef.current?.abort();
+
+      abortControllerRef.current =
+        null;
+    };
+  }, []);
 
   return (
     <>
@@ -1242,11 +1699,46 @@ export default function AIChat() {
           opacity: 0.7;
         }
 
-        /*
-         * ==============================================
-         * TABLET
-         * ==============================================
-         */
+        .gv-ai-stop {
+          flex:
+            0 0 110px;
+
+          min-height: 88px;
+
+          box-sizing: border-box;
+
+          white-space: nowrap;
+
+          border:
+            1px solid
+            rgba(239, 68, 68, 0.4);
+
+          background:
+            rgba(239, 68, 68, 0.1);
+
+          color:
+            #fecaca;
+        }
+
+        .gv-ai-stop:hover {
+          border-color:
+            rgba(239, 68, 68, 0.65);
+
+          background:
+            rgba(239, 68, 68, 0.16);
+        }
+
+        .gv-ai-stopped {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+
+          margin-top: 7px;
+
+          font-size: 11px;
+
+          opacity: 0.55;
+        }
 
         @media (max-width: 900px) {
           .gv-ai-layout {
@@ -1265,16 +1757,11 @@ export default function AIChat() {
             max-width: 88%;
           }
 
-          .gv-ai-send {
+          .gv-ai-send,
+          .gv-ai-stop {
             flex-basis: 96px;
           }
         }
-
-        /*
-         * ==============================================
-         * MOBILE
-         * ==============================================
-         */
 
         @media (max-width: 700px) {
           .gv-ai-layout {
@@ -1359,7 +1846,8 @@ export default function AIChat() {
             min-height: 100px;
           }
 
-          .gv-ai-send {
+          .gv-ai-send,
+          .gv-ai-stop {
             width: 100%;
 
             flex:
@@ -1368,12 +1856,6 @@ export default function AIChat() {
             min-height: 48px;
           }
         }
-
-        /*
-         * ==============================================
-         * SMALL PHONES
-         * ==============================================
-         */
 
         @media (max-width: 430px) {
           .gv-ai-history {
@@ -1446,7 +1928,8 @@ export default function AIChat() {
               }
               disabled={
                 loading ||
-                historyLoading
+                historyLoading ||
+                stopping
               }
               className="btn gv-ai-new-chat"
             >
@@ -1522,7 +2005,8 @@ export default function AIChat() {
                         }
                         disabled={
                           loading ||
-                          historyLoading
+                          historyLoading ||
+                          stopping
                         }
                         className={`gv-ai-history-item ${
                           active
@@ -1595,7 +2079,11 @@ export default function AIChat() {
                 <span className="ai-status-dot" />
 
                 <span>
-                  متاح
+                  {stopping
+                    ? "جارٍ الإيقاف"
+                    : loading
+                      ? "جاري التوليد"
+                      : "متاح"}
                 </span>
               </div>
 
@@ -1647,6 +2135,15 @@ export default function AIChat() {
                       <div className="gv-ai-message-content">
                         {message.content}
                       </div>
+
+                      {message.role ===
+                        "assistant" &&
+                        message.status ===
+                          "STOPPED" && (
+                          <div className="gv-ai-stopped">
+                            ⏹ تم إيقاف التوليد
+                          </div>
+                        )}
                     </div>
                   ),
                 )
@@ -1675,25 +2172,41 @@ export default function AIChat() {
                 rows={3}
                 disabled={
                   loading ||
-                  historyLoading
+                  historyLoading ||
+                  stopping
                 }
                 maxLength={4000}
                 className="gv-ai-textarea"
               />
 
-              <button
-                type="submit"
-                disabled={
-                  loading ||
-                  historyLoading ||
-                  !input.trim()
-                }
-                className="btn gv-ai-send"
-              >
-                {loading
-                  ? "جاري الإرسال..."
-                  : "إرسال"}
-              </button>
+              {loading ? (
+                <button
+                  type="button"
+                  onClick={
+                    stopGeneration
+                  }
+                  disabled={
+                    stopping
+                  }
+                  className="btn gv-ai-stop"
+                >
+                  {stopping
+                    ? "جارٍ الإيقاف..."
+                    : "إيقاف"}
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={
+                    historyLoading ||
+                    stopping ||
+                    !input.trim()
+                  }
+                  className="btn gv-ai-send"
+                >
+                  إرسال
+                </button>
+              )}
 
             </form>
 
