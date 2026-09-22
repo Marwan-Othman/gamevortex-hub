@@ -33,9 +33,7 @@ export default function AIChat() {
       content: text,
     };
 
-    const nextMessages = [...messages, userMessage];
-
-    setMessages(nextMessages);
+    setMessages((current) => [...current, userMessage]);
     setInput("");
     setLoading(true);
 
@@ -46,7 +44,7 @@ export default function AIChat() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: nextMessages,
+          message: text,
         }),
       });
 
@@ -54,7 +52,9 @@ export default function AIChat() {
 
       if (!response.ok) {
         throw new Error(
-          data?.error || "حدث خطأ أثناء الاتصال بالمساعد الذكي.",
+          typeof data?.error === "string"
+            ? data.error
+            : "حدث خطأ أثناء الاتصال بالمساعد الذكي.",
         );
       }
 
@@ -73,7 +73,7 @@ export default function AIChat() {
         assistantMessage,
       ]);
     } catch (error) {
-      const message =
+      const errorMessage =
         error instanceof Error
           ? error.message
           : "حدث خطأ غير متوقع.";
@@ -82,7 +82,7 @@ export default function AIChat() {
         ...current,
         {
           role: "assistant",
-          content: `تعذر تنفيذ الطلب: ${message}`,
+          content: `تعذر تنفيذ الطلب: ${errorMessage}`,
         },
       ]);
     } finally {
@@ -164,7 +164,9 @@ export default function AIChat() {
           disabled={loading || !input.trim()}
           className="btn"
         >
-          {loading ? "جاري الإرسال..." : "إرسال"}
+          {loading
+            ? "جاري الإرسال..."
+            : "إرسال"}
         </button>
       </form>
     </section>
