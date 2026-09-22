@@ -19,6 +19,7 @@
     "db:status": "prisma migrate status",
     "test:smoke": "node scripts/smoke-check.mjs",
     "validate:env": "node scripts/validate-env.mjs",
+    "test:ai-providers": "node --env-file=.env scripts/test-ai-providers.mjs",
     "production:validate": "npm run validate:env && npm run test:source && npm run db:validate && npm run db:generate && npm run db:migrate && npm run typecheck && next build && npm run test:smoke",
     "production:start": "node scripts/start-production.mjs",
     "production:seed": "node scripts/seed-production.mjs",
