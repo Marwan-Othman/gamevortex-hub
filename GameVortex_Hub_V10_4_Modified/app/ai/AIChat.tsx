@@ -196,6 +196,25 @@ export default function AIChat() {
     null,
   );
 
+  const [
+    renamingConversationId,
+    setRenamingConversationId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    renameValue,
+    setRenameValue,
+  ] = useState("");
+
+  const [
+    deletingConversationId,
+    setDeletingConversationId,
+  ] = useState<string | null>(
+    null,
+  );
+
   const abortControllerRef =
     useRef<AbortController | null>(
       null,
@@ -317,7 +336,9 @@ export default function AIChat() {
     if (
       loading ||
       stopping ||
-      regeneratingMessageId
+      regeneratingMessageId ||
+      renamingConversationId ||
+      deletingConversationId
     ) {
       return;
     }
@@ -330,6 +351,8 @@ export default function AIChat() {
     setInput("");
     setCopiedMessageId(null);
     setHistoryOpen(false);
+    setRenameValue("");
+    setRenamingConversationId(null);
   }
 
   async function loadConversation(
@@ -338,7 +361,9 @@ export default function AIChat() {
     if (
       loading ||
       stopping ||
-      regeneratingMessageId
+      regeneratingMessageId ||
+      renamingConversationId ||
+      deletingConversationId
     ) {
       return;
     }
@@ -462,6 +487,221 @@ export default function AIChat() {
     }
   }
 
+  async function startRenameConversation(
+    conversation: Conversation,
+  ) {
+    if (
+      loading ||
+      stopping ||
+      regeneratingMessageId ||
+      deletingConversationId
+    ) {
+      return;
+    }
+
+    setRenamingConversationId(
+      conversation.id,
+    );
+
+    setRenameValue(
+      conversation.title ||
+        "New Chat",
+    );
+  }
+
+  function cancelRename() {
+    setRenamingConversationId(
+      null,
+    );
+
+    setRenameValue("");
+  }
+
+  async function saveConversationRename(
+    id: string,
+  ) {
+    const title =
+      renameValue.trim();
+
+    if (!title) {
+      return;
+    }
+
+    if (title.length > 80) {
+      return;
+    }
+
+    if (
+      loading ||
+      stopping ||
+      regeneratingMessageId ||
+      deletingConversationId
+    ) {
+      return;
+    }
+
+    try {
+      setHistoryLoading(true);
+
+      const response =
+        await fetch(
+          `/api/ai/conversations/${encodeURIComponent(
+            id,
+          )}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              title,
+            }),
+          },
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.error ===
+            "string"
+            ? data.error
+            : "CONVERSATION_RENAME_FAILED",
+        );
+      }
+
+      const updatedConversation =
+        data?.data ??
+        data?.conversation;
+
+      setConversations(
+        (current) =>
+          current.map(
+            (conversation) =>
+              conversation.id === id
+                ? {
+                    ...conversation,
+                    title:
+                      updatedConversation?.title ??
+                      title,
+                    updatedAt:
+                      updatedConversation?.updatedAt ??
+                      conversation.updatedAt,
+                  }
+                : conversation,
+          ),
+      );
+
+      setRenamingConversationId(
+        null,
+      );
+
+      setRenameValue("");
+    } catch (error) {
+      console.error(
+        "AI_CONVERSATION_RENAME_ERROR",
+        error,
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function deleteConversation(
+    conversation: Conversation,
+  ) {
+    if (
+      loading ||
+      stopping ||
+      regeneratingMessageId ||
+      renamingConversationId ||
+      deletingConversationId
+    ) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `هل تريد حذف المحادثة "${conversation.title || "New Chat"}"؟\n\nسيتم حذف رسائلها أيضًا ولا يمكن التراجع عن العملية.`,
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingConversationId(
+        conversation.id,
+      );
+
+      const response =
+        await fetch(
+          `/api/ai/conversations/${encodeURIComponent(
+            conversation.id,
+          )}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.error ===
+            "string"
+            ? data.error
+            : "CONVERSATION_DELETE_FAILED",
+        );
+      }
+
+      setConversations(
+        (current) =>
+          current.filter(
+            (item) =>
+              item.id !==
+              conversation.id,
+          ),
+      );
+
+      /*
+       * If the deleted conversation is the currently
+       * open conversation, reset the chat immediately.
+       */
+      if (
+        conversationId ===
+        conversation.id
+      ) {
+        setConversationId(null);
+
+        setMessages([
+          WELCOME_MESSAGE,
+        ]);
+
+        setInput("");
+        setCopiedMessageId(null);
+      }
+
+      setRenamingConversationId(
+        null,
+      );
+
+      setRenameValue("");
+    } catch (error) {
+      console.error(
+        "AI_CONVERSATION_DELETE_ERROR",
+        error,
+      );
+    } finally {
+      setDeletingConversationId(
+        null,
+      );
+    }
+  }
+
   async function regenerateMessage(
     message: Message,
   ) {
@@ -469,7 +709,9 @@ export default function AIChat() {
       !message.id ||
       loading ||
       stopping ||
-      regeneratingMessageId
+      regeneratingMessageId ||
+      renamingConversationId ||
+      deletingConversationId
     ) {
       return;
     }
@@ -702,7 +944,9 @@ export default function AIChat() {
       !text ||
       loading ||
       stopping ||
-      regeneratingMessageId
+      regeneratingMessageId ||
+      renamingConversationId ||
+      deletingConversationId
     ) {
       return;
     }
@@ -745,6 +989,13 @@ export default function AIChat() {
 
         setConversationId(
           conversation.id,
+        );
+
+        setConversations(
+          (current) => [
+            conversation,
+            ...current,
+          ],
         );
       }
 
@@ -1264,7 +1515,9 @@ export default function AIChat() {
           disabled={
             loading ||
             stopping ||
-            !!regeneratingMessageId
+            !!regeneratingMessageId ||
+            !!renamingConversationId ||
+            !!deletingConversationId
           }
         >
           ＋ محادثة جديدة
@@ -1306,44 +1559,187 @@ export default function AIChat() {
               {conversations.map(
                 (
                   conversation,
-                ) => (
-                  <button
-                    type="button"
-                    key={
-                      conversation.id
-                    }
-                    className={`gv-ai-history-item ${
-                      conversationId ===
-                      conversation.id
-                        ? "active"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      void loadConversation(
-                        conversation.id,
-                      )
-                    }
-                    disabled={
-                      loading ||
-                      stopping ||
-                      historyLoading ||
-                      !!regeneratingMessageId
-                    }
-                  >
-                    <span className="gv-ai-history-title">
-                      {conversation.title ||
-                        "New Chat"}
-                    </span>
+                ) => {
+                  const isRenaming =
+                    renamingConversationId ===
+                    conversation.id;
 
-                    <span className="gv-ai-history-count">
-                      {conversation
-                        ._count
-                        ?.messages ??
-                        0}{" "}
-                      رسالة
-                    </span>
-                  </button>
-                ),
+                  const isDeleting =
+                    deletingConversationId ===
+                    conversation.id;
+
+                  return (
+                    <div
+                      key={
+                        conversation.id
+                      }
+                      className={`gv-ai-history-item-wrapper ${
+                        conversationId ===
+                        conversation.id
+                          ? "active"
+                          : ""
+                      }`}
+                    >
+                      {isRenaming ? (
+                        <div className="gv-ai-rename-box">
+                          <input
+                            value={
+                              renameValue
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              setRenameValue(
+                                event
+                                  .target
+                                  .value,
+                              )
+                            }
+                            onKeyDown={(
+                              event,
+                            ) => {
+                              if (
+                                event.key ===
+                                "Enter"
+                              ) {
+                                event.preventDefault();
+
+                                void saveConversationRename(
+                                  conversation.id,
+                                );
+                              }
+
+                              if (
+                                event.key ===
+                                "Escape"
+                              ) {
+                                event.preventDefault();
+
+                                cancelRename();
+                              }
+                            }}
+                            maxLength={
+                              80
+                            }
+                            autoFocus
+                            disabled={
+                              historyLoading
+                            }
+                            aria-label="اسم المحادثة الجديد"
+                          />
+
+                          <div className="gv-ai-rename-actions">
+                            <button
+                              type="button"
+                              className="gv-ai-save"
+                              onClick={() =>
+                                void saveConversationRename(
+                                  conversation.id,
+                                )
+                              }
+                              disabled={
+                                historyLoading ||
+                                !renameValue.trim()
+                              }
+                            >
+                              حفظ
+                            </button>
+
+                            <button
+                              type="button"
+                              className="gv-ai-cancel"
+                              onClick={
+                                cancelRename
+                              }
+                              disabled={
+                                historyLoading
+                              }
+                            >
+                              إلغاء
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="gv-ai-history-item"
+                            onClick={() =>
+                              void loadConversation(
+                                conversation.id,
+                              )
+                            }
+                            disabled={
+                              loading ||
+                              stopping ||
+                              historyLoading ||
+                              !!regeneratingMessageId ||
+                              !!renamingConversationId ||
+                              !!deletingConversationId
+                            }
+                          >
+                            <span className="gv-ai-history-title">
+                              {conversation.title ||
+                                "New Chat"}
+                            </span>
+
+                            <span className="gv-ai-history-count">
+                              {conversation
+                                ._count
+                                ?.messages ??
+                                0}{" "}
+                              رسالة
+                            </span>
+                          </button>
+
+                          <div className="gv-ai-history-actions">
+                            <button
+                              type="button"
+                              className="gv-ai-rename-button"
+                              onClick={() =>
+                                void startRenameConversation(
+                                  conversation,
+                                )
+                              }
+                              disabled={
+                                loading ||
+                                stopping ||
+                                !!regeneratingMessageId ||
+                                !!deletingConversationId ||
+                                historyLoading
+                              }
+                              aria-label={`إعادة تسمية ${conversation.title}`}
+                            >
+                              ✏️
+                            </button>
+
+                            <button
+                              type="button"
+                              className="gv-ai-delete-button"
+                              onClick={() =>
+                                void deleteConversation(
+                                  conversation,
+                                )
+                              }
+                              disabled={
+                                loading ||
+                                stopping ||
+                                !!regeneratingMessageId ||
+                                !!renamingConversationId ||
+                                !!deletingConversationId
+                              }
+                              aria-label={`حذف ${conversation.title}`}
+                            >
+                              {isDeleting
+                                ? "..."
+                                : "🗑️"}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                },
               )}
             </div>
           )}
@@ -1386,8 +1782,6 @@ export default function AIChat() {
               !!message.id &&
               message.content.trim()
                 .length > 0 &&
-              message.id !==
-                undefined &&
               message.status !==
                 "PENDING" &&
               message.status !==
@@ -1434,7 +1828,9 @@ export default function AIChat() {
                           )
                         }
                         disabled={
-                          !!regeneratingMessageId
+                          !!regeneratingMessageId ||
+                          !!renamingConversationId ||
+                          !!deletingConversationId
                         }
                         aria-label={
                           isCopied
@@ -1459,7 +1855,9 @@ export default function AIChat() {
                           disabled={
                             loading ||
                             stopping ||
-                            !!regeneratingMessageId
+                            !!regeneratingMessageId ||
+                            !!renamingConversationId ||
+                            !!deletingConversationId
                           }
                           aria-label="إعادة توليد الرد"
                         >
@@ -1537,7 +1935,9 @@ export default function AIChat() {
           disabled={
             loading ||
             stopping ||
-            !!regeneratingMessageId
+            !!regeneratingMessageId ||
+            !!renamingConversationId ||
+            !!deletingConversationId
           }
           maxLength={4000}
         />
@@ -1563,7 +1963,9 @@ export default function AIChat() {
             disabled={
               !input.trim() ||
               stopping ||
-              !!regeneratingMessageId
+              !!regeneratingMessageId ||
+              !!renamingConversationId ||
+              !!deletingConversationId
             }
             className="btn"
           >
@@ -1591,7 +1993,11 @@ export default function AIChat() {
         .gv-ai-new-chat,
         .gv-ai-history-close,
         .gv-ai-copy,
-        .gv-ai-regenerate {
+        .gv-ai-regenerate,
+        .gv-ai-rename-button,
+        .gv-ai-delete-button,
+        .gv-ai-save,
+        .gv-ai-cancel {
           appearance: none;
           border: 1px solid
             rgba(255, 255, 255, 0.12);
@@ -1620,7 +2026,11 @@ export default function AIChat() {
         .gv-ai-history-button:hover,
         .gv-ai-new-chat:hover,
         .gv-ai-copy:hover,
-        .gv-ai-regenerate:hover {
+        .gv-ai-regenerate:hover,
+        .gv-ai-rename-button:hover,
+        .gv-ai-delete-button:hover,
+        .gv-ai-save:hover,
+        .gv-ai-cancel:hover {
           border-color: rgba(
             34,
             211,
@@ -1657,7 +2067,11 @@ export default function AIChat() {
         .gv-ai-history-button:disabled,
         .gv-ai-new-chat:disabled,
         .gv-ai-copy:disabled,
-        .gv-ai-regenerate:disabled {
+        .gv-ai-regenerate:disabled,
+        .gv-ai-rename-button:disabled,
+        .gv-ai-delete-button:disabled,
+        .gv-ai-save:disabled,
+        .gv-ai-cancel:disabled {
           opacity: 0.55;
           cursor: not-allowed;
           transform: none;
@@ -1697,33 +2111,29 @@ export default function AIChat() {
         .gv-ai-history-list {
           display: grid;
           gap: 8px;
-          max-height: 280px;
+          max-height: 320px;
           overflow-y: auto;
         }
 
-        .gv-ai-history-item {
-          width: 100%;
+        .gv-ai-history-item-wrapper {
+          position: relative;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          padding: 11px 12px;
+          gap: 7px;
+          width: 100%;
+          padding: 4px;
           border: 1px solid
             rgba(255, 255, 255, 0.07);
-          border-radius: 11px;
+          border-radius: 12px;
           background: rgba(
             255,
             255,
             255,
             0.025
           );
-          color: #e2e8f0;
-          text-align: start;
-          cursor: pointer;
         }
 
-        .gv-ai-history-item:hover,
-        .gv-ai-history-item.active {
+        .gv-ai-history-item-wrapper.active {
           border-color: rgba(
             124,
             58,
@@ -1736,6 +2146,26 @@ export default function AIChat() {
             237,
             0.12
           );
+        }
+
+        .gv-ai-history-item {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          min-height: 42px;
+          padding: 7px 8px;
+          border: 0;
+          background: transparent;
+          color: #e2e8f0;
+          text-align: start;
+          cursor: pointer;
+        }
+
+        .gv-ai-history-item:hover {
+          color: #fff;
         }
 
         .gv-ai-history-title {
@@ -1757,6 +2187,37 @@ export default function AIChat() {
           font-size: 11px;
         }
 
+        .gv-ai-history-actions {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex: 0 0 auto;
+        }
+
+        .gv-ai-rename-button,
+        .gv-ai-delete-button {
+          width: 34px;
+          height: 34px;
+          padding: 0;
+          border-radius: 8px;
+          font-size: 14px;
+        }
+
+        .gv-ai-delete-button:hover {
+          border-color: rgba(
+            248,
+            113,
+            113,
+            0.55
+          );
+          background: rgba(
+            239,
+            68,
+            68,
+            0.1
+          );
+        }
+
         .gv-ai-history-empty {
           padding: 18px 8px;
           color: rgba(
@@ -1766,6 +2227,79 @@ export default function AIChat() {
             0.58
           );
           text-align: center;
+        }
+
+        .gv-ai-rename-box {
+          width: 100%;
+          display: grid;
+          gap: 8px;
+          padding: 7px;
+        }
+
+        .gv-ai-rename-box input {
+          width: 100%;
+          min-height: 40px;
+          box-sizing: border-box;
+          padding: 0 11px;
+          border: 1px solid
+            rgba(255, 255, 255, 0.12);
+          border-radius: 9px;
+          outline: none;
+          background: rgba(
+            0,
+            0,
+            0,
+            0.2
+          );
+          color: #fff;
+          font: inherit;
+        }
+
+        .gv-ai-rename-box input:focus {
+          border-color: rgba(
+            34,
+            211,
+            238,
+            0.55
+          );
+        }
+
+        .gv-ai-rename-actions {
+          display: flex;
+          gap: 7px;
+        }
+
+        .gv-ai-save,
+        .gv-ai-cancel {
+          min-height: 34px;
+          padding: 0 11px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .gv-ai-save {
+          border-color: rgba(
+            34,
+            197,
+            94,
+            0.35
+          );
+          background: rgba(
+            34,
+            197,
+            94,
+            0.08
+          );
+        }
+
+        .gv-ai-cancel {
+          border-color: rgba(
+            255,
+            255,
+            255,
+            0.1
+          );
         }
 
         .gv-ai-message-actions {
@@ -1874,14 +2408,23 @@ export default function AIChat() {
             padding: 11px;
           }
 
+          .gv-ai-history-item-wrapper {
+            align-items: stretch;
+          }
+
           .gv-ai-history-item {
             align-items: flex-start;
             flex-direction: column;
-            gap: 5px;
+            justify-content: center;
+            gap: 4px;
           }
 
           .gv-ai-history-count {
             font-size: 10px;
+          }
+
+          .gv-ai-history-actions {
+            padding-right: 3px;
           }
 
           .gv-ai-message-actions {
@@ -1900,6 +2443,22 @@ export default function AIChat() {
             grid-template-columns: 1fr;
           }
 
+          .gv-ai-history-item-wrapper {
+            flex-wrap: wrap;
+          }
+
+          .gv-ai-history-item {
+            flex: 1 1 calc(100% - 82px);
+          }
+
+          .gv-ai-history-actions {
+            flex: 0 0 auto;
+          }
+
+          .gv-ai-rename-box {
+            padding: 5px;
+          }
+
           .gv-ai-message-actions {
             width: 100%;
           }
@@ -1912,4 +2471,4 @@ export default function AIChat() {
       `}</style>
     </section>
   );
-}
+        }
