@@ -1,18 +1,22 @@
-export type AiMessage = {
-  role:
-    | "system"
-    | "user"
-    | "assistant";
-  content: string;
-};
+import {
+  openaiRespond,
+  type OpenAiMessage,
+} from "@/lib/ai/openai";
 
+export type AiMessage = OpenAiMessage;
+
+/**
+ * Maximum length accepted by the GameVortex AI chat layer.
+ *
+ * The API route also validates this with Zod.
+ * This second layer protects server-side callers.
+ */
 const MAX_INPUT_LENGTH = 4000;
 const MAX_SYSTEM_LENGTH = 4000;
-const DEFAULT_MAX_OUTPUT = 800;
 
 function cleanText(
   value: string,
-  maxLength = MAX_INPUT_LENGTH,
+  maxLength: number,
 ): string {
   return value
     .replace(
@@ -23,232 +27,61 @@ function cleanText(
     .slice(0, maxLength);
 }
 
-function getMaxOutputTokens(): number {
-  const value =
-    Number(
-      process.env.AI_MAX_OUTPUT_TOKENS ||
-        DEFAULT_MAX_OUTPUT,
+function sanitizeMessages(
+  messages: AiMessage[],
+): AiMessage[] {
+  const safeMessages = messages
+    .filter(
+      (message) =>
+        message &&
+        (
+          message.role === "system" ||
+          message.role === "user" ||
+          message.role === "assistant"
+        ) &&
+        typeof message.content === "string",
+    )
+    .map((message) => ({
+      role: message.role,
+      content: cleanText(
+        message.content,
+        message.role === "system"
+          ? MAX_SYSTEM_LENGTH
+          : MAX_INPUT_LENGTH,
+      ),
+    }))
+    .filter(
+      (message) =>
+        message.content.length > 0,
     );
 
-  if (
-    !Number.isSafeInteger(value) ||
-    value <= 0 ||
-    value > 4000
-  ) {
-    return DEFAULT_MAX_OUTPUT;
+  if (safeMessages.length === 0) {
+    throw new Error("AI_EMPTY_INPUT");
   }
 
-  return value;
+  return safeMessages;
 }
 
+/**
+ * Non-streaming GameVortex AI chat.
+ *
+ * This function keeps the old aiChat() API so existing
+ * callers do not need to be rewritten.
+ *
+ * The actual provider is OpenAI.
+ */
 export async function aiChat(
   messages: AiMessage[],
-) {
-  const base =
-    process.env.AI_PROVIDER_BASE_URL;
-
-  const key =
-    process.env.AI_PROVIDER_API_KEY;
-
-  if (!base || !key) {
-    throw new Error(
-      "AI_PROVIDER_NOT_CONFIGURED",
-    );
-  }
-
-  let providerUrl: URL;
-
-  try {
-    providerUrl =
-      new URL(
-        `${base.replace(/\/$/, "")}/chat/completions`,
-      );
-  } catch {
-    throw new Error(
-      "AI_PROVIDER_URL_INVALID",
-    );
-  }
-
-  if (
-    providerUrl.protocol !==
-      "https:" &&
-    process.env.NODE_ENV ===
-      "production"
-  ) {
-    throw new Error(
-      "AI_PROVIDER_URL_INVALID",
-    );
-  }
-
+): Promise<string> {
   const safeMessages =
-    messages
-      .filter(
-        (message) =>
-          message &&
-          (
-            message.role ===
-              "system" ||
-            message.role ===
-              "user" ||
-            message.role ===
-              "assistant"
-          ) &&
-          typeof message.content ===
-            "string",
-      )
-      .map(
-        (message, index) => ({
-          role:
-            message.role,
-          content:
-            index === 0 &&
-            message.role ===
-              "system"
-              ? cleanText(
-                  message.content,
-                  MAX_SYSTEM_LENGTH,
-                )
-              : cleanText(
-                  message.content,
-                  MAX_INPUT_LENGTH,
-                ),
-        }),
-      )
-      .filter(
-        (message) =>
-          message.content.length > 0,
-      );
+    sanitizeMessages(messages);
 
-  if (
-    safeMessages.length === 0
-  ) {
-    throw new Error(
-      "AI_EMPTY_INPUT",
-    );
-  }
-
-  const response =
-    await fetch(
-      providerUrl,
-      {
-        method: "POST",
-        headers: {
-          Authorization:
-            `Bearer ${key}`,
-          "Content-Type":
-            "application/json",
-          Accept:
-            "application/json",
-        },
-        body: JSON.stringify({
-          model:
-            process.env.AI_MODEL ||
-            "default",
-          messages:
-            safeMessages,
-          temperature: 0.2,
-          max_tokens:
-            getMaxOutputTokens(),
-        }),
-        cache: "no-store",
-      },
+  const result =
+    await openaiRespond(
+      safeMessages,
     );
 
-  let data: unknown;
-
-  try {
-    data =
-      await response.json();
-  } catch {
-    throw new Error(
-      "AI_PROVIDER_INVALID_RESPONSE",
-    );
-  }
-
-  if (!response.ok) {
-    const object =
-      data &&
-      typeof data ===
-        "object"
-        ? data as Record<
-            string,
-            unknown
-          >
-        : {};
-
-    const error =
-      object.error &&
-      typeof object.error ===
-        "object"
-        ? object.error as Record<
-            string,
-            unknown
-          >
-        : null;
-
-    throw new Error(
-      String(
-        error?.message ||
-          object.message ||
-          "AI_PROVIDER_ERROR",
-      ).slice(0, 500),
-    );
-  }
-
-  const object =
-    data &&
-    typeof data ===
-      "object"
-      ? data as Record<
-          string,
-          unknown
-        >
-      : {};
-
-  const choices =
-    Array.isArray(
-      object.choices,
-    )
-      ? object.choices
-      : [];
-
-  const first =
-    choices[0];
-
-  const message =
-    first &&
-    typeof first ===
-      "object"
-      ? (
-          first as Record<
-            string,
-            unknown
-          >
-        ).message
-      : null;
-
-  const content =
-    message &&
-    typeof message ===
-      "object"
-      ? (
-          message as Record<
-            string,
-            unknown
-          >
-        ).content
-      : null;
-
-  if (
-    typeof content !==
-    "string"
-  ) {
-    throw new Error(
-      "AI_EMPTY_RESPONSE",
-    );
-  }
-
-  return content
+  return result.text
     .trim()
     .slice(0, 20_000);
 }
