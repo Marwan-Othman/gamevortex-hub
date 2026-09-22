@@ -236,10 +236,28 @@ function getSafeErrorDetails(
     .slice(0, 1000);
 }
 
-function buildErrorResponse(
+/**
+ * Builds a client-safe error message.
+ *
+ * The important change here is that the actual provider
+ * details are included in the "error" field as well.
+ *
+ * The current AIChat UI reads "error", not "details".
+ *
+ * Example:
+ *
+ * AI_PROVIDER_ERROR: The model is not available...
+ */
+function buildClientError(
   error: unknown,
-  userId?: string,
-) {
+): {
+  publicError: string;
+  details: string;
+  displayError: string;
+  errorCode: string;
+  status: number;
+  requestId?: string;
+} {
   const publicError =
     toPublicError(error);
 
@@ -255,13 +273,20 @@ function buildErrorResponse(
   const requestId =
     getOpenAiRequestId(error);
 
+  const displayError =
+    details &&
+    details !== "AI_FAILED" &&
+    details !== "OPENAI_ERROR"
+      ? `${publicError}: ${details}`
+      : publicError;
+
   return {
     publicError,
+    details,
+    displayError,
     errorCode,
     status,
-    details,
     requestId,
-    userId,
   };
 }
 
@@ -776,15 +801,15 @@ export async function POST(
         }
 
         const {
+          displayError,
           publicError,
           errorCode,
           status,
           details,
           requestId,
         } =
-          buildErrorResponse(
+          buildClientError(
             error,
-            userId,
           );
 
         await logAiFailure(
@@ -796,8 +821,19 @@ export async function POST(
 
         return NextResponse.json(
           {
+            /*
+             * The UI reads this field.
+             * Include the real safe provider
+             * reason here.
+             */
             error:
-              publicError,
+              displayError,
+
+            /*
+             * Keep the structured fields
+             * available for debugging.
+             */
+            publicError,
 
             details,
 
@@ -926,15 +962,15 @@ export async function POST(
              * --------------------------------------- */
 
             const {
+              displayError,
               publicError,
               errorCode,
               status,
               details,
               requestId,
             } =
-              buildErrorResponse(
+              buildClientError(
                 error,
-                userId,
               );
 
             if (assistantMessageId) {
@@ -966,13 +1002,25 @@ export async function POST(
               activeConversationId,
             );
 
+            /*
+             * IMPORTANT:
+             *
+             * The current AIChat UI reads
+             * event.error.
+             *
+             * Therefore we put displayError
+             * there instead of only putting
+             * the useful message in "details".
+             */
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "error",
 
                   error:
-                    publicError,
+                    displayError,
+
+                  publicError,
 
                   details,
 
@@ -1123,15 +1171,15 @@ export async function POST(
      * --------------------------------------------------- */
 
     const {
+      displayError,
       publicError,
       errorCode,
       status,
       details,
       requestId,
     } =
-      buildErrorResponse(
+      buildClientError(
         error,
-        userId,
       );
 
     await logAiFailure(
@@ -1144,7 +1192,9 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          publicError,
+          displayError,
+
+        publicError,
 
         details,
 
