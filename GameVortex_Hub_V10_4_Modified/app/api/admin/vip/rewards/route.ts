@@ -5,6 +5,8 @@ import {
 
 import { z } from "zod";
 
+import { Prisma } from "@prisma/client";
+
 import {
   db,
 } from "@/lib/prisma";
@@ -226,7 +228,7 @@ export async function POST(
           active:
             input.active,
           metadata:
-            input.metadata,
+            input.metadata as Prisma.InputJsonValue | undefined,
         },
       });
 
