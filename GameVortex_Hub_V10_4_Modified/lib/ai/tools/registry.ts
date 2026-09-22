@@ -12,6 +12,7 @@ import {
 
 import {
   getProduct,
+  searchApps,
   searchMarketplace,
 } from "./store";
 
@@ -30,23 +31,12 @@ export type AiToolDefinition = {
   execute: AiToolExecutor;
 };
 
-/**
- * Central registry for GameVortex AI Tools.
- *
- * This registry is only a routing layer.
- *
- * It does NOT grant direct database access.
- *
- * Every Tool remains responsible for:
- * - Authentication
- * - Authorization
- * - Safe Prisma queries
- * - Minimal returned data
- */
-export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
+export const AI_TOOL_REGISTRY:
+  readonly AiToolDefinition[] =
   [
     {
-      name: "searchGames",
+      name:
+        "searchGames",
 
       description:
         "Search published games available in the GameVortex game catalog.",
@@ -97,7 +87,8 @@ export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
     },
 
     {
-      name: "getGame",
+      name:
+        "getGame",
 
       description:
         "Get details about one published GameVortex game by id or slug.",
@@ -143,7 +134,60 @@ export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
     },
 
     {
-      name: "searchMarketplace",
+      name:
+        "searchApps",
+
+      description:
+        "Search active GameVortex apps and digital products.",
+
+      inputSchema:
+        z.object({
+          query: z
+            .string()
+            .trim()
+            .min(1)
+            .max(100),
+
+          platform: z
+            .string()
+            .trim()
+            .min(1)
+            .max(50)
+            .optional(),
+
+          region: z
+            .string()
+            .trim()
+            .min(1)
+            .max(50)
+            .optional(),
+
+          pagination:
+            z.object({
+              page: z
+                .number()
+                .int()
+                .min(1)
+                .max(1000)
+                .default(1),
+
+              limit: z
+                .number()
+                .int()
+                .min(1)
+                .max(25)
+                .default(10),
+            })
+              .optional(),
+        }),
+
+      execute:
+        searchApps,
+    },
+
+    {
+      name:
+        "searchMarketplace",
 
       description:
         "Search active products currently available in the GameVortex Marketplace.",
@@ -205,7 +249,8 @@ export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
     },
 
     {
-      name: "getProduct",
+      name:
+        "getProduct",
 
       description:
         "Get details about one active GameVortex Marketplace product by id or SKU.",
@@ -251,7 +296,8 @@ export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
     },
 
     {
-      name: "searchLibrary",
+      name:
+        "searchLibrary",
 
       description:
         "Search the authenticated user's own GameVortex game library.",
@@ -298,34 +344,27 @@ export const AI_TOOL_REGISTRY: readonly AiToolDefinition[] =
     },
   ] as const;
 
-/**
- * Find a registered AI Tool.
- */
 export function getAiTool(
   name: string,
 ): AiToolDefinition | undefined {
   return AI_TOOL_REGISTRY.find(
-    (tool) => tool.name === name,
+    (tool) =>
+      tool.name === name,
   );
 }
 
-/**
- * Return only public Tool names.
- */
 export function getAiToolNames(): string[] {
   return AI_TOOL_REGISTRY.map(
     (tool) => tool.name,
   );
 }
 
-/**
- * Validate the Tool name before execution.
- */
 function validateToolName(
   name: unknown,
 ): string {
   if (
-    typeof name !== "string" ||
+    typeof name !==
+      "string" ||
     name.length === 0 ||
     name.length > 100
   ) {
@@ -337,36 +376,27 @@ function validateToolName(
   return name;
 }
 
-/**
- * Execute one registered GameVortex AI Tool.
- *
- * Security flow:
- *
- * 1. Validate Tool name.
- * 2. Find Tool in the allowlisted registry.
- * 3. Validate input against the registry schema.
- * 4. Execute the Tool.
- * 5. Never expose internal exceptions.
- *
- * Authentication and authorization are still performed
- * by the individual Tool implementation.
- */
 export async function executeAiTool(
   name: string,
   input: unknown,
 ): Promise<unknown> {
   try {
     const validatedName =
-      validateToolName(name);
+      validateToolName(
+        name,
+      );
 
     const tool =
-      getAiTool(validatedName);
+      getAiTool(
+        validatedName,
+      );
 
     if (!tool) {
       return {
         ok: false,
         error: {
-          code: "UNKNOWN_AI_TOOL",
+          code:
+            "UNKNOWN_AI_TOOL",
           message:
             "The requested GameVortex AI tool does not exist.",
         },
@@ -383,6 +413,8 @@ export async function executeAiTool(
       validatedInput,
     );
   } catch (error) {
-    return aiToolErrorResult(error);
+    return aiToolErrorResult(
+      error,
+    );
   }
 }
