@@ -1,64 +1,216 @@
+import Link from "next/link";
 import AIChat from "./AIChat";
+import styles from "./ai.module.css";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "GameVortex AI",
+  description:
+    "GameVortex AI - مساعدك الذكي للألعاب والتطبيقات ومنصة GameVortex Hub.",
+};
 
 export default function AIPage() {
   return (
-    <main
-      className="wrap"
-      dir="rtl"
-    >
-      <section className="glass hero">
-        <span className="badge">
-          GAMEVORTEX AI
-        </span>
+    <main className={styles.page} dir="rtl">
+      <section className={styles.hero}>
+        <div className={styles.heroGlowOne} />
+        <div className={styles.heroGlowTwo} />
 
-        <h1>
-          GameVortex AI
-        </h1>
+        <div className={styles.heroContent}>
+          <div className={styles.heroBadge}>
+            <span className={styles.badgeDot} />
+            GAMEVORTEX AI
+          </div>
 
-        <p>
-          مساعدك الذكي داخل GameVortex Hub
-          للألعاب والتطبيقات والمنصة.
-        </p>
+          <h1 className={styles.heroTitle}>
+            ذكاء اصطناعي
+            <span> مصمم لعالم الألعاب</span>
+          </h1>
+
+          <p className={styles.heroText}>
+            مساعدك الذكي داخل GameVortex Hub. اسأل، اكتشف، حلل واستكشف
+            عالم الألعاب والتطبيقات من مكان واحد.
+          </p>
+
+          <div className={styles.heroActions}>
+            <a href="#ai-chat" className={styles.primaryButton}>
+              <span className={styles.buttonIcon}>✦</span>
+              ابدأ المحادثة
+            </a>
+
+            <Link href="/vip" className={styles.secondaryButton}>
+              <span className={styles.buttonIcon}>♛</span>
+              اكتشف GameVortex VIP
+            </Link>
+          </div>
+        </div>
+
+        <div className={styles.aiOrb}>
+          <div className={styles.orbRingOuter} />
+          <div className={styles.orbRingMiddle} />
+          <div className={styles.orbCore}>
+            <span>AI</span>
+          </div>
+
+          <div className={`${styles.orbParticle} ${styles.particleOne}`} />
+          <div className={`${styles.orbParticle} ${styles.particleTwo}`} />
+          <div className={`${styles.orbParticle} ${styles.particleThree}`} />
+        </div>
       </section>
 
-      <AIChat />
+      <section className={styles.toolsSection}>
+        <div className={styles.sectionHeading}>
+          <div>
+            <span className={styles.sectionKicker}>AI TOOLS</span>
 
-      <section className="grid">
-        <article className="glass card">
-          <h2>
-            🎮 الألعاب
-          </h2>
+            <h2>
+              أدواتك الذكية
+              <span> في مكان واحد</span>
+            </h2>
+          </div>
 
-          <p className="muted">
-            ساعد نفسك في اكتشاف الألعاب
-            وفهم الأنظمة والمنصات.
+          <p>
+            استخدم أدوات GameVortex AI للوصول إلى تجربة أكثر ذكاءً داخل
+            المنصة.
           </p>
-        </article>
+        </div>
 
-        <article className="glass card">
+        <div className={styles.toolsGrid}>
+          <article className={styles.toolCard}>
+            <div className={styles.toolIcon}>✦</div>
+
+            <div className={styles.toolContent}>
+              <span className={styles.toolLabel}>CHAT</span>
+
+              <h3>AI Chat</h3>
+
+              <p>
+                تحدث مع مساعد GameVortex AI واحصل على المساعدة في الألعاب
+                والتطبيقات والمنصة.
+              </p>
+            </div>
+          </article>
+
+          <article className={styles.toolCard}>
+            <div className={styles.toolIcon}>◈</div>
+
+            <div className={styles.toolContent}>
+              <span className={styles.toolLabel}>IMAGE</span>
+
+              <h3>AI Images</h3>
+
+              <p>
+                مساحة مخصصة لإنشاء الصور بالذكاء الاصطناعي عند توفر خدمة
+                الصور ورصيدها.
+              </p>
+            </div>
+          </article>
+
+          <article className={styles.toolCard}>
+            <div className={styles.toolIcon}>▶</div>
+
+            <div className={styles.toolContent}>
+              <span className={styles.toolLabel}>VIDEO</span>
+
+              <h3>AI Video</h3>
+
+              <p>
+                واجهة جاهزة لخدمات الفيديو بالذكاء الاصطناعي مع احتساب
+                الاستخدام من رصيد الفيديو.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="ai-chat" className={styles.chatSection}>
+        <div className={styles.chatHeading}>
+          <div>
+            <span className={styles.sectionKicker}>GAMEVORTEX AI</span>
+
+            <h2>
+              تحدث مع
+              <span> مساعدك الذكي</span>
+            </h2>
+          </div>
+
+          <div className={styles.statusBadge}>
+            <span />
+            AI READY
+          </div>
+        </div>
+
+        <div className={styles.chatWrapper}>
+          <AIChat />
+        </div>
+      </section>
+
+      <section className={styles.featuresSection}>
+        <div className={styles.featureCard}>
+          <div className={styles.featureIcon}>🎮</div>
+
+          <div>
+            <h3>مخصص للألعاب</h3>
+
+            <p>
+              اسأل عن الألعاب والمنصات والأنظمة واحصل على مساعدة داخل
+              GameVortex Hub.
+            </p>
+          </div>
+        </div>
+
+        <div className={styles.featureCard}>
+          <div className={styles.featureIcon}>⚡</div>
+
+          <div>
+            <h3>تجربة سريعة</h3>
+
+            <p>
+              واجهة مصممة للوصول السريع إلى أدوات الذكاء الاصطناعي بدون
+              مغادرة المنصة.
+            </p>
+          </div>
+        </div>
+
+        <div className={styles.featureCard}>
+          <div className={styles.featureIcon}>🔐</div>
+
+          <div>
+            <h3>حماية المفاتيح</h3>
+
+            <p>
+              مفاتيح مزودي الذكاء الاصطناعي يجب أن تبقى على الخادم ولا يتم
+              إرسالها إلى المتصفح.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.vipBanner}>
+        <div className={styles.vipBannerGlow} />
+
+        <div className={styles.vipCrown}>♛</div>
+
+        <div className={styles.vipContent}>
+          <span>GAMEVORTEX VIP</span>
+
           <h2>
-            🧠 مساعد ذكي
+            احصل على رصيد AI أكبر
+            <br />
+            ومزايا حصرية
           </h2>
 
-          <p className="muted">
-            محادثة مباشرة من داخل
+          <p>
+            باقات VIP تمنحك حدود استخدام أعلى ومزايا إضافية داخل
             GameVortex Hub.
           </p>
-        </article>
+        </div>
 
-        <article className="glass card">
-          <h2>
-            🔐 حماية
-          </h2>
-
-          <p className="muted">
-            مفاتيح مزود الذكاء الاصطناعي
-            تبقى على الخادم.
-          </p>
-        </article>
+        <Link href="/vip" className={styles.vipButton}>
+          مشاهدة الباقات
+          <span>←</span>
+        </Link>
       </section>
     </main>
   );
