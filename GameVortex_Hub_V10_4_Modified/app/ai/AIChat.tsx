@@ -177,9 +177,9 @@ export default function AIChat() {
   >(null);
 
   /*
-   * --------------------------------------------------
-   * LOAD CONVERSATION LIST
-   * --------------------------------------------------
+   * =====================================================
+   * LOAD CONVERSATIONS
+   * =====================================================
    */
   const loadConversations =
     useCallback(
@@ -250,24 +250,24 @@ export default function AIChat() {
       [],
     );
 
-  /*
-   * Load the history once when the AI page opens.
-   */
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
 
   /*
-   * --------------------------------------------------
-   * LOAD ONE CONVERSATION
-   * --------------------------------------------------
+   * =====================================================
+   * OPEN EXISTING CONVERSATION
+   * =====================================================
    */
   const openConversation =
     useCallback(
       async (
         conversationId: string,
       ) => {
-        if (loading) {
+        if (
+          loading ||
+          historyLoading
+        ) {
           return;
         }
 
@@ -366,7 +366,9 @@ export default function AIChat() {
             loadedMessages.length >
               0
               ? loadedMessages
-              : [WELCOME_MESSAGE],
+              : [
+                  WELCOME_MESSAGE,
+                ],
           );
 
           setInput("");
@@ -388,20 +390,25 @@ export default function AIChat() {
           );
         }
       },
-      [loading],
+      [
+        loading,
+        historyLoading,
+      ],
     );
 
   /*
-   * --------------------------------------------------
+   * =====================================================
    * NEW CHAT
-   * --------------------------------------------------
+   * =====================================================
    *
-   * We intentionally do NOT create the DB conversation
-   * here. The server creates it when the first message
-   * is sent.
+   * We intentionally do not create the DB record here.
+   * The server creates it when the first message is sent.
    */
   function startNewChat() {
-    if (loading) {
+    if (
+      loading ||
+      historyLoading
+    ) {
       return;
     }
 
@@ -421,9 +428,9 @@ export default function AIChat() {
   }
 
   /*
-   * --------------------------------------------------
+   * =====================================================
    * SEND MESSAGE
-   * --------------------------------------------------
+   * =====================================================
    */
   async function sendMessage(
     event: FormEvent<HTMLFormElement>,
@@ -452,7 +459,7 @@ export default function AIChat() {
       };
 
     /*
-     * Add the user's message immediately.
+     * Immediately show the user's message.
      */
     setMessages(
       (current) => [
@@ -465,8 +472,8 @@ export default function AIChat() {
     setLoading(true);
 
     /*
-     * Add an empty assistant message immediately.
-     * Streaming tokens will be appended to it.
+     * Create the assistant placeholder.
+     * Streaming tokens will be inserted into it.
      */
     setMessages(
       (current) => [
@@ -497,10 +504,6 @@ export default function AIChat() {
               JSON.stringify({
                 message: text,
 
-                /*
-                 * When null, the server creates a
-                 * new conversation automatically.
-                 */
                 ...(currentConversationId
                   ? {
                       conversationId:
@@ -514,9 +517,8 @@ export default function AIChat() {
         );
 
       /*
-       * Authentication / validation / credit errors
-       * happen before streaming starts, so they arrive
-       * as normal JSON.
+       * Errors that happen before Streaming starts
+       * are returned as JSON.
        */
       if (!response.ok) {
         let data:
@@ -554,6 +556,8 @@ export default function AIChat() {
 
       let buffer = "";
       let finished = false;
+      let receivedAssistantText =
+        false;
 
       while (!finished) {
         const {
@@ -622,9 +626,9 @@ export default function AIChat() {
           }
 
           /*
-           * ------------------------------------------------
+           * -----------------------------------------------
            * STREAM DELTA
-           * ------------------------------------------------
+           * -----------------------------------------------
            */
           if (
             eventData.type ===
@@ -632,6 +636,11 @@ export default function AIChat() {
           ) {
             const delta =
               eventData.text;
+
+            if (delta) {
+              receivedAssistantText =
+                true;
+            }
 
             setMessages(
               (current) => {
@@ -677,9 +686,9 @@ export default function AIChat() {
           }
 
           /*
-           * ------------------------------------------------
+           * -----------------------------------------------
            * STREAM ERROR
-           * ------------------------------------------------
+           * -----------------------------------------------
            */
           if (
             eventData.type ===
@@ -692,18 +701,14 @@ export default function AIChat() {
           }
 
           /*
-           * ------------------------------------------------
+           * -----------------------------------------------
            * STREAM COMPLETE
-           * ------------------------------------------------
+           * -----------------------------------------------
            */
           if (
             eventData.type ===
             "done"
           ) {
-            /*
-             * The first message of a new chat receives
-             * its conversation ID from the server here.
-             */
             if (
               eventData.conversationId
             ) {
@@ -712,10 +717,6 @@ export default function AIChat() {
               );
             }
 
-            /*
-             * Refresh the sidebar so the new conversation
-             * immediately appears in history.
-             */
             await loadConversations();
 
             finished = true;
@@ -726,61 +727,64 @@ export default function AIChat() {
 
       /*
        * If the server closed the stream without sending
-       * any assistant content, show a useful error instead
-       * of leaving an empty message in the chat.
+       * a valid assistant response.
        */
-      setMessages(
-        (current) => {
-          if (
-            current.length ===
-            0
-          ) {
-            return current;
-          }
+      if (
+        !receivedAssistantText
+      ) {
+        setMessages(
+          (current) => {
+            if (
+              current.length ===
+              0
+            ) {
+              return current;
+            }
 
-          const updated =
-            [...current];
+            const updated =
+              [...current];
 
-          const lastIndex =
-            updated.length -
-            1;
+            const lastIndex =
+              updated.length -
+              1;
 
-          const last =
-            updated[
-              lastIndex
-            ];
+            const last =
+              updated[
+                lastIndex
+              ];
 
-          if (
-            last.role ===
-              "assistant" &&
-            !last.content.trim()
-          ) {
-            updated[
-              lastIndex
-            ] = {
-              ...last,
+            if (
+              last.role ===
+                "assistant" &&
+              !last.content.trim()
+            ) {
+              updated[
+                lastIndex
+              ] = {
+                ...last,
 
-              content:
-                "لم يصل رد من GameVortex AI.",
-            };
-          }
+                content:
+                  "لم يصل رد من GameVortex AI.",
+              };
+            }
 
-          return updated;
-        },
-      );
+            return updated;
+          },
+        );
+      }
     } catch (error) {
-      const errorMessage =
+      const message =
         error instanceof Error
           ? error.message
           : "حدث خطأ غير متوقع.";
 
       setErrorMessage(
-        errorMessage,
+        message,
       );
 
       /*
-       * Remove the empty assistant placeholder if
-       * streaming failed before any useful content arrived.
+       * Convert the empty assistant placeholder into
+       * a visible error message.
        */
       setMessages(
         (current) => {
@@ -807,7 +811,7 @@ export default function AIChat() {
               ...last,
 
               content:
-                `تعذر تنفيذ الطلب: ${errorMessage}`,
+                `تعذر تنفيذ الطلب: ${message}`,
             };
           }
 
@@ -820,420 +824,882 @@ export default function AIChat() {
   }
 
   return (
-    <section className="glass card">
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "minmax(190px, 230px) minmax(0, 1fr)",
-          gap: "18px",
-          alignItems: "stretch",
-        }}
-      >
-        {/*
-         * ==================================================
-         * CHAT HISTORY
-         * ==================================================
-         */}
-        <aside
-          style={{
-            border:
-              "1px solid rgba(255,255,255,0.08)",
+    <>
+      <style jsx>{`
+        .gv-ai-root {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+        }
 
-            borderRadius:
-              "18px",
+        .gv-ai-layout {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
 
-            background:
-              "rgba(255,255,255,0.025)",
+          display: grid;
+          grid-template-columns:
+            minmax(190px, 230px)
+            minmax(0, 1fr);
+
+          gap: 18px;
+          align-items: stretch;
+        }
+
+        .gv-ai-history {
+          width: 100%;
+          min-width: 0;
+          min-height: 420px;
+          box-sizing: border-box;
+
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+
+          padding: 14px;
+
+          overflow: hidden;
+
+          border:
+            1px solid
+            rgba(255, 255, 255, 0.08);
+
+          border-radius: 18px;
+
+          background:
+            rgba(255, 255, 255, 0.025);
+        }
+
+        .gv-ai-history-list {
+          width: 100%;
+          min-width: 0;
+          min-height: 0;
+
+          flex: 1;
+
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+
+          overflow-x: hidden;
+          overflow-y: auto;
+
+          overscroll-behavior: contain;
+        }
+
+        .gv-ai-new-chat {
+          width: 100%;
+          min-height: 44px;
+
+          white-space: nowrap;
+
+          box-sizing: border-box;
+        }
+
+        .gv-ai-history-item {
+          width: 100%;
+          min-width: 0;
+
+          display: block;
+
+          padding: 11px;
+
+          box-sizing: border-box;
+
+          text-align: right;
+
+          border:
+            1px solid
+            rgba(255, 255, 255, 0.06);
+
+          border-radius: 14px;
+
+          background:
+            rgba(255, 255, 255, 0.025);
+
+          color: inherit;
+
+          cursor: pointer;
+
+          transition:
+            background 0.2s ease,
+            border-color 0.2s ease,
+            transform 0.2s ease;
+        }
+
+        .gv-ai-history-item:hover {
+          border-color:
+            rgba(168, 85, 247, 0.35);
+
+          background:
+            rgba(168, 85, 247, 0.08);
+        }
+
+        .gv-ai-history-item-active {
+          border-color:
+            rgba(168, 85, 247, 0.65);
+
+          background:
+            rgba(168, 85, 247, 0.12);
+        }
+
+        .gv-ai-history-item:disabled {
+          cursor: default;
+          opacity: 0.65;
+        }
+
+        .gv-ai-history-title {
+          width: 100%;
+          min-width: 0;
+
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.5;
+        }
+
+        .gv-ai-history-meta {
+          min-width: 0;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 8px;
+
+          margin-top: 5px;
+
+          font-size: 11px;
+
+          opacity: 0.6;
+        }
+
+        .gv-ai-history-meta span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .gv-ai-chat {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+
+          overflow: hidden;
+        }
+
+        .gv-ai-header {
+          width: 100%;
+          min-width: 0;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 16px;
+
+          margin-bottom: 14px;
+        }
+
+        .gv-ai-header-text {
+          min-width: 0;
+        }
+
+        .gv-ai-header-title {
+          margin:
+            8px 0 0;
+
+          overflow-wrap: anywhere;
+
+          font-size:
+            clamp(22px, 3vw, 30px);
+
+          line-height: 1.25;
+        }
+
+        .gv-ai-header-description {
+          margin:
+            5px 0 0;
+
+          line-height: 1.6;
+
+          overflow-wrap: anywhere;
+        }
+
+        .gv-ai-status {
+          flex:
+            0 0 auto;
+
+          display: flex;
+          align-items: center;
+          gap: 7px;
+
+          white-space: nowrap;
+        }
+
+        .gv-ai-error {
+          width: 100%;
+          box-sizing: border-box;
+
+          margin-bottom: 12px;
+
+          padding:
+            10px 12px;
+
+          overflow-wrap: anywhere;
+
+          border:
+            1px solid
+            rgba(239, 68, 68, 0.35);
+
+          border-radius: 12px;
+
+          background:
+            rgba(239, 68, 68, 0.08);
+
+          color:
+            #fecaca;
+
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .gv-ai-messages {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+
+          min-height: 280px;
+          max-height: 560px;
+
+          padding:
+            4px;
+
+          overflow-x: hidden;
+          overflow-y: auto;
+
+          overscroll-behavior: contain;
+
+          scrollbar-width: thin;
+        }
+
+        .gv-ai-message {
+          width: fit-content;
+
+          max-width:
+            min(82%, 760px);
+
+          margin-bottom: 12px;
+
+          padding:
+            12px 14px;
+
+          box-sizing: border-box;
+
+          border:
+            1px solid
+            rgba(255, 255, 255, 0.08);
+
+          border-radius: 16px;
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
+
+          line-height: 1.75;
+        }
+
+        .gv-ai-message-user {
+          margin-right: 0;
+          margin-left: auto;
+
+          background:
+            rgba(124, 58, 237, 0.14);
+
+          border-color:
+            rgba(168, 85, 247, 0.22);
+        }
+
+        .gv-ai-message-assistant {
+          margin-right: auto;
+          margin-left: 0;
+
+          background:
+            rgba(255, 255, 255, 0.035);
+        }
+
+        .gv-ai-message-role {
+          margin-bottom: 5px;
+
+          font-size: 11px;
+          font-weight: 800;
+
+          opacity: 0.65;
+        }
+
+        .gv-ai-message-content {
+          min-width: 0;
+
+          white-space: pre-wrap;
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .gv-ai-form {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+
+          display: flex;
+          align-items: stretch;
+
+          gap: 10px;
+
+          margin-top: 14px;
+        }
+
+        .gv-ai-textarea {
+          flex:
+            1 1 auto;
+
+          width: 100%;
+          min-width: 0;
+          min-height: 88px;
+
+          box-sizing: border-box;
+
+          resize: vertical;
+
+          padding:
+            13px 14px;
+
+          border:
+            1px solid
+            rgba(255, 255, 255, 0.1);
+
+          border-radius: 15px;
+
+          background:
+            rgba(255, 255, 255, 0.035);
+
+          color: #fff;
+
+          outline: none;
+
+          font: inherit;
+
+          line-height: 1.6;
+        }
+
+        .gv-ai-textarea::placeholder {
+          color:
+            rgba(203, 213, 225, 0.45);
+        }
+
+        .gv-ai-textarea:focus {
+          border-color:
+            rgba(168, 85, 247, 0.55);
+
+          box-shadow:
+            0 0 0 3px
+            rgba(168, 85, 247, 0.08);
+        }
+
+        .gv-ai-send {
+          flex:
+            0 0 110px;
+
+          min-height: 88px;
+
+          box-sizing: border-box;
+
+          white-space: nowrap;
+        }
+
+        .gv-ai-empty {
+          padding:
+            12px 6px;
+
+          font-size: 13px;
+
+          line-height: 1.7;
+
+          overflow-wrap: anywhere;
+        }
+
+        .gv-ai-loading {
+          padding:
+            12px 6px;
+
+          font-size: 13px;
+
+          line-height: 1.7;
+
+          opacity: 0.7;
+        }
+
+        /*
+         * ==============================================
+         * TABLET
+         * ==============================================
+         */
+
+        @media (max-width: 900px) {
+          .gv-ai-layout {
+            grid-template-columns:
+              minmax(175px, 200px)
+              minmax(0, 1fr);
+
+            gap: 14px;
+          }
+
+          .gv-ai-history {
+            padding: 11px;
+          }
+
+          .gv-ai-message {
+            max-width: 88%;
+          }
+
+          .gv-ai-send {
+            flex-basis: 96px;
+          }
+        }
+
+        /*
+         * ==============================================
+         * MOBILE
+         * ==============================================
+         */
+
+        @media (max-width: 700px) {
+          .gv-ai-layout {
+            display: flex;
+            flex-direction: column;
+
+            width: 100%;
+            gap: 14px;
+          }
+
+          .gv-ai-history {
+            width: 100%;
+            min-height: auto;
+
+            max-height: none;
+
+            padding: 11px;
+
+            box-sizing: border-box;
+          }
+
+          .gv-ai-history-list {
+            width: 100%;
+
+            max-height: 190px;
+
+            overflow-x: hidden;
+            overflow-y: auto;
+          }
+
+          .gv-ai-history-item {
+            flex:
+              0 0 auto;
+
+            width: 100%;
+          }
+
+          .gv-ai-chat {
+            width: 100%;
+            min-width: 0;
+          }
+
+          .gv-ai-header {
+            align-items: flex-start;
+
+            flex-direction: column;
+
+            gap: 9px;
+          }
+
+          .gv-ai-status {
+            align-self: flex-start;
+          }
+
+          .gv-ai-messages {
+            width: 100%;
+
+            min-height: 250px;
+            max-height: 480px;
+          }
+
+          .gv-ai-message {
+            width: auto;
+
+            max-width: 92%;
 
             padding:
-              "14px",
+              10px 12px;
+          }
 
-            minHeight:
-              "420px",
+          .gv-ai-form {
+            flex-direction: column;
 
-            display: "flex",
+            width: 100%;
 
-            flexDirection:
-              "column",
+            gap: 9px;
+          }
 
-            gap: "12px",
-          }}
-        >
-          <button
-            type="button"
-            onClick={
-              startNewChat
-            }
-            disabled={
-              loading ||
-              historyLoading
-            }
-            className="btn"
-            style={{
-              width: "100%",
-              opacity:
-                loading ||
-                historyLoading
-                  ? 0.6
-                  : 1,
-            }}
-          >
-            + محادثة جديدة
-          </button>
+          .gv-ai-textarea {
+            width: 100%;
 
-          <div
-            style={{
-              display: "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "space-between",
-              gap: "8px",
-            }}
-          >
-            <span
-              className="badge"
-            >
-              سجل المحادثات
-            </span>
+            min-height: 100px;
+          }
 
-            {conversations.length >
-              0 && (
-              <span
-                className="muted"
-                style={{
-                  fontSize:
-                    "12px",
-                }}
-              >
-                {
-                  conversations.length
-                }
-              </span>
-            )}
-          </div>
+          .gv-ai-send {
+            width: 100%;
 
-          <div
-            style={{
-              display: "flex",
-              flexDirection:
-                "column",
-              gap: "8px",
-              overflowY:
-                "auto",
-              flex: 1,
-            }}
-          >
-            {conversationsLoading && (
-              <div
-                className="muted"
-                style={{
-                  padding:
-                    "12px 6px",
-                  fontSize:
-                    "13px",
-                }}
-              >
-                جاري تحميل المحادثات...
-              </div>
-            )}
+            flex:
+              0 0 auto;
 
-            {!conversationsLoading &&
-              conversations.length ===
-                0 && (
-                <div
-                  className="muted"
-                  style={{
-                    padding:
-                      "12px 6px",
-                    fontSize:
-                      "13px",
-                    lineHeight:
-                      1.7,
-                  }}
-                >
-                  لا توجد محادثات محفوظة حتى الآن.
-                </div>
-              )}
+            min-height: 48px;
+          }
+        }
 
-            {!conversationsLoading &&
-              conversations.map(
-                (
-                  conversation,
-                ) => {
-                  const active =
-                    currentConversationId ===
-                    conversation.id;
+        /*
+         * ==============================================
+         * SMALL PHONES
+         * ==============================================
+         */
 
-                  return (
-                    <button
-                      key={
-                        conversation.id
-                      }
-                      type="button"
-                      onClick={() =>
-                        openConversation(
-                          conversation.id,
-                        )
-                      }
-                      disabled={
-                        loading ||
-                        historyLoading
-                      }
-                      style={{
-                        width:
-                          "100%",
-                        textAlign:
-                          "right",
-                        border:
-                          active
-                            ? "1px solid rgba(168,85,247,0.65)"
-                            : "1px solid rgba(255,255,255,0.06)",
-                        borderRadius:
-                          "14px",
-                        background:
-                          active
-                            ? "rgba(168,85,247,0.12)"
-                            : "rgba(255,255,255,0.025)",
-                        padding:
-                          "11px",
-                        cursor:
-                          loading ||
-                          historyLoading
-                            ? "default"
-                            : "pointer",
-                        opacity:
-                          loading ||
-                          historyLoading
-                            ? 0.65
-                            : 1,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight:
-                            700,
-                          fontSize:
-                            "13px",
-                          lineHeight:
-                            1.5,
-                          overflow:
-                            "hidden",
-                          textOverflow:
-                            "ellipsis",
-                          whiteSpace:
-                            "nowrap",
-                        }}
-                      >
-                        {getConversationLabel(
-                          conversation,
-                        )}
-                      </div>
+        @media (max-width: 430px) {
+          .gv-ai-history {
+            padding: 10px;
 
-                      <div
-                        style={{
-                          marginTop:
-                            "5px",
-                          display:
-                            "flex",
-                          justifyContent:
-                            "space-between",
-                          gap:
-                            "8px",
-                          fontSize:
-                            "11px",
-                          opacity:
-                            0.6,
-                        }}
-                      >
-                        <span>
-                          {formatConversationDate(
-                            conversation.updatedAt,
-                          )}
-                        </span>
+            border-radius: 15px;
+          }
 
-                        {conversation
-                          ._count
-                          ?.messages !==
-                          undefined && (
-                          <span>
-                            {
-                              conversation
-                                ._count
-                                .messages
-                            }{" "}
-                            رسالة
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                },
-              )}
-          </div>
-        </aside>
+          .gv-ai-history-list {
+            max-height: 165px;
+          }
 
-        {/*
-         * ==================================================
-         * CHAT AREA
-         * ==================================================
-         */}
-        <div
-          style={{
-            minWidth:
-              0,
-          }}
-        >
-          <div className="ai-chat-header">
-            <div>
-              <span className="badge">
-                GAMEVORTEX AI
-              </span>
+          .gv-ai-history-item {
+            padding: 10px;
+          }
 
-              <h2>
-                المساعد الذكي
-              </h2>
+          .gv-ai-history-title {
+            font-size: 12px;
+          }
 
-              <p className="muted">
-                {currentConversationId
-                  ? "المحادثة محفوظة ويمكنك العودة إليها لاحقًا."
-                  : "محادثة جديدة"}
-              </p>
-            </div>
+          .gv-ai-history-meta {
+            font-size: 10px;
+          }
 
-            <div className="ai-status">
-              <span className="ai-status-dot" />
+          .gv-ai-messages {
+            min-height: 220px;
+            max-height: 430px;
+          }
 
-              <span>
-                متاح
-              </span>
-            </div>
-          </div>
+          .gv-ai-message {
+            max-width: 94%;
 
-          {errorMessage && (
-            <div
-              style={{
-                margin:
-                  "0 0 12px",
-                padding:
-                  "10px 12px",
-                border:
-                  "1px solid rgba(239,68,68,0.35)",
-                borderRadius:
-                  "12px",
-                background:
-                  "rgba(239,68,68,0.08)",
-                color:
-                  "#fecaca",
-                fontSize:
-                  "13px",
-              }}
-            >
-              {errorMessage}
-            </div>
-          )}
+            padding:
+              10px 11px;
 
-          <div className="ai-chat-messages">
-            {historyLoading ? (
-              <div
-                className="ai-message ai-message-assistant"
-              >
-                <div className="ai-message-role">
-                  GameVortex AI
-                </div>
+            border-radius: 14px;
 
-                <div className="ai-message-content">
-                  جاري تحميل المحادثة...
-                </div>
-              </div>
-            ) : (
-              messages.map(
-                (
-                  message,
-                  index,
-                ) => (
-                  <div
-                    key={
-                      message.id ??
-                      `${message.role}-${index}`
-                    }
-                    className={`ai-message ${
-                      message.role ===
-                      "user"
-                        ? "ai-message-user"
-                        : "ai-message-assistant"
-                    }`}
-                  >
-                    <div className="ai-message-role">
-                      {message.role ===
-                      "user"
-                        ? "أنت"
-                        : "GameVortex AI"}
-                    </div>
+            font-size: 14px;
+          }
 
-                    <div className="ai-message-content">
-                      {message.content}
-                    </div>
-                  </div>
-                ),
-              )
-            )}
+          .gv-ai-header-title {
+            font-size: 22px;
+          }
 
-            {loading && (
-              <div className="ai-message ai-message-assistant">
-                <div className="ai-message-role">
-                  GameVortex AI
-                </div>
+          .gv-ai-form {
+            gap: 8px;
+          }
+        }
 
-                <div className="ai-message-content">
-                  جاري التفكير...
-                </div>
-              </div>
-            )}
-          </div>
+        @media (prefers-reduced-motion: reduce) {
+          .gv-ai-history-item {
+            transition: none;
+          }
+        }
+      `}</style>
 
-          <form
-            onSubmit={
-              sendMessage
-            }
-            className="ai-chat-form"
-          >
-            <textarea
-              value={input}
-              onChange={(
-                event,
-              ) =>
-                setInput(
-                  event.target
-                    .value,
-                )
-              }
-              placeholder="اكتب رسالتك هنا..."
-              rows={3}
-              disabled={
-                loading ||
-                historyLoading
-              }
-              maxLength={4000}
-            />
+      <section className="glass card gv-ai-root">
+        <div className="gv-ai-layout">
+
+          {/* =================================================
+              CHAT HISTORY
+          ================================================== */}
+
+          <aside className="gv-ai-history">
 
             <button
-              type="submit"
+              type="button"
+              onClick={
+                startNewChat
+              }
               disabled={
                 loading ||
-                historyLoading ||
-                !input.trim()
+                historyLoading
               }
-              className="btn"
+              className="btn gv-ai-new-chat"
             >
-              {loading
-                ? "جاري الإرسال..."
-                : "إرسال"}
+              + محادثة جديدة
             </button>
-          </form>
+
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "space-between",
+                gap: "8px",
+              }}
+            >
+              <span className="badge">
+                سجل المحادثات
+              </span>
+
+              {conversations.length >
+                0 && (
+                <span
+                  className="muted"
+                  style={{
+                    fontSize:
+                      "12px",
+                  }}
+                >
+                  {
+                    conversations.length
+                  }
+                </span>
+              )}
+            </div>
+
+            <div className="gv-ai-history-list">
+
+              {conversationsLoading && (
+                <div className="gv-ai-loading">
+                  جاري تحميل المحادثات...
+                </div>
+              )}
+
+              {!conversationsLoading &&
+                conversations.length ===
+                  0 && (
+                  <div className="gv-ai-empty muted">
+                    لا توجد محادثات محفوظة حتى الآن.
+                  </div>
+                )}
+
+              {!conversationsLoading &&
+                conversations.map(
+                  (
+                    conversation,
+                  ) => {
+                    const active =
+                      currentConversationId ===
+                      conversation.id;
+
+                    return (
+                      <button
+                        key={
+                          conversation.id
+                        }
+                        type="button"
+                        onClick={() =>
+                          openConversation(
+                            conversation.id,
+                          )
+                        }
+                        disabled={
+                          loading ||
+                          historyLoading
+                        }
+                        className={`gv-ai-history-item ${
+                          active
+                            ? "gv-ai-history-item-active"
+                            : ""
+                        }`}
+                      >
+                        <div className="gv-ai-history-title">
+                          {getConversationLabel(
+                            conversation,
+                          )}
+                        </div>
+
+                        <div className="gv-ai-history-meta">
+                          <span>
+                            {formatConversationDate(
+                              conversation.updatedAt,
+                            )}
+                          </span>
+
+                          {conversation
+                            ._count
+                            ?.messages !==
+                            undefined && (
+                            <span>
+                              {
+                                conversation
+                                  ._count
+                                  .messages
+                              }{" "}
+                              رسالة
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  },
+                )}
+
+            </div>
+          </aside>
+
+          {/* =================================================
+              CHAT AREA
+          ================================================== */}
+
+          <div className="gv-ai-chat">
+
+            <div className="gv-ai-header">
+
+              <div className="gv-ai-header-text">
+
+                <span className="badge">
+                  GAMEVORTEX AI
+                </span>
+
+                <h2 className="gv-ai-header-title">
+                  المساعد الذكي
+                </h2>
+
+                <p className="muted gv-ai-header-description">
+                  {currentConversationId
+                    ? "المحادثة محفوظة ويمكنك العودة إليها لاحقًا."
+                    : "محادثة جديدة"}
+                </p>
+
+              </div>
+
+              <div className="ai-status gv-ai-status">
+                <span className="ai-status-dot" />
+
+                <span>
+                  متاح
+                </span>
+              </div>
+
+            </div>
+
+            {errorMessage && (
+              <div className="gv-ai-error">
+                {errorMessage}
+              </div>
+            )}
+
+            <div className="gv-ai-messages">
+
+              {historyLoading ? (
+                <div className="ai-message ai-message-assistant">
+                  <div className="ai-message-role">
+                    GameVortex AI
+                  </div>
+
+                  <div className="ai-message-content">
+                    جاري تحميل المحادثة...
+                  </div>
+                </div>
+              ) : (
+                messages.map(
+                  (
+                    message,
+                    index,
+                  ) => (
+                    <div
+                      key={
+                        message.id ??
+                        `${message.role}-${index}`
+                      }
+                      className={`gv-ai-message ${
+                        message.role ===
+                        "user"
+                          ? "gv-ai-message-user"
+                          : "gv-ai-message-assistant"
+                      }`}
+                    >
+                      <div className="gv-ai-message-role">
+                        {message.role ===
+                        "user"
+                          ? "أنت"
+                          : "GameVortex AI"}
+                      </div>
+
+                      <div className="gv-ai-message-content">
+                        {message.content}
+                      </div>
+                    </div>
+                  ),
+                )
+              )}
+
+            </div>
+
+            <form
+              onSubmit={
+                sendMessage
+              }
+              className="gv-ai-form"
+            >
+
+              <textarea
+                value={input}
+                onChange={(
+                  event,
+                ) =>
+                  setInput(
+                    event.target
+                      .value,
+                  )
+                }
+                placeholder="اكتب رسالتك هنا..."
+                rows={3}
+                disabled={
+                  loading ||
+                  historyLoading
+                }
+                maxLength={4000}
+                className="gv-ai-textarea"
+              />
+
+              <button
+                type="submit"
+                disabled={
+                  loading ||
+                  historyLoading ||
+                  !input.trim()
+                }
+                className="btn gv-ai-send"
+              >
+                {loading
+                  ? "جاري الإرسال..."
+                  : "إرسال"}
+              </button>
+
+            </form>
+
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
