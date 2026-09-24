@@ -1,6 +1,28 @@
+import type { Viewport } from "next";
+import { Cairo, Inter, Rajdhani } from "next/font/google";
 import SiteHeader from "@/components/layout/SiteHeader";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import "./styles.css";
+import "./design-system.css";
+
+const fontDisplay = Rajdhani({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
+  variable: "--font-display",
+});
+
+const fontBody = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-body",
+});
+
+const fontArabic = Cairo({
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  variable: "--font-arabic",
+});
 
 function getMetadataBase() {
   const origin = process.env.APP_ORIGIN?.trim();
@@ -22,11 +44,13 @@ export const metadata = {
   metadataBase: getMetadataBase(),
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#050313",
+  viewportFit: "cover",
+  colorScheme: "dark",
+  themeColor: "#05030d",
 };
 
 export default function RootLayout({
@@ -35,7 +59,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl">
+    <html
+      lang="ar"
+      dir="rtl"
+      className={`${fontDisplay.variable} ${fontBody.variable} ${fontArabic.variable}`}
+    >
       <body>
         <SiteHeader />
 
