@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Me = {
@@ -208,6 +208,7 @@ function BellIcon() {
 
 export default function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const [isOpen, setIsOpen] = useState(false);
   const [me, setMe] = useState<Me>(null);
@@ -248,6 +249,16 @@ export default function SiteHeader() {
       document.body.style.overflow = "";
     };
   }, [isOpen]);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {}
+    setMe(null);
+    setIsOpen(false);
+    router.push("/");
+    router.refresh();
+  }
 
   const isOwner = me?.role === "SUPER_ADMIN";
 
@@ -372,6 +383,16 @@ export default function SiteHeader() {
                 حسابي
               </span>
             </Link>
+
+            {me ? (
+              <button
+                type="button"
+                className="gv-logout-button"
+                onClick={handleLogout}
+              >
+                خروج
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -471,6 +492,24 @@ export default function SiteHeader() {
             );
           })}
         </nav>
+
+        {me ? (
+          <button
+            type="button"
+            className="gv-drawer-logout"
+            onClick={handleLogout}
+          >
+            تسجيل الخروج
+          </button>
+        ) : (
+          <Link
+            href="/auth/login"
+            className="gv-drawer-logout gv-drawer-login"
+            onClick={() => setIsOpen(false)}
+          >
+            تسجيل الدخول
+          </Link>
+        )}
       </aside>
     </>
   );
