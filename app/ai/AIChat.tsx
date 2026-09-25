@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Globe, Send, Sparkles } from "lucide-react";
 import styles from "./ai.module.css";
 
 const QUICK = [
@@ -83,10 +82,10 @@ export default function AIChat() {
     <div className={styles.newChatShell}>
       <div className={styles.newChatHeader}>
         <div className={styles.newChatIdentity}>
-          <span className={styles.newChatIcon}><Sparkles size={17} /></span>
+          <span className={styles.newChatIcon}>✦</span>
           <div><strong>محادثة GameVortex AI</strong><div className={styles.connected}><span />متصل</div></div>
         </div>
-        <div className={styles.webSearchBadge}><Globe size={13} /> GameVortex Knowledge</div>
+        <div className={styles.webSearchBadge}>◎ GameVortex Knowledge</div>
       </div>
 
       <div className={styles.newMessages}>
@@ -107,7 +106,7 @@ export default function AIChat() {
 
       <form className={styles.newComposer} onSubmit={onSubmit}>
         <input value={input} onChange={(event) => setInput(event.target.value)} placeholder="اكتب سؤالك هنا..." aria-label="رسالة" disabled={loading} />
-        <button type="submit" disabled={loading || !input.trim()} aria-label="إرسال"><Send size={17} /></button>
+        <button type="submit" disabled={loading || !input.trim()} aria-label="إرسال">➤</button>
       </form>
 
       <div className={styles.quickPrompts}>
