@@ -135,7 +135,6 @@ model User {
   vipRewardClaims VipRewardClaim[]
   vipPurchases VipPurchase[]
 
-  conversations Conversation[]
 }
 
 model PointLedger {
