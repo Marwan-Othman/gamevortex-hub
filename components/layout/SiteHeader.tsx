@@ -11,17 +11,17 @@ type Me = {
 } | null;
 
 const NAV_LINKS = [
-  { href: "/games", label: "الألعاب", icon: GameIcon },
+  { href: "/games", label: "Games", icon: GameIcon },
   { href: "/vip", label: "VIP", icon: CrownIcon },
   { href: "/ai", label: "AI", icon: AIIcon },
-  { href: "/marketplace", label: "المتجر", icon: StoreIcon },
-  { href: "/library", label: "مكتبتي", icon: LibraryIcon },
-  { href: "/wallet", label: "المحفظة", icon: WalletIcon },
-  { href: "/rewards", label: "المكافآت", icon: GiftIcon },
-  { href: "/referrals", label: "الإحالات", icon: UsersIcon },
-  { href: "/rankings", label: "الترتيب", icon: TrophyIcon },
-  { href: "/quran", label: "القرآن", icon: BookIcon },
-  { href: "/profile/gamer", label: "ملفي", icon: UserIcon },
+  { href: "/marketplace", label: "Store", icon: StoreIcon },
+  { href: "/library", label: "Library", icon: LibraryIcon },
+  { href: "/wallet", label: "Wallet", icon: WalletIcon },
+  { href: "/rewards", label: "Rewards", icon: GiftIcon },
+  { href: "/referrals", label: "Referrals", icon: UsersIcon },
+  { href: "/rankings", label: "Rank", icon: TrophyIcon },
+  { href: "/quran", label: "Quran", icon: BookIcon },
+  { href: "/profile/gamer", label: "Profile", icon: UserIcon },
 ];
 
 function Icon({ children }: { children: React.ReactNode }) {

@@ -87,12 +87,12 @@ function AIIcon() {
 const navigationItems = [
   {
     href: "/",
-    label: "الرئيسية",
+    label: "Home",
     Icon: HomeIcon,
   },
   {
     href: "/games",
-    label: "الألعاب",
+    label: "Games",
     Icon: GameIcon,
   },
   {
@@ -107,22 +107,22 @@ const navigationItems = [
   },
   {
     href: "/library",
-    label: "المكتبة",
+    label: "Vault",
     Icon: GridIcon,
   },
   {
     href: "/rewards",
-    label: "المكافآت",
+    label: "Rewards",
     Icon: GiftIcon,
   },
   {
     href: "/gift-cards",
-    label: "البطاقات",
+    label: "Store",
     Icon: CardIcon,
   },
   {
     href: "/profile/gamer",
-    label: "حسابي",
+    label: "Profile",
     Icon: UserIcon,
   },
 ];

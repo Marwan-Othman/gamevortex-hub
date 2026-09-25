@@ -188,10 +188,10 @@ export default async function Games({
     <main className="wrap">
       <section className="glass hero">
         <p className="muted">
-          GAME DISCOVERY
+          DISCOVER GAMES
         </p>
 
-        <h1>اكتشف عالم الألعاب</h1>
+        <h1>اكتشف ألعابك القادمة</h1>
 
         <p>
           اكتشف ألعابًا لجميع المنصات مع البحث
@@ -252,7 +252,7 @@ export default async function Games({
             name="q"
             defaultValue={q}
             maxLength={80}
-            placeholder="ابحث باسم اللعبة..."
+            placeholder="Search for games, genres..."
             aria-label="بحث عن لعبة"
           />
 

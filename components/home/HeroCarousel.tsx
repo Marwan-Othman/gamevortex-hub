@@ -7,10 +7,10 @@ import styles from "../../app/home.module.css";
 const SLIDES = [
   {
     number: "01",
-    eyebrow: "GAMEVORTEX EXPERIENCE",
-    title: "عالمك يبدأ من هنا",
+    eyebrow: "WELCOME TO GAMEVORTEX",
+    title: "WELCOME TO GAMEVORTEX",
     subtitle:
-      "منصة واحدة تجمع ألعابك ومنصاتك ومكتبتك واكتشافاتك في تجربة Gaming متطورة.",
+      "PLAY • EARN • CREATE • CONNECT",
     href: "/games",
     cta: "استكشف الألعاب",
     accent: "#6C63FF",
@@ -20,10 +20,10 @@ const SLIDES = [
   },
   {
     number: "02",
-    eyebrow: "DISCOVER • PLAY • ENJOY",
-    title: "اكتشف عوالم جديدة",
+    eyebrow: "DISCOVER MORE",
+    title: "DISCOVER YOUR NEXT GAME",
     subtitle:
-      "اكتشف أحدث الألعاب والأكثر شعبية والأعلى تقييمًا من مكان واحد وبأسلوب مختلف.",
+      "Explore worlds beyond reality.",
     href: "/games?sort=newest",
     cta: "شاهد الإصدارات الجديدة",
     accent: "#00D4FF",
@@ -33,10 +33,10 @@ const SLIDES = [
   },
   {
     number: "03",
-    eyebrow: "PREMIUM GAMING",
-    title: "ارتقِ بتجربتك مع VIP",
+    eyebrow: "PLAYER’S CHOICE",
+    title: "كل شيء في مكان واحد",
     subtitle:
-      "مزايا وتجربة أكثر تميزًا داخل عالم GameVortex المصمم للاعبين.",
+      "Your games, rewards, library and AI in one vortex.",
     href: "/rewards",
     cta: "اكتشف VIP",
     accent: "#A855F7",
