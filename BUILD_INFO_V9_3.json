@@ -1,0 +1,14 @@
+{
+  "version": "V9.3",
+  "name": "GameVortex Hub",
+  "status": "production-environment-ready",
+  "changes": [
+    "production Docker compose stack",
+    "automatic Prisma migrations on startup",
+    "safe owner bootstrap",
+    "database health checks",
+    "PostgreSQL backup script",
+    "production environment template"
+  ],
+  "requires_external_credentials": true
+}

@@ -1,0 +1,26 @@
+{
+  "name": "GameVortex Hub V10 Ultimate Merged",
+  "version": "10.0.0",
+  "sources": [
+    "GameVortex_Hub_V9_3_Real_Environment.zip",
+    "GameVortex_Hub_V9_4_1_PreBuild_Fixed.zip",
+    "GameVortex_Hub_V10_Production_Hardened.zip",
+    "GameVortex_Hub_V10_1_Production_Hardened.zip",
+    "GameVortex_Hub_V10_2_Production_Hardened.zip",
+    "GameVortex_Hub_Final_Staging_Ready.zip"
+  ],
+  "canonical_source": "GameVortex_Hub_Final_Staging_Ready.zip",
+  "normalized_source_paths": 154,
+  "database_models": 30,
+  "database_enums": 17,
+  "migration_count": 6,
+  "tests": ["tests/digital-keys.test.ts", "tests/payments.test.ts"],
+  "dependencies": {
+    "next": "16.3.1",
+    "react": "19.1.8",
+    "prisma": "6.12.0",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.7"
+  },
+  "generated_artifacts_excluded": ["tsconfig.tsbuildinfo"]
+}

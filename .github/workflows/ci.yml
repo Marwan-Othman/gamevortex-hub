@@ -1,0 +1,70 @@
+name: Quality Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gamevortex
+          POSTGRES_PASSWORD: gamevortex
+          POSTGRES_DB: gamevortex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gamevortex -d gamevortex"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://gamevortex:gamevortex@localhost:5432/gamevortex
+      AUTH_SECRET: ci-only-secret-with-at-least-thirty-two-characters
+      APP_ORIGIN: http://localhost:3000
+      OWNER_EMAIL: owner@example.test
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Validate database schema
+        run: npm run db:validate
+
+      - name: Generate database client
+        run: npm run db:generate
+
+      - name: Apply migrations to an empty database
+        run: npm run db:migrate
+
+      - name: Verify migrated database matches Prisma schema
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+
+      - name: Check TypeScript
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Run release smoke check
+        env:
+          REQUIRE_BUILD: "1"
+          REQUIRE_LOCKFILE: "1"
+        run: npm run test:smoke

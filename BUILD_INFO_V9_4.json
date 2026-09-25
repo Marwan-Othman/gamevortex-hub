@@ -1,0 +1,12 @@
+{
+  "version": "V9.4",
+  "status": "production-hardened-source",
+  "database": "Prisma/PostgreSQL",
+  "payments": "Stripe + compatible HMAC adapter",
+  "email": "Resend adapter",
+  "gaming": "Steam + configurable Xbox/PlayStation adapters",
+  "ai": "OpenAI-compatible server adapter",
+  "rate_limit": "Upstash optional with local fallback",
+  "security": "RBAC + CSRF origin checks + signed webhooks + idempotency",
+  "note": "Final production validation requires registry access, a PostgreSQL instance, and real provider credentials."
+}

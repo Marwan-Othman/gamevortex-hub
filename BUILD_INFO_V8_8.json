@@ -1,0 +1,16 @@
+{
+  "version": "8.8",
+  "name": "GameVortex Hub",
+  "stage": "Development",
+  "focus": "Game detail library, favorites, and wishlist actions",
+  "schemaMigration": false,
+  "productionValidated": false,
+  "validation": {
+    "sourceSanity": true,
+    "nodeScriptSyntax": true,
+    "npmCi": false,
+    "prismaValidate": false,
+    "nextBuild": false,
+    "smokeTest": false
+  }
+}
