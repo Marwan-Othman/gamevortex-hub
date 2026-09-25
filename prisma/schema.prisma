@@ -132,12 +132,10 @@ model User {
   reportsModerated ContentReport[] @relation("ModeratorReports")
 
   vipSubscriptions VipSubscription[]
-  aiUsages AiUsage[]
   vipRewardClaims VipRewardClaim[]
   vipPurchases VipPurchase[]
 
   conversations Conversation[]
-  aiMediaJobs AiMediaJob[]
 }
 
 model PointLedger {
@@ -765,25 +763,8 @@ enum VipSubscriptionEventType {
   CREDITS_RESET
 }
 
-enum AiUsageType {
-  CHAT
-  IMAGE
-  VIDEO
-}
 
-enum ChatMessageRole {
-  USER
-  ASSISTANT
-  SYSTEM
-}
 
-enum ChatMessageStatus {
-  PENDING
-  STREAMING
-  COMPLETE
-  STOPPED
-  ERROR
-}
 
 enum ModerationStatus {
   PENDING
@@ -1096,7 +1077,7 @@ model RaffleEntry {
 
 
 /* =========================================================
-   GAMEVORTEX VIP / SUBSCRIPTIONS / AI CREDITS
+   GAMEVORTEX VIP / SUBSCRIPTIONS
    ========================================================= */
 
 model VipPlan {
@@ -1158,7 +1139,6 @@ model VipSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan VipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
   events VipSubscriptionEvent[]
-  aiUsages AiUsage[]
   rewards VipRewardClaim[]
   purchase VipPurchase?
 
@@ -1188,61 +1168,8 @@ model VipSubscriptionEvent {
   @@index([type, createdAt])
 }
 
-model AiUsage {
-  id String @id @default(cuid())
 
-  userId String
-  subscriptionId String?
-  type AiUsageType
-  amount Int @default(1)
 
-  idempotencyKey String @unique
-  metadata Json?
-
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subscription VipSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-
-  @@index([userId, type, createdAt])
-  @@index([subscriptionId, type, createdAt])
-}
-
-model Conversation {
-  id String @id @default(cuid())
-
-  userId String
-
-  title String @default("New Chat")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages Message[]
-
-  @@index([userId, updatedAt])
-  @@index([userId, createdAt])
-}
-
-model Message {
-  id String @id @default(cuid())
-
-  conversationId String
-
-  role ChatMessageRole
-  status ChatMessageStatus @default(COMPLETE)
-
-  content String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId, createdAt])
-  @@index([conversationId, role, createdAt])
-}
 
 model VipReward {
   id String @id @default(cuid())
@@ -1319,42 +1246,6 @@ model VipPurchase {
 }
 
 
-model AiMediaJob {
-  id String @id @default(cuid())
 
-  userId String
-  kind AiMediaKind
-  provider AiMediaProvider
-  providerTaskId String? @unique
-  providerFileId String?
-  model String?
-  prompt String
-  status AiMediaJobStatus @default(QUEUED)
-  resultUrl String?
-  idempotencyKey String @unique
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([userId, status, createdAt])
-}
-
-enum AiMediaKind {
-  IMAGE
-  VIDEO
-}
-
-enum AiMediaJobStatus {
-  QUEUED
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum AiMediaProvider {
-  FAL
-  MINIMAX
-}

@@ -12,7 +12,6 @@ function configurationStatus() {
     owner: Boolean(process.env.OWNER_EMAIL),
     payments: Boolean(process.env.PAYMENT_PROVIDER && (process.env.STRIPE_SECRET_KEY || process.env.PAYMENT_PROVIDER_BASE_URL || process.env.PAYPAL_CLIENT_ID)),
     email: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM),
-    ai: Boolean((process.env.AI_PROVIDER_BASE_URL && process.env.AI_PROVIDER_API_KEY) || process.env.OPENAI_API_KEY),
     quran: true,
     rateLimit: process.env.RATE_LIMIT_STORE === "upstash"
       ? Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)

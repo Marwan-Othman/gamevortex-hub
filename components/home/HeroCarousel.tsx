@@ -36,7 +36,7 @@ const SLIDES = [
     eyebrow: "PLAYER’S CHOICE",
     title: "كل شيء في مكان واحد",
     subtitle:
-      "Your games, rewards, library and AI in one vortex.",
+      "Your games, rewards, library and VIP in one vortex.",
     href: "/rewards",
     cta: "اكتشف VIP",
     accent: "#A855F7",

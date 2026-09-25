@@ -1,0 +1,3192 @@
+============================================================
+GAMEVORTEX HUB — 3D GLASS + REAL CONTENT + QURAN AUDIO UPGRADE
+Revision: 2026-08-14
+============================================================
+
+هذه النسخة تعدّل المواصفات السابقة دون إنشاء مشروع منفصل، وتحافظ على
+قاعدة عدم استخدام Fake Data/Fake Integrations، وتضيف تصميم 3D Glassmorphism
+ومكتبة ألعاب/تطبيقات موسعة ومحتوى قابل للتنزيل مباشرة فقط عندما يكون
+مصرحًا بإعادة توزيعه، بالإضافة إلى نظام قرآن صوتي حقيقي متعدد القراء.
+============================================================
+
+GameVortex Hub — ألعاب لجميع المنصات
+بوابتك الموحدة لجميع منصات الألعاب
+
+مواصفات تطوير المشروع الحالي — Production Specification
+
+1. فكرة المشروع
+- تطوير المشروع الحالي نفسه، وليس إنشاء مشروع جديد أو Demo منفصل.
+- إجراء فحص شامل للمشروع قبل أي تعديل، مع المحافظة على الكود والبيانات الجيدة.
+- دعم العربية RTL والإنجليزية LTR مع تبديل اللغة.
+- تصميم 3D Glassmorphism خرافي وفاخر كهوية بصرية أساسية للمشروع، مع طبقات زجاجية شفافة، عمق ثلاثي الأبعاد، إضاءة واقعية، Refraction، Blur، Depth، Soft Shadows، Volumetric Glow، Floating Cards، Parallax، Micro-interactions، وواجهة مستقبلية راقية، مع الحفاظ على الأداء وReduced Motion.
+- Responsive للهاتف والتابلت واللابتوب وسطح المكتب.
+
+2. Audit شامل قبل التطوير
+فحص:
+- الصفحات وComponents.
+- قاعدة البيانات وEntities.
+- Authentication وRoutes وAPIs.
+- RBAC والصلاحيات.
+- التصميم والبيانات الموجودة.
+- عدم إعادة بناء المشروع من الصفر.
+- عدم حذف البيانات بدون Migration آمنة.
+
+3. المستخدمون والصلاحيات
+الأدوار:
+- SUPER_ADMIN
+- STAFF
+- USER
+- يوجد SUPER_ADMIN واحد فقط وهو مالك المشروع المحدد في ملف المشروع.
+- حماية الصلاحيات Server-side، وليس عبر إخفاء عناصر الواجهة أو localStorage/React State فقط.
+
+المناطق الحساسة:
+- /admin
+- /api/admin
+- Wallet
+- Payments
+- Withdrawals
+- Points
+- Downloads
+
+الاستجابات:
+- 401 للمستخدم غير المسجل.
+- 403 للمستخدم المسجل غير المصرح له.
+
+منع تعديل:
+- الدور.
+- Owner status.
+- الرصيد.
+- النقاط.
+- الأسعار.
+- المكافآت.
+
+الحماية من:
+- IDOR.
+- Privilege Escalation.
+- XSS.
+- CSRF.
+- SQL/NoSQL Injection.
+- Replay attacks.
+- Rate abuse.
+- Secret exposure.
+
+تسجيل جميع العمليات الحساسة في Audit Logs.
+
+4. قاعدة البيانات
+- استخدام Prisma/PostgreSQL إذا كان متاحًا.
+- إذا لم يكن متاحًا، تحويل التصميم إلى قاعدة/خدمة موثوقة أخرى مناسبة للبيئة.
+- النماذج المطلوبة:
+  User, Wallet, OwnerWallet, Game, App, GiftCard, Purchase, Review,
+  DownloadHistory, PointHistory, WithdrawalRequest, Notification, Task,
+  PaymentTransaction, AuditLog, ProductImage, Payout, Settings.
+- استخدام Decimal أو integer cents للأموال، وعدم استخدام Float.
+- Unique Constraints.
+- Atomic Transactions.
+- Idempotency.
+
+5. الألعاب والتطبيقات
+يجب أن يكون الكتالوج حقيقيًا وليس Fake Data.
+
+كل Game يتضمن:
+- عنوان عربي وإنجليزي.
+- Slug.
+- وصف.
+- المنصة.
+- النوع والتصنيف.
+- السعر والخصم.
+- Rewards.
+- صورة الغلاف وScreenshots.
+- الحجم.
+- عدد التحميلات.
+- التقييم.
+- الرابط الرسمي.
+- مصدر التحميل.
+- حالة المصدر.
+
+حالات المصدر:
+- VERIFIED
+- NEEDS_SOURCE
+- PENDING_REVIEW
+- UNPUBLISHED
+
+RAWG يستخدم للـMetadata فقط، وليس مصدرًا لملفات الألعاب.
+
+- دعم Batch Import/Upsert لـ500+ لعبة حقيقية عند توفر 500+ مصدر حقيقي موثوق.
+- لا يجوز نشر لعبة بدون مصدر موثوق.
+- منع Picsum وUnsplash كصور تمثيلية للألعاب.
+- منع example.com والروابط الوهمية.
+
+6. نظام Download
+إنشاء:
+- /api/download
+
+ويكون محميًا بـ:
+- Authentication.
+- Authorization.
+- Source Verification.
+- Duplicate Protection.
+
+التحميل المباشر فقط للملفات:
+- المرخصة.
+- المملوكة/المصرح بتوزيعها.
+- الموجودة على Storage/CDN موثوق.
+
+يفضل Signed URLs أو Secure Download Endpoint.
+
+ممنوع:
+- Fake Download.
+- Dummy Blob.
+- data:text.
+
+إذا لم يوجد مصدر قانوني:
+- عرض NEEDS_SOURCE / Official Store بدل الادعاء بوجود تحميل مباشر.
+
+عند التحميل الصحيح:
+- تسجيل DownloadHistory.
+- زيادة downloadsCount.
+- إعطاء النقاط مرة واحدة.
+- تسجيل PointHistory.
+- تسجيل AuditLog.
+- إنشاء Notification.
+
+7. نظام النقاط
+المستويات:
+- FREE: 1000 نقطة = 5؛ أول تحميل مجاني = +5 نقاط.
+- VIP: 500 نقطة = 5؛ التحميل المجاني = +5.
+- OWNER: 30 نقطة = 0.50؛ التحميل المجاني = +500.
+
+كما يوجد:
+- pointsReward للمستخدم.
+- ownerPointsReward للمالك.
+
+جميع عمليات النقاط:
+- Atomic.
+- Server-Side.
+- محمية من التكرار والتلاعب.
+
+القيم المالية المهمة قابلة للتعديل من Settings.
+
+8. Wallet وPayments
+محفظتان:
+- User Wallet.
+- Owner Wallet.
+
+كلتاهما تدعمان:
+- Balance.
+- Pending Balance.
+- Transactions.
+
+إعدادات محفظة المالك:
+- OWNER_WALLET_ADDRESS
+- NETWORK
+- TOKEN
+
+عدم افتراض Network أو Token.
+عدم تخزين Private Key أو Seed Phrase.
+
+إذا تم استخدام QR، يكون Dynamic ويعرض المعلومات بعد التحقق من الشبكة والعملة/Token.
+
+9. الدفع
+- استخدام Payment Provider حقيقي متاح للبيئة.
+- ممنوع Fake Gateway.
+- السعر والمبلغ والعملة والمكافآت يحددها السيرفر وليس العميل.
+- Signed Webhooks.
+- Idempotency.
+
+إذا لم توجد Integration حقيقية:
+- عرض NOT_CONFIGURED أو NEEDS_INTEGRATION.
+- عدم إنشاء نظام دفع وهمي.
+
+10. Withdrawals
+الصفحات:
+- /withdraw
+- /admin/withdraw
+
+الحالات:
+- PENDING
+- APPROVED
+- REJECTED
+- PAID
+
+التحقق من:
+- الرصيد.
+- الحد الأدنى.
+- طريقة السحب.
+- بيانات السحب.
+
+استخدام Balance Lock داخل Transaction.
+عند الرفض يعاد الرصيد تلقائيًا.
+عدم إظهار نجاح التحويل دون خدمة دفع حقيقية.
+
+11. Reviews
+API:
+- /api/reviews
+
+يدعم:
+- CREATE.
+- UPDATE.
+- READ.
+
+التقييم من 1 إلى 5.
+تقييم واحد لكل User + Game مع إمكانية التعديل.
+حساب ratingAverage وratingCount من قاعدة البيانات.
+Badges مثل Verified وVIP.
+
+12. Gift Cards
+الصفحة:
+- /gift-cards
+
+- منتجات قانونية حقيقية فقط.
+- عدم إظهار الكود قبل نجاح الشراء.
+- السعر والمخزون والتحقق والدفع والتسليم داخل Atomic Transaction.
+- إذا كانت البطاقات داخلية، تسميتها Internal Gift Cards.
+- عدم تقديمها كأكواد رسمية لـSteam أو Apple أو Google وغيرها دون حق بيع فعلي.
+
+13. VIP / Tasks / Notifications / Profile
+الصفحات:
+- /vip
+- /tasks
+- /wallet
+- /profile
+
+- انتهاء VIP يعيد المستخدم إلى FREE مع الاحتفاظ بالتاريخ.
+- منع تكرار مكافآت المهام.
+- الإشعارات تغطي الدفع والشراء والنقاط والسحب وVIP والمهام.
+- Profile يعرض بيانات حقيقية من Database.
+
+14. Admin
+الصفحة:
+- /admin
+
+إحصائيات حقيقية.
+إدارة:
+- Games.
+- Apps.
+- Gift Cards.
+- Users.
+- Withdrawals.
+
+إضافة Owner Edit Game Modal لتعديل اللعبة.
+المنتجات المرتبطة بـPurchases/Downloads/Reviews تستخدم Soft Delete بدل الحذف النهائي.
+
+أقسام:
+- Owner Wallet.
+- Owner Payouts.
+- Audit Logs.
+
+STAFF بصلاحيات محدودة ولا يستطيع تحويل نفسه إلى SUPER_ADMIN.
+
+15. UI/UX
+الصفحات الرئيسية:
+- Homepage.
+- Games.
+- Apps.
+- Mods.
+- Gift Cards.
+- VIP.
+- Tasks.
+- Wallet.
+- Points.
+- Withdrawals.
+- Reviews.
+- Profile.
+- Admin.
+
+التصميم:
+- Premium 3D Glass Cards.
+- Multi-layer Glass Surfaces.
+- Realistic Refraction/Blur/Depth.
+- Floating 3D Panels وParallax.
+- Soft volumetric shadows and highlights.
+- Dynamic glass reflections.
+- Subtle neon accents فقط عند الحاجة.
+- Skeleton Loading.
+- Toasts.
+- Modals.
+- Mobile Navigation.
+
+Accessibility:
+- RTL/LTR.
+- Keyboard Navigation.
+- Semantic HTML.
+- Contrast.
+- Reduced Motion.
+
+16. SEO والأداء
+SEO:
+- Metadata.
+- OpenGraph.
+- Twitter Cards.
+- Canonical.
+- Structured Data.
+
+Performance:
+- Pagination.
+- Debounced Search.
+- Lazy Loading.
+- Image Optimization.
+- WebP/AVIF.
+- Caching.
+- Code Splitting.
+- Server-side Filtering.
+
+17. Production Rules
+ممنوع:
+- Fake Data.
+- Fake Payments.
+- Fake Wallet.
+- Fake Downloads.
+- Fake Gift Cards.
+- Fake Reviews.
+- Fake Statistics.
+- Fake URLs.
+- Secrets في Frontend أو Git.
+
+لا يتم الادعاء بأن ميزة تعمل قبل التحقق منها فعليًا.
+لا يقال إن هناك 500+ لعبة إلا إذا كانت موجودة فعليًا.
+لا يقال Download مباشر إلا مع مصدر قانوني فعلي.
+لا يقال Wallet Connected إلا بعد تحديد Network/Token ووجود Integration حقيقية.
+
+18. ترتيب التنفيذ — 27 مرحلة
+1. Audit
+2. إصلاح الأخطاء الحالية
+3. Database/Migration
+4. Authentication
+5. RBAC
+6. Owner Protection
+7. Middleware
+8. Games/Apps
+9. Game Details
+10. Reviews
+11. Download API
+12. Points
+13. User Wallet
+14. Payments
+15. Withdrawals
+16. Owner Wallet
+17. Owner Payout
+18. Gift Cards
+19. VIP
+20. Tasks
+21. Notifications
+22. استيراد 500+ لعبة
+23. SEO
+24. Performance
+25. Accessibility
+26. Security Audit
+27. Final QA
+
+19. التحقق بعد كل مرحلة
+إجراء:
+- Build.
+- Type Check.
+- Database Check.
+- API Check.
+- Authorization Check.
+- Error Check.
+- Regression Check.
+
+20. اختبارات الأمان المطلوبة
+USER لا يستطيع:
+- دخول Admin.
+- تغيير السعر.
+- تغيير النقاط.
+- تغيير الدور.
+- تغيير Owner Wallet.
+- الحصول على Frontend rewards غير مصرح بها.
+
+STAFF لا يستطيع تحويل نفسه إلى SUPER_ADMIN.
+
+منع تكرار:
+- Download.
+- Webhook.
+- Purchase.
+- Review.
+- Task.
+- Withdrawal.
+
+رفض القيم السالبة:
+- Points.
+- Balance.
+- Price.
+- Reward.
+- Withdrawal.
+
+اختبار:
+- Authentication.
+- RBAC.
+- IDOR.
+- Privilege Escalation.
+- CSRF.
+- XSS.
+- Injection.
+- Rate Limiting.
+- Webhook Security.
+- Idempotency.
+- Session Security.
+- Secret Exposure.
+- File Upload.
+- Download Authorization.
+- Gift Card Exposure.
+- Wallet Manipulation.
+
+21. النتيجة النهائية
+الهدف هو الوصول إلى GameVortex Hub Production-ready قدر الإمكان ضمن إمكانيات البيئة، مع علاقة حقيقية بين:
+UI → Database → Backend → Authentication → Authorization → Transactions → Wallet → Points → Payments → Withdrawals → Audit Logs
+
+مع الحفاظ على المشروع الحالي وعدم إنشاء مشروع منفصل.
+
+22. AI & SMART PLATFORM UPGRADE
+================================
+
+إضافة طبقة AI متكاملة داخل GameVortex Hub مع الحفاظ على المشروع الحالي وعدم إنشاء مشروع منفصل.
+
+22.1 AI Assistant داخل المنصة
+- AI Assistant داخل الواجهة الرئيسية وصفحات الألعاب والتطبيقات وحساب المستخدم.
+- دعم العربية والإنجليزية وRTL/LTR.
+- الإجابة اعتمادًا على بيانات المنصة الحقيقية.
+- منع اختلاق الألعاب والأسعار والروابط والمخزون والعروض.
+- Loading/Error/Retry وClear Chat.
+- Rate Limiting وتسجيل استخدام آمن.
+- عند عدم وجود مزود AI حقيقي: NOT_CONFIGURED بدل Fake AI.
+
+22.2 AI Smart Search
+- بحث ذكي يفهم اللغة الطبيعية بالعربية والإنجليزية.
+- تحويل الطلبات الطبيعية إلى فلاتر Server-side.
+- Relevance + Rating + Popularity + Availability.
+- دعم المنصة والنوع والسعر والتقييم والإصدار والحجم.
+- حماية من Prompt Injection وInput Abuse.
+- Debounce وCaching عند الحاجة.
+
+22.3 AI Recommendations
+- نظام توصيات شخصي لكل مستخدم.
+- الاستفادة من المشاهدات والمفضلة وWishlist والتنزيلات والتقييمات والبحث والمنصة والتصنيف.
+- أقسام Recommended For You وBecause You Viewed وSimilar Games وYou May Also Like.
+- Fallback إلى Popular/Trending عند نقص البيانات.
+- التوصيات من المنتجات المنشورة والحقيقية فقط.
+- إمكانية تعطيل التخصيص.
+
+22.4 AI Game Discovery
+- اكتشاف الألعاب بالذكاء الاصطناعي من الكتالوج الحقيقي.
+- دعم Platform وGenre وPrice وRating وRelease Date وSize وAvailability.
+- إظهار سبب التوصية باختصار.
+
+22.5 AI Admin Analytics
+- تحليل البيانات الحقيقية للتحميلات والمشتريات والإيرادات والمستخدمين وVIP والنقاط والبطاقات والمراجعات والترند.
+- كشف التغيرات غير الطبيعية واقتراح مؤشرات للمراجعة.
+- لا يسمح للـAI بتعديل الأموال أو النقاط أو الصلاحيات مباشرة.
+
+22.6 AI Content Moderation
+- مراجعة Reviews والمحتوى الذي ينشئه المستخدم.
+- الحالات SAFE / NEEDS_REVIEW / REJECTED.
+- اكتشاف Spam وAbuse ومحاولات إدخال تعليمات ضارة.
+- Human Review عند الحاجة.
+- Audit Logs.
+
+22.7 AI Safety & API Protection
+- API Keys في Server-side فقط.
+- Authentication وAuthorization وRate Limiting.
+- حماية Prompt Injection وTool Injection.
+- عدم إرسال كلمات المرور أو Private Keys أو Seed Phrases أو البيانات الحساسة إلى AI.
+- Allowlist للأدوات.
+- Cost Controls وRequest Limits وTimeouts.
+
+23. PERSONALIZATION
+===================
+- Favorites لكل Game/App مع منع التكرار وServer-side.
+- Wishlist منفصلة عند الحاجة.
+- Recently Viewed مع سياسة Retention واضحة.
+- Trending / New Releases / Most Downloaded / Most Viewed / Highest Rated / Best Deals اعتمادًا على بيانات حقيقية.
+
+24. ACHIEVEMENTS & BADGES
+=========================
+- Achievements وBadges مرتبطة بأحداث حقيقية.
+- أول تنزيل، عدد التنزيلات، أول مراجعة، عدد المراجعات، المهام، المستويات وVIP milestones.
+- منع تكرار المكافآت.
+- منح Server-side وتسجيل AchievementHistory.
+
+25. GAME COMPARISON
+===================
+- مقارنة لعبتين أو أكثر.
+- الاسم والمنصة والنوع والسعر والخصم والحجم والتقييم والتنزيلات وتاريخ الإصدار وحالة المصدر والمتطلبات عند توفرها.
+- المنتجات المنشورة فقط.
+- Responsive وRTL/LTR.
+
+26. QUICK VIEW
+==============
+- Quick View للألعاب والتطبيقات عبر Modal/Drawer.
+- Cover والاسم والمنصة والنوع والتقييم والسعر والخصم وحالة المصدر وFavorite وWishlist وCompare وView Details.
+- لا يتجاوز APIs الآمنة الأصلية.
+
+27. NOTIFICATIONS 2.0
+=====================
+- Purchase / Payment / Download / Points / VIP / Task / Withdrawal / Gift Card / Discount / Wishlist / System / Security.
+- Read/Unread وMark all as read وNotification Center وPreferences.
+- منع التكرار وعدم وضع Secrets داخل الإشعارات.
+
+28. DYNAMIC OFFERS & DISCOUNTS
+==============================
+- Percentage Discount وFixed Discount وLimited-time Offers وFeatured Deals وVIP Deals وPersonalized Deals.
+- حساب Server-side وAtomic validation ومنع التلاعب.
+- AI يقترح فقط، ولا يطبق تغييرات مالية مباشرة.
+
+29. PREMIUM CYBERPUNK UI
+========================
+- تطوير الهوية إلى Premium 3D Glassmorphism كالتصميم الأساسي، مع Cyberpunk/Neon كعناصر Accent اختيارية فقط.
+- Glass Cards وNeon Borders وCyberpunk Gradients وGlow وFrosted Glass وDynamic Highlights وSkeletons وToasts وModals وDrawers.
+- حالات Hover وFocus وEmpty وError.
+
+30. DYNAMIC BACKGROUNDS
+=======================
+- Cyberpunk وNeon Grid وParticles وAurora وDigital Waves وAnimated Gradient وStarfield عند الحاجة.
+- قابلة للتعطيل، وتحترم Reduced Motion، ولا تؤثر على القراءة والأداء.
+
+31. BACKGROUND CONTROLLER
+=========================
+- Background Mode وIntensity وOpacity وParticle Count وAnimation Speed وGrid Visibility وGradient Strength وBlur وMobile Performance Mode.
+
+32. ANIMATION CONTROLLER
+=======================
+- Animation Enabled وSpeed وPage Transitions وHover/Card/Modal/Loading Animations.
+- احترام prefers-reduced-motion.
+
+33. GLOW / NEON CONTROLLER
+=========================
+- Glow Intensity وNeon Borders وShadows وCard Glow وButton Glow وAI Glow.
+- Presets: Subtle / Balanced / Cyberpunk / Maximum.
+
+34. THEME CONTROLLER
+====================
+- Dark Premium وCyberpunk وNeon وGlass وHigh Contrast عند الحاجة.
+- حفظ التفضيل واحترام System.
+
+35. MOBILE & TABLET CONTROLS
+============================
+- Mobile Bottom Navigation وTouch-friendly Buttons وSwipe-friendly Cards وResponsive Filters وBottom Sheets وMobile Search وMobile AI Assistant وTablet layouts وSafe Area.
+- منع Horizontal Overflow وتحسين الأداء.
+
+36. NEW WIDGETS & DASHBOARD
+===========================
+- AI Insights وTrending Games وNew Releases وMost Downloaded وRecently Viewed وFavorites وWishlist وAchievement Progress وPoints Summary وVIP Status وWallet Summary وNotifications وActive Deals وPlatform Distribution وDownloads Analytics وRevenue Analytics للـAdmin فقط.
+- جميع Widgets تعتمد على بيانات حقيقية وتدعم Loading/Error/Empty.
+
+37. ADVANCED OWNER SETTINGS
+===========================
+- AI Configuration وUsage Limits وRecommendation وModeration وBackground وAnimation وGlow وTheme وMobile Performance وNotifications وTrending وSearch وCache وFeature Flags وMaintenance وSecurity وAudit Settings.
+- عدم عرض API Keys كاملة.
+- حماية Server-side وتسجيل Audit Log.
+
+38. DATABASE EXTENSIONS
+=======================
+إضافة Models/Relations عند توفر Prisma/PostgreSQL:
+- UserPreference
+- Favorite
+- WishlistItem
+- RecentlyViewed
+- Achievement
+- UserAchievement
+- Badge
+- UserBadge
+- AIConversation
+- AIMessage
+- AIUsageLog
+- AIRecommendation
+- SearchQuery
+- NotificationPreference
+- Offer
+- Discount
+- UserNotification
+- ContentModerationReview
+- UISettings
+- FeatureFlag
+- AnalyticsEvent
+- GameComparisonSession / ComparisonItem
+مع Foreign Keys وIndexes وUnique Constraints وSoft Delete وTimestamps وAtomic Transactions وIdempotency.
+
+39. AI API ARCHITECTURE
+=======================
+المسارات المقترحة:
+- /api/ai/chat
+- /api/ai/search
+- /api/ai/recommendations
+- /api/ai/discover
+- /api/ai/moderate
+- /api/admin/ai/analytics
+- /api/admin/ai/settings
+
+المتطلبات: Authentication وAuthorization وRate Limiting وInput/Output Validation وServer-side API Keys وRequest Limits وTimeout وRetry آمن وCost Controls وLogging وError Handling وNo Secret Exposure.
+
+40. SEARCH ARCHITECTURE
+=======================
+- Full-text Search وArabic/English normalization وSynonyms وTypo tolerance عند توفر التقنية وFilters وSorting وPagination وDebounce وCaching وServer-side authorization.
+
+41. CONTENT MODERATION WORKFLOW
+===============================
+PENDING → AI_REVIEWED → NEEDS_HUMAN_REVIEW → APPROVED/REJECTED.
+- Validation ثم AI Review عند التفعيل ثم تصنيف ثم Human Review عند الحاجة ثم النشر ثم Audit Log.
+- عدم الحذف النهائي دون سياسة واضحة.
+
+42. SECURITY EXTENSIONS
+=======================
+- Prompt Injection وTool Injection وAPI Abuse وRate Limits منفصلة للـAI والبحث والتنزيل.
+- CSRF وStrict CORS وSecure Cookies وSession Rotation وCSP وSecurity Headers وSanitization وOutput Encoding وFile Validation وDownload Authorization وMass Assignment protection وServer-side validation.
+
+43. ACCESSIBILITY EXTENSIONS
+============================
+- RTL/LTR وKeyboard Navigation وSemantic HTML وContrast وReduced Motion.
+- ARIA labels وFocus Visible وFocus Trap وScreen-reader friendly AI وAccessible Notifications وComparison وMobile Controls.
+
+44. PERFORMANCE EXTENSIONS
+==========================
+- Lazy-load AI وBackground Effects وDynamic imports وMobile particle reduction وRecommendation/Trending cache وPagination وVirtualization عند الحاجة وWebP/AVIF وCDN عند توفره وDebounced Search وServer-side Filtering وCore Web Vitals monitoring.
+
+45. ANALYTICS & OBSERVABILITY
+=============================
+- DAU/WAU/MAU عند توفر البيانات وDownloads وViews وSearches وAI Requests/Errors وRecommendation CTR وSearch CTR وConversion وPurchases وRevenue وVIP conversions وNotification engagement.
+- Error Monitoring وAPI Latency وDatabase Performance وAI Latency وAI Usage/Cost وSecurity Events.
+- لا Fake Statistics.
+
+46. FEATURE FLAGS
+=================
+- AI Assistant وAI Search وAI Recommendations وAI Moderation وAchievements وWishlist وComparison وQuick View وDynamic Offers وBackground Effects وAdvanced Animations وNew Widgets.
+- Server-side evaluation للميزات الحساسة وAudit Log للتغييرات.
+
+47. UPDATED PAGE STRUCTURE
+==========================
+Homepage: AI Assistant / Smart Search / Trending / New Releases / Deals / Personalized Recommendations.
+Games: Filters / Smart Search / Quick View / Compare / Favorites / Wishlist.
+Game Details: AI Similar Games / Recommendations / Reviews / Achievements / Download or Official Source status.
+Apps: نفس المبادئ بما يناسب التطبيقات.
+Profile: Favorites / Wishlist / Recently Viewed / Achievements / Badges / AI preferences / Notification preferences / Theme preferences.
+Admin: AI Analytics / Content Moderation / Advanced Settings / UI Controllers / Feature Flags / Security Events / Existing management.
+
+48. UPDATED IMPLEMENTATION ORDER
+================================
+28. AI Architecture
+29. AI Assistant
+30. AI Smart Search
+31. AI Recommendations
+32. AI Game Discovery
+33. AI Admin Analytics
+34. AI Content Moderation
+35. AI Security Audit
+36. Favorites
+37. Wishlist
+38. Recently Viewed
+39. Trending / New Releases / Most Downloaded
+40. Achievements / Badges
+41. Game Comparison
+42. Quick View
+43. Advanced Notifications
+44. Dynamic Offers
+45. Premium Cyberpunk UI Upgrade
+46. Background Controller
+47. Animation Controller
+48. Glow/Neon Controller
+49. Theme Controller
+50. Mobile/Tablet Controls
+51. Widgets / Dashboard Upgrade
+52. Owner Advanced Settings
+53. Database Extensions
+54. Feature Flags
+55. Analytics / Observability
+56. Accessibility Audit
+57. Performance Audit
+58. AI Security / Prompt Injection Audit
+59. Full Regression Testing
+60. Final Production QA
+
+49. FINAL ACCEPTANCE CRITERIA
+============================
+- المشروع الحالي هو نفسه، دون مشروع منفصل.
+- البيانات الحالية الجيدة محفوظة.
+- لا Fake Data/Payments/Wallet/Downloads/Gift Cards/Reviews/Statistics/AI claims.
+- AI يعمل فقط عند وجود Integration حقيقية.
+- البحث الذكي يعيد منتجات حقيقية.
+- التوصيات مبنية على بيانات حقيقية.
+- AI Moderation لا تتجاوز صلاحيات Admin/Staff.
+- جميع العمليات الحساسة Server-side.
+- RBAC وAudit Logs وIdempotency وRate Limiting فعالة.
+- RTL/LTR وAccessibility وReduced Motion وMobile/Tablet Responsive محفوظة.
+- Controllers تعمل دون التأثير على الأمان.
+- Achievements لا تمنح مكافآت مكررة.
+- Favorites وWishlist Server-side.
+- Comparison وQuick View لا تتجاوز APIs الأصلية.
+- Notifications لا تتكرر.
+- Discounts تتحقق منها الخوادم.
+- Admin Advanced Settings محمية.
+- لا يتم الادعاء بأن ميزة تعمل قبل اختبارها فعليًا.
+
+50. MASTER IMPLEMENTATION DIRECTIVE
+===================================
+نفّذ كل الإضافات داخل المشروع الحالي GameVortex Hub. قبل التعديل نفّذ Audit شامل، وأثناء التنفيذ حافظ على البيانات والوظائف السليمة، ولا تستخدم Fake Integrations أو Secrets في Frontend، واستخدم Server-side validation وAtomic Transactions وIdempotency وAudit Logs. بعد التنفيذ نفّذ Build وType Check وDatabase/API/Security/Accessibility/Performance/Mobile/AI Safety/Regression/Final QA.
+
+النتيجة المطلوبة: نسخة Production-ready قدر الإمكان من GameVortex Hub مع AI Assistant وSmart Search وPersonalized Recommendations وAI Discovery وAI Admin Analytics وAI Content Moderation وAchievements وBadges وFavorites وWishlist وTrending وNew Releases وMost Downloaded وRecently Viewed وGame Comparison وQuick View وNotifications وDynamic Offers وPremium Cyberpunk/Glassmorphism UI وBackground/Animation/Glow/Theme Controllers وMobile/Tablet Controls وWidgets وAdvanced Admin Settings، مع الالتزام بالأمن والخصوصية وإمكانية الوصول والأداء وعدم اختلاق أي بيانات أو تكاملات غير موجودة فعليًا.
+
+51. STASH-INSPIRED GAMING TRACKER & SOCIAL ECOSYSTEM
+=====================================================
+
+الهدف:
+إضافة جميع الوظائف الأساسية المستوحاة من تجربة Stash — Track Video Games إلى GameVortex Hub، مع دمجها داخل المشروع الحالي وعدم إنشاء تطبيق أو مشروع منفصل، مع إزالة أي تكرار مع الوظائف الموجودة مسبقًا.
+
+51.1 GAMING LIBRARY / MY GAMES
+------------------------------
+إضافة مكتبة ألعاب شخصية Server-side لكل مستخدم.
+
+الحالات الأساسية:
+- WANT: ألعاب يريد المستخدم لعبها مستقبلًا.
+- PLAYING: ألعاب يلعبها المستخدم حاليًا.
+- BEATEN: ألعاب أكملها المستخدم.
+- ARCHIVED: ألعاب مؤرشفة خارج القوائم النشطة.
+
+المتطلبات:
+- تغيير حالة اللعبة Server-side.
+- منع التكرار لنفس User + Game.
+- حفظ تاريخ تغيير الحالة.
+- دعم فلترة وترتيب المكتبة.
+- دعم Platform وGenre وRating وRelease Date.
+- إظهار إحصائيات المكتبة.
+- إمكانية نقل اللعبة بين الحالات.
+- دعم Soft Delete/Archive عند الحاجة.
+- عدم احتساب أي نشاط أو Achievement مرتين.
+
+51.2 GAME BACKLOG
+-----------------
+إنشاء Backlog واضح للمستخدم:
+- عدد ألعاب WANT.
+- عدد ألعاب PLAYING.
+- عدد ألعاب BEATEN.
+- عدد ألعاب ARCHIVED.
+- نسبة الإنجاز.
+- آخر الألعاب التي تم تعديل حالتها.
+- أكثر المنصات استخدامًا.
+- أكثر الأنواع الموجودة في المكتبة.
+
+إضافة Dashboard للمكتبة:
+- My Games.
+- Currently Playing.
+- Backlog.
+- Completed.
+- Archived.
+- Favorites.
+- Wishlist.
+- Recently Viewed.
+
+51.3 MULTI-PLATFORM GAME TRACKING
+---------------------------------
+دعم ربط اللعبة الواحدة بأكثر من Platform عندما تكون البيانات الحقيقية متوفرة.
+
+Platforms:
+- PC.
+- Steam.
+- PlayStation.
+- Xbox.
+- Nintendo.
+- Retro/Legacy Platforms.
+- أي منصات أخرى مدعومة فعليًا في قاعدة البيانات.
+
+متطلبات:
+- Platform Entity مستقلة.
+- Platform-specific release data عند توفرها.
+- عدم دمج نسخ مختلفة من اللعبة بشكل خاطئ.
+- دعم أكثر من نسخة/إصدار للعبة عند توفر بيانات موثوقة.
+
+51.4 GAME DISCOVERY
+-------------------
+تطوير قسم Discover كواجهة اكتشاف ألعاب متكاملة.
+
+الأقسام:
+- Popular Games.
+- Trending Games.
+- New Releases.
+- Upcoming Games.
+- Highest Rated.
+- Most Downloaded.
+- Most Viewed.
+- Best Deals.
+- Recommended For You.
+- Similar Games.
+- Because You Viewed.
+- You May Also Like.
+
+جميع النتائج يجب أن تعتمد على بيانات حقيقية ومنتجات منشورة فقط.
+
+51.5 ADVANCED GAME DETAILS
+--------------------------
+توسيع Game Details Page لتشمل:
+- Arabic title.
+- English title.
+- Slug.
+- Description.
+- Platforms.
+- Genres.
+- Tags.
+- Release Date.
+- Publisher عند توفره.
+- Developer عند توفره.
+- Cover.
+- Screenshots.
+- Videos/Trailers عند توفر مصدر موثوق.
+- Rating Average.
+- Rating Count.
+- Reviews.
+- Comments.
+- Price.
+- Discount.
+- Availability.
+- Size.
+- Requirements عند توفرها.
+- Official Store/Source.
+- Download status.
+- Favorite.
+- Wishlist.
+- Add to Library.
+- Change Library Status.
+- Compare.
+- Similar Games.
+- AI Recommendations.
+
+51.6 GAME MEDIA GALLERY
+-----------------------
+إضافة معرض Media للعبة:
+- Cover.
+- Screenshots.
+- Trailers/Videos.
+- Gallery viewer.
+- Lightbox/Modal.
+- Lazy Loading.
+- WebP/AVIF عند توفره.
+- CDN عند توفره.
+
+عدم استخدام صور Placeholder على أنها صور اللعبة الحقيقية.
+
+51.7 FAVORITES
+--------------
+توسيع Favorites الموجودة في المشروع:
+- Favorite Game.
+- Favorite App عند الحاجة.
+- Favorite status Server-side.
+- منع التكرار.
+- Toggle آمن.
+- Favorite Count عند الحاجة.
+- Favorites Dashboard.
+- Favorites Widget في Profile.
+- Favorites ضمن توصيات المستخدم.
+
+51.8 WISHLIST
+-------------
+إنشاء Wishlist مستقلة عن WANT عند الحاجة.
+
+WishlistItem:
+- User.
+- Game/App.
+- AddedAt.
+- TargetPrice اختياري.
+- NotifyOnRelease.
+- NotifyOnDiscount.
+- Active/Removed.
+
+وظائف:
+- Add.
+- Remove.
+- Sort.
+- Filter.
+- Price/Discount Alerts.
+- Release Alerts.
+- Wishlist Dashboard.
+
+51.9 RECENTLY VIEWED
+--------------------
+تتبع آخر الألعاب/التطبيقات التي شاهدها المستخدم.
+
+المتطلبات:
+- Server-side عند تسجيل الدخول.
+- Anonymous/session tracking اختياري بسياسة واضحة.
+- Retention Policy.
+- Deduplication.
+- Maximum history size.
+- Recently Viewed Widget.
+- Clear History.
+- Privacy setting لتعطيل الميزة.
+
+51.10 PERSONAL GAME COLLECTIONS
+-------------------------------
+إضافة Collections مخصصة للمستخدم.
+
+وظائف:
+- Create Collection.
+- Rename.
+- Description.
+- Cover.
+- Add Games.
+- Remove Games.
+- Reorder Games.
+- Public/Private.
+- Share Collection.
+- Duplicate protection.
+- Soft Delete.
+
+أمثلة:
+- Best PS5 Games.
+- My Horror Games.
+- Games To Play With Friends.
+- Favorite RPGs.
+- 2026 Backlog.
+
+51.11 PUBLIC COLLECTIONS & SHARING
+-----------------------------------
+السماح للمستخدم بنشر Collection عامة.
+
+المتطلبات:
+- Public URL/Slug.
+- Owner.
+- Followers/Views عند الحاجة.
+- Share.
+- Report.
+- Moderation.
+- Soft Delete.
+- Privacy controls.
+
+51.12 GAMER PROFILE 2.0
+-----------------------
+توسيع Profile إلى هوية Gamer متكاملة.
+
+يعرض:
+- Avatar.
+- Username.
+- Bio.
+- Favorite Games.
+- Library Summary.
+- Want.
+- Playing.
+- Beaten.
+- Archived.
+- Wishlist.
+- Collections.
+- Reviews.
+- Ratings.
+- Achievements.
+- Badges.
+- Followers.
+- Following.
+- Recent Activity.
+- Leaderboard position.
+- Platform distribution.
+- Genre distribution.
+
+إعدادات الخصوصية:
+- Public.
+- Followers only.
+- Private.
+- Hide Library.
+- Hide Wishlist.
+- Hide Activity.
+- Hide Reviews.
+
+51.13 FOLLOW / FOLLOWERS / FOLLOWING
+-------------------------------------
+إضافة Social Graph.
+
+Entities:
+- Follow.
+- Follower.
+- Following.
+
+المتطلبات:
+- Follow.
+- Unfollow.
+- Prevent self-follow.
+- Unique User + Target.
+- Block/Mute عند الحاجة.
+- Privacy.
+- Notifications.
+- Rate Limiting.
+- Audit عند العمليات الحساسة.
+
+51.14 GAMING ACTIVITY FEED
+--------------------------
+إضافة Feed اجتماعي يعتمد على الأحداث الحقيقية.
+
+أمثلة:
+- User added a game to WANT.
+- User started PLAYING.
+- User BEATEN a game.
+- User rated a game.
+- User published a review.
+- User created a collection.
+- User earned an achievement/badge.
+- User followed another gamer.
+- User added a favorite.
+
+الخصائص:
+- Following Feed.
+- Global Community Feed.
+- Personalized Feed.
+- Pagination/Cursor pagination.
+- Hide/Mute.
+- Report.
+- Moderation.
+- Notification integration.
+
+51.15 REVIEWS 2.0
+-----------------
+توسيع Reviews الموجودة بالفعل في المشروع.
+
+يدعم:
+- Rating 1–5.
+- Review text.
+- Create/Edit/Delete حسب الصلاحيات.
+- One review per User + Game.
+- Verified/VIP badges.
+- Review timestamps.
+- Helpful/Like عند الحاجة.
+- Comments.
+- Replies عند الحاجة.
+- Report.
+- Moderation.
+- AI Moderation.
+- Review sorting:
+  - Newest.
+  - Highest rated.
+  - Lowest rated.
+  - Most helpful.
+
+لا يتم إنشاء Fake Reviews أو Fake Ratings.
+
+51.16 REVIEW COMMENTS
+---------------------
+إضافة Comments على Reviews.
+
+المتطلبات:
+- Authentication.
+- Server-side validation.
+- XSS protection.
+- Rate limiting.
+- Moderation.
+- Edit/Delete according to ownership and role.
+- Report.
+- Notifications.
+- Soft Delete عند الحاجة.
+- منع Spam.
+
+51.17 RELEASE & GAME ALERTS
+---------------------------
+إضافة نظام Game Release Alerts.
+
+أنواع التنبيهات:
+- Upcoming release.
+- Release date changed.
+- Game released.
+- Wishlist discount.
+- Price drop.
+- New edition/version.
+- New platform availability.
+
+القنوات:
+- In-app.
+- Push عند توفر integration حقيقية.
+- Email عند توفر integration حقيقية.
+
+عدم إرسال تنبيه قبل التحقق من مصدر البيانات.
+
+51.18 WISHLIST PRICE/DISCOUNT ALERTS
+-------------------------------------
+عند توفر بيانات سعر حقيقية:
+- Track current price.
+- Track previous price.
+- Detect discount.
+- Notify user.
+- Optional target price.
+- Avoid duplicate notifications.
+- Store price history عند توفر مصدر موثوق.
+
+لا يتم اختلاق الأسعار.
+
+51.19 STEAM LIBRARY IMPORT
+--------------------------
+إضافة Steam Import كميزة اختيارية عند توفر Integration حقيقية.
+
+المتطلبات:
+- Secure connection/import flow.
+- Import owned games المتاحة من مصدر Steam المسموح.
+- Mapping إلى Game Entity.
+- Duplicate protection.
+- Import status.
+- Import history.
+- Error handling.
+- Rate limiting.
+- عدم تخزين Steam credentials/passwords.
+- عدم الادعاء بأن اللعبة مملوكة إذا لم يؤكد المصدر ذلك.
+
+API:
+- /api/integrations/steam/connect
+- /api/integrations/steam/import
+- /api/integrations/steam/status
+- /api/integrations/steam/disconnect
+
+عند عدم توفر Integration:
+- NOT_CONFIGURED / NEEDS_INTEGRATION.
+
+51.20 GAMING LEADERBOARD
+------------------------
+توسيع Leaderboard إلى نظام قابل للتخصيص.
+
+أنواع ممكنة:
+- Most Active Gamers.
+- Most Games Beaten.
+- Most Reviews.
+- Most Collections.
+- Achievement Score.
+- Community Score.
+- Points.
+- XP.
+
+المتطلبات:
+- Server-side calculations.
+- منع التلاعب.
+- Pagination.
+- Time ranges:
+  - Daily.
+  - Weekly.
+  - Monthly.
+  - All Time.
+- Privacy controls.
+- عدم الاعتماد على بيانات وهمية.
+
+51.21 GAMER XP / LEVELS
+-----------------------
+إضافة XP اختياري منفصل عن Wallet Points.
+
+مصادر XP:
+- Completing game tracking milestones.
+- Writing valid reviews.
+- Creating collections.
+- Community activity.
+- Achievements.
+- Verified events.
+
+المتطلبات:
+- XPHistory.
+- Atomic updates.
+- Anti-abuse.
+- No duplicate rewards.
+- Clear separation between XP and monetary Points.
+
+51.22 ACHIEVEMENTS & BADGES 2.0
+-------------------------------
+دمج النظام الموجود وتوسيعه.
+
+أمثلة:
+- First Game Added.
+- First Game Played.
+- First Game Beaten.
+- First Review.
+- 10 Reviews.
+- 50 Reviews.
+- 100 Games Added.
+- 10 Games Beaten.
+- Collection Creator.
+- Community Member.
+- Steam Importer.
+- VIP Milestone.
+
+المتطلبات:
+- Server-side.
+- AchievementHistory.
+- UserBadge.
+- Duplicate protection.
+- Optional XP reward.
+- Optional non-monetary badge reward.
+- لا تستخدم Achievement كمصدر أموال إلا عبر قواعد Server-side واضحة.
+
+51.23 GAMING STATISTICS
+-----------------------
+إضافة إحصائيات شخصية:
+
+- Total Games.
+- Want Count.
+- Playing Count.
+- Beaten Count.
+- Archived Count.
+- Favorite Count.
+- Wishlist Count.
+- Review Count.
+- Average Rating Given.
+- Games by Platform.
+- Games by Genre.
+- Completion Rate.
+- Recently Played/Updated.
+- Monthly activity.
+
+الإحصائيات يجب أن تحسب من Database الحقيقية.
+
+51.24 PLATFORM & GENRE ANALYTICS
+--------------------------------
+إضافة Charts:
+- Platform Distribution.
+- Genre Distribution.
+- Completion Progress.
+- Games Added Over Time.
+- Games Beaten Over Time.
+- Review Activity.
+
+استخدام البيانات الحقيقية فقط.
+
+51.25 SOCIAL DISCOVERY
+----------------------
+تحسين اكتشاف اللاعبين:
+- Suggested Gamers.
+- Similar Taste Gamers.
+- Popular Gamers.
+- Active Gamers.
+- Gamers who like the same games.
+
+عند استخدام AI:
+- AI يقترح بناءً على بيانات حقيقية.
+- لا يتم كشف البيانات الخاصة.
+- لا يتم اقتراح مستخدمين محظورين/مخفيين.
+
+51.26 COMMUNITY SEARCH
+----------------------
+إضافة البحث عن:
+- Games.
+- Users.
+- Collections.
+- Reviews.
+- Platforms.
+- Genres.
+
+Search:
+- Arabic/English normalization.
+- Typo tolerance عند توفر التقنية.
+- Pagination.
+- Filters.
+- Sorting.
+- Rate limiting.
+
+51.27 QUICK VIEW SOCIAL ACTIONS
+-------------------------------
+Quick View الموجود حاليًا يجب أن يتكامل مع:
+- Add to Library.
+- Want.
+- Playing.
+- Beaten.
+- Favorite.
+- Wishlist.
+- Compare.
+- Share.
+- Follow related gamer عند Profile Quick View.
+
+51.28 HUMBLEBUNDLE RADAR / DEAL RADAR
+-------------------------------------
+إضافة Deal Radar مستوحى من HumbleBundle Radar.
+
+عند توفر مصدر قانوني وIntegration حقيقية:
+- Monitor bundles.
+- Detect new bundles.
+- Detect price changes.
+- Notify interested users.
+- Show source.
+- Show official link.
+- Avoid duplicate alerts.
+
+لا يتم استخدام بيانات أو روابط وهمية.
+
+API:
+- /api/deals
+- /api/deals/alerts
+- /api/deals/providers
+- /api/admin/deals/sync
+
+عند عدم توفر Integration:
+- NOT_CONFIGURED.
+
+51.29 DEALS & PRICE HISTORY
+---------------------------
+إضافة:
+- Current Price.
+- Original Price.
+- Discount.
+- Price History عند توفر مصدر موثوق.
+- Best Deal.
+- VIP Deal.
+- Featured Deal.
+
+كل السعر/الخصم:
+- Server-side.
+- Atomic validation.
+- Source verified.
+- Audit Log عند التعديل الإداري.
+
+51.30 GAME RECOMMENDATION ENGINE 2.0
+------------------------------------
+توسيع AI Recommendations الموجودة لتشمل إشارات Gaming Tracker.
+
+مصادر:
+- Library.
+- Want.
+- Playing.
+- Beaten.
+- Favorites.
+- Wishlist.
+- Reviews.
+- Ratings.
+- Collections.
+- Recently Viewed.
+- Platforms.
+- Genres.
+- Search history وفق سياسة الخصوصية.
+- Community follows.
+
+أنواع:
+- Because You Played.
+- Because You Rated.
+- Similar Games.
+- Similar Gamers.
+- Complete Your Collection.
+- From Your Wishlist.
+- Trending Among People You Follow.
+
+Fallback:
+- Trending.
+- Highest Rated.
+- New Releases.
+
+51.31 COMMUNITY MODERATION
+--------------------------
+إضافة أدوات:
+- Report User.
+- Report Review.
+- Report Comment.
+- Report Collection.
+- Block.
+- Mute.
+- Admin Moderation Queue.
+- AI Moderation.
+- Human Review.
+
+حالات المحتوى:
+- PENDING.
+- AI_REVIEWED.
+- NEEDS_HUMAN_REVIEW.
+- APPROVED.
+- REJECTED.
+- HIDDEN.
+- SOFT_DELETED.
+
+كل إجراء Moderation حساس يسجل AuditLog.
+
+51.32 SOCIAL NOTIFICATIONS
+--------------------------
+إضافة أنواع:
+- New Follower.
+- Review Comment.
+- Review Reply.
+- Collection Shared.
+- Collection Activity.
+- Game Release.
+- Wishlist Discount.
+- Achievement Earned.
+- Badge Earned.
+- Leaderboard Change.
+- Steam Import Completed.
+- Moderation Result.
+- Security Event.
+
+الخصائص:
+- Read/Unread.
+- Mark all as read.
+- Preferences.
+- Deep links.
+- Deduplication.
+- No secrets.
+
+51.33 GAME SHARING
+------------------
+إضافة مشاركة:
+- Game.
+- Review.
+- Collection.
+- Profile.
+- Wishlist item عند السماح.
+
+يجب أن تكون المشاركة مبنية على روابط حقيقية:
+- /games/[slug]
+- /reviews/[id]
+- /collections/[slug]
+- /profile/[username]
+
+مع OpenGraph وStructured Data.
+
+51.34 PUBLIC GAME PAGES / SEO
+-----------------------------
+تحسين صفحات الألعاب العامة:
+- SEO title.
+- Description.
+- Canonical.
+- OpenGraph.
+- Twitter/X Card.
+- JSON-LD عند الحاجة.
+- Breadcrumbs.
+- Related Games.
+- Reviews.
+- Collections.
+- Platform data.
+- Release data.
+
+لا يتم Index لبيانات خاصة بالمستخدم.
+
+51.35 DATABASE EXTENSIONS — GAMING TRACKER
+------------------------------------------
+عند توفر Prisma/PostgreSQL، إضافة Models/Relations:
+
+- GameLibraryItem
+- GameStatusHistory
+- GameCollection
+- GameCollectionItem
+- GameFavorite
+- WishlistItem
+- RecentlyViewed
+- Follow
+- UserBlock
+- UserMute
+- ActivityEvent
+- ReviewComment
+- ReviewReaction عند الحاجة
+- GameAlert
+- PriceHistory
+- Deal
+- DealProvider
+- DealAlert
+- SteamIntegration
+- SteamImportJob
+- SteamImportItem
+- GamerXPHistory
+- GamerLevel
+- LeaderboardSnapshot عند الحاجة
+- UserStatistics
+- GamePlatform
+- GameGenre
+- GameMedia
+- SocialNotification
+- ContentReport
+- ModerationAction
+
+مع:
+- Foreign Keys.
+- Indexes.
+- Unique Constraints.
+- Composite Unique Constraints.
+- Soft Delete.
+- CreatedAt/UpdatedAt.
+- Atomic Transactions.
+- Idempotency.
+- Retention Policies.
+
+51.36 API ARCHITECTURE — GAMING TRACKER
+----------------------------------------
+المسارات المقترحة:
+
+Library:
+- /api/library
+- /api/library/[gameId]
+- /api/library/status
+- /api/library/stats
+
+Collections:
+- /api/collections
+- /api/collections/[id]
+- /api/collections/[id]/games
+
+Favorites:
+- /api/favorites
+- /api/favorites/[gameId]
+
+Wishlist:
+- /api/wishlist
+- /api/wishlist/[gameId]
+
+Recently Viewed:
+- /api/recently-viewed
+- /api/recently-viewed/clear
+
+Social:
+- /api/users/[id]/follow
+- /api/users/[id]/unfollow
+- /api/followers
+- /api/following
+- /api/activity
+- /api/users/[id]/block
+- /api/users/[id]/mute
+
+Reviews:
+- /api/reviews
+- /api/reviews/[id]/comments
+- /api/reviews/[id]/report
+
+Alerts:
+- /api/game-alerts
+- /api/wishlist-alerts
+- /api/release-alerts
+
+Steam:
+- /api/integrations/steam/connect
+- /api/integrations/steam/import
+- /api/integrations/steam/status
+- /api/integrations/steam/disconnect
+
+Deals:
+- /api/deals
+- /api/deals/alerts
+
+Leaderboard:
+- /api/leaderboard
+
+Statistics:
+- /api/gaming/stats
+
+51.37 ADMIN — GAMING SOCIAL MANAGEMENT
+--------------------------------------
+إضافة داخل /admin:
+
+- Game Library Management.
+- Collections Moderation.
+- User Social Management.
+- Reviews Moderation.
+- Comments Moderation.
+- Reports.
+- Blocks/Mutes overview عند الحاجة.
+- Release Alerts.
+- Deal Radar.
+- Steam Integrations Status.
+- Leaderboards.
+- Gaming Analytics.
+- Recommendation Analytics.
+- Social Engagement Analytics.
+
+صلاحيات STAFF محدودة.
+SUPER_ADMIN فقط يستطيع إعدادات النظام الحساسة.
+
+51.38 OWNER SETTINGS — GAMING TRACKER
+-------------------------------------
+إضافة:
+- Library Status Settings.
+- Collection Settings.
+- Social Settings.
+- Review Settings.
+- Comment Settings.
+- Leaderboard Settings.
+- XP Settings.
+- Achievement Settings.
+- Alert Settings.
+- Deal Providers.
+- Steam Integration.
+- Privacy/Retention.
+- Moderation.
+- Feed Ranking.
+- Recommendation Signals.
+
+لا تعرض API Keys كاملة.
+كل تغيير حساس:
+- Server-side.
+- Authorization.
+- AuditLog.
+
+51.39 PRIVACY & DATA CONTROL
+----------------------------
+إضافة للمستخدم:
+- Export Gaming Data عند توفر آلية التصدير.
+- Clear Recently Viewed.
+- Delete Collections.
+- Remove Reviews وفق السياسة.
+- Disconnect Steam.
+- Disable Personalization.
+- Disable Social Activity.
+- Hide Library.
+- Hide Wishlist.
+- Hide Achievements.
+- Hide Followers/Following عند الحاجة.
+- Delete Account وفق سياسة الحذف.
+
+51.40 GAMING SECURITY
+---------------------
+اختبارات إضافية:
+
+- منع User من تعديل Library الخاصة بمستخدم آخر.
+- منع User من إضافة Review نيابة عن مستخدم آخر.
+- منع التلاعب بـLeaderboard.
+- منع تكرار XP/Achievement.
+- منع Follow duplication.
+- منع Comment spam.
+- منع Alert spam.
+- منع Steam integration takeover.
+- منع كشف بيانات Library الخاصة.
+- منع IDOR في Collections.
+- منع IDOR في Reviews/Comments.
+- منع تغيير Owner/Admin gaming settings.
+- Rate limiting على Follow/Review/Comment/Search/Alerts/Import.
+
+51.41 PERFORMANCE
+-----------------
+- Cursor pagination للFeeds عند الحاجة.
+- Virtualization للقوائم الكبيرة.
+- Cache للـTrending.
+- Cache للـPopular.
+- Cache للـGame Details غير الحساسة.
+- Debounced Search.
+- Lazy media loading.
+- CDN عند توفره.
+- Image optimization.
+- Background jobs لـSteam Import/Deal Sync/Alerts.
+- Queue system عند الحاجة.
+- عدم تنفيذ عمليات ثقيلة داخل Request الأساسي.
+
+51.42 FEATURE FLAGS — GAMING
+----------------------------
+إضافة Feature Flags:
+
+- Game Library.
+- Game Status Tracking.
+- Collections.
+- Social Profiles.
+- Follow.
+- Activity Feed.
+- Review Comments.
+- Release Alerts.
+- Wishlist Alerts.
+- Steam Import.
+- Leaderboard.
+- Gamer XP.
+- Gaming Statistics.
+- Deal Radar.
+- Price History.
+- Social Recommendations.
+
+كل ميزة حساسة:
+- Server-side evaluation.
+- AuditLog.
+
+51.43 UPDATED PAGE STRUCTURE — GAMING
+--------------------------------------
+Homepage:
+- Smart Search.
+- AI Assistant.
+- Trending.
+- New Releases.
+- Deals.
+- Personalized Recommendations.
+- Community Activity.
+
+Games:
+- Search.
+- Filters.
+- Quick View.
+- Compare.
+- Favorite.
+- Wishlist.
+- Add to Library.
+
+Game Details:
+- Media Gallery.
+- Platforms.
+- Release Date.
+- Price/Deals.
+- Reviews.
+- Comments.
+- Similar Games.
+- AI Recommendations.
+- Add to Library.
+- Want/Playing/Beaten/Archived.
+- Favorite.
+- Wishlist.
+- Alerts.
+- Compare.
+
+My Library:
+- Want.
+- Playing.
+- Beaten.
+- Archived.
+- Favorites.
+- Wishlist.
+- Recently Viewed.
+- Collections.
+- Statistics.
+
+Community:
+- Activity Feed.
+- Gamers.
+- Reviews.
+- Collections.
+- Leaderboard.
+
+Profile:
+- Gamer Identity.
+- Library Summary.
+- Favorites.
+- Wishlist.
+- Collections.
+- Reviews.
+- Achievements.
+- Badges.
+- Followers.
+- Following.
+- Activity.
+- Statistics.
+- Privacy.
+
+Deals:
+- Featured Deals.
+- Bundles.
+- Price Drops.
+- Wishlist Discounts.
+- Deal Radar.
+
+Admin:
+- Gaming Catalog.
+- Users.
+- Reviews.
+- Comments.
+- Reports.
+- Collections.
+- Social Activity.
+- Alerts.
+- Deals.
+- Steam Integrations.
+- Leaderboards.
+- Gaming Analytics.
+- Moderation.
+
+51.44 UPDATED IMPLEMENTATION ORDER — GAMING
+-------------------------------------------
+بعد المراحل الحالية، تنفيذ الميزات الجديدة دون إعادة بناء المشروع:
+
+61. Gaming Library Core.
+62. Game Status Tracking.
+63. Backlog Dashboard.
+64. Multi-Platform Mapping.
+65. Advanced Game Details.
+66. Media Gallery.
+67. Personal Collections.
+68. Public Collections.
+69. Favorites Integration.
+70. Wishlist Integration.
+71. Recently Viewed.
+72. Gamer Profile 2.0.
+73. Follow/Followers/Following.
+74. Activity Feed.
+75. Reviews 2.0.
+76. Review Comments.
+77. Release Alerts.
+78. Wishlist Price/Discount Alerts.
+79. Gaming Statistics.
+80. Gamer XP/Levels.
+81. Achievements/Badges 2.0.
+82. Leaderboard 2.0.
+83. Social Discovery.
+84. Community Search.
+85. Steam Import Integration.
+86. Deal/HumbleBundle Radar.
+87. Price History.
+88. Social Notifications.
+89. Community Moderation.
+90. Gaming Security Audit.
+91. Gaming Performance Audit.
+92. Gaming Accessibility Audit.
+93. Gaming SEO Audit.
+94. Full Regression Testing.
+95. Final Production QA.
+
+51.45 GAMING ACCEPTANCE CRITERIA
+--------------------------------
+- Library حقيقية مرتبطة بـDatabase.
+- Want/Playing/Beaten/Archived تعمل Server-side.
+- لا توجد Duplicate Library Items.
+- Collections تعمل مع Privacy.
+- Favorites وWishlist Server-side.
+- Recently Viewed لها Retention Policy.
+- Profiles تعرض بيانات حقيقية.
+- Follow/Followers آمنان من التكرار وIDOR.
+- Activity Feed مبني على أحداث حقيقية.
+- Reviews وComments محمية من Spam/XSS/IDOR.
+- Release Alerts تعتمد على بيانات حقيقية.
+- Wishlist Discount Alerts تعتمد على أسعار حقيقية فقط.
+- Steam Import يعمل فقط عند وجود Integration حقيقية.
+- Deal Radar يعمل فقط عند وجود Provider حقيقي.
+- Leaderboard لا يمكن التلاعب به من Client.
+- XP/Achievements لا تتكرر.
+- Statistics لا تستخدم Fake Data.
+- Media تستخدم مصادر حقيقية.
+- Community Moderation مرتبطة بـAudit Logs.
+- الخصوصية تمنع كشف المكتبة/النشاط الخاص.
+- جميع APIs تستخدم Authentication/Authorization حسب الحاجة.
+- لا توجد Secrets في Frontend.
+- لا توجد Fake Integrations.
+- لا يتم الادعاء بأن Steam Import أو Deal Radar أو Push Notifications تعمل قبل اختبار Integration فعليًا.
+
+51.46 DUPLICATION & UNIFICATION RULE
+-------------------------------------
+قبل التنفيذ:
+- دمج Gaming Tracker مع Favorites/Wishlist/Notifications/Achievements/Reviews/AI الموجودة مسبقًا.
+- عدم إنشاء Model مكرر إذا كان Model موجودًا يؤدي نفس الوظيفة.
+- عدم إنشاء API مكرر إذا كان Endpoint الحالي يمكن توسيعه بأمان.
+- عدم إنشاء Page مكررة.
+- الاحتفاظ بنسخة واحدة من كل Feature.
+- استخدام العلاقات الحالية عند إمكانية ذلك.
+- إجراء Migration آمنة عند الحاجة.
+- الحفاظ على البيانات الحالية.
+- أي تعارض بين المواصفات يحل بالحفاظ على الميزة الأقوى والأكثر أمانًا دون حذف بيانات.
+
+51.47 MASTER GAMING DIRECTIVE
+-----------------------------
+أضف جميع ميزات Gaming Tracker وSocial Gaming المستوحاة من Stash داخل GameVortex Hub الحالي، وليس كتطبيق منفصل.
+
+المطلوب دمجه:
+Game Discovery
++ Multi-Platform Catalog
++ My Games
++ Want
++ Playing
++ Beaten
++ Archived
++ Backlog
++ Favorites
++ Wishlist
++ Recently Viewed
++ Personal Collections
++ Public Collections
++ Gamer Profiles
++ Follow/Followers/Following
++ Activity Feed
++ Reviews
++ Review Comments
++ Ratings
++ Release Alerts
++ Wishlist Price Alerts
++ Steam Library Import عند توفر Integration حقيقية
++ Leaderboards
++ Gamer XP/Levels
++ Achievements
++ Badges
++ Gaming Statistics
++ Social Discovery
++ Game Sharing
++ Deal/HumbleBundle Radar عند توفر Provider حقيقي
++ Price History عند توفر مصدر حقيقي
++ Community Moderation
++ Social Notifications
++ Privacy Controls
++ SEO Public Game Pages
++ AI Recommendations Integration
++ AI Game Discovery Integration.
+
+جميع الميزات يجب أن تلتزم بالقواعد الموجودة في هذه المواصفات:
+- Production-ready قدر الإمكان.
+- لا Fake Data.
+- لا Fake APIs.
+- لا Fake Integrations.
+- لا Fake Payments.
+- لا Fake Downloads.
+- لا Fake Statistics.
+- لا Fake Reviews.
+- لا Secrets في Frontend.
+- Server-side authorization.
+- Atomic Transactions.
+- Idempotency.
+- Rate Limiting.
+- Audit Logs.
+- Secure Cookies/Sessions.
+- XSS/CSRF/Injection/IDOR protection.
+- Accessibility.
+- RTL/LTR.
+- Mobile/Tablet Responsive.
+- Performance.
+- Privacy.
+- Regression Testing.
+
+الهدف النهائي:
+تحويل GameVortex Hub إلى Gaming Ecosystem متكامل يجمع بين Gaming Marketplace + Game Tracker + Backlog Manager + Game Discovery + Social Gaming Network + Reviews/Community + Deals + AI، مع الحفاظ على المشروع الحالي والبيانات والوظائف الموجودة وعدم تكرار أو استبدال المكونات السليمة.
+
+52. HOMEPAGE RANKINGS + DYNAMIC MOST PLAYED / TOP RATED
+=========================================================
+
+إضافة قسم رئيسي مخصص في الصفحة الرئيسية لعرض الألعاب الأعلى تقييماً والأكثر لعباً، مع تحديث تلقائي اعتماداً على بيانات الاستخدام الحقيقية من قاعدة البيانات، وليس بيانات وهمية أو قوائم ثابتة.
+
+52.1 واجهة القسم
+------------------
+- قسم واضح في الصفحة الرئيسية بعنوان قابل للتعريب مثل: "الأعلى تقييماً" و"الأكثر لعباً".
+- تبويبات أو شرائح مستقلة:
+  1. الأعلى تقييماً Top Rated.
+  2. الأكثر لعباً Most Played.
+  3. الأكثر رواجاً Trending.
+  4. صاعد بسرعة Rising Fast.
+  5. جديد ومميز New & Featured.
+- بطاقات ألعاب متجاوبة Desktop / Tablet / Mobile.
+- صورة الغلاف، الاسم، المنصة، النوع، التقييم، عدد التقييمات، وعدد مرات اللعب/التشغيل بحسب البيانات المتاحة.
+- زر مشاهدة التفاصيل، وزر إضافة إلى المفضلة/Wishlist عند توفر الصلاحية.
+- Skeleton Loading وEmpty State وError State.
+- دعم RTL/LTR وإمكانية الوصول ولوحة المفاتيح وReduced Motion.
+
+52.2 منطق الترتيب الديناميكي
+-----------------------------
+- Top Rated يعتمد على متوسط التقييم مع مراعاة عدد التقييمات لتقليل تأثير لعبة حصلت على تقييمات قليلة جداً.
+- Most Played يعتمد على أحداث اللعب/التشغيل الحقيقية المسجلة Server-side.
+- Trending يعتمد على معدل النمو في اللعب والتفاعل خلال فترة زمنية حديثة مقارنة بالفترة السابقة.
+- يمكن احتساب الوزن من عدة مؤشرات حقيقية مثل play events وviews وratings وfavorites وwishlist، وفق سياسة واضحة قابلة للضبط من Admin.
+- لا يسمح للواجهة Frontend بتعديل ترتيب الألعاب مباشرة.
+- كل الحسابات الحساسة تتم Server-side.
+- تطبيق حد أدنى لعدد التقييمات قبل إدراج اللعبة في Top Rated إذا كان ذلك مطلوباً من إعدادات النظام.
+- منع التلاعب بالتقييمات أو اللعب المتكرر المصطنع عبر Rate Limiting وAnti-Abuse وAnomaly Detection.
+
+52.3 التحديث التلقائي
+----------------------
+- تحديث النتائج عند تسجيل أحداث جديدة مؤثرة في الترتيب.
+- استخدام Cache آمن مع TTL مناسب لتقليل ضغط قاعدة البيانات.
+- Invalidation عند تغير التقييمات أو أحداث اللعب المهمة.
+- إمكانية تحديث القسم دورياً دون إعادة تحميل الصفحة بالكامل.
+- عند فشل التحديث، يتم الاحتفاظ بآخر نتيجة سليمة مع إظهار حالة مناسبة دون اختلاق بيانات.
+
+52.4 قاعدة البيانات وواجهات API
+--------------------------------
+- استخدام الجداول/Models الحالية للألعاب والمستخدمين والتقييمات والتفاعلات عند إمكانية ذلك.
+- عدم إنشاء Model أو API مكرر إذا كان الموجود يمكن توسيعه بأمان.
+- تسجيل Play Event بطريقة Idempotent ومحمية من التكرار غير الطبيعي.
+- Endpoint قراءة مخصص للترتيبات الديناميكية يمكنه دعم:
+  - category=top-rated
+  - category=most-played
+  - category=trending
+  - category=rising
+- دعم pagination وlimit وplatform وgenre وtimeRange عند الحاجة.
+- حماية API من scraping المفرط وRate Limiting.
+- عدم كشف بيانات المستخدمين الشخصية ضمن إحصاءات القسم.
+
+52.5 لوحة الإدارة
+------------------
+- إعدادات للتحكم في فترة التحليل، الحد الأدنى للتقييمات، أوزان المؤشرات، TTL للـCache، وعدد الألعاب المعروضة.
+- معاينة أسباب ظهور اللعبة في الترتيب.
+- سجلات Audit عند تعديل خوارزمية الترتيب أو إعداداتها.
+- منع Admin/Staff غير المصرح لهم من تعديل إعدادات الترتيب الحساسة.
+
+53. QURAN RECITERS / AUDIO VOICE SYSTEM
+========================================
+
+إضافة نظام أصوات قراء عالميين داخل الميزة الصوتية الموجودة في المشروع، مع إمكانية اختيار القارئ وتغييره بسهولة، بشرط استخدام مصادر صوتية مرخصة أو Integrations قانونية فعلية وعدم تضمين ملفات صوتية محمية بحقوق غير مصرح بها.
+
+53.1 مكتبة القراء
+------------------
+إتاحة قائمة قابلة للتوسعة من القراء، ومن أمثلة القراء الذين يمكن دعمهم عند توفر مصدر قانوني/ترخيص مناسب:
+- الشيخ مشاري راشد العفاسي.
+- الشيخ عبد الباسط عبد الصمد.
+- الشيخ عبد الرحمن السديس.
+- الشيخ ماهر المعيقلي.
+- الشيخ ياسر الدوسري.
+- الشيخ سعد الغامدي.
+- الشيخ محمد صديق المنشاوي.
+- الشيخ محمود خليل الحصري.
+- الشيخ سعود الشريم.
+- الشيخ فارس عباد.
+- الشيخ هاني الرفاعي.
+- الشيخ إدريس أبكر.
+- الشيخ ناصر القطامي.
+
+ملاحظة تنفيذية: لا تتم إضافة أي تسجيل فعلي أو رابط صوتي إلا من Provider حقيقي ومصدر قانوني موثوق، ويتم حفظ بيانات الترخيص/المصدر في Server-side Configuration عند الحاجة.
+
+53.2 واجهة اختيار القارئ
+-------------------------
+- صفحة/نافذة اختيار القارئ.
+- صورة أو أيقونة تعريفية عند توفرها بشكل قانوني.
+- اسم القارئ.
+- اللغة/الرواية/الجودة إذا كانت متاحة من المصدر.
+- زر Preview لتجربة مقطع قصير من المصدر المصرح به.
+- زر Select/اختيار.
+- مؤشر للقارئ الحالي.
+- بحث وفرز حسب الاسم.
+- إمكانية تمييز القراء المفضلين.
+
+53.3 تغيير صوت القارئ
+----------------------
+- زر "تغيير القارئ" ظاهر داخل مشغل الصوت.
+- تغيير القارئ دون فقدان موضع التشغيل الحالي إذا كان المصدر يدعم ذلك.
+- حفظ القارئ المفضل Server-side للمستخدم المسجل، وLocal Preference للزائر عند الحاجة.
+- مزامنة الاختيار بين الأجهزة للمستخدم المسجل.
+- استعادة آخر قارئ مستخدم عند فتح المشغل.
+- إعداد افتراضي قابل للتغيير من Settings.
+
+53.4 مشغل الصوت
+----------------
+- Play / Pause.
+- Previous / Next.
+- شريط تقدم قابل للسحب.
+- مستوى الصوت.
+- سرعة التشغيل عند دعمها من المشغل.
+- Repeat / Auto Next.
+- إظهار اسم السورة/المقطع والقارئ.
+- تحميل/تخزين مؤقت Offline فقط إذا كان Provider والترخيص يسمحان بذلك.
+- استمرار التشغيل في الخلفية على الأجهزة المدعومة.
+- دعم Media Session API عند توفرها.
+- Accessibility labels وKeyboard Controls.
+
+53.5 Backend / Security / Privacy
+----------------------------------
+- لا يتم وضع مفاتيح API أو Secrets داخل Frontend.
+- استخدام Provider Adapter قابل لتبديل مزود الصوت دون إعادة بناء النظام بالكامل.
+- التحقق Server-side من صلاحية مصدر الصوت والرابط قبل إرساله للواجهة.
+- Rate Limiting على طلبات الصوت والـPreview.
+- عدم تسجيل بيانات استماع شخصية غير ضرورية.
+- دعم حذف تفضيل القارئ وإدارة الخصوصية.
+- Audit Logs للتغييرات الإدارية في مزودي الصوت والقراء.
+- التعامل مع انقطاع المصدر أو تغييره عبر Fallback قانوني موثوق، وليس Fake Audio.
+
+53.6 Admin Audio Management
+----------------------------
+- إضافة/تعطيل قارئ.
+- إدارة Provider.
+- تحديد مصدر الصوت والترخيص وحالة المصدر.
+- ترتيب القراء في الواجهة.
+- تحديد القارئ الافتراضي.
+- اختبار اتصال المصدر قبل تفعيله.
+- منع تفعيل أي قارئ لا يحتوي على مصدر قانوني/مصرح به موثق بشكل مستقل.
+
+54. UNIFIED ACCEPTANCE CRITERIA FOR RANKINGS + AUDIO
+====================================================
+- القوائم الأعلى تقييماً والأكثر لعباً تعتمد على بيانات حقيقية من Database.
+- لا توجد Fake Statistics أو Fake Reviews أو Fake Play Counts.
+- ترتيب الألعاب يتغير تلقائياً عند تغير البيانات المؤثرة.
+- لا يمكن للمستخدم تعديل الإحصاءات أو ترتيب الألعاب من Frontend.
+- جميع العمليات الحساسة Server-side.
+- لا توجد API Keys أو Secrets في Frontend.
+- قسم الصفحة الرئيسية Responsive وRTL/LTR وAccessible.
+- نظام القراء يدعم عدة أصوات حقيقية من مصادر قانونية قابلة للتحقق.
+- المستخدم يستطيع تغيير القارئ وحفظ اختياره.
+- لا يتم ادعاء دعم قارئ أو مصدر صوتي قبل اختبار التكامل فعلياً.
+- جميع الإضافات تلتزم بقواعد عدم التكرار والحفاظ على Models/APIs/Pages الحالية.
+- بعد التنفيذ يجب إجراء Build + Type Check + Database/API Tests + Security Tests + Accessibility + Performance + Regression + Final QA.
+52.6 REAL GAME CATALOG EXPANSION — ALL PLATFORMS
+=================================================
+
+الهدف:
+توسيع كتالوج GameVortex Hub إلى أكبر عدد ممكن من الألعاب الحقيقية لجميع المنصات التي يمكن دعمها ببيانات ومصادر موثوقة، مع الحفاظ على قاعدة "لا Fake Data".
+
+المنصات المستهدفة:
+- PC / Windows / Linux / macOS عند توفر بيانات حقيقية.
+- Steam.
+- PlayStation 4 / PlayStation 5.
+- Xbox One / Xbox Series.
+- Nintendo Switch / Switch 2 عند توفر البيانات.
+- Android.
+- iOS/iPadOS.
+- Retro / Legacy Platforms.
+- أي منصة أخرى يمكن توفير بيانات موثوقة لها.
+
+متطلبات كل لعبة:
+- عنوان عربي وإنجليزي.
+- Slug فريد.
+- وصف مختصر ووصف مفصل.
+- Story / Gameplay / Features.
+- Developer / Publisher عند توفرهما.
+- Release Date لكل منصة عند توفرها.
+- Genres / Tags.
+- Cover حقيقي.
+- Screenshots حقيقية.
+- Trailer/Video من مصدر مصرح أو موثوق عند توفره.
+- Rating وRating Count من البيانات الحقيقية.
+- Popularity / Views / Plays / Downloads من أحداث GameVortex الحقيقية فقط.
+- Size ومتطلبات التشغيل عند توفرها.
+- Platform-specific data.
+- Store/source metadata.
+- License/Distribution Status.
+- Download Source Status.
+
+52.7 REAL IMAGES & MEDIA PIPELINE
+----------------------------------
+- استخدام صور اللعبة الحقيقية من مزود Metadata أو مصدر مرخص/مصرح به.
+- منع الصور الوهمية وPlaceholder من الظهور كأنها صور حقيقية.
+- تخزين Image Source وAttribution وLicense Status عند الحاجة.
+- دعم Cover وScreenshots وLogos وBackgrounds وTrailers.
+- Image Proxy/CDN اختياري لتحسين الأداء، مع احترام حقوق المصدر.
+- WebP/AVIF وResponsive Images وLazy Loading.
+- فحص MIME/Content-Type وحجم الملفات قبل التخزين.
+- عدم استخدام روابط صور غير موثوقة أو example.com.
+
+52.8 DETAILED GAME DESCRIPTION
+------------------------------
+كل Game Details يجب أن يعرض:
+- نبذة كاملة.
+- القصة.
+- أسلوب اللعب.
+- المزايا.
+- الأنظمة والمنصات.
+- المطور والناشر.
+- تاريخ الإصدار.
+- الأنواع والتصنيفات.
+- متطلبات التشغيل عند توفرها.
+- الحجم عند توفره.
+- التقييمات والمراجعات.
+- الإصدارات.
+- حالة التوفر.
+- حالة التحميل.
+- مصدر التوزيع.
+- الترخيص.
+- بدائل رسمية عند عدم توفر توزيع مباشر مرخص.
+
+52.9 DIRECT DOWNLOAD — AUTHORIZED CONTENT ONLY
+----------------------------------------------
+الهدف:
+السماح للمستخدم بالتحميل من داخل GameVortex Hub دون إجباره على مغادرة الموقع، ولكن فقط للملفات التي يملك GameVortex Hub حق استضافتها أو إعادة توزيعها.
+
+قواعد إلزامية:
+- Direct Download داخل الموقع مسموح فقط للملفات:
+  1. المملوكة لـGameVortex Hub.
+  2. المرخصة صراحة لإعادة التوزيع.
+  3. مفتوحة المصدر/Freeware/Public Domain وفق شروط الترخيص.
+  4. التي منح مالك الحقوق/الموزع إذنًا واضحًا لاستضافتها وتوزيعها.
+- استخدام Object Storage/CDN موثوق.
+- Secure Download Endpoint.
+- Signed URLs قصيرة العمر عند الحاجة.
+- Authentication/Authorization.
+- Download entitlement checks.
+- Malware/file integrity scanning عند توفره.
+- SHA-256 checksum للملفات عند الحاجة.
+- Range Requests وResume Downloads عند دعمها.
+- تسجيل DownloadHistory وAuditLog.
+- Rate Limiting وAbuse Protection.
+- منع Hotlinking عند الحاجة.
+
+ممنوع:
+- إعادة استضافة ألعاب تجارية محمية بحقوق النشر بدون إذن.
+- تجاوز DRM أو حماية المتاجر.
+- استخدام Torrents أو Mirrors غير مصرح بها كمصدر شرعي.
+- Scraping ملفات الألعاب من المتاجر لإعادة توزيعها.
+- الادعاء بأن أي لعبة قابلة للتحميل المباشر قبل التحقق من الترخيص.
+
+إذا لم يكن التحميل المباشر من GameVortex Hub ممكنًا بشكل قانوني:
+- لا توجد مشكلة في توجيه المستخدم إلى الموقع/المتجر الرسمي.
+- يظهر زر واضح مثل "التحميل من المصدر الرسمي" أو "زيارة المصدر الرسمي".
+- يحفظ النظام Official URL وSource Provider وSource Verification Status.
+- لا يتم إنشاء رابط تحميل وهمي أو غير موثوق.
+- لا يتم اعتبار الانتقال للمصدر الرسمي فشلًا في تجربة المستخدم؛ بل هو Fallback رسمي معتمد.
+
+52.10 MASS GAME IMPORT
+----------------------
+- دعم Batch Import/Upsert لأكبر عدد ممكن من الألعاب التي يمكن التحقق منها.
+- Pagination وBackground Jobs للدفعات الكبيرة.
+- Deduplication حسب External ID + Platform.
+- تحديث Metadata دون فقدان البيانات المحلية.
+- حفظ External Source وLast Synced At.
+- حفظ Source Verification Status.
+- عدم إدخال لعبة إلى Published Catalog قبل اجتياز Validation.
+- عدم استخدام رقم ثابت مثل 500+ إلا إذا كانت الألعاب موجودة فعليًا.
+
+53. APPLICATIONS HUB — REAL APPS CATALOG
+========================================
+
+الهدف:
+إضافة قسم Applications مستقل داخل GameVortex Hub لعرض أكبر عدد ممكن من التطبيقات الحقيقية للمنصات المدعومة، مع بيانات وصور حقيقية ووصف مفصل ومصدر تحميل موثوق.
+
+الصفحة:
+- /apps
+- /apps/[slug]
+
+التصنيفات:
+- Windows Apps.
+- macOS Apps.
+- Linux Apps.
+- Android Apps.
+- iOS/iPadOS Apps.
+- Productivity.
+- Education.
+- Graphics & Design.
+- Video & Audio.
+- Communication.
+- Utilities.
+- Security.
+- Development.
+- Browsers.
+- Media.
+- Open Source.
+- Freeware.
+- Publicly distributable software.
+
+53.1 APP DATA MODEL
+-------------------
+كل App يتضمن:
+- Arabic Title.
+- English Title.
+- Slug.
+- Short Description.
+- Detailed Description.
+- Features.
+- Developer/Publisher.
+- Version.
+- Release Date.
+- Last Updated.
+- Platforms.
+- Architecture عند توفرها.
+- File Size.
+- Screenshots.
+- Logo/Icon.
+- Categories/Tags.
+- Requirements.
+- License.
+- Version History عند توفرها.
+- Download Source.
+- Distribution Permission.
+- Source Verification Status.
+- SHA-256 عند توفر الملف.
+- Download Count من Database الحقيقية.
+- Rating/Reviews عند توفرها.
+
+53.2 REAL APP IMAGES
+--------------------
+- صور حقيقية للتطبيق وواجهته.
+- Icon/Logo حقيقي.
+- Screenshots حقيقية.
+- منع Placeholder من الظهور كصورة فعلية.
+- Source URL وLicense/Attribution Metadata عند الحاجة.
+- Image optimization وCDN عند توفره.
+
+53.3 DIRECT APP DOWNLOAD
+------------------------
+السماح بالتحميل من داخل GameVortex Hub فقط عندما يكون الملف قابلًا لإعادة التوزيع قانونيًا.
+
+مصادر مسموحة:
+- ملفات يملكها GameVortex Hub.
+- Open Source وفق الترخيص.
+- Freeware يسمح بإعادة التوزيع.
+- Developer/Publisher distribution permission.
+- Public download artifacts التي تسمح شروطها بإعادة التوزيع.
+
+آلية التحميل:
+- /api/apps/[appId]/download
+- Entitlement/Authorization.
+- Signed URL أو Secure Download Endpoint.
+- Storage/CDN.
+- Resume.
+- Integrity verification.
+- DownloadHistory.
+- Rate Limiting.
+- Malware scanning عند توفره.
+
+إذا كان التطبيق لا يسمح بإعادة التوزيع:
+- لا يتم نسخ الملف إلى GameVortex Hub.
+- يعرض النظام Source/Official Availability Status.
+- لا يتم الادعاء بأن التحميل مباشر.
+
+53.4 MASS APP IMPORT
+--------------------
+- Batch Import/Upsert.
+- External IDs.
+- Deduplication.
+- Source verification.
+- Version sync.
+- Background jobs.
+- Pagination.
+- Cache.
+- Search indexing.
+- عدم إعلان رقم إجمالي ثابت إلا إذا كان العدد الحقيقي موجودًا.
+
+53.5 APP DISCOVERY
+------------------
+إضافة:
+- Trending Apps.
+- Most Downloaded Apps.
+- Highest Rated Apps.
+- New Apps.
+- Recently Updated.
+- Best Open Source.
+- Recommended Apps.
+- Similar Apps.
+- Apps by Platform.
+- Apps by Category.
+
+54. REAL GIFT CARD MARKETPLACE EXPANSION
+========================================
+
+إضافة عدد كبير من بطاقات الهدايا الحقيقية، بشرط وجود مخزون/مزود/ترخيص بيع حقيقي.
+
+الفئات الممكنة:
+- Gaming Platforms.
+- Console Stores.
+- PC Stores.
+- Mobile Stores.
+- Entertainment.
+- Digital Services.
+- Internal Gift Cards إذا كانت من GameVortex Hub.
+
+كل بطاقة:
+- Product Name.
+- Brand.
+- Region/Country.
+- Currency.
+- Denomination.
+- Price.
+- Stock.
+- Delivery Type.
+- Provider.
+- Terms.
+- Redemption Instructions.
+- Inventory Status.
+- Supplier Verification.
+- Product Image.
+- Purchase History.
+- Delivery Status.
+
+القواعد:
+- لا Fake Gift Cards.
+- لا إظهار الكود قبل نجاح الدفع.
+- لا بيع بطاقة دون حق بيع فعلي.
+- التحقق من Region/Currency.
+- Atomic Transaction.
+- Inventory Lock.
+- Idempotency.
+- Secure Code Storage.
+- لا تخزين الأكواد كنص مكشوف.
+- Audit Logs.
+- Fraud/Risk checks عند الحاجة.
+- إذا لم يوجد Provider حقيقي: NOT_CONFIGURED / NEEDS_PROVIDER.
+
+55. QURAN AUDIO — REAL RECITERS & IN-SITE PLAYER
+================================================
+
+الهدف:
+إضافة قسم قرآن داخل الموقع مع تشغيل وإيقاف مباشر من داخل GameVortex Hub، مع عدة قراء حقيقيين من مصادر صوت موثوقة ومصرح باستخدامها.
+
+55.1 GLOBAL QURAN PLAYER
+------------------------
+زر مشغل قرآن واضح ويمكن إظهاره في جميع الصفحات:
+- Play.
+- Pause.
+- Stop.
+- Previous.
+- Next.
+- Progress.
+- Volume.
+- Mute.
+- Playback speed عند دعمها.
+- Repeat.
+- Auto Next.
+- اسم السورة.
+- اسم القارئ.
+- زر "تغيير القارئ".
+- حالة التشغيل الحالية.
+- Mini Player ثابت.
+- Expanded Player.
+- دعم Mobile/Tablet/Desktop.
+- Accessibility.
+- Keyboard controls.
+- Media Session API عند توفرها.
+
+55.2 VISIBILITY
+---------------
+- زر التشغيل والإيقاف متاح لجميع المستخدمين، بما في ذلك الزائر غير المسجل.
+- لا يشترط تسجيل الدخول للاستماع.
+- يمكن إخفاء/إظهار المشغل من Settings.
+- المشغل لا يغطي المحتوى الأساسي.
+- يحترم Reduced Motion.
+- لا يبدأ الصوت تلقائيًا بدون تفاعل المستخدم، إلا وفق سياسات المتصفح المسموحة.
+
+55.3 REAL RECITERS
+------------------
+- دعم أكبر عدد ممكن من القراء الحقيقيين الذين يمكن توفير صوتهم من مصادر موثوقة ومصرح باستخدامها.
+- إلزامي: لكل قارئ مفعّل يجب تسجيل مصدر قانوني/مصرح به بشكل مستقل، ولا يكفي وجود Provider عام دون توثيق مصدر القارئ نفسه.
+- حفظ:
+  - Reciter ID.
+  - Name.
+  - Arabic Name.
+  - Riwayah عند توفرها.
+  - Quality.
+  - Provider.
+  - Legal Source URL.
+  - License/Permission URL أو مستند إثبات الإذن عند توفره.
+  - License/Permission Status.
+  - Source Verification Status.
+  - Verification Date.
+  - Verified By / Verification Record.
+  - Audio Base URL.
+  - Available Surahs.
+  - Active/Inactive.
+- عدم إنشاء أصوات اصطناعية أو الادعاء أنها صوت القارئ الحقيقي.
+- لا يتم نسخ أو إعادة استضافة تسجيلات محمية دون إذن.
+
+55.4 RECITER SWITCHING
+----------------------
+- زر تغيير القارئ داخل المشغل.
+- قائمة بحث وفرز.
+- Preview إذا كان المصدر يسمح.
+- Select.
+- Favorite Reciter.
+- حفظ القارئ المفضل Server-side للمستخدم المسجل.
+- Local Preference للزائر.
+- مزامنة الاختيار بين الأجهزة للمستخدم المسجل.
+- محاولة الحفاظ على السورة والموضع عند تبديل القارئ إذا كان المصدر يسمح.
+- Fallback لمصدر قانوني موثوق عند انقطاع المصدر.
+
+55.5 QURAN AUDIO SOURCES
+------------------------
+- استخدام Provider Adapter.
+- التحقق Server-side من المصدر.
+- عدم وضع API Keys في Frontend.
+- عدم الاعتماد على روابط مجهولة.
+- Source Health Check.
+- License/Permission Check.
+- Cache آمن عند السماح.
+- Streaming داخل الموقع.
+- Offline Download فقط عندما يسمح Provider/License.
+- Rate Limiting.
+- Audit Logs لتغييرات المزودين.
+
+55.6 QURAN PAGES
+----------------
+إضافة:
+- /quran
+- /quran/[surah]
+- /quran/reciters
+
+تتضمن:
+- قائمة السور.
+- اختيار السورة.
+- اختيار القارئ.
+- تشغيل السورة.
+- إيقاف/استئناف.
+- Next/Previous.
+- حفظ آخر موضع عند توفر حساب.
+- Last Played.
+- Favorite Reciters.
+- Search.
+- RTL.
+- نص القرآن عند توفر مصدر موثوق ومرخص.
+
+55.7 ADMIN QURAN AUDIO
+----------------------
+داخل /admin:
+- إدارة القراء.
+- إدارة Providers.
+- تحديد القارئ الافتراضي.
+- ترتيب القراء.
+- تفعيل/تعطيل القارئ.
+- Source URL.
+- License/Permission Status.
+- Health Check.
+- اختبار الصوت.
+- إدارة السور المتوفرة.
+- Audit Log.
+- منع تفعيل مصدر غير موثق.
+
+56. HOMEPAGE — 3D GLASS ECOSYSTEM
+=================================
+
+إعادة تصميم الصفحة الرئيسية بالكامل حول 3D Glassmorphism.
+
+Hero:
+- طبقات زجاجية عميقة.
+- 3D floating game cards.
+- Dynamic lighting.
+- Parallax.
+- Glass reflections.
+- Soft volumetric glow.
+- Search داخل Glass Panel.
+- AI Assistant داخل Glass Orb/Panel.
+- Quran Mini Player داخل Glass Dock.
+
+الأقسام:
+- Top Rated.
+- Most Played.
+- Trending.
+- Rising Fast.
+- New & Featured.
+- Games by Platform.
+- Applications.
+- Apps Trending.
+- Gift Cards.
+- Quran Reciters.
+- Community Activity.
+- Recommended For You.
+- Deals.
+- Recently Viewed.
+
+56.1 3D CARD SYSTEM
+-------------------
+كل بطاقة تدعم:
+- Depth.
+- Hover tilt.
+- Reflection.
+- Dynamic highlight.
+- Image zoom.
+- Glass overlay.
+- Badges.
+- Platform chips.
+- Rating.
+- Download/Play CTA.
+- Favorite/Wishlist.
+- Accessible focus state.
+
+56.2 PERFORMANCE
+----------------
+- GPU-friendly transforms.
+- محدودية Blur وBackdrop Filter على الأجهزة الضعيفة.
+- Mobile 3D Performance Mode.
+- Reduced Motion.
+- Lazy Loading.
+- Virtualization للقوائم الكبيرة.
+- عدم التضحية بـCore Web Vitals.
+
+57. UNIFIED CONTENT / DOWNLOAD POLICY
+=====================================
+
+GameVortex Hub يستخدم قاعدة موحدة:
+
+A) Metadata:
+- يمكن جلبها من Providers موثوقين.
+- تخزين External ID وSource.
+
+B) Images:
+- صور حقيقية من مصدر يسمح باستخدامها أو عبر آلية مناسبة للترخيص.
+- حفظ Attribution/License عند الحاجة.
+
+C) Downloads:
+- داخل الموقع فقط للملفات التي يملك GameVortex Hub حق توزيعها.
+- لا يتم تحويل صفحة متجر إلى "تحميل مباشر" بشكل مضلل.
+- لا يتم تجاوز DRM أو أنظمة الحماية.
+- لا يتم إعادة توزيع ملفات محمية بحقوق النشر بدون إذن.
+
+D) Status:
+- VERIFIED.
+- LICENSED_FOR_DISTRIBUTION.
+- OPEN_SOURCE.
+- FREEWARE_REDISTRIBUTABLE.
+- STREAM_ONLY.
+- OFFICIAL_SOURCE.
+- NEEDS_SOURCE.
+- NEEDS_LICENSE.
+- UNPUBLISHED.
+
+E) لا يتم نشر أي عنصر كتحميل مباشر إلا بعد Source Verification.
+
+58. NEW DATABASE MODELS / EXTENSIONS
+====================================
+
+يمكن إنشاء Model جديد عند الحاجة حتى لو كان هناك Model قديم مشابه، إذا كان الـModel الجديد يحقق متطلبات المجال بشكل أوضح أو يوفر مرونة/قابلية توسع أفضل.
+
+قواعد إنشاء Model جديد:
+- عدم إجبار Model قديم على وظائف لا تناسبه.
+- توثيق سبب إنشاء الـModel الجديد.
+- إضافة Foreign Keys/Indexes/Unique Constraints المناسبة.
+- Migration آمنة مع الحفاظ على البيانات القديمة.
+- يمكن الاحتفاظ بالـModel القديم إذا كان مستخدمًا في وظائف أخرى.
+- يمكن تنفيذ Deprecation/Migration لاحقًا بعد التحقق، ولا يتم حذف Model قديم تلقائيًا.
+
+النماذج الجديدة المقترحة:
+- AppPlatform.
+- AppCategory.
+- AppMedia.
+- AppVersion.
+- AppSource.
+- AppDownloadFile.
+- AppLicense.
+- GamePlatformRelease.
+- GameMediaSource.
+- DownloadSourceVerification.
+- GiftCardProvider.
+- GiftCardProduct.
+- GiftCardInventory.
+- GiftCardOrder.
+- GiftCardDelivery.
+- QuranReciter.
+- QuranAudioProvider.
+- QuranSurahAudio.
+- QuranPlayerPreference.
+- QuranFavoriteReciter.
+- MediaLicenseRecord.
+- ContentSourceAudit.
+
+مع:
+- Foreign Keys.
+- Indexes.
+- Unique Constraints.
+- Soft Delete.
+- Timestamps.
+- Atomic Transactions.
+- Idempotency.
+- Audit Logs.
+
+59. NEW API ARCHITECTURE
+=======================
+
+Games:
+- /api/games
+- /api/games/[id]
+- /api/games/[id]/media
+- /api/games/[id]/download
+- /api/games/rankings
+
+Apps:
+- /api/apps
+- /api/apps/[id]
+- /api/apps/[id]/media
+- /api/apps/[id]/download
+- /api/apps/rankings
+
+Gift Cards:
+- /api/gift-cards
+- /api/gift-cards/[id]
+- /api/gift-cards/purchase
+- /api/gift-cards/inventory
+
+Quran:
+- /api/quran/reciters
+- /api/quran/surahs
+- /api/quran/audio
+- /api/quran/preferences
+- /api/quran/reciters/[id]/health
+
+كل API:
+- Authentication عند الحاجة.
+- Authorization.
+- Rate Limiting.
+- Validation.
+- Error handling.
+- Audit Logging للعمليات الحساسة.
+- لا Secrets في Frontend.
+
+60. UPDATED ACCEPTANCE CRITERIA — 3D GLASS + CONTENT + QURAN
+==============================================================
+
+- التصميم الأساسي أصبح Premium 3D Glassmorphism وليس Cyberpunk-only.
+- Cyberpunk/Neon تستخدم كـAccent اختياري.
+- الألعاب والتطبيقات حقيقية وليست Fake Data.
+- الصور حقيقية ومصدرها معروف.
+- الوصف مفصل عند توفر البيانات.
+- لا يوجد رابط تحميل وهمي.
+- Direct Download يعمل فقط للمحتوى المسموح بإعادة توزيعه.
+- الألعاب التجارية غير المرخصة لإعادة التوزيع لا تتم استضافتها أو توزيعها مباشرة.
+- إذا تعذر التحميل المباشر من GameVortex، يمكن للمستخدم الانتقال إلى المصدر/المتجر الرسمي عبر رابط موثق.
+- التطبيقات القابلة لإعادة التوزيع فقط يمكن تنزيلها من داخل الموقع.
+- Gift Cards حقيقية فقط مع Provider/Inventory حقيقي.
+- لا يتم عرض Gift Card كمنتج رسمي دون حق البيع.
+- Quran Player يعمل داخل الموقع.
+- Play/Pause ظاهر لجميع المستخدمين.
+- يوجد عدد كبير من القراء الحقيقيين فقط عند توفر مصادر موثوقة ومصرح بها.
+- المستخدم يستطيع تغيير القارئ.
+- الصوت ليس AI-generated imitation.
+- لا يتم الادعاء بأن مصدرًا أو قارئًا متاح قبل اختبار التكامل.
+- جميع البيانات والإحصائيات والتنزيلات الحقيقية Server-side.
+- لا Fake Data / Fake Images / Fake Downloads / Fake Gift Cards / Fake Audio / Fake Integrations.
+- RTL/LTR وAccessibility وReduced Motion محفوظة.
+- Mobile/Tablet/Desktop Responsive.
+- Performance Audit.
+- Security Audit.
+- License/Source Verification.
+- Build + Type Check + Database/API Tests + Security Tests + Accessibility + Performance + Regression + Final QA.
+
+61. UPDATED MASTER IMPLEMENTATION DIRECTIVE
+===========================================
+
+نفذ هذه التغييرات داخل GameVortex Hub الحالي فقط.
+
+أولوية التنفيذ:
+1. Audit للمشروع الحالي.
+2. استبدال الهوية البصرية بـPremium 3D Glassmorphism.
+3. توحيد Components القديمة مع نظام 3D Glass الجديد وإزالة التكرارات.
+4. توسيع Game Catalog بمصادر وMetadata حقيقية.
+5. إضافة Real Media Pipeline.
+6. إضافة Direct Download Infrastructure للمحتوى المصرح بإعادة توزيعه فقط.
+7. إضافة Applications Hub.
+8. إضافة App Direct Download للمحتوى المصرح به فقط.
+9. إضافة Gift Card Marketplace مع Provider/Inventory حقيقي.
+10. إضافة Quran Player عالمي.
+11. إضافة Reciter Management وProvider Verification.
+12. دمج كل الميزات مع Favorites/Wishlist/Library/Reviews/AI/Notifications.
+13. تحديث Homepage إلى 3D Glass Ecosystem.
+14. Database Migrations آمنة، مع السماح بإنشاء Models جديدة عند الحاجة.
+15. Owner Dynamic CMS وProduct Management وDynamic Fields.
+16. Owner Revenue/Points Routing وExternal Settlement Integration.
+17. Security + License + Source Verification.
+16. Performance + Accessibility.
+17. Regression + Final Production QA.
+
+قاعدة نهائية:
+"أكبر عدد ممكن" يعني أكبر عدد يمكن توفيره فعليًا وبشكل موثوق وقانوني، وليس إنشاء أرقام أو روابط أو ملفات وهمية للوصول إلى رقم مستهدف.
+
+62. OWNER DYNAMIC CMS & PRODUCT MANAGEMENT
+===========================================
+
+المالك (SUPER_ADMIN / OWNER) يحصل على لوحة تحكم ديناميكية كاملة لإدارة بنية المحتوى والمنتجات دون الحاجة إلى تعديل الكود لكل تغيير.
+
+62.1 DYNAMIC FIELDS
+-------------------
+يمكن للمالك:
+- إضافة خانات/حقول جديدة إلى صفحات الألعاب.
+- إضافة خانات/حقول جديدة إلى التطبيقات.
+- إضافة خانات/حقول جديدة إلى بطاقات الهدايا.
+- تعديل اسم الحقل.
+- تغيير نوع الحقل.
+- ترتيب الحقول.
+- إخفاء/إظهار الحقول.
+- حذف الحقول القديمة.
+- جعل الحقل Required/Optional.
+- تحديد الحقل حسب المنصة أو الفئة.
+- إضافة حقول نصية، رقمية، سعرية، تاريخ، رابط، صورة، قائمة، Multi-select، Boolean، Rich Text.
+- تحديد Validation Rules لكل حقل.
+- تحديد Default Value.
+- تحديد صلاحية ظهور الحقل في الواجهة أو لوحة الإدارة.
+- إنشاء Custom Metadata دون تعديل Schema يدويًا كل مرة عندما يكون ذلك مناسبًا.
+
+حماية:
+- جميع تغييرات الـSchema/Metadata تمر عبر Server-side Authorization.
+- لا يسمح USER أو STAFF غير المصرح له بتعديل تعريفات الحقول.
+- Audit Log لكل Add/Edit/Delete.
+- Soft Delete أو Versioning للحقول الحساسة عند الحاجة.
+- Migration آمنة عندما يكون الحقل مرتبطًا بـDatabase Column.
+- منع حذف حقل ما زالت تعتمد عليه عمليات مالية أو أمنية إلا بعد تأكيد/خطة ترحيل.
+
+62.2 OWNER GAME MANAGEMENT
+--------------------------
+المالك يستطيع من Admin:
+- إضافة لعبة جديدة.
+- تعديل لعبة موجودة.
+- حذف لعبة.
+- أرشفة لعبة بدل حذفها.
+- تعديل الاسم والوصف.
+- تعديل الصور.
+- تعديل المنصات.
+- تعديل التصنيف.
+- تعديل السعر.
+- تعديل الخصم.
+- تعديل Rewards.
+- تعديل حالة التحميل.
+- إضافة مصدر تحميل.
+- تعديل مصدر التحميل.
+- تحديد Official Source.
+- تحديد License/Distribution Status.
+- تحديد Published/Unpublished.
+- تحديد Featured.
+- تحديد Trending Override فقط كإعداد إداري موثق، دون تزوير إحصاءات المستخدمين.
+
+62.3 OWNER APP MANAGEMENT
+-------------------------
+المالك يستطيع:
+- إضافة تطبيق جديد.
+- تعديل تطبيق.
+- حذف تطبيق.
+- أرشفة تطبيق.
+- تعديل الوصف.
+- تعديل الصور.
+- تعديل الإصدار.
+- تعديل المنصات.
+- تعديل التصنيف.
+- تعديل السعر.
+- تعديل الخصم.
+- تعديل Rewards.
+- تعديل Source.
+- تعديل Download Status.
+- تعديل License.
+- Publish/Unpublish.
+- Featured/Unfeatured.
+
+62.4 OWNER GIFT CARD MANAGEMENT
+-------------------------------
+المالك يستطيع:
+- إضافة بطاقة هدايا جديدة.
+- تعديل بيانات البطاقة.
+- حذف/أرشفة المنتج.
+- تعديل السعر.
+- تعديل القيمة الاسمية.
+- تعديل العملة.
+- تعديل المنطقة.
+- إدارة المخزون.
+- إدارة Provider.
+- تفعيل/تعطيل المنتج.
+- Publish/Unpublish.
+
+62.5 PRICE CONTROL
+------------------
+- المالك يستطيع تعديل سعر المنتج من Admin.
+- السعر النهائي يحدده Server-side.
+- لا يستطيع المستخدم إرسال سعر بديل عبر Frontend.
+- كل تعديل للسعر يسجل في AuditLog.
+- حفظ Previous Price وNew Price وChanged By وChanged At وReason عند الحاجة.
+- منع الأسعار السالبة.
+- استخدام Decimal أو integer cents.
+- دعم Currency لكل منتج.
+- دعم Sale Price عند الحاجة.
+
+63. OWNER REVENUE ROUTING & EXTERNAL WALLET SETTLEMENT
+======================================================
+
+الهدف:
+كل عملية شراء داخل GameVortex Hub، وكذلك العمليات الخارجية المرتبطة بمنتجات GameVortex Hub، يجب أن تنتج Ledger Event واضحًا يحدد ما يذهب إلى رصيد/محفظة المالك، وما إذا كان الاستحقاق نقاطًا داخلية أو مبلغًا ماليًا.
+
+63.1 OWNER DESTINATION WALLET
+-----------------------------
+عنوان المحفظة الخارجية الذي حدده المالك كوجهة التسوية:
+
+OWNER_EXTERNAL_WALLET_ADDRESS =
+BbTXjZaXQzZiD3jUz59iemfsB19eCpYmuQFvJ4sEwEqM
+
+قواعد إلزامية:
+- هذا العنوان يُخزن كـConfiguration/Secret-safe destination حسب طبيعة الشبكة.
+- لا يتم افتراض Network أو Chain أو Token من العنوان وحده.
+- يجب على المالك تحديد:
+  - Network / Chain.
+  - Asset / Token.
+  - Decimals عند الحاجة.
+  - Provider/RPC/Payment Processor.
+  - Confirmation Policy.
+- لا يتم إرسال أي معاملة Blockchain حقيقية قبل اكتمال Network + Asset + Provider Configuration والتحقق من صحة العنوان على الشبكة المحددة.
+- لا يتم تخزين Private Key أو Seed Phrase داخل الموقع.
+- إذا كانت المنصة لا تدعم أصلًا تحويلًا خارجيًا مباشرًا، يستخدم النظام Payout Provider حقيقيًا أو Settlement Adapter بدل Fake Transfer.
+
+63.2 FREE GAME / FREE APP PURCHASE EVENT
+-----------------------------------------
+عندما يشتري المستخدم لعبة أو تطبيقًا مجانيًا:
+- لا يتم تسجيل مبلغ مالي كإيراد إذا كان السعر النهائي = 0.
+- يتم حساب Owner Points Reward وفق إعدادات المالك.
+- يتم تحويل/إضافة النقاط المستحقة تلقائيًا إلى Owner Wallet Ledger كـOwner Points Credit.
+- العملية Atomic.
+- تمنع من التكرار بواسطة Purchase/Event Idempotency Key.
+- يسجل:
+  - Purchase ID.
+  - Product ID.
+  - Product Type.
+  - User ID.
+  - Owner ID.
+  - Points Amount.
+  - Conversion Rule.
+  - Timestamp.
+  - Source.
+  - Audit ID.
+- لا يتم إنشاء نقاط من Frontend.
+
+63.3 PAID GAME / PAID APP / GIFT CARD
+--------------------------------------
+عندما تكون اللعبة أو التطبيق أو بطاقة الهدية مدفوعة:
+- يتم تثبيت السعر النهائي Server-side.
+- بعد نجاح الدفع/Settlement فقط يتم إنشاء Owner Revenue Event.
+- يسجل المبلغ والعملة والرسوم والضرائب/الخصومات عند توفرها.
+- يتم تحويل صافي المبلغ المستحق للمالك إلى Owner Settlement Ledger.
+- إذا كانت خدمة الدفع تدعم Payout/Wallet Transfer تلقائيًا، ينفذ عبر Provider رسمي.
+- إذا كانت العملية Blockchain، يستخدم Settlement Adapter مع Network/Token/Provider محددين مسبقًا.
+- لا يتم اعتبار العملية "محولة" إلا بعد وصول Confirmation حقيقي من Provider/Network.
+- يحتفظ النظام بـTransaction Hash / Provider Transaction ID عند توفره.
+- أي فشل ينتقل إلى PENDING/FAILED ويعاد التعامل معه بأمان دون خصم مزدوج.
+
+63.4 PURCHASES OUTSIDE THE WEBSITE
+----------------------------------
+الهدف:
+دعم المبيعات الخارجية المرتبطة بمنتجات GameVortex Hub.
+
+مهم:
+لا يمكن للموقع معرفة عملية شراء خارجية بشكل تلقائي من دون مصدر بيانات خارجي. لذلك يجب أن تكون المبيعات الخارجية مرتبطة عبر Integration حقيقية.
+
+مصادر مقبولة:
+- Payment Provider Webhook.
+- External Marketplace Webhook/API.
+- Merchant/Store API.
+- Signed Server-to-Server Event.
+- POS/Order System Integration.
+- Manual Admin Settlement مع Audit Log عند عدم توفر API، إذا سمحت سياسة العمل بذلك.
+
+كل External Purchase Event يجب أن يحتوي على:
+- External Event ID.
+- Product ID / SKU.
+- Product Type.
+- Amount.
+- Currency.
+- Customer/Order Reference عند السماح.
+- Timestamp.
+- Provider.
+- Signature Verification Status.
+- Settlement Status.
+
+بعد التحقق:
+A) منتج مجاني:
+- إنشاء Owner Points Credit وفق قاعدة النقاط.
+- عدم إنشاء مبلغ مالي إذا كانت العملية مجانية.
+
+B) منتج مدفوع:
+- إنشاء Owner Revenue Event.
+- تسوية المبلغ إلى وجهة المالك عبر Provider/Settlement Adapter الحقيقي.
+- تسجيل Transaction ID/Hash عند توفره.
+
+ممنوع:
+- افتراض حدوث شراء خارجي دون Webhook/API/Order Evidence.
+- تحويل أموال أو نقاط استنادًا إلى بيانات Frontend فقط.
+- إنشاء Fake Blockchain Transaction.
+- الادعاء بأن المبلغ وصل إلى المحفظة قبل Confirmation حقيقي.
+
+63.5 OWNER WALLET LEDGER
+------------------------
+Owner Wallet لا يكون مجرد رقم Balance.
+
+يحتوي على Ledger Entries:
+- CREDIT_POINTS.
+- CREDIT_REVENUE.
+- DEBIT_PAYOUT.
+- REFUND.
+- REVERSAL.
+- ADJUSTMENT.
+- PENDING.
+- SETTLED.
+- FAILED.
+
+مع:
+- Immutable Ledger.
+- Atomic Transactions.
+- Idempotency.
+- Audit Logs.
+- Reconciliation.
+- Provider Transaction ID.
+- Blockchain Transaction Hash عند توفره.
+
+63.6 AUTOMATIC ROUTING FLOW
+---------------------------
+داخل الموقع:
+
+Purchase Created
+→ Server Validation
+→ Payment/Free Verification
+→ Purchase Finalized
+→ Reward/Revenue Calculation
+→ Owner Ledger Credit
+→ Settlement Job
+→ External Provider/Wallet
+→ Confirmation
+→ Owner Settlement Status
+→ Notification
+→ Audit Log.
+
+للمنتج المجاني:
+Purchase Created
+→ Free Verification
+→ Owner Points Calculation
+→ Owner Points Ledger Credit
+→ Audit Log.
+
+للمنتج المدفوع:
+Purchase Created
+→ Payment Confirmation
+→ Owner Revenue Calculation
+→ Owner Revenue Ledger
+→ Settlement Provider
+→ External Wallet/Account
+→ Confirmation
+→ Transaction Hash/Provider ID
+→ Audit Log.
+
+63.7 REFUNDS / CHARGEBACKS
+--------------------------
+إذا حدث:
+- Refund.
+- Chargeback.
+- Payment Reversal.
+- Gift Card Cancellation.
+
+يتم إنشاء Reversal Ledger Entry بدل تعديل السجل القديم.
+
+إذا تم تحويل الإيراد سابقًا:
+- يسجل النظام مبلغ الاسترداد.
+- يضع Settlement Adjustment/Pending Recovery.
+- يمنع تكرار الخصم.
+- يحافظ على Audit Trail كامل.
+
+63.8 SECURITY
+-------------
+- جميع عمليات التسوية Server-side.
+- Signed Webhooks.
+- HMAC/Provider Signature Verification عند دعمها.
+- Idempotency Keys.
+- Rate Limiting.
+- Replay Protection.
+- لا Secrets في Frontend.
+- لا Private Keys في Database.
+- لا Seed Phrases.
+- لا يتم تنفيذ Blockchain Transfer من متصفح المستخدم.
+- لا يسمح Admin عادي بتغيير وجهة المحفظة.
+- تغيير Owner Wallet Destination يحتاج SUPER_ADMIN + Re-authentication + Audit Log.
+- أي تغيير Network/Token يتطلب Verification قبل التفعيل.
+
+63.9 RECONCILIATION
+-------------------
+Job دوري يقوم بمقارنة:
+- Purchases.
+- Payment Transactions.
+- Owner Ledger.
+- Provider Payouts.
+- External Wallet Transactions عند توفر API/RPC.
+
+ويضع الحالات:
+- MATCHED.
+- PENDING.
+- MISMATCH.
+- NEEDS_REVIEW.
+
+لا يتم تعديل Ledger التاريخي مباشرة؛ يتم إنشاء Adjustment Entry موثق.
+
+64. FINANCIAL ACCEPTANCE CRITERIA
+=================================
+
+- شراء لعبة مجانية أو تطبيق مجاني يؤدي تلقائيًا إلى Owner Points Credit وفق إعدادات النقاط.
+- شراء لعبة مدفوعة يؤدي إلى Owner Revenue Credit بعد نجاح الدفع.
+- شراء تطبيق مدفوع يؤدي إلى Owner Revenue Credit بعد نجاح الدفع.
+- شراء Gift Card مدفوعة يؤدي إلى Owner Revenue Credit بعد نجاح الدفع/التسوية.
+- المبيعات الخارجية لا تُحتسب إلا من Integration أو Evidence موثوق.
+- المالك يستطيع سحب Owner Points من داخل الموقع بحد أدنى 15 نقطة = 0.50 USD.
+- سعر تحويل Owner Points ثابت: 30 نقطة = 1 USD.
+- جميع التحويلات الخارجية الحقيقية تتطلب Network/Asset/Provider Configuration.
+- لا يتم الادعاء بأن العنوان الخارجي صالح لكل الشبكات قبل التحقق.
+- لا يتم تنفيذ أي Transfer حقيقي إذا كانت Integration غير مكتملة؛ الحالة تكون NEEDS_INTEGRATION أو PENDING.
+- كل عملية لها Idempotency وAudit Trail.
+- Refund/Chargeback ينتج Reversal/Adjustment.
+- لا يمكن للمستخدم تغيير السعر أو المكافأة أو وجهة المالك من Frontend.
+
+65. IMPORTANT OWNER WALLET NOTE
+===============================
+
+العنوان الذي طلبه المالك هو:
+BbTXjZaXQzZiD3jUz59iemfsB19eCpYmuQFvJ4sEwEqM
+
+يتم اعتماده في المواصفة كـOWNER_EXTERNAL_WALLET_ADDRESS، لكن لا يتم افتراض الشبكة أو العملة من العنوان وحده.
+
+حتى يصبح التحويل الخارجي تلقائيًا فعليًا يجب ربط:
+- Network/Chain.
+- Asset/Token أو Currency.
+- Payment/Payout Provider أو Blockchain RPC.
+- Verification.
+- Confirmation Tracking.
+
+وبالنسبة للمشتريات خارج الموقع:
+لا يمكن للنظام اكتشافها تلقائيًا لمجرد وجود عنوان محفظة؛ يجب ربط مصدر البيع الخارجي عبر Webhook/API/Provider أو Order System موثوق. بعد وصول الحدث والتحقق من توقيعه يمكن تنفيذ نفس قواعد Owner Points/Revenue Routing.
+
+هذه القاعدة تمنع التحويلات الوهمية وتضمن أن حالة "SETTLED" لا تظهر إلا بعد تأكيد حقيقي.
+
+66. OWNER POINTS WITHDRAWAL — MINIMUM 0.50 USD
+================================================
+
+الهدف:
+السماح للمالك بسحب نقاطه من Owner Wallet داخل الموقع وتحويل قيمتها إلى مبلغ مالي، وفق قاعدة ثابتة خاصة بالمالك.
+
+66.1 OWNER-ONLY CONVERSION RATE
+-------------------------------
+- 30 Owner Points = 1.00 USD.
+- 1 Owner Point = 0.033333... USD.
+- الحد الأدنى للسحب = 0.50 USD.
+- بما أن 30 نقطة = 1 USD، فإن الحد الأدنى العملي للسحب هو 15 نقطة = 0.50 USD.
+- السحب بأقل من 15 نقطة مرفوض.
+- لا يتم تطبيق سعر تحويل المستخدمين أو VIP على Owner Points.
+- هذه القاعدة خاصة بمحفظة المالك فقط.
+
+66.2 WITHDRAWAL EXAMPLES
+------------------------
+- 15 نقطة = 0.50 USD.
+- 30 نقطة = 1.00 USD.
+- 60 نقطة = 2.00 USD.
+- 150 نقطة = 5.00 USD.
+- 300 نقطة = 10.00 USD.
+- 3,000 نقطة = 100.00 USD.
+
+66.3 OWNER WITHDRAWAL FLOW
+--------------------------
+من لوحة المالك:
+1. فتح Owner Wallet.
+2. اختيار Withdraw Points.
+3. إدخال عدد النقاط أو المبلغ المراد سحبه.
+4. النظام يحسب القيمة تلقائيًا وفق:
+   USD = OwnerPoints / 30
+5. التحقق من:
+   - أن المستخدم هو OWNER/SUPER_ADMIN المصرح له.
+   - أن النقاط متاحة وليست Pending.
+   - أن الرصيد لا يصبح سالبًا.
+   - أن المبلغ >= 0.50 USD.
+6. إنشاء Withdrawal Request.
+7. حجز النقاط/نقلها إلى Pending Withdrawal بشكل Atomic.
+8. تنفيذ التسوية عبر Payment/Payout Provider حقيقي أو Settlement Adapter.
+9. انتظار Confirmation.
+10. عند نجاح التحويل:
+    - SETTLED/PAID.
+    - خصم النقاط نهائيًا من Owner Wallet.
+    - تسجيل مبلغ USD.
+    - تسجيل Provider Transaction ID أو Blockchain Transaction Hash عند توفره.
+11. عند الفشل:
+    - FAILED/REJECTED.
+    - إعادة النقاط المحجوزة إلى Available Balance دون تكرار.
+
+66.4 WITHDRAWAL STATES
+----------------------
+- REQUESTED.
+- PENDING.
+- PROCESSING.
+- PAID / SETTLED.
+- FAILED.
+- REJECTED.
+- CANCELLED.
+- REVERSED.
+
+66.5 WITHDRAWAL SECURITY
+------------------------
+- Owner-only authorization.
+- Re-authentication قبل السحب عند الحاجة.
+- Server-side conversion.
+- Idempotency Key لكل طلب.
+- Audit Log.
+- لا يمكن للواجهة تعديل سعر التحويل.
+- لا يمكن للواجهة إنشاء Withdrawal ناجح مباشرة.
+- لا يتم إعلان السحب Paid قبل Confirmation حقيقي.
+- منع Double Withdrawal.
+- منع Race Conditions.
+- Atomic Balance Reservation.
+- Rate Limiting.
+- Fraud/Abuse Checks عند الحاجة.
+
+66.6 WITHDRAWAL LEDGER
+----------------------
+كل عملية سحب تنشئ Ledger Entries واضحة:
+- POINTS_WITHDRAWAL_REQUESTED.
+- POINTS_RESERVED.
+- POINTS_DEBITED عند التسوية الناجحة.
+- PAYOUT_PENDING.
+- PAYOUT_SETTLED.
+- PAYOUT_FAILED.
+- POINTS_RETURNED عند الفشل.
+
+كل سجل يتضمن:
+- Withdrawal ID.
+- Owner ID.
+- Points Amount.
+- Conversion Rate.
+- USD Amount.
+- Currency.
+- Provider.
+- Provider Transaction ID.
+- Blockchain Hash عند توفره.
+- Status.
+- Created At.
+- Processed At.
+- Failure Reason عند وجوده.
+- Audit ID.
+
+66.7 OWNER WALLET UI
+--------------------
+داخل Owner Wallet يظهر:
+- Available Points.
+- Pending Points.
+- Withdrawable Points.
+- Current Conversion Rate: 30 Points = $1.
+- Minimum Withdrawal: 15 Points = $0.50.
+- USD Estimated Value.
+- Withdraw Button.
+- Withdrawal History.
+- Status لكل طلب.
+- Transaction ID/Hash عند توفره.
+
+66.8 ACCEPTANCE CRITERIA
+------------------------
+- المالك يستطيع طلب سحب النقاط من داخل الموقع.
+- أقل سحب = 0.50 USD = 15 نقطة.
+- 30 نقطة = 1 USD للمالك فقط.
+- النظام يرفض أي طلب أقل من 15 نقطة.
+- النظام يحسب القيمة Server-side.
+- لا يستطيع المستخدم العادي استخدام Owner Withdrawal.
+- لا يمكن خصم النقاط مرتين.
+- إذا فشل الدفع تعاد النقاط المحجوزة.
+- لا يتم تسجيل السحب كناجح قبل Confirmation حقيقي.
+- جميع عمليات السحب مسجلة في Owner Ledger وAuditLog.

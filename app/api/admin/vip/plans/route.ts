@@ -74,24 +74,6 @@ const updateSchema =
         .min(1)
         .max(100),
 
-    chatCredits:
-      z.number()
-        .int()
-        .min(0)
-        .max(1_000_000),
-
-    imageCredits:
-      z.number()
-        .int()
-        .min(0)
-        .max(1_000_000),
-
-    videoCredits:
-      z.number()
-        .int()
-        .min(0)
-        .max(1_000_000),
-
     active:
       z.boolean(),
 
@@ -279,15 +261,6 @@ export async function PATCH(
             new Prisma.Decimal(
               input.pointsMultiplier,
             ),
-
-          chatCredits:
-            input.chatCredits,
-
-          imageCredits:
-            input.imageCredits,
-
-          videoCredits:
-            input.videoCredits,
 
           active:
             input.active,

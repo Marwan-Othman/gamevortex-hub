@@ -25,7 +25,7 @@ export default async function OwnerControlCenter() {
     );
   }
 
-  const [users, games, publishedGames, products, orders, withdrawals, vipPlans, aiUsage, mobileGames, ownerWallet] = await Promise.all([
+  const [users, games, publishedGames, products, orders, withdrawals, vipPlans, mobileGames, ownerWallet] = await Promise.all([
     db.user.count(),
     db.game.count(),
     db.game.count({ where: { published: true } }),
@@ -33,15 +33,11 @@ export default async function OwnerControlCenter() {
     db.order.count(),
     db.withdrawalRequest.count(),
     db.vipPlan.count({ where: { active: true } }),
-    db.aiUsage.aggregate({ _sum: { amount: true } }),
     db.game.count({ where: { gamePlatforms: { some: { platform: { in: ["ANDROID", "IOS"] } } }, published: true } }),
     db.ownerWallet.findUnique({ where: { ownerId: owner.id }, select: { availablePoints: true, pendingPoints: true } }),
   ]);
 
   const integrations = [
-    ["OpenAI", Boolean(process.env.OPENAI_API_KEY), "/ai"],
-    ["fal.ai", Boolean(process.env.FAL_KEY), "/ai"],
-    ["MiniMax", Boolean(process.env.MINIMAX_API_KEY), "/ai"],
     ["RAWG Mobile Catalog", Boolean(process.env.RAWG_API_KEY), "/admin/games"],
     ["Payments", Boolean(process.env.PAYMENT_PROVIDER || process.env.PAYMENT_PROVIDER_BASE_URL), "/admin/errors"],
     ["Quran Provider", Boolean(process.env.QURAN_PROVIDER_BASE_URL || process.env.QURAN_PROVIDER_API_KEY), "/admin/quran"],
@@ -54,7 +50,6 @@ export default async function OwnerControlCenter() {
     ["VIP", "/vip", `${vipPlans} خطط نشطة`],
     ["المدفوعات والسحوبات", "/admin/errors", `${orders} طلب · ${withdrawals} سحب`],
     ["محفظة الأموال", "/wallet", "محفظة المستخدم المالية"],
-    ["الذكاء الاصطناعي", "/ai", `${aiUsage._sum.amount ?? 0} عملية مسجلة`],
     ["القرآن", "/admin/quran", "إدارة المصادر والقراء"],
     ["المراجعة والمحتوى", "/admin/moderation", "بلاغات ومراجعة المحتوى"],
     ["السحوبات", "/admin/draws", "إدارة السحوبات"],

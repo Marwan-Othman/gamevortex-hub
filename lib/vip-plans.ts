@@ -30,9 +30,6 @@ export type VipPlan = {
   /** هل يمكن شراؤها. Free و Owner لا تُشترى. */
   readonly purchasable: boolean;
   readonly pointsMultiplier: number;
-  readonly chatCredits: number;
-  readonly imageCredits: number;
-  readonly videoCredits: number;
 };
 
 export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
@@ -47,9 +44,6 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: null,
     purchasable: false,
     pointsMultiplier: 1,
-    chatCredits: 100,
-    imageCredits: 10,
-    videoCredits: 2,
   },
   {
     code: "VIP_1M",
@@ -62,9 +56,6 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: 1,
     purchasable: true,
     pointsMultiplier: 1.25,
-    chatCredits: 500,
-    imageCredits: 50,
-    videoCredits: 5,
   },
   {
     code: "VIP_3M",
@@ -77,9 +68,6 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: 3,
     purchasable: true,
     pointsMultiplier: 1.5,
-    chatCredits: 1500,
-    imageCredits: 180,
-    videoCredits: 15,
   },
   {
     code: "VIP_6M",
@@ -92,9 +80,6 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: 6,
     purchasable: true,
     pointsMultiplier: 1.75,
-    chatCredits: 5000,
-    imageCredits: 500,
-    videoCredits: 40,
   },
   {
     code: "VIP_1Y",
@@ -107,9 +92,6 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: 12,
     purchasable: true,
     pointsMultiplier: 2,
-    chatCredits: 12000,
-    imageCredits: 1200,
-    videoCredits: 100,
   },
   {
     code: "OWNER",
@@ -122,9 +104,6 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: null,
     purchasable: false,
     pointsMultiplier: 1,
-    chatCredits: 0,
-    imageCredits: 0,
-    videoCredits: 0,
   },
 ]);
 
@@ -206,9 +185,6 @@ export type PublicVipPlan = {
   durationMonths: number | null;
   purchasable: boolean;
   pointsMultiplier: number;
-  chatCredits: number;
-  imageCredits: number;
-  videoCredits: number;
 };
 
 export function toPublicVipPlan(plan: VipPlan): PublicVipPlan {
@@ -224,8 +200,5 @@ export function toPublicVipPlan(plan: VipPlan): PublicVipPlan {
     durationMonths: plan.durationMonths,
     purchasable: plan.purchasable,
     pointsMultiplier: plan.pointsMultiplier,
-    chatCredits: plan.chatCredits,
-    imageCredits: plan.imageCredits,
-    videoCredits: plan.videoCredits,
   };
 }

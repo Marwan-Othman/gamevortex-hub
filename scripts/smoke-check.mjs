@@ -25,8 +25,6 @@ const required = [
   'components/marketplace/OrderHistory.tsx',
   'lib/digital-keys.ts',
   'prisma/migrations/20260820070000_digital_key_fulfillment/migration.sql',
-  'app/api/ai/chat/route.ts',
-  'lib/ai.ts',
   'lib/payouts.ts',
   'scripts/process-withdrawals.mjs',
   'app/api/reports/route.ts',

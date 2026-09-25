@@ -5,8 +5,6 @@ import {
   PaymentStatus,
 } from "@prisma/client";
 
-import { OWNER_AI_ENTITLEMENTS, hasOwnerAiAccess } from "@/lib/ai/entitlements";
-
 import { db } from "@/lib/prisma";
 import {
   addMonthsUtc,
@@ -215,7 +213,7 @@ async function notifyVipActivation(
  * - browser price
  * - browser duration
  * - browser multiplier
- * - browser AI credits
+ * - browser-facing VIP benefits
  *
  * Everything comes from the server-side VipPlan record.
  */
@@ -522,7 +520,7 @@ export async function activateVipSubscription(
  * expired / canceled / refunded
  *      -> new term starts now
  *
- * AI credits are reset to the purchased plan allowance.
+ * Subscription benefits are reset to the purchased plan allowance.
  */
 export async function renewVipSubscription(
   input: RenewVipInput,
@@ -1023,7 +1021,7 @@ export async function getVipSubscriptionStatus(
   /*
    * Owner VIP is derived from SUPER_ADMIN.
    */
-  if (hasOwnerAiAccess(user.role)) {
+  if (user.role === "SUPER_ADMIN") {
     return {
       isOwner: true,
       isVip: true,
@@ -1040,63 +1038,7 @@ export async function getVipSubscriptionStatus(
 
   const now = new Date();
 
-  const freeMonthStart =
-    new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        1,
-      ),
-    );
-
-  const freeUsage =
-    await db.aiUsage.groupBy({
-      by: ["type"],
-      where: {
-        userId,
-        subscriptionId: null,
-        createdAt: {
-          gte: freeMonthStart,
-        },
-      },
-      _sum: {
-        amount: true,
-      },
-    });
-
-  const freeUsed = {
-    CHAT: 0,
-    IMAGE: 0,
-    VIDEO: 0,
-  };
-
-  for (const row of freeUsage) {
-    const amount =
-      row._sum.amount ?? 0;
-
-    if (row.type === "CHAT") {
-      freeUsed.CHAT = amount;
-    } else if (row.type === "IMAGE") {
-      freeUsed.IMAGE = amount;
-    } else if (row.type === "VIDEO") {
-      freeUsed.VIDEO = amount;
-    }
-  }
-
-  const freeCredits = {
-    chat: Math.max(
-      0,
-      100 - freeUsed.CHAT,
-    ),
-    image: Math.max(
-      0,
-      10 - freeUsed.IMAGE,
-    ),
-    video: Math.max(
-      0,
-      2 - freeUsed.VIDEO,
-    ),
-  };
+  const freeCredits = { chat: 0, image: 0, video: 0 };
 
   const subscription =
     await db.vipSubscription.findFirst({

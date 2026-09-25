@@ -1,0 +1,50 @@
+{
+  "name": "gamevortex-hub",
+  "version": "10.4.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "postinstall": "prisma generate",
+    "build": "npm run db:generate && next build",
+    "build:production": "npm run production:validate",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:validate": "prisma validate",
+    "db:format": "prisma format",
+    "db:status": "prisma migrate status",
+    "test:smoke": "node scripts/smoke-check.mjs",
+    "validate:env": "node scripts/validate-env.mjs",
+    "production:validate": "npm run validate:env && npm run test:source && npm run db:validate && npm run db:generate && npm run db:migrate && npm run typecheck && next build && npm run test:smoke",
+    "production:start": "node scripts/start-production.mjs",
+    "production:seed": "node scripts/seed-production.mjs",
+    "db:backup": "sh scripts/backup-postgres.sh",
+    "payouts:process": "node scripts/process-withdrawals.mjs",
+    "production:bootstrap": "node scripts/bootstrap-production.mjs",
+    "test:source": "node scripts/source-integrity-check.mjs",
+    "fix:owner": "node scripts/fix-owner-conflict.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "6.12.0",
+    "next": "16.3.1",
+    "react": "19.1.8",
+    "react-dom": "19.1.8",
+    "zod": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.12.0",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "prisma": "6.12.0",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20.9.0 <23",
+    "npm": ">=10.0.0"
+  }
+}

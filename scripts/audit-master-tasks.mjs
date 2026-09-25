@@ -11,10 +11,6 @@ const hasModel = (name) => new RegExp(`^model\\s+${name}\\s*\\{`, 'm').test(mode
 const checks = [
   ['Authentication/session', exists('lib/auth.ts')],
   ['RBAC owner', exists('lib/auth.ts') && fs.readFileSync(path.join(root, 'lib/auth.ts'), 'utf8').includes('Role.SUPER_ADMIN')],
-  ['AI chat', route('ai/chat')],
-  ['AI image', route('ai/image')],
-  ['AI video', route('ai/video')],
-  ['AI conversations', route('ai/conversations')],
   ['Game search', route('search')],
   ['Recommendations', route('me/recommendations')],
   ['Marketplace', route('marketplace/products')],
@@ -34,8 +30,6 @@ const checks = [
   ['Follow model', hasModel('UserFollow')],
   ['Activity model', hasModel('Activity')],
   ['Notifications model', hasModel('Notification')],
-  ['AI usage model', hasModel('AiUsage')],
-  ['AI media jobs model', hasModel('AiMediaJob')],
   ['Audit log model', hasModel('AuditLog')],
 ];
 
@@ -45,8 +39,7 @@ for (const [name, ok] of checks) console.log(`${ok ? 'PASS' : 'CHECK'}  ${name}`
 
 console.log('\nExternal integrations require manual verification:');
 for (const key of [
-  'DATABASE_URL', 'AUTH_SECRET', 'APP_ORIGIN', 'OPENAI_API_KEY', 'FAL_KEY',
-  'MINIMAX_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
+  'DATABASE_URL', 'AUTH_SECRET', 'APP_ORIGIN', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
   'PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'STEAM_API_KEY', 'RAWG_API_KEY',
 ]) {
   console.log(`${process.env[key] ? 'SET' : 'NOT_SET'}  ${key}`);

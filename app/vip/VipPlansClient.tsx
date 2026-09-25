@@ -17,9 +17,6 @@ type Plan = {
   durationMonths: number | null;
   purchasable: boolean;
   pointsMultiplier: number;
-  chatCredits: number;
-  imageCredits: number;
-  videoCredits: number;
 };
 
 type Status = {
@@ -32,9 +29,6 @@ type Status = {
   expiresAt: string | null;
   points: number;
   pointsMultiplier: number;
-  chatCredits: number;
-  imageCredits: number;
-  videoCredits: number;
 };
 
 const PLAN_DESCRIPTIONS: Record<string, string> = {
@@ -42,16 +36,16 @@ const PLAN_DESCRIPTIONS: Record<string, string> = {
     "ابدأ مجانًا واستمتع بالميزات الأساسية داخل GameVortex Hub.",
 
   VIP_1M:
-    "خطة مناسبة لتجربة مزايا VIP والحصول على رصيد AI ونقاط أكثر.",
+    "خطة مناسبة لتجربة مزايا VIP والحصول على نقاط أكثر.",
 
   VIP_3M:
-    "ثلاثة أشهر من مزايا VIP مع رصيد AI أكبر ومضاعف نقاط أفضل.",
+    "ثلاثة أشهر من مزايا VIP ومضاعف نقاط أفضل.",
 
   VIP_6M:
     "خطة طويلة تمنحك رصيدًا أكبر ومضاعف نقاط قوي ومزايا حصرية.",
 
   VIP_1Y:
-    "تجربة VIP الكاملة لمدة سنة مع أعلى مضاعف نقاط ورصيد AI كبير.",
+    "تجربة VIP الكاملة لمدة سنة مع أعلى مضاعف نقاط ومزايا حصرية.",
 
   OWNER:
     "عضوية المالك الدائمة مع جميع مزايا VIP وصلاحيات المالك.",
@@ -127,20 +121,6 @@ function PointsIcon() {
   );
 }
 
-function AiIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className={styles.svg}
-    >
-      <rect x="4" y="5" width="16" height="14" rx="4" />
-      <path d="M8 11h.01M16 11h.01" />
-      <path d="M9 15c1.8 1.2 4.2 1.2 6 0" />
-      <path d="M8 5V3M16 5V3" />
-    </svg>
-  );
-}
 
 function GiftIcon() {
   return (
@@ -202,38 +182,10 @@ function getDurationLabel(plan: Plan) {
  * Owner VIP يستخدم قيمة رقمية كبيرة داخليًا لتمثيل
  * الاستخدام غير المحدود. لا نعرض هذه القيمة للمستخدم.
  */
-function formatCredits(
-  value: number,
-  unlimited = false,
-) {
-  if (unlimited) {
-    return "∞";
-  }
-
-  if (!Number.isFinite(value) || value < 0) {
-    return "0";
-  }
-
-  return value.toLocaleString("en-US");
-}
 
 function getFeatures(plan: Plan) {
-  const isOwner = plan.code === "OWNER";
-
   return [
     `مضاعف النقاط ×${plan.pointsMultiplier}`,
-    `${formatCredits(
-      plan.chatCredits,
-      isOwner,
-    )} رصيد AI Chat`,
-    `${formatCredits(
-      plan.imageCredits,
-      isOwner,
-    )} رصيد AI Image`,
-    `${formatCredits(
-      plan.videoCredits,
-      isOwner,
-    )} رصيد AI Video`,
     "مزايا VIP الحصرية",
   ];
 }
@@ -443,7 +395,7 @@ export default function VipPlansClient() {
           </h1>
 
           <p className={styles.heroText}>
-            احصل على نقاط أكثر، رصيد AI أكبر،
+            احصل على نقاط أكثر ومزايا حصرية،
             عروض حصرية، مكافآت خاصة وتجربة
             GameVortex أكثر تميزًا.
           </p>
@@ -458,14 +410,6 @@ export default function VipPlansClient() {
               <CrownIcon />
               اختر خطتك الآن
             </a>
-
-            <Link
-              href="/ai"
-              className={`${styles.secondaryButton} ${styles.largeButton}`}
-            >
-              <AiIcon />
-              اكتشف GameVortex AI
-            </Link>
           </div>
         </div>
 
@@ -485,7 +429,7 @@ export default function VipPlansClient() {
           >
             MORE REWARDS
             <br />
-            MORE AI
+            MORE VIP
             <br />
             MORE POSSIBILITIES
           </div>
@@ -503,17 +447,6 @@ export default function VipPlansClient() {
             <span>
               مضاعف نقاط حسب الباقة
             </span>
-          </div>
-        </div>
-
-        <div className={styles.benefit}>
-          <div className={styles.benefitIcon}>
-            <AiIcon />
-          </div>
-
-          <div>
-            <strong>AI Credits أكبر</strong>
-            <span>Chat و Image و Video</span>
           </div>
         </div>
 
@@ -603,39 +536,6 @@ export default function VipPlansClient() {
               <span>
                 مضاعف النقاط
               </span>
-            </div>
-
-            <div>
-              <strong>
-                {formatCredits(
-                  status.chatCredits,
-                  status.isOwner,
-                )}
-              </strong>
-
-              <span>Chat Credits</span>
-            </div>
-
-            <div>
-              <strong>
-                {formatCredits(
-                  status.imageCredits,
-                  status.isOwner,
-                )}
-              </strong>
-
-              <span>Image Credits</span>
-            </div>
-
-            <div>
-              <strong>
-                {formatCredits(
-                  status.videoCredits,
-                  status.isOwner,
-                )}
-              </strong>
-
-              <span>Video Credits</span>
             </div>
           </div>
         </section>
@@ -851,7 +751,6 @@ export default function VipPlansClient() {
           <div
             className={styles.ownerFeatures}
           >
-            <span>♾ استخدام AI</span>
             <span>♾ VIP دائم</span>
             <span>👑 جميع المزايا</span>
             <span>⚙️ صلاحيات المالك</span>
@@ -897,17 +796,6 @@ export default function VipPlansClient() {
             <p>
               احصل على مضاعف نقاط أعلى
               حسب باقتك.
-            </p>
-          </div>
-
-          <div className={styles.whyCard}>
-            <AiIcon />
-
-            <h3>AI أقوى</h3>
-
-            <p>
-              رصيد أكبر لـ Chat وImage
-              وVideo.
             </p>
           </div>
 

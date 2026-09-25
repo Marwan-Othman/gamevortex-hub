@@ -93,12 +93,6 @@ export async function GET(request: NextRequest) {
             )
               ? pointsMultiplier
               : 1,
-          chatCredits:
-            plan.chatCredits,
-          imageCredits:
-            plan.imageCredits,
-          videoCredits:
-            plan.videoCredits,
         };
       },
     ),

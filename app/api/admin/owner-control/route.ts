@@ -15,15 +15,14 @@ export async function GET(request: NextRequest) {
   if (blocked) return blocked;
   try {
     const owner = await requireOwner();
-    const [users, games, products, orders, payments, withdrawals, vipSubscriptions, aiUsage, errors, reports] = await Promise.all([
+    const [users, games, products, orders, payments, withdrawals, vipSubscriptions, errors, reports] = await Promise.all([
       db.user.count(), db.game.count(), db.gameProduct.count(), db.order.count(), db.payment.count(),
       db.withdrawalRequest.count({ where: { status: { in: ["REQUESTED", "PENDING", "PROCESSING"] } } }),
       db.vipSubscription.count({ where: { status: "ACTIVE" } }),
-      db.aiUsage.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
       db.systemError.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
       db.contentReport.count({ where: { status: "PENDING" } }),
     ]);
-    return NextResponse.json({ ok: true, owner: { id: owner.id, username: owner.username, email: owner.email, role: owner.role }, stats: { users, games, products, orders, payments, pendingWithdrawals: withdrawals, activeVip: vipSubscriptions, aiUsage24h: aiUsage, errors24h: errors, pendingReports: reports } });
+    return NextResponse.json({ ok: true, owner: { id: owner.id, username: owner.username, email: owner.email, role: owner.role }, stats: { users, games, products, orders, payments, pendingWithdrawals: withdrawals, activeVip: vipSubscriptions, errors24h: errors, pendingReports: reports } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "OWNER_CONTROL_FAILED";
     return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : 403 });

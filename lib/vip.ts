@@ -1,7 +1,6 @@
 import { Prisma, VipSubscriptionStatus } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getVipPlan, type VipPlanCode } from "@/lib/vip-plans";
-import { OWNER_AI_ENTITLEMENTS, hasOwnerAiAccess } from "@/lib/ai/entitlements";
 
 export type VipAccess = {
   isOwner: boolean;
@@ -65,7 +64,7 @@ export async function getVipAccess(
    * SUPER_ADMIN automatically receives permanent Owner VIP.
    * No expiresAt is required.
    */
-  if (hasOwnerAiAccess(user.role)) {
+  if (user.role === "SUPER_ADMIN") {
     return {
       isOwner: true,
       isVip: true,

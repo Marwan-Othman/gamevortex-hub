@@ -13,7 +13,6 @@ type Me = {
 const NAV_LINKS = [
   { href: "/games", label: "Games", icon: GameIcon },
   { href: "/vip", label: "VIP", icon: CrownIcon },
-  { href: "/ai", label: "AI", icon: AIIcon },
   { href: "/marketplace", label: "Store", icon: StoreIcon },
   { href: "/library", label: "Library", icon: LibraryIcon },
   { href: "/wallet", label: "Wallet", icon: WalletIcon },
@@ -60,16 +59,6 @@ function CrownIcon() {
   );
 }
 
-function AIIcon() {
-  return (
-    <Icon>
-      <rect x="4" y="4" width="16" height="16" rx="4" />
-      <path d="M9 9h.01M15 9h.01" />
-      <path d="M8 14c1.2 1.4 2.8 2 4 2s2.8-.6 4-2" />
-      <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2" />
-    </Icon>
-  );
-}
 
 function StoreIcon() {
   return (

@@ -43,8 +43,5 @@ if (production && process.env.PAYMENT_PROVIDER === 'hmac' && !process.env.PAYMEN
 if (production && process.env.PAYMENT_PROVIDER && process.env.PAYMENT_PROVIDER !== 'stripe' && process.env.PAYMENT_PROVIDER !== 'paypal' && process.env.PAYMENT_PROVIDER !== 'hmac') errors.push('PAYMENT_PROVIDER must be stripe, paypal, or hmac.');
 if (production && process.env.PAYMENT_PROVIDER && (!process.env.DIGITAL_KEY_ENCRYPTION_SECRET || process.env.DIGITAL_KEY_ENCRYPTION_SECRET.length < 32)) errors.push('DIGITAL_KEY_ENCRYPTION_SECRET must be at least 32 characters when payments are enabled.');
 if (production && process.env.RESEND_API_KEY && !process.env.EMAIL_FROM) errors.push('EMAIL_FROM is required when Resend email is enabled.');
-if (production && process.env.AI_PROVIDER_BASE_URL && !process.env.AI_PROVIDER_API_KEY) errors.push('AI_PROVIDER_API_KEY is required when AI_PROVIDER_BASE_URL is configured.');
-const leakedPublicAiKeys = ['NEXT_PUBLIC_OPENAI_API_KEY', 'NEXT_PUBLIC_FAL_KEY', 'NEXT_PUBLIC_MINIMAX_API_KEY', 'NEXT_PUBLIC_AI_PROVIDER_API_KEY'].filter((key) => process.env[key]);
-if (leakedPublicAiKeys.length) errors.push(`AI provider secrets must never use the NEXT_PUBLIC_ prefix (found: ${leakedPublicAiKeys.join(', ')}). Remove the NEXT_PUBLIC_ version — it would be exposed to the browser.`);
 if (errors.length) { console.error(errors.map((x) => `ERROR: ${x}`).join('\n')); process.exit(1); }
 console.log(`Environment validation: PASS (${production ? 'production' : 'development'})`);

@@ -47,21 +47,6 @@ const PopularIcon = (
   </svg>
 );
 
-const AIIcon = (
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-  >
-    <rect x="4" y="4" width="16" height="16" rx="4" />
-    <path d="M9 9h.01M15 9h.01" />
-    <path d="M8 14c1.2 1.4 2.8 2 4 2s2.8-.6 4-2" />
-    <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2" />
-  </svg>
-);
 
 const VIPIcon = (
   <svg
@@ -120,54 +105,19 @@ export default async function Home() {
 
       <CategoriesRow />
 
-      <section className={styles.aiVipSection} dir="rtl">
-        <div className={styles.aiVipGlow} />
-
-        <div className={styles.aiVipGrid}>
-          <Link href="/ai" className={styles.aiHomeCard}>
-            <div className={styles.homeCardIcon}>
-              {AIIcon}
-            </div>
-
-            <div className={styles.homeCardContent}>
-              <span className={styles.homeCardLabel}>
-                GAMEVORTEX AI
-              </span>
-
-              <h2>ذكاء اصطناعي لعالم الألعاب</h2>
-
-              <p>
-                تحدث مع GameVortex AI، اكتشف الألعاب واحصل على
-                المساعدة الذكية داخل المنصة.
-              </p>
-            </div>
-
-            <span className={styles.homeCardArrow}>
-              ←
-            </span>
-          </Link>
-
+      <section className={styles.vipHomeSection} dir="rtl">
+        <div className={styles.vipHomeGlow} />
+        <div className={styles.vipHomeGrid}>
           <Link href="/vip" className={styles.vipHomeCard}>
             <div className={styles.homeCardIcon}>
               {VIPIcon}
             </div>
-
             <div className={styles.homeCardContent}>
-              <span className={styles.homeCardLabel}>
-                GAMEVORTEX VIP
-              </span>
-
-              <h2>مزايا أكثر. نقاط أكثر. AI أكثر.</h2>
-
-              <p>
-                احصل على رصيد AI أكبر، مضاعفات نقاط ومزايا
-                حصرية مع باقات GameVortex VIP.
-              </p>
+              <span className={styles.homeCardLabel}>GAMEVORTEX VIP</span>
+              <h2>مزايا أكثر. نقاط أكثر.</h2>
+              <p>احصل على مضاعفات نقاط ومزايا حصرية مع باقات GameVortex VIP.</p>
             </div>
-
-            <span className={styles.homeCardArrow}>
-              ←
-            </span>
+            <span className={styles.homeCardArrow}>←</span>
           </Link>
         </div>
       </section>

@@ -113,9 +113,6 @@ describe('formatUsdCents / toPublicVipPlan', () => {
       durationMonths: 3,
       purchasable: true,
       pointsMultiplier: 1.5,
-      chatCredits: 1500,
-      imageCredits: 180,
-      videoCredits: 15,
     });
   });
 });
