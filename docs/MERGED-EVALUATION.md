@@ -48,7 +48,7 @@ This archive is a **merged foundation and implementation plan**, not a claim tha
 - Real payment provider.
 - Real payout/settlement provider and confirmation tracking.
 - Gift-card provider/inventory.
-- Real AI provider.
+- Reachable self-hosted GameVortex AI model runtime.
 - Steam integration when enabled.
 - Deal/price provider when enabled.
 - Full gaming social ecosystem.

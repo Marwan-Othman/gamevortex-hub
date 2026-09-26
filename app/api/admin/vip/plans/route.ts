@@ -74,6 +74,7 @@ const updateSchema =
         .min(1)
         .max(100),
 
+
     active:
       z.boolean(),
 
@@ -261,6 +262,7 @@ export async function PATCH(
             new Prisma.Decimal(
               input.pointsMultiplier,
             ),
+
 
           active:
             input.active,

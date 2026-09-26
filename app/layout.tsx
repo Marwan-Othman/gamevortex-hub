@@ -1,5 +1,7 @@
 import SiteHeader from "@/components/layout/SiteHeader";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import SiteFooter from "@/components/layout/SiteFooter";
+import PwaRegister from "@/components/pwa/PwaRegister";
 import "./styles.css";
 
 function getMetadataBase() {
@@ -26,7 +28,8 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#050313",
+  themeColor: "#071426",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -39,14 +42,13 @@ export default function RootLayout({
       <body>
         <SiteHeader />
 
-        <main>{children}</main>
+        <PwaRegister />
+
+        <main className="gv-app-main">{children}</main>
 
         <MobileBottomNav />
 
-        <footer className="gv-footer">
-          <strong>GAMEVORTEX HUB</strong>
-          <span>بوابتك الموحدة لجميع منصات الألعاب</span>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

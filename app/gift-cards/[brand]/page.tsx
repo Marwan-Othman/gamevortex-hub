@@ -12,6 +12,7 @@ import {
   splitCategoryName,
 } from "@/lib/gift-card-brands";
 import styles from "../gift-cards.module.css";
+import LocaleText from "@/components/ui/LocaleText";
 
 export const dynamic = "force-dynamic";
 
@@ -69,9 +70,9 @@ export default async function GiftCardBrandPage({
     });
 
   return (
-    <main className="wrap" dir="rtl">
+    <main className="wrap">
       <Link href="/gift-cards" className={styles.backLink}>
-        ← كل البطاقات
+        <LocaleText ar="← كل البطاقات" en="← All gift cards" />
       </Link>
 
       <div className={styles.brandHead} style={{ "--from": tint.from, "--to": tint.to } as CSSProperties}>
@@ -81,15 +82,15 @@ export default async function GiftCardBrandPage({
         <div>
           <h1>{brandName}</h1>
           <span className={styles.brandMeta}>
-            {regions.length} منطقة · {items.length} فئة
+            {regions.length} <LocaleText ar="منطقة" en="regions" /> · {items.length} <LocaleText ar="فئة" en="denominations" />
           </span>
         </div>
       </div>
 
-      <p className={styles.notice}>الشراء المباشر لهذه البطاقات سيتوفر قريبًا.</p>
+      <p className={styles.notice}><LocaleText ar="الشراء المباشر غير متاح حاليًا من هذه الصفحة." en="Direct purchases are not available from this page right now." /></p>
 
       {regions.length > 1 && (
-        <nav className={styles.regionNav} aria-label="المناطق">
+        <nav className={styles.regionNav} aria-label="Regions">
           {regions.map((region) => (
             <a key={region.code} href={`#region-${region.code}`} className={styles.regionChip}>
               {region.info.flag} {region.info.name}
@@ -104,7 +105,7 @@ export default async function GiftCardBrandPage({
             <h2>
               {region.info.flag} {region.info.name}
             </h2>
-            <span className="pill">{region.list.length} فئة</span>
+            <span className="pill">{region.list.length} <LocaleText ar="فئة" en="denominations" /></span>
           </div>
 
           <div className={styles.denomGrid}>

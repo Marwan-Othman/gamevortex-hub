@@ -24,6 +24,6 @@ Do not commit `.env.production`, owner passwords, API keys, payment secrets, or 
 ## Still requires real external providers
 - HTTPS reverse proxy/domain.
 - Payment provider credentials and webhook URL.
-- AI provider credentials.
+- Self-hosted GameVortex AI runtime and model weights, when chat is enabled.
 - Quran provider/license-approved audio sources.
 - Real payout provider before enabling owner withdrawals.

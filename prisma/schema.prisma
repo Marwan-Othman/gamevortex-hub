@@ -13,6 +13,12 @@ enum Role {
   USER
 }
 
+enum AuthProvider {
+  GOOGLE
+  APPLE
+  STEAM
+}
+
 enum PlatformType {
   PC
   PLAYSTATION
@@ -134,7 +140,90 @@ model User {
   vipSubscriptions VipSubscription[]
   vipRewardClaims VipRewardClaim[]
   vipPurchases VipPurchase[]
+  oauthAccounts OAuthAccount[]
 
+  conversations Conversation[]
+  gameVortexAiConversations GameVortexAiConversation[]
+}
+
+model OAuthAccount {
+  id String @id @default(cuid())
+  userId String
+  provider AuthProvider
+  providerAccountId String
+  email String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider])
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ChatMessageStatus {
+  PENDING
+  STREAMING
+  COMPLETE
+  STOPPED
+  ERROR
+}
+
+model Conversation {
+  id String @id @default(cuid())
+  userId String
+  title String @default("New Chat")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, createdAt])
+}
+
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  role ChatMessageRole
+  status ChatMessageStatus @default(COMPLETE)
+  content String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId, role, createdAt])
+}
+
+model GameVortexAiConversation {
+  id String @id @default(cuid())
+  userId String
+  title String @default("New conversation") @db.VarChar(100)
+  systemInstructions String? @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages GameVortexAiMessage[]
+  @@index([userId, updatedAt])
+}
+
+model GameVortexAiMessage {
+  id String @id @default(cuid())
+  conversationId String
+  role String @db.VarChar(16)
+  content String @db.Text
+  createdAt DateTime @default(now())
+  conversation GameVortexAiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  @@index([conversationId, createdAt])
 }
 
 model PointLedger {
@@ -317,9 +406,47 @@ model Game {
   entitlements Entitlement[]
   favorites FavoriteGame[]
   wishlists WishlistGame[]
+  gameCategories GameCategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id String @id @default(cuid())
+
+  slug String @unique
+  nameAr String
+  nameEn String
+
+  descriptionAr String?
+  descriptionEn String?
+
+  active Boolean @default(true)
+  sortOrder Int @default(0)
+
+  gameCategories GameCategory[]
+  appCategories AppCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+model GameCategory {
+  id String @id @default(cuid())
+
+  gameId String
+  categoryId String
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([gameId, categoryId])
+  @@index([categoryId, gameId])
 }
 
 model GamePlatform {
@@ -334,6 +461,62 @@ model GamePlatform {
 
   @@unique([gameId, platform])
   @@index([platform, gameId])
+}
+
+
+model App {
+  id String @id @default(cuid())
+  slug String @unique
+  nameAr String
+  nameEn String
+  descriptionAr String?
+  descriptionEn String?
+  developer String?
+  publisher String?
+  iconUrl String?
+  coverUrl String?
+  officialUrl String?
+  downloadSource String?
+  sourceStatus SourceStatus @default(NEEDS_SOURCE)
+  sourceProvider String?
+  priceCents Int @default(0)
+  discountPercent Int @default(0)
+  ratingAverage Float @default(0)
+  ratingCount Int @default(0)
+  viewCount Int @default(0)
+  downloadCount Int @default(0)
+  published Boolean @default(false)
+  featured Boolean @default(false)
+  appPlatforms AppPlatform[]
+  appCategories AppCategory[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, featured])
+  @@index([sourceStatus])
+}
+
+model AppPlatform {
+  id String @id @default(cuid())
+  appId String
+  platform PlatformType
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([appId, platform])
+  @@index([platform, appId])
+}
+
+model AppCategory {
+  id String @id @default(cuid())
+  appId String
+  categoryId String
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([appId, categoryId])
+  @@index([categoryId, appId])
 }
 
 model Review {
@@ -1094,9 +1277,6 @@ model VipPlan {
 
   pointsMultiplier Decimal @default(1.0) @db.Decimal(5,2)
 
-  chatCredits Int @default(0)
-  imageCredits Int @default(0)
-  videoCredits Int @default(0)
 
   active Boolean @default(true)
   sortOrder Int @default(0)
@@ -1125,9 +1305,6 @@ model VipSubscription {
   provider String?
   providerSubscriptionId String?
 
-  chatCredits Int @default(0)
-  imageCredits Int @default(0)
-  videoCredits Int @default(0)
 
   lastRewardAt DateTime?
   nextRewardAt DateTime?
@@ -1179,9 +1356,6 @@ model VipReward {
   nameEn String
 
   points Int @default(0)
-  chatCredits Int @default(0)
-  imageCredits Int @default(0)
-  videoCredits Int @default(0)
 
   active Boolean @default(true)
   metadata Json?
@@ -1203,9 +1377,6 @@ model VipRewardClaim {
   subscriptionId String?
 
   points Int @default(0)
-  chatCredits Int @default(0)
-  imageCredits Int @default(0)
-  videoCredits Int @default(0)
 
   idempotencyKey String @unique
   claimedAt DateTime @default(now())
@@ -1243,8 +1414,3 @@ model VipPurchase {
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
-
-
-
-
-

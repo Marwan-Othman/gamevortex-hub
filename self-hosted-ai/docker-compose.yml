@@ -1,0 +1,27 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NO_CLOUD: "1"
+    expose:
+      - "11434"
+    volumes:
+      - gamevortex_ollama_models:/root/.ollama
+
+  ai-gateway:
+    build: .
+    restart: unless-stopped
+    environment:
+      GAMEVORTEX_AI_GATEWAY_PORT: 8081
+      GAMEVORTEX_AI_RUNTIME_TOKEN: ${GAMEVORTEX_AI_RUNTIME_TOKEN:?Set GAMEVORTEX_AI_RUNTIME_TOKEN in self-hosted-ai/.env}
+      GAMEVORTEX_AI_MODEL: ${GAMEVORTEX_AI_MODEL:-qwen3:1.7b}
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      - ollama
+    ports:
+      - "127.0.0.1:8081:8081"
+
+volumes:
+  gamevortex_ollama_models:

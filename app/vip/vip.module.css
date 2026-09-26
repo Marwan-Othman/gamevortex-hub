@@ -2,7 +2,7 @@
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 34px 0 80px;
-  color: #f7f8ff;
+  color: #fffaf7;
 }
 
 .svg {
@@ -24,23 +24,23 @@
   min-height: 430px;
   padding: 55px;
   overflow: hidden;
-  border: 1px solid rgba(171, 91, 255, 0.25);
+  border: 1px solid rgba(255, 253, 101, 0.25);
   border-radius: 30px;
   background:
     radial-gradient(
       circle at 85% 20%,
-      rgba(149, 68, 255, 0.26),
+      rgba(255, 243, 78, 0.26),
       transparent 32%
     ),
     radial-gradient(
       circle at 20% 100%,
-      rgba(36, 190, 255, 0.16),
+      rgba(255, 45, 87, 0.16),
       transparent 34%
     ),
     linear-gradient(
       135deg,
-      rgba(16, 18, 40, 0.97),
-      rgba(8, 10, 23, 0.98)
+      rgba(43, 26, 14, 0.97),
+      rgba(25, 14, 7, 0.98)
     );
   box-shadow:
     0 30px 80px rgba(0, 0, 0, 0.38),
@@ -54,7 +54,7 @@
   left: -80px;
   bottom: -110px;
   border-radius: 50%;
-  background: rgba(43, 206, 255, 0.15);
+  background: rgba(255, 52, 107, 0.15);
   filter: blur(60px);
   pointer-events: none;
 }
@@ -66,7 +66,7 @@
   right: 10%;
   top: -140px;
   border-radius: 50%;
-  background: rgba(169, 65, 255, 0.18);
+  background: rgba(246, 255, 75, 0.18);
   filter: blur(65px);
   pointer-events: none;
 }
@@ -81,10 +81,10 @@
   align-items: center;
   gap: 7px;
   padding: 7px 12px;
-  border: 1px solid rgba(183, 94, 255, 0.25);
+  border: 1px solid rgba(247, 255, 104, 0.25);
   border-radius: 999px;
-  color: #d2a5ff;
-  background: rgba(166, 74, 255, 0.08);
+  color: #ffffb2;
+  background: rgba(254, 255, 84, 0.08);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.2px;
@@ -99,14 +99,14 @@
 }
 
 .heroTitle span {
-  color: #b75aff;
-  text-shadow: 0 0 35px rgba(178, 83, 255, 0.25);
+  color: #f5ff64;
+  text-shadow: 0 0 35px rgba(247, 255, 93, 0.25);
 }
 
 .heroText {
   max-width: 650px;
   margin: 0;
-  color: #9da7bf;
+  color: #c6a8a0;
   font-size: 15px;
   line-height: 1.9;
 }
@@ -138,18 +138,18 @@
 
 .primaryButton {
   color: #fff;
-  border: 1px solid rgba(195, 111, 255, 0.35);
+  border: 1px solid rgba(244, 255, 122, 0.35);
   background: linear-gradient(
     135deg,
-    #7730ff,
-    #bd35ff
+    #ffe039,
+    #deff3e
   );
   box-shadow:
-    0 12px 30px rgba(126, 43, 255, 0.22);
+    0 12px 30px rgba(255, 233, 52, 0.22);
 }
 
 .secondaryButton {
-  color: #d7d9e6;
+  color: #ece3de;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
 }
@@ -161,11 +161,11 @@
 
 .primaryButton:hover {
   box-shadow:
-    0 17px 38px rgba(126, 43, 255, 0.3);
+    0 17px 38px rgba(255, 233, 52, 0.3);
 }
 
 .secondaryButton:hover {
-  border-color: rgba(180, 98, 255, 0.3);
+  border-color: rgba(252, 255, 109, 0.3);
 }
 
 .largeButton {
@@ -182,25 +182,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 208, 76, 0.22);
+  border: 1px solid rgba(86, 215, 255, 0.22);
   border-radius: 50%;
   background:
     radial-gradient(
       circle,
-      rgba(112, 58, 255, 0.19),
-      rgba(6, 9, 22, 0.2) 52%,
-      rgba(6, 8, 18, 0.03)
+      rgba(255, 213, 67, 0.19),
+      rgba(24, 11, 5, 0.2) 52%,
+      rgba(20, 10, 5, 0.03)
     );
   box-shadow:
-    0 0 70px rgba(116, 56, 255, 0.13),
-    inset 0 0 50px rgba(255, 201, 64, 0.05);
+    0 0 70px rgba(255, 217, 65, 0.13),
+    inset 0 0 50px rgba(74, 216, 255, 0.05);
 }
 
 .heroCrown::before {
   content: "";
   position: absolute;
   inset: 14px;
-  border: 1px solid rgba(255, 215, 93, 0.16);
+  border: 1px solid rgba(103, 217, 255, 0.16);
   border-radius: 50%;
 }
 
@@ -209,20 +209,20 @@
   inset: 34px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(167, 89, 255, 0.3);
+  border: 1px solid rgba(255, 250, 99, 0.3);
   border-radius: 50%;
-  background: rgba(7, 10, 25, 0.5);
+  background: rgba(27, 13, 6, 0.5);
   box-shadow:
-    0 0 45px rgba(144, 67, 255, 0.13),
-    inset 0 0 30px rgba(173, 74, 255, 0.08);
+    0 0 45px rgba(255, 239, 77, 0.13),
+    inset 0 0 30px rgba(247, 255, 84, 0.08);
 }
 
 .crownRing svg {
   width: 90px;
   height: 90px;
-  color: #ffd65a;
+  color: #64d8ff;
   filter: drop-shadow(
-    0 0 15px rgba(255, 210, 74, 0.3)
+    0 0 15px rgba(84, 212, 255, 0.3)
   );
 }
 
@@ -239,7 +239,7 @@
   position: absolute;
   z-index: 2;
   bottom: 37px;
-  color: #a3a9bd;
+  color: #c4afa7;
   font-size: 8px;
   font-weight: 900;
   line-height: 1.6;
@@ -254,7 +254,7 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 21px;
-  background: rgba(7, 10, 23, 0.75);
+  background: rgba(25, 12, 6, 0.75);
 }
 
 .benefit {
@@ -276,13 +276,13 @@
   height: 50px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(165, 80, 255, 0.2);
+  border: 1px solid rgba(255, 253, 90, 0.2);
   border-radius: 15px;
-  color: #b35cff;
-  background: rgba(145, 59, 255, 0.08);
+  color: #faff66;
+  background: rgba(255, 244, 68, 0.08);
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.04),
-    0 0 25px rgba(133, 51, 255, 0.06);
+    0 0 25px rgba(255, 236, 60, 0.06);
 }
 
 .benefitIcon svg {
@@ -302,7 +302,7 @@
 
 .benefit span {
   margin-top: 5px;
-  color: #7d879f;
+  color: #a6877f;
   font-size: 10px;
 }
 
@@ -312,32 +312,32 @@
   gap: 4px;
   margin-top: 16px;
   padding: 14px 16px;
-  border: 1px solid rgba(255, 91, 120, 0.2);
+  border: 1px solid rgba(101, 255, 151, 0.2);
   border-radius: 15px;
-  color: #ffb6c6;
-  background: rgba(255, 61, 104, 0.06);
+  color: #c3ffd4;
+  background: rgba(70, 255, 122, 0.06);
   font-size: 11px;
 }
 
 .errorBox strong {
-  color: #ff6c8d;
+  color: #77ff9c;
 }
 
 .accountCard {
   margin-top: 16px;
   padding: 22px;
-  border: 1px solid rgba(77, 198, 255, 0.17);
+  border: 1px solid rgba(255, 87, 117, 0.17);
   border-radius: 23px;
   background:
     radial-gradient(
       circle at 0% 50%,
-      rgba(58, 192, 255, 0.07),
+      rgba(255, 67, 101, 0.07),
       transparent 35%
     ),
     linear-gradient(
       135deg,
-      rgba(8, 15, 30, 0.96),
-      rgba(7, 11, 23, 0.97)
+      rgba(33, 11, 6, 0.96),
+      rgba(25, 11, 6, 0.97)
     );
   box-shadow:
     0 20px 55px rgba(0, 0, 0, 0.28),
@@ -353,7 +353,7 @@
 
 .smallLabel {
   display: block;
-  color: #7c87a1;
+  color: #a8867e;
   font-size: 10px;
   font-weight: 800;
 }
@@ -374,19 +374,19 @@
 }
 
 .ownerBadge {
-  color: #ffe17b;
-  border: 1px solid rgba(255, 202, 65, 0.3);
-  background: rgba(255, 202, 65, 0.08);
+  color: #86deff;
+  border: 1px solid rgba(75, 215, 255, 0.3);
+  background: rgba(75, 215, 255, 0.08);
 }
 
 .activeBadge {
-  color: #6cf2cf;
-  border: 1px solid rgba(60, 226, 178, 0.24);
-  background: rgba(60, 226, 178, 0.07);
+  color: #fe6adb;
+  border: 1px solid rgba(241, 53, 202, 0.24);
+  background: rgba(241, 53, 202, 0.07);
 }
 
 .freeBadge {
-  color: #9fa8bd;
+  color: #c4a9a3;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
@@ -432,7 +432,7 @@
 
 .accountStats span {
   margin-top: 4px;
-  color: #7f89a4;
+  color: #ab8b81;
   font-size: 11px;
 }
 
@@ -449,7 +449,7 @@
 }
 
 .sectionKicker {
-  color: #b66bff;
+  color: #feff76;
   font-size: 11px;
   font-weight: 1000;
   letter-spacing: 2px;
@@ -462,7 +462,7 @@
 
 .sectionHeading p {
   margin: 0;
-  color: #7f89a4;
+  color: #ab8b81;
   font-size: 14px;
 }
 
@@ -487,8 +487,8 @@
   background:
     linear-gradient(
       145deg,
-      rgba(15, 18, 34, 0.96),
-      rgba(8, 10, 21, 0.97)
+      rgba(37, 22, 14, 0.96),
+      rgba(23, 13, 7, 0.97)
     );
   box-shadow:
     0 18px 45px rgba(0, 0, 0, 0.25),
@@ -504,67 +504,67 @@
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: #7b8397;
+  background: #9d847d;
 }
 
 .planCard:hover {
   transform: translateY(-5px);
-  border-color: rgba(163, 90, 255, 0.25);
+  border-color: rgba(255, 246, 100, 0.25);
   box-shadow:
     0 25px 55px rgba(0, 0, 0, 0.35),
-    0 0 28px rgba(142, 59, 255, 0.06);
+    0 0 28px rgba(255, 241, 68, 0.06);
 }
 
 .currentPlan {
-  border-color: rgba(255, 210, 77, 0.23);
+  border-color: rgba(87, 213, 255, 0.23);
 }
 
 .free::before {
   background: linear-gradient(
     90deg,
-    #69758d,
-    #aab2c0
+    #957069,
+    #c6b2ae
   );
 }
 
 .bronze::before {
   background: linear-gradient(
     90deg,
-    #ff824d,
-    #ffb45a
+    #57ffdd,
+    #64f8ff
   );
 }
 
 .blue::before {
   background: linear-gradient(
     90deg,
-    #49c9ff,
-    #6f85ff
+    #ff5376,
+    #ffa87a
   );
 }
 
 .gold::before {
   background: linear-gradient(
     90deg,
-    #ffba36,
-    #ffe06c
+    #3fe1ff,
+    #77d8ff
   );
 }
 
 .purple::before {
   background: linear-gradient(
     90deg,
-    #9b45ff,
-    #ee59ff
+    #fff84f,
+    #c1ff63
   );
 }
 
 .owner::before {
   background: linear-gradient(
     90deg,
-    #ffb62e,
-    #fff09b,
-    #ffb62e
+    #37e1ff,
+    #a7e0ff,
+    #37e1ff
   );
 }
 
@@ -574,9 +574,9 @@
   inset-inline-end: 13px;
   padding: 5px 8px;
   border-radius: 999px;
-  color: #f7ddff;
-  background: rgba(174, 70, 255, 0.14);
-  border: 1px solid rgba(205, 108, 255, 0.28);
+  color: #faffeb;
+  background: rgba(244, 255, 80, 0.14);
+  border: 1px solid rgba(233, 255, 119, 0.28);
   font-size: 9px;
   font-weight: 900;
 }
@@ -602,7 +602,7 @@
 
 .planLabel {
   display: block;
-  color: #727c96;
+  color: #9d7d73;
   font-size: 9px;
   font-weight: 900;
 }
@@ -616,7 +616,7 @@
 .planDescription {
   min-height: 68px;
   margin: 17px 0 0;
-  color: #8d97ae;
+  color: #b59790;
   font-size: 11px;
   line-height: 1.7;
 }
@@ -634,7 +634,7 @@
 }
 
 .priceBlock span {
-  color: #7b859d;
+  color: #a4857d;
   font-size: 10px;
 }
 
@@ -649,7 +649,7 @@
   align-items: flex-start;
   gap: 7px;
   min-width: 0;
-  color: #c3c8d7;
+  color: #ddcec9;
   font-size: 10px;
   line-height: 1.5;
 }
@@ -661,9 +661,9 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: #54edc6;
-  background: rgba(57, 220, 175, 0.08);
-  border: 1px solid rgba(57, 220, 175, 0.18);
+  color: #fb50d1;
+  background: rgba(235, 50, 194, 0.08);
+  border: 1px solid rgba(235, 50, 194, 0.18);
 }
 
 .checkIcon {
@@ -694,14 +694,14 @@
 
 .planButton {
   color: #fff;
-  border: 1px solid rgba(181, 108, 255, 0.3);
+  border: 1px solid rgba(255, 255, 119, 0.3);
   background: linear-gradient(
     135deg,
-    rgba(115, 48, 255, 0.95),
-    rgba(180, 50, 255, 0.95)
+    rgba(255, 220, 57, 0.95),
+    rgba(229, 255, 59, 0.95)
   );
   box-shadow:
-    0 8px 25px rgba(120, 47, 255, 0.18);
+    0 8px 25px rgba(255, 225, 56, 0.18);
 }
 
 .planButton:hover {
@@ -714,7 +714,7 @@
 }
 
 .currentButton {
-  color: #8c96ac;
+  color: #b3958f;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.045);
 }
@@ -738,18 +738,18 @@
   margin-top: 16px;
   padding: 24px;
   overflow: hidden;
-  border: 1px solid rgba(255, 205, 62, 0.34);
+  border: 1px solid rgba(72, 211, 255, 0.34);
   border-radius: 23px;
   background:
     radial-gradient(
       circle at 0% 50%,
-      rgba(255, 192, 46, 0.1),
+      rgba(55, 215, 255, 0.1),
       transparent 35%
     ),
     linear-gradient(
       135deg,
-      rgba(48, 35, 10, 0.8),
-      rgba(18, 14, 7, 0.94)
+      rgba(7, 46, 53, 0.8),
+      rgba(6, 18, 20, 0.94)
     );
 }
 
@@ -759,9 +759,9 @@
   display: grid;
   place-items: center;
   border-radius: 20px;
-  color: #ffda61;
-  background: rgba(255, 198, 56, 0.08);
-  border: 1px solid rgba(255, 203, 70, 0.2);
+  color: #6cd8ff;
+  background: rgba(65, 214, 255, 0.08);
+  border: 1px solid rgba(80, 217, 255, 0.2);
 }
 
 .ownerIcon svg {
@@ -776,7 +776,7 @@
 }
 
 .ownerTitleRow span {
-  color: #ffd967;
+  color: #72dcff;
   font-size: 11px;
   font-weight: 1000;
   letter-spacing: 1.5px;
@@ -785,8 +785,8 @@
 .ownerTitleRow small {
   padding: 4px 7px;
   border-radius: 999px;
-  color: #1b1505;
-  background: #ffd451;
+  color: #03181e;
+  background: #5bd6ff;
   font-size: 8px;
   font-weight: 1000;
 }
@@ -799,7 +799,7 @@
 .ownerContent p {
   max-width: 760px;
   margin: 0;
-  color: #aaa17f;
+  color: #81a3b1;
   font-size: 11px;
   line-height: 1.7;
 }
@@ -814,9 +814,9 @@
 .ownerFeatures span {
   padding: 6px 8px;
   border-radius: 8px;
-  color: #cfc39b;
-  background: rgba(255, 211, 77, 0.05);
-  border: 1px solid rgba(255, 211, 77, 0.1);
+  color: #9ec8d7;
+  background: rgba(87, 213, 255, 0.05);
+  border: 1px solid rgba(87, 213, 255, 0.1);
   font-size: 9px;
 }
 
@@ -831,13 +831,13 @@
 }
 
 .ownerAccess strong {
-  color: #ffd75c;
+  color: #66d8ff;
   font-size: 24px;
 }
 
 .ownerAccess span {
   margin-top: 4px;
-  color: #938b6f;
+  color: #708e99;
   font-size: 9px;
 }
 
@@ -855,13 +855,13 @@
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 19px;
-  background: rgba(10, 13, 25, 0.8);
+  background: rgba(27, 14, 9, 0.8);
 }
 
 .whyCard > svg {
   width: 28px;
   height: 28px;
-  color: #b15dff;
+  color: #fcff67;
 }
 
 .whyCard h3 {
@@ -871,7 +871,7 @@
 
 .whyCard p {
   margin: 0;
-  color: #7f89a4;
+  color: #ab8b81;
   font-size: 11px;
   line-height: 1.7;
 }
@@ -883,9 +883,9 @@
   align-content: center;
   gap: 12px;
   padding: 40px;
-  border: 1px solid rgba(150, 83, 255, 0.18);
+  border: 1px solid rgba(255, 237, 93, 0.18);
   border-radius: 28px;
-  background: rgba(10, 12, 24, 0.88);
+  background: rgba(26, 15, 9, 0.88);
   text-align: center;
 }
 
@@ -895,7 +895,7 @@
 
 .loadingCard p {
   margin: 0;
-  color: #808aa2;
+  color: #a98a82;
 }
 
 .loadingOrb {
@@ -904,9 +904,9 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: #c56aff;
-  border: 1px solid rgba(197, 106, 255, 0.3);
-  background: rgba(164, 63, 255, 0.08);
+  color: #f0ff75;
+  border: 1px solid rgba(240, 255, 117, 0.3);
+  background: rgba(250, 255, 73, 0.08);
   animation: vipPulse 1.5s ease-in-out infinite;
 }
 
@@ -919,7 +919,7 @@
   50% {
     transform: scale(1.08);
     box-shadow:
-      0 0 40px rgba(167, 73, 255, 0.25);
+      0 0 40px rgba(252, 255, 83, 0.25);
   }
 }
 
@@ -990,7 +990,7 @@
     width: 100%;
     padding-top: 13px;
     border-top: 1px solid
-      rgba(255, 211, 77, 0.1);
+      rgba(87, 213, 255, 0.1);
   }
 
   .whyGrid {
@@ -1251,9 +1251,9 @@
 }
 
 
-.page{background:radial-gradient(700px 480px at 82% 0%,rgba(168,60,255,.13),transparent 60%),radial-gradient(650px 420px at 12% 55%,rgba(32,246,255,.07),transparent 60%),transparent!important}
-.hero{border-color:rgba(168,60,255,.2)!important;box-shadow:0 30px 90px rgba(0,0,0,.42),inset 0 1px rgba(255,255,255,.06)!important}
+.page{background:radial-gradient(700px 480px at 82% 0%,rgba(245, 255, 69, .13),transparent 60%),radial-gradient(650px 420px at 12% 55%,rgba(255, 41, 139, .07),transparent 60%),transparent!important}
+.hero{border-color:rgba(245, 255, 69, .2)!important;box-shadow:0 30px 90px rgba(0, 0, 0, .42),inset 0 1px rgba(255, 255, 255, .06)!important}
 .primaryButton{background:linear-gradient(135deg,var(--gv-purple),var(--gv-pink))!important;color:#fff!important}
-.benefits{border-color:rgba(168,60,255,.16)!important;background:rgba(6,9,17,.72)!important}
-.benefitIcon{color:var(--gv-cyan)!important;border-color:rgba(32,246,255,.18)!important;background:rgba(32,246,255,.055)!important}
+.benefits{border-color:rgba(245, 255, 69, .16)!important;background:rgba(19, 8, 5, .72)!important}
+.benefitIcon{color:var(--gv-cyan)!important;border-color:rgba(255, 41, 139, .18)!important;background:rgba(255, 41, 139, .055)!important}
 

@@ -1,5 +1,7 @@
 # GameVortex Hub — Master Task Implementation Status
 
+> **Historical snapshot:** this document predates the self-hosted AI runtime. Provider names and setup notes below describe an earlier state, not the current implementation. Use [`GAMEVORTEX_AI.md`](GAMEVORTEX_AI.md) for current AI deployment instructions.
+
 This archive is a source-code implementation pass over the uploaded GameVortex Hub V10.4 project.
 
 ## Implemented in this pass
@@ -20,8 +22,7 @@ The master plan contains 300 tasks. Several of those tasks require resources tha
 
 - Production/staging PostgreSQL and migration execution against that database.
 - Real Stripe/PayPal webhook verification and real-money transactions/refunds.
-- External AI provider credentials and provider-side quota/model availability.
-- fal.ai/MiniMax media jobs and provider callbacks.
+- A reachable self-hosted Ollama runtime and model weights for actual AI responses; see `GAMEVORTEX_AI.md` and `../self-hosted-ai/README.md`.
 - Exchange accounts/API credentials and live market data for trading.
 - Real paper/live trading execution and financial settlement.
 - Legal/compliance approval, Shariah review by a qualified reviewer, and production operational approval.

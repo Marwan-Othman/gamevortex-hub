@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import LanguageSwitcher from "@/components/ui/LanguageSwitcher";
 
 type Me = {
   username?: string | null;
@@ -11,7 +12,9 @@ type Me = {
 } | null;
 
 const NAV_LINKS = [
+  { href: "/ai", label: "GameVortex AI", icon: GameIcon },
   { href: "/games", label: "Games", icon: GameIcon },
+  { href: "/apps", label: "Apps", icon: GridIcon },
   { href: "/vip", label: "VIP", icon: CrownIcon },
   { href: "/marketplace", label: "Store", icon: StoreIcon },
   { href: "/library", label: "Library", icon: LibraryIcon },
@@ -45,6 +48,17 @@ function GameIcon() {
       <rect x="3" y="7" width="18" height="11" rx="4" />
       <path d="M7 11v4M5 13h4" />
       <path d="M16 12h.01M19 14h.01" />
+    </Icon>
+  );
+}
+
+function GridIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
     </Icon>
   );
 }
@@ -201,6 +215,14 @@ export default function SiteHeader() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [me, setMe] = useState<Me>(null);
+  const [language, setLanguage] = useState<"ar" | "en">("ar");
+
+  useEffect(() => {
+    const applyLanguage = () => setLanguage(localStorage.getItem("selectedLanguage") === "en" ? "en" : "ar");
+    applyLanguage();
+    window.addEventListener("gv-language-change", applyLanguage);
+    return () => window.removeEventListener("gv-language-change", applyLanguage);
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/me", {
@@ -263,6 +285,9 @@ export default function SiteHeader() {
   };
 
   const profileHref = "/profile/gamer";
+  const translateNav = (label: string) => language === "ar"
+    ? ({ Games: "الألعاب", Apps: "التطبيقات", VIP: "VIP", Store: "المتجر", Library: "المكتبة", Wallet: "المحفظة", Rewards: "المكافآت", Referrals: "الإحالات", Rank: "الترتيب", Quran: "القرآن", Profile: "الملف الشخصي", "GameVortex AI": "GameVortex AI", "الإدارة": "الإدارة" } as Record<string, string>)[label] || label
+    : ({ "GameVortex AI": "GameVortex AI", "الإدارة": "Admin" } as Record<string, string>)[label] || label;
 
   const publicNavLinks = isOwner
     ? [
@@ -274,6 +299,15 @@ export default function SiteHeader() {
         },
       ]
     : NAV_LINKS;
+
+  const desktopNavLinks = [
+    { href: "/", label: language === "ar" ? "اكتشف" : "Discover", icon: HomeIcon },
+    { href: "/games", label: language === "ar" ? "الألعاب" : "Games", icon: GameIcon },
+    { href: "/marketplace", label: language === "ar" ? "المتجر" : "Store", icon: StoreIcon },
+    { href: "/library", label: language === "ar" ? "المكتبة" : "Library", icon: LibraryIcon },
+    { href: "/vip", label: "VIP", icon: CrownIcon },
+    { href: "/ai", label: language === "ar" ? "الذكاء" : "AI", icon: GameIcon },
+  ];
 
   return (
     <>
@@ -308,17 +342,7 @@ export default function SiteHeader() {
             className="gv-desktop-nav"
             aria-label="التنقل الرئيسي"
           >
-            <Link
-              href="/"
-              className={`gv-nav-link ${
-                isActive("/") ? "is-active" : ""
-              }`}
-            >
-              <HomeIcon />
-              <span>الرئيسية</span>
-            </Link>
-
-            {publicNavLinks.map((link) => {
+            {desktopNavLinks.map((link) => {
               const IconComponent = link.icon;
 
               return (
@@ -339,6 +363,7 @@ export default function SiteHeader() {
           </nav>
 
           <div className="gv-header-actions">
+            <LanguageSwitcher />
             <Link
               href="/games"
               className="gv-icon-button"
@@ -379,7 +404,7 @@ export default function SiteHeader() {
                 className="gv-logout-button"
                 onClick={handleLogout}
               >
-                خروج
+                {language === "ar" ? "خروج" : "Sign out"}
               </button>
             ) : null}
           </div>
@@ -400,7 +425,7 @@ export default function SiteHeader() {
         }`}
         role="dialog"
         aria-modal="true"
-        aria-label="القائمة الرئيسية"
+        aria-label={language === "ar" ? "القائمة الرئيسية" : "Main menu"}
       >
         <div className="gv-drawer-top">
           <Link
@@ -421,7 +446,7 @@ export default function SiteHeader() {
           <button
             type="button"
             className="gv-close-button"
-            aria-label="إغلاق القائمة"
+            aria-label={language === "ar" ? "إغلاق القائمة" : "Close menu"}
             onClick={() => setIsOpen(false)}
           >
             <CloseIcon />
@@ -433,16 +458,16 @@ export default function SiteHeader() {
             GAMEVORTEX HUB
           </span>
 
-          <strong>عالم الألعاب بين يديك</strong>
+          <strong>{language === "ar" ? "عالم الألعاب بين يديك" : "Gaming at your fingertips"}</strong>
 
           <span>
-            اكتشف، العب، اجمع، وارتقِ بتجربتك.
+            {language === "ar" ? "اكتشف، العب، اجمع، وارتقِ بتجربتك." : "Discover, play, collect and level up."}
           </span>
         </div>
 
         <nav
           className="gv-drawer-nav"
-          aria-label="قائمة الهاتف"
+          aria-label={language === "ar" ? "قائمة الهاتف" : "Mobile navigation"}
         >
           <Link
             href="/"
@@ -455,7 +480,7 @@ export default function SiteHeader() {
               <HomeIcon />
             </span>
 
-            <span>الرئيسية</span>
+            <span>{language === "ar" ? "الرئيسية" : "Home"}</span>
           </Link>
 
           {publicNavLinks.map((link) => {
@@ -476,7 +501,7 @@ export default function SiteHeader() {
                   <IconComponent />
                 </span>
 
-                <span>{link.label}</span>
+                <span>{translateNav(link.label)}</span>
               </Link>
             );
           })}
@@ -488,7 +513,7 @@ export default function SiteHeader() {
             className="gv-drawer-logout"
             onClick={handleLogout}
           >
-            تسجيل الخروج
+            {language === "ar" ? "تسجيل الخروج" : "Sign out"}
           </button>
         ) : (
           <Link
@@ -496,7 +521,7 @@ export default function SiteHeader() {
             className="gv-drawer-logout gv-drawer-login"
             onClick={() => setIsOpen(false)}
           >
-            تسجيل الدخول
+            {language === "ar" ? "تسجيل الدخول" : "Sign in"}
           </Link>
         )}
       </aside>

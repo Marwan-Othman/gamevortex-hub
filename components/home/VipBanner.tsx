@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useLocale } from "@/components/ui/useLocale";
 import styles from "../../app/home.module.css";
 
 export default function VipBanner() {
+  const english = useLocale() === "en";
   return (
     <section className={styles.vip} aria-label="GameVortex VIP">
       <div className={styles.vipOrb} aria-hidden="true" />
@@ -12,15 +16,15 @@ export default function VipBanner() {
           GAMEVORTEX VIP
         </span>
 
-        <h2>ارتقِ بتجربتك إلى مستوى آخر</h2>
+        <h2>{english ? "Take your experience to the next level" : "ارتقِ بتجربتك إلى مستوى آخر"}</h2>
 
         <p>
-          مزايا حصرية وتجربة أكثر تميزًا داخل عالم GameVortex Hub.
+          {english ? "Exclusive perks and a better experience in the world of GameVortex Hub." : "مزايا حصرية وتجربة أكثر تميزًا داخل عالم GameVortex Hub."}
         </p>
       </div>
 
       <Link href="/vip" className={styles.vipBtn}>
-        اكتشف VIP
+        {english ? "Explore VIP" : "اكتشف VIP"}
 
         <svg
           width="17"

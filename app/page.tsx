@@ -8,6 +8,7 @@ import PlatformRow from "@/components/home/PlatformRow";
 import CategoriesRow from "@/components/home/CategoriesRow";
 import VipBanner from "@/components/home/VipBanner";
 import GameRow from "@/components/home/GameRow";
+import LocaleText from "@/components/ui/LocaleText";
 
 const NewestIcon = (
   <svg
@@ -64,7 +65,7 @@ const VIPIcon = (
 );
 
 export default async function Home() {
-  const [newest, rated, played] = await Promise.all([
+  const [newest, rated, played, apps] = await Promise.all([
     db.game.findMany({
       where: { published: true },
       orderBy: { createdAt: "desc" },
@@ -88,6 +89,12 @@ export default async function Home() {
       ],
       take: 10,
     }),
+
+    db.app.findMany({
+      where: { published: true },
+      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
+      take: 6,
+    }),
   ]);
 
   return (
@@ -105,6 +112,19 @@ export default async function Home() {
 
       <CategoriesRow />
 
+      <section className="wrap" style={{ paddingInline: 0 }}>
+        <div className="section-head"><div><span className="muted">GAMEVORTEX APP HUB</span><h2>التطبيقات</h2></div><Link href="/apps" className="btn secondary">عرض الكل</Link></div>
+        <div className="grid">
+          {apps.map((app) => (
+            <Link href={`/apps/${app.slug}`} className="glass card" key={app.id}>
+              <span className="badge">APP</span>
+              <h3>{app.nameAr}</h3>
+              <p className="muted">{app.nameEn}{app.developer ? ` · ${app.developer}` : ""}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className={styles.vipHomeSection} dir="rtl">
         <div className={styles.vipHomeGlow} />
         <div className={styles.vipHomeGrid}>
@@ -114,8 +134,8 @@ export default async function Home() {
             </div>
             <div className={styles.homeCardContent}>
               <span className={styles.homeCardLabel}>GAMEVORTEX VIP</span>
-              <h2>مزايا أكثر. نقاط أكثر.</h2>
-              <p>احصل على مضاعفات نقاط ومزايا حصرية مع باقات GameVortex VIP.</p>
+              <LocaleText as="h2" ar="مزايا أكثر. نقاط أكثر." en="More perks. More points." />
+              <LocaleText as="p" ar="احصل على مضاعفات نقاط ومزايا حصرية مع باقات GameVortex VIP." en="Earn bonus points and unlock exclusive perks with GameVortex VIP plans." />
             </div>
             <span className={styles.homeCardArrow}>←</span>
           </Link>

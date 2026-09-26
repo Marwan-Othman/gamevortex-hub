@@ -535,9 +535,6 @@ export async function POST(
                 provider:
                   provider.name,
 
-                chatCredits: 0,
-                imageCredits: 0,
-                videoCredits: 0,
               },
             });
 

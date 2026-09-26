@@ -4,6 +4,7 @@ import Link from "next/link";
 import { db } from "../../lib/prisma";
 import styles from "../home.module.css";
 import { GAME_PLATFORMS } from "../../lib/platforms";
+import LocaleText from "@/components/ui/LocaleText";
 
 export const metadata = {
   title: "التصنيفات | GameVortex Hub",
@@ -39,16 +40,15 @@ export default async function CategoriesPage() {
               GAMEVORTEX DISCOVERY
             </p>
 
-            <h1>استكشف الألعاب</h1>
+            <LocaleText as="h1" ar="استكشف الألعاب" en="Explore games" />
 
             <p className="muted">
-              اختر المنصة أو نوع اللعبة للوصول إلى
-              الألعاب التي تبحث عنها بسهولة.
+              <LocaleText as="span" ar="اختر المنصة أو نوع اللعبة للوصول إلى الألعاب التي تبحث عنها بسهولة." en="Choose a platform or genre to quickly find the games you are looking for." />
             </p>
           </div>
         </div>
 
-        <h2>المنصات</h2>
+        <LocaleText as="h2" ar="المنصات" en="Platforms" />
 
         <div className="grid">
           {GAME_PLATFORMS.map((platform) => (
@@ -81,7 +81,7 @@ export default async function CategoriesPage() {
                       margin: 0,
                     }}
                   >
-                    {platform.nameAr}
+                    <LocaleText ar={platform.nameAr} en={platform.nameEn} />
                   </h3>
 
                   <p
@@ -102,10 +102,10 @@ export default async function CategoriesPage() {
       <section className={styles.section}>
         <div className={styles.sectionHead}>
           <div>
-            <h2>التصنيفات</h2>
+            <LocaleText as="h2" ar="التصنيفات" en="Genres" />
 
             <p className="muted">
-              تصفح الألعاب حسب النوع.
+              <LocaleText ar="تصفح الألعاب حسب النوع." en="Browse games by genre." />
             </p>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default async function CategoriesPage() {
                     margin: "6px 0 0",
                   }}
                 >
-                  {genre._count._all} لعبة
+                  {genre._count._all} <LocaleText ar="لعبة" en="games" />
                 </p>
               </Link>
             );
@@ -148,7 +148,7 @@ export default async function CategoriesPage() {
 
           {!genres.length && (
             <p className="muted">
-              لا توجد تصنيفات متاحة حاليًا.
+              <LocaleText ar="لا توجد تصنيفات متاحة حاليًا." en="No genres are available right now." />
             </p>
           )}
         </div>

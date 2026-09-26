@@ -18,24 +18,24 @@ export default function WeeklyXpChart({ points, totalLabel }: { points: { label:
     <div className={styles.panel}>
       <div className={styles.panelHead}>
         <span>سجل النشاطات الأسبوعي</span>
-        <span style={{ color: "#a78bfa" }}>{totalLabel}</span>
+        <span style={{ color: "#ffe492" }}>{totalLabel}</span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="140" preserveAspectRatio="none">
         <defs>
           <linearGradient id="xpFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+            <stop offset="0%" stopColor="#ffdf5d" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#ffdf5d" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#xpFill)" />
-        <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="#ffe492" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         {coords.map((c) => (
-          <circle key={c.label} cx={c.x} cy={c.y} r="3" fill="#eef0fb" stroke="#8b5cf6" strokeWidth="1.5" />
+          <circle key={c.label} cx={c.x} cy={c.y} r="3" fill="#fcf2ed" stroke="#ffdf5d" strokeWidth="1.5" />
         ))}
       </svg>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
         {points.map((p) => (
-          <span key={p.label} style={{ fontSize: 10, color: "#9aa0c4" }}>{p.label}</span>
+          <span key={p.label} style={{ fontSize: 10, color: "#cbae9d" }}>{p.label}</span>
         ))}
       </div>
     </div>

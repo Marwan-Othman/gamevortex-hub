@@ -8,11 +8,12 @@
 | Gamer Profiles / Follow / Feed | IMPLEMENTED_CORE | E2E regression coverage |
 | Reviews / moderation | IMPLEMENTED_CORE | E2E + abuse testing |
 | Achievements / XP / rankings | IMPLEMENTED_CORE | Anti-abuse/anti-cheat rules |
-| Recommendations | IMPLEMENTED_CORE | Optional AI provider for advanced mode |
-| AI Assistant | PROVIDER_READY | Configure OpenAI-compatible provider |
-| AI Smart Search | PROVIDER_READY | Connect provider and ranking pipeline |
-| AI Recommendations | PROVIDER_READY | Connect provider and cost controls |
-| AI Moderation | PROVIDER_READY | Human review queue + provider |
+| Recommendations | IMPLEMENTED_CORE | Existing site ranking logic |
+| GameVortex AI Chat | SELF_HOSTED_RUNTIME | Run Ollama and install the configured local model |
+| GameVortex AI Image/Video | NOT_IMPLEMENTED | No media generation routes are present |
+| AI Smart Search | NOT_IMPLEMENTED | No AI search endpoint is present |
+| AI Recommendations | NOT_IMPLEMENTED | No provider integration is present |
+| AI Moderation | NOT_IMPLEMENTED | Use existing human moderation workflow |
 | Payments | IMPLEMENTED_PROVIDER | Configure Stripe or compatible provider |
 | Payment webhooks | IMPLEMENTED | Configure signing secret and provider webhook |
 | Owner Wallet | IMPLEMENTED_CORE | Financial reconciliation in operations |

@@ -458,14 +458,8 @@ async function refundVipPayment(
             status:
               VipSubscriptionStatus.REFUNDED,
 
-            chatCredits:
-              0,
 
-            imageCredits:
-              0,
 
-            videoCredits:
-              0,
 
             updatedAt:
               new Date(),

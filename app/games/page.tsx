@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "../../lib/prisma";
 import { vortexScore } from "../../lib/game-score";
+import LocaleText from "@/components/ui/LocaleText";
 import {
   GAME_PLATFORMS,
   normalizePlatform,
@@ -17,6 +18,8 @@ type Props = {
     platform?: string;
     genre?: string;
     sort?: string;
+    page?: string;
+    limit?: string;
   }>;
 };
 
@@ -32,9 +35,14 @@ export default async function Games({
   const genre = (params.genre || "")
     .trim()
     .slice(0, 60);
+  const pageParam = Number(params.page || "1");
+  const limitParam = Number(params.limit || "24");
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+  const limit = Number.isFinite(limitParam) && limitParam > 0 && limitParam <= 60 ? Math.floor(limitParam) : 24;
 
   const sort =
     params.sort === "popular" ||
+    params.sort === "views" ||
     params.sort === "newest"
       ? params.sort
       : "rating";
@@ -60,9 +68,16 @@ export default async function Games({
 
     ...(genre
       ? {
-          genre: {
-            equals: genre,
-            mode: "insensitive" as const,
+          gameCategories: {
+            some: {
+              category: {
+                OR: [
+                  { slug: genre.toLowerCase() },
+                  { nameEn: { equals: genre, mode: "insensitive" as const } },
+                  { nameAr: { equals: genre, mode: "insensitive" as const } },
+                ],
+              },
+            },
           },
         }
       : {}),
@@ -96,14 +111,15 @@ export default async function Games({
   const orderBy =
     sort === "popular"
       ? [
-          {
-            playCount: "desc" as const,
-          },
-          {
-            viewCount: "desc" as const,
-          },
+          { playCount: "desc" as const },
+          { viewCount: "desc" as const },
         ]
-      : sort === "newest"
+      : sort === "views"
+        ? [
+            { viewCount: "desc" as const },
+            { playCount: "desc" as const },
+          ]
+        : sort === "newest"
         ? [
             {
               createdAt: "desc" as const,
@@ -121,40 +137,28 @@ export default async function Games({
             },
           ];
 
-  const [games, genres] = await Promise.all([
+  const [games, total, genres] = await Promise.all([
     db.game.findMany({
       where,
       orderBy,
-      take: 60,
+      skip: (page - 1) * limit,
+      take: limit,
       include: {
         gamePlatforms: true,
+        gameCategories: { include: { category: true } },
       },
     }),
 
-    db.game.findMany({
-      where: {
-        published: true,
-      },
-      select: {
-        genre: true,
-      },
-      distinct: ["genre"],
-      orderBy: {
-        genre: "asc",
-      },
+    db.game.count({ where }),
+
+    db.category.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: "asc" }, { nameEn: "asc" }],
+      select: { slug: true, nameAr: true, nameEn: true },
     }),
   ]);
 
-  const genreValues = [
-    ...new Set(
-      genres
-        .map((item) => item.genre)
-        .filter(
-          (value): value is string =>
-            Boolean(value),
-        ),
-    ),
-  ];
+  const genreValues = genres;
 
   function buildPlatformHref(
     platformSlug?: string,
@@ -177,11 +181,26 @@ export default async function Games({
       search.set("sort", sort);
     }
 
+    if (page > 1) {
+      search.set("page", String(page));
+    }
+
     const query = search.toString();
 
     return query
       ? `/games?${query}`
       : "/games";
+  }
+
+  function buildPageHref(nextPage: number) {
+    const search = new URLSearchParams();
+    if (q) search.set("q", q);
+    if (normalizedPlatform) search.set("platform", normalizedPlatform);
+    if (genre) search.set("genre", genre);
+    if (sort !== "rating") search.set("sort", sort);
+    if (nextPage > 1) search.set("page", String(nextPage));
+    const query = search.toString();
+    return query ? `/games?${query}` : "/games";
   }
 
   return (
@@ -191,11 +210,10 @@ export default async function Games({
           DISCOVER GAMES
         </p>
 
-        <h1>اكتشف ألعابك القادمة</h1>
+        <LocaleText as="h1" ar="اكتشف ألعابك القادمة" en="Discover your next game" />
 
         <p>
-          اكتشف ألعابًا لجميع المنصات مع البحث
-          والفلترة والترتيب من الخادم وVortex Score.
+          <LocaleText as="span" ar="اكتشف ألعابًا لجميع المنصات مع البحث والفلترة والترتيب من الخادم وVortex Score." en="Explore games across platforms with server-side search, filters, sorting and Vortex Score." />
         </p>
 
         <div className="platform-list">
@@ -211,7 +229,7 @@ export default async function Games({
               🎮
             </span>
 
-            <span>كل المنصات</span>
+            <LocaleText ar="كل المنصات" en="All platforms" />
           </Link>
 
           {GAME_PLATFORMS.map((item) => {
@@ -232,12 +250,7 @@ export default async function Games({
                   {item.icon}
                 </span>
 
-                <span>
-                  {getPlatformName(
-                    item.slug,
-                    "ar",
-                  )}
-                </span>
+                <LocaleText ar={getPlatformName(item.slug, "ar")} en={getPlatformName(item.slug, "en")} />
               </Link>
             );
           })}
@@ -253,7 +266,7 @@ export default async function Games({
             defaultValue={q}
             maxLength={80}
             placeholder="Search for games, genres..."
-            aria-label="بحث عن لعبة"
+            aria-label="Search for a game"
           />
 
           <div className="filter-row">
@@ -263,18 +276,16 @@ export default async function Games({
               defaultValue={
                 normalizedPlatform ?? ""
               }
-              aria-label="المنصة"
+              aria-label="Platform"
             >
-              <option value="">
-                كل المنصات
-              </option>
+              <LocaleText as="option" value="" ar="كل المنصات" en="All platforms" />
 
               {GAME_PLATFORMS.map((item) => (
                 <option
                   key={item.slug}
                   value={item.slug}
                 >
-                  {item.nameAr}
+                  <LocaleText as="option" value={item.slug} ar={item.nameAr} en={item.nameEn} />
                 </option>
               ))}
             </select>
@@ -283,18 +294,13 @@ export default async function Games({
               className="input"
               name="genre"
               defaultValue={genre}
-              aria-label="النوع"
+              aria-label="Genre"
             >
-              <option value="">
-                كل الأنواع
-              </option>
+              <LocaleText as="option" value="" ar="كل الأنواع" en="All genres" />
 
               {genreValues.map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
-                  {value}
+                <option key={value.slug} value={value.slug}>
+                  {value.nameEn}
                 </option>
               ))}
             </select>
@@ -303,26 +309,22 @@ export default async function Games({
               className="input"
               name="sort"
               defaultValue={sort}
-              aria-label="الترتيب"
+              aria-label="Sort order"
             >
-              <option value="rating">
-                الأعلى تقييمًا
-              </option>
+              <LocaleText as="option" value="rating" ar="الأعلى تقييمًا" en="Top rated" />
 
-              <option value="popular">
-                الأكثر لعبًا
-              </option>
+              <LocaleText as="option" value="popular" ar="الأكثر لعبًا" en="Most played" />
 
-              <option value="newest">
-                الأحدث
-              </option>
+              <LocaleText as="option" value="views" ar="الأكثر مشاهدة" en="Most viewed" />
+
+              <LocaleText as="option" value="newest" ar="الأحدث" en="Newest" />
             </select>
 
             <button
               className="btn"
               type="submit"
             >
-              بحث
+              <LocaleText ar="بحث" en="Search" />
             </button>
           </div>
         </form>
@@ -359,7 +361,7 @@ export default async function Games({
               </span>
             </div>
 
-            <h2>{game.titleAr}</h2>
+            <h2><LocaleText ar={game.titleAr} en={game.titleEn || game.titleAr} /></h2>
 
             <p>{game.titleEn}</p>
 
@@ -410,7 +412,7 @@ export default async function Games({
                           ),
                           "ar",
                         )
-                      : "متعدد المنصات"}
+                      : <LocaleText ar="متعدد المنصات" en="Multi-platform" />}
                   </span>
                 </span>
               )}
@@ -418,18 +420,34 @@ export default async function Games({
 
             <p className="muted">
               {game.genre || "Gaming"} ·{" "}
-              {game.playCount} لعب
+              {game.playCount} <LocaleText ar="لعب" en="plays" />
             </p>
           </Link>
         ))}
       </div>
 
+      {games.length > 0 && total > limit && (
+        <nav className="glass card" aria-label="Pagination" style={{ marginTop: "18px", display: "flex", gap: "10px", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+          {page > 1 && (
+            <Link className="btn" href={buildPageHref(page - 1)}>
+              <LocaleText ar="السابق" en="Previous" />
+            </Link>
+          )}
+          <span className="muted">{page} / {Math.ceil(total / limit)}</span>
+          {page < Math.ceil(total / limit) && (
+            <Link className="btn" href={buildPageHref(page + 1)}>
+              <LocaleText ar="التالي" en="Next" />
+            </Link>
+          )}
+        </nav>
+      )}
+
       {!games.length && (
         <section className="glass card">
-          <h2>لا توجد نتائج</h2>
+          <LocaleText as="h2" ar="لا توجد نتائج" en="No results" />
 
           <p className="muted">
-            جرّب تغيير البحث أو الفلاتر.
+            <LocaleText ar="جرّب تغيير البحث أو الفلاتر." en="Try changing your search or filters." />
           </p>
         </section>
       )}

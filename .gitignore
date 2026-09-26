@@ -1,14 +1,23 @@
-node_modules
-.next
+# Environment secrets (keep checked-in examples)
 .env
-.env.local
-.env.*.local
-.env.production
-.env.development
-.env.test
-backups/
+.env.*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
 
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
 *.tsbuildinfo
 
-.vercel
-.env.vercel*
+# Deployment/local tooling
+.vercel/
+.turbo/
+.DS_Store
+*.log
+*.zip

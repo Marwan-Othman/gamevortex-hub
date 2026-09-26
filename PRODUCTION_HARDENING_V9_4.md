@@ -8,7 +8,7 @@ This revision keeps the V9.3 application/data model and hardens the production p
 - Payment idempotency at `(provider, providerPaymentId)` database level.
 - Resend email adapter.
 - Steam Web API integration plus configurable Xbox/PlayStation HTTP adapters.
-- OpenAI-compatible server-side AI chat adapter with input limits and a security system prompt.
+- Historical AI implementation notes are superseded by the self-hosted GameVortex AI runtime in `docs/GAMEVORTEX_AI.md`.
 - Owner payout adapter and a safe batch payout processor with reservation/refund accounting.
 - Health endpoint with database and integration configuration visibility for private admin checks.
 - Dynamic game metadata/canonical URLs/Open Graph.
@@ -21,7 +21,7 @@ A source archive cannot invent provider credentials. To activate real external s
 - Stripe: `PAYMENT_PROVIDER=stripe`, `STRIPE_SECRET_KEY`, `PAYMENT_WEBHOOK_SECRET`.
 - Resend: `RESEND_API_KEY`, `EMAIL_FROM`.
 - Steam: `STEAM_API_KEY`.
-- AI: `AI_PROVIDER_BASE_URL`, `AI_PROVIDER_API_KEY`, `AI_MODEL`.
+- GameVortex AI: use the self-hosted Ollama gateway settings documented in `docs/GAMEVORTEX_AI.md`.
 - Owner payout: `PAYOUT_PROVIDER`, `PAYOUT_PROVIDER_BASE_URL`, `PAYOUT_PROVIDER_SECRET`, and the destination wallet.
 - Multi-instance rate limiting: `RATE_LIMIT_STORE=upstash`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 

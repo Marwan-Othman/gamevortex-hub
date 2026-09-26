@@ -21,7 +21,7 @@ export default function PlatformDonutChart({
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <svg viewBox="0 0 100 100" width="130" height="130" style={{ flexShrink: 0 }}>
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="14" />
+          <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255, 255, 255, 0.06)" strokeWidth="14" />
           {segments.map((s) => {
             const fraction = s.value / total;
             const dash = fraction * circumference;
@@ -42,8 +42,8 @@ export default function PlatformDonutChart({
             offset += dash;
             return circle;
           })}
-          <text x="50" y="47" textAnchor="middle" fontSize="13" fontWeight="800" fill="#eef0fb">{centerValue}</text>
-          <text x="50" y="60" textAnchor="middle" fontSize="7" fill="#9aa0c4">{centerLabel}</text>
+          <text x="50" y="47" textAnchor="middle" fontSize="13" fontWeight="800" fill="#fcf2ed">{centerValue}</text>
+          <text x="50" y="60" textAnchor="middle" fontSize="7" fill="#cbae9d">{centerLabel}</text>
         </svg>
         <div className={styles.legendRow} style={{ flex: 1, marginTop: 0 }}>
           {segments.map((s) => (
@@ -53,7 +53,7 @@ export default function PlatformDonutChart({
               <strong>{total ? Math.round((s.value / total) * 100) : 0}%</strong>
             </div>
           ))}
-          {!segments.length && <span style={{ color: "#9aa0c4", fontSize: 11.5 }}>لا توجد مبيعات مدفوعة بعد.</span>}
+          {!segments.length && <span style={{ color: "#cbae9d", fontSize: 11.5 }}>لا توجد مبيعات مدفوعة بعد.</span>}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import styles from "./vip.module.css";
+import { useLocale } from "@/components/ui/useLocale";
 
 type Plan = {
   code: string;
@@ -31,24 +32,24 @@ type Status = {
   pointsMultiplier: number;
 };
 
-const PLAN_DESCRIPTIONS: Record<string, string> = {
+const PLAN_DESCRIPTIONS: Record<string, { ar: string; en: string }> = {
   FREE:
-    "ابدأ مجانًا واستمتع بالميزات الأساسية داخل GameVortex Hub.",
+    { ar: "ابدأ مجانًا واستمتع بالميزات الأساسية داخل GameVortex Hub.", en: "Start for free and enjoy the core GameVortex Hub features." },
 
   VIP_1M:
-    "خطة مناسبة لتجربة مزايا VIP والحصول على نقاط أكثر.",
+    { ar: "خطة مناسبة لتجربة مزايا VIP والحصول على نقاط أكثر.", en: "A great way to try VIP benefits and earn more points." },
 
   VIP_3M:
-    "ثلاثة أشهر من مزايا VIP ومضاعف نقاط أفضل.",
+    { ar: "ثلاثة أشهر من مزايا VIP ومضاعف نقاط أفضل.", en: "Three months of VIP benefits and a better points multiplier." },
 
   VIP_6M:
-    "خطة طويلة تمنحك رصيدًا أكبر ومضاعف نقاط قوي ومزايا حصرية.",
+    { ar: "خطة طويلة تمنحك رصيدًا أكبر ومضاعف نقاط قوي ومزايا حصرية.", en: "A longer plan with more credits, a stronger points multiplier and exclusive benefits." },
 
   VIP_1Y:
-    "تجربة VIP الكاملة لمدة سنة مع أعلى مضاعف نقاط ومزايا حصرية.",
+    { ar: "تجربة VIP الكاملة لمدة سنة مع أعلى مضاعف نقاط ومزايا حصرية.", en: "A full year of VIP with the highest points multiplier and exclusive benefits." },
 
   OWNER:
-    "عضوية المالك الدائمة مع جميع مزايا VIP وصلاحيات المالك.",
+    { ar: "عضوية المالك الدائمة مع جميع مزايا VIP وصلاحيات المالك.", en: "Permanent owner membership with VIP benefits and owner permissions." },
 };
 
 const PLAN_ACCENTS: Record<string, string> = {
@@ -60,13 +61,13 @@ const PLAN_ACCENTS: Record<string, string> = {
   OWNER: styles.owner,
 };
 
-const PLAN_LABELS: Record<string, string> = {
-  FREE: "البداية",
-  VIP_1M: "شهر واحد",
-  VIP_3M: "3 أشهر",
-  VIP_6M: "6 أشهر",
-  VIP_1Y: "سنة كاملة",
-  OWNER: "للمالك فقط",
+const PLAN_LABELS: Record<string, { ar: string; en: string }> = {
+  FREE: { ar: "البداية", en: "Starter" },
+  VIP_1M: { ar: "شهر واحد", en: "1 month" },
+  VIP_3M: { ar: "3 أشهر", en: "3 months" },
+  VIP_6M: { ar: "6 أشهر", en: "6 months" },
+  VIP_1Y: { ar: "سنة كاملة", en: "1 year" },
+  OWNER: { ar: "للمالك فقط", en: "Owner only" },
 };
 
 function makeIdempotencyKey() {
@@ -162,20 +163,20 @@ function ArrowIcon() {
   );
 }
 
-function getDurationLabel(plan: Plan) {
+function getDurationLabel(plan: Plan, english: boolean) {
   if (!plan.durationMonths) {
-    return "بدون مدة";
+    return english ? "No expiry" : "بدون مدة";
   }
 
   if (plan.durationMonths === 1) {
-    return "شهري";
+    return english ? "Monthly" : "شهري";
   }
 
   if (plan.durationMonths === 12) {
-    return "سنوي";
+    return english ? "Yearly" : "سنوي";
   }
 
-  return `${plan.durationMonths} أشهر`;
+  return english ? `${plan.durationMonths} months` : `${plan.durationMonths} أشهر`;
 }
 
 /**
@@ -183,14 +184,15 @@ function getDurationLabel(plan: Plan) {
  * الاستخدام غير المحدود. لا نعرض هذه القيمة للمستخدم.
  */
 
-function getFeatures(plan: Plan) {
+function getFeatures(plan: Plan, english: boolean) {
   return [
-    `مضاعف النقاط ×${plan.pointsMultiplier}`,
-    "مزايا VIP الحصرية",
+    english ? `Points multiplier ×${plan.pointsMultiplier}` : `مضاعف النقاط ×${plan.pointsMultiplier}`,
+    english ? "Exclusive VIP benefits" : "مزايا VIP الحصرية",
   ];
 }
 
 export default function VipPlansClient() {
+  const english = useLocale() === "en";
   const [plans, setPlans] = useState<Plan[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
@@ -355,9 +357,7 @@ export default function VipPlansClient() {
 
           <h1>GameVortex VIP</h1>
 
-          <p>
-            جارٍ تحميل الباقات والمزايا...
-          </p>
+          <p>{english ? "Loading plans and benefits…" : "جارٍ تحميل الباقات والمزايا..."}</p>
         </section>
       </main>
     );
@@ -373,7 +373,8 @@ export default function VipPlansClient() {
   return (
     <main
       className={styles.page}
-      dir="rtl"
+      lang={english ? "en" : "ar"}
+      dir={english ? "ltr" : "rtl"}
     >
       <section className={styles.hero}>
         <div
@@ -395,9 +396,7 @@ export default function VipPlansClient() {
           </h1>
 
           <p className={styles.heroText}>
-            احصل على نقاط أكثر ومزايا حصرية،
-            عروض حصرية، مكافآت خاصة وتجربة
-            GameVortex أكثر تميزًا.
+            {english ? "Earn more points, unlock exclusive benefits and enjoy special rewards across GameVortex." : "احصل على نقاط أكثر ومزايا حصرية، عروض حصرية، مكافآت خاصة وتجربة GameVortex أكثر تميزًا."}
           </p>
 
           <div
@@ -408,7 +407,7 @@ export default function VipPlansClient() {
               className={`${styles.primaryButton} ${styles.largeButton}`}
             >
               <CrownIcon />
-              اختر خطتك الآن
+              {english ? "Choose your plan" : "اختر خطتك الآن"}
             </a>
           </div>
         </div>
@@ -443,9 +442,9 @@ export default function VipPlansClient() {
           </div>
 
           <div>
-            <strong>نقاط أكثر</strong>
+            <strong>{english ? "More points" : "نقاط أكثر"}</strong>
             <span>
-              مضاعف نقاط حسب الباقة
+              {english ? "A points multiplier for your plan" : "مضاعف نقاط حسب الباقة"}
             </span>
           </div>
         </div>
@@ -456,8 +455,8 @@ export default function VipPlansClient() {
           </div>
 
           <div>
-            <strong>مكافآت حصرية</strong>
-            <span>عروض ومكافآت VIP</span>
+            <strong>{english ? "Exclusive rewards" : "مكافآت حصرية"}</strong>
+            <span>{english ? "VIP offers and rewards" : "عروض ومكافآت VIP"}</span>
           </div>
         </div>
 
@@ -467,9 +466,9 @@ export default function VipPlansClient() {
           </div>
 
           <div>
-            <strong>تجربة مميزة</strong>
+            <strong>{english ? "A premium experience" : "تجربة مميزة"}</strong>
             <span>
-              مزايا خاصة لأعضاء VIP
+              {english ? "Special perks for VIP members" : "مزايا خاصة لأعضاء VIP"}
             </span>
           </div>
         </div>
@@ -480,7 +479,7 @@ export default function VipPlansClient() {
           className={styles.errorBox}
           role="alert"
         >
-          <strong>حدث خطأ</strong>
+          <strong>{english ? "Something went wrong" : "حدث خطأ"}</strong>
           <span>{error}</span>
         </section>
       ) : null}
@@ -496,7 +495,7 @@ export default function VipPlansClient() {
               <span
                 className={styles.smallLabel}
               >
-                عضويتك الحالية
+                {english ? "Current membership" : "عضويتك الحالية"}
               </span>
 
               <h2>
@@ -534,7 +533,7 @@ export default function VipPlansClient() {
               </strong>
 
               <span>
-                مضاعف النقاط
+                {english ? "Points multiplier" : "مضاعف النقاط"}
               </span>
             </div>
           </div>
@@ -556,12 +555,11 @@ export default function VipPlansClient() {
             </span>
 
             <h2>
-              اختر الباقة المناسبة لك
+              {english ? "Choose the plan that fits you" : "اختر الباقة المناسبة لك"}
             </h2>
 
             <p>
-              كلما ارتفعت الباقة، تحصل على
-              رصيد ومزايا أكثر.
+              {english ? "Higher plans include more credits and benefits." : "كلما ارتفعت الباقة، تحصل على رصيد ومزايا أكثر."}
             </p>
           </div>
         </div>
@@ -580,8 +578,7 @@ export default function VipPlansClient() {
               PLAN_ACCENTS[plan.code] ||
               styles.purple;
 
-            const features =
-              getFeatures(plan);
+            const features = getFeatures(plan, english);
 
             return (
               <article
@@ -619,13 +616,11 @@ export default function VipPlansClient() {
                         styles.planLabel
                       }
                     >
-                      {PLAN_LABELS[
-                        plan.code
-                      ] || "VIP"}
+                      {PLAN_LABELS[plan.code]?.[english ? "en" : "ar"] || "VIP"}
                     </span>
 
                     <h3>
-                      {plan.nameAr}
+                      {english ? plan.nameEn : plan.nameAr}
                     </h3>
                   </div>
                 </div>
@@ -635,10 +630,7 @@ export default function VipPlansClient() {
                     styles.planDescription
                   }
                 >
-                  {PLAN_DESCRIPTIONS[
-                    plan.code
-                  ] ||
-                    "استمتع بمزايا GameVortex VIP."}
+                  {PLAN_DESCRIPTIONS[plan.code]?.[english ? "en" : "ar"] || (english ? "Enjoy GameVortex VIP benefits." : "استمتع بمزايا GameVortex VIP.")}
                 </p>
 
                 <div
@@ -651,7 +643,7 @@ export default function VipPlansClient() {
                   </strong>
 
                   <span>
-                    {getDurationLabel(plan)}
+                    {getDurationLabel(plan, english)}
                   </span>
                 </div>
 
@@ -705,12 +697,12 @@ export default function VipPlansClient() {
                 >
                   {busyPlan ===
                   plan.code
-                    ? "جارٍ التحويل للدفع..."
+                    ? (english ? "Redirecting to checkout…" : "جارٍ التحويل للدفع...")
                     : isCurrent
-                      ? "خطتك الحالية"
+                      ? (english ? "Current plan" : "خطتك الحالية")
                       : plan.purchasable
-                        ? "اشترك الآن"
-                        : "مجاني"}
+                        ? (english ? "Subscribe now" : "اشترك الآن")
+                        : (english ? "Free" : "مجاني")}
 
                   {!isCurrent &&
                   plan.purchasable ? (
@@ -739,33 +731,31 @@ export default function VipPlansClient() {
           </div>
 
           <h2>
-            عضوية المالك الدائمة
+            {english ? "Permanent owner membership" : "عضوية المالك الدائمة"}
           </h2>
 
           <p>
-            مخصصة لحساب SUPER_ADMIN فقط.
-            تشمل جميع مزايا VIP مع الوصول
-            إلى صلاحيات المالك والميزات الخاصة.
+            {english ? "For SUPER_ADMIN accounts only. Includes VIP benefits and owner permissions." : "مخصصة لحساب SUPER_ADMIN فقط. تشمل جميع مزايا VIP مع الوصول إلى صلاحيات المالك والميزات الخاصة."}
           </p>
 
           <div
             className={styles.ownerFeatures}
           >
-            <span>♾ VIP دائم</span>
-            <span>👑 جميع المزايا</span>
-            <span>⚙️ صلاحيات المالك</span>
+            <span>{english ? "♾ Lifetime VIP" : "♾ VIP دائم"}</span>
+            <span>{english ? "👑 All benefits" : "👑 جميع المزايا"}</span>
+            <span>{english ? "⚙️ Owner permissions" : "⚙️ صلاحيات المالك"}</span>
           </div>
         </div>
 
         <div
           className={styles.ownerAccess}
         >
-          <strong>مجاني</strong>
+          <strong>{english ? "Free" : "مجاني"}</strong>
 
           <span>
             {status?.isOwner
-              ? "تم تفعيل Owner VIP"
-              : "مخصص للمالك"}
+              ? (english ? "Owner VIP is active" : "تم تفعيل Owner VIP")
+              : (english ? "Owner only" : "مخصص للمالك")}
           </span>
         </div>
       </section>
@@ -782,7 +772,7 @@ export default function VipPlansClient() {
             </span>
 
             <h2>
-              لماذا GameVortex VIP؟
+              {english ? "Why GameVortex VIP?" : "لماذا GameVortex VIP؟"}
             </h2>
           </div>
         </div>
@@ -791,33 +781,30 @@ export default function VipPlansClient() {
           <div className={styles.whyCard}>
             <PointsIcon />
 
-            <h3>اكسب أكثر</h3>
+            <h3>{english ? "Earn more" : "اكسب أكثر"}</h3>
 
             <p>
-              احصل على مضاعف نقاط أعلى
-              حسب باقتك.
+              {english ? "Get a higher points multiplier with your plan." : "احصل على مضاعف نقاط أعلى حسب باقتك."}
             </p>
           </div>
 
           <div className={styles.whyCard}>
             <GiftIcon />
 
-            <h3>مكافآت خاصة</h3>
+            <h3>{english ? "Special rewards" : "مكافآت خاصة"}</h3>
 
             <p>
-              عروض ومكافآت مخصصة لأعضاء
-              VIP.
+              {english ? "Offers and rewards for VIP members." : "عروض ومكافآت مخصصة لأعضاء VIP."}
             </p>
           </div>
 
           <div className={styles.whyCard}>
             <SparkIcon />
 
-            <h3>تجربة مميزة</h3>
+            <h3>{english ? "A premium experience" : "تجربة مميزة"}</h3>
 
             <p>
-              مزايا حصرية داخل GameVortex
-              Hub.
+              {english ? "Exclusive benefits inside GameVortex Hub." : "مزايا حصرية داخل GameVortex Hub."}
             </p>
           </div>
         </div>

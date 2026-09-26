@@ -572,8 +572,8 @@ UI → Database → Backend → Authentication → Authorization → Transaction
 
 37. ADVANCED OWNER SETTINGS
 ===========================
-- AI Configuration وUsage Limits وRecommendation وModeration وBackground وAnimation وGlow وTheme وMobile Performance وNotifications وTrending وSearch وCache وFeature Flags وMaintenance وSecurity وAudit Settings.
-- عدم عرض API Keys كاملة.
+- Model runtime status وBackground وAnimation وGlow وTheme وMobile Performance وNotifications وTrending وSearch وCache وFeature Flags وMaintenance وSecurity وAudit Settings.
+- إبقاء إعدادات اتصال GameVortex AI سرية وعلى الخادم فقط.
 - حماية Server-side وتسجيل Audit Log.
 
 38. DATABASE EXTENSIONS
@@ -587,10 +587,8 @@ UI → Database → Backend → Authentication → Authorization → Transaction
 - UserAchievement
 - Badge
 - UserBadge
-- AIConversation
-- AIMessage
-- AIUsageLog
-- AIRecommendation
+- GameVortexAiConversation
+- GameVortexAiMessage
 - SearchQuery
 - NotificationPreference
 - Offer
@@ -603,18 +601,9 @@ UI → Database → Backend → Authentication → Authorization → Transaction
 - GameComparisonSession / ComparisonItem
 مع Foreign Keys وIndexes وUnique Constraints وSoft Delete وTimestamps وAtomic Transactions وIdempotency.
 
-39. AI API ARCHITECTURE
-=======================
-المسارات المقترحة:
-- /api/ai/chat
-- /api/ai/search
-- /api/ai/recommendations
-- /api/ai/discover
-- /api/ai/moderate
-- /api/admin/ai/analytics
-- /api/admin/ai/settings
-
-المتطلبات: Authentication وAuthorization وRate Limiting وInput/Output Validation وServer-side API Keys وRequest Limits وTimeout وRetry آمن وCost Controls وLogging وError Handling وNo Secret Exposure.
+39. GAMEVORTEX AI — CURRENT IMPLEMENTATION
+==========================================
+هذا القسم يستبدل أي تصميم AI أقدم في هذه المواصفة التاريخية. واجهة المحادثة الحالية على /ai تتصل من الخادم ببوابة Ollama مستضافة ذاتيًا عبر HTTPS. راجع docs/GAMEVORTEX_AI.md وself-hosted-ai/README.md لإعداد المحرك وحدوده. لا توجد أدوات موقع مسجلة أو قدرات بحث/تعديل/إدارة داخل المحادثة.
 
 40. SEARCH ARCHITECTURE
 =======================

@@ -1,8 +1,7 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-COPY package.json ./
-# package-lock.json is intentionally not required by this source bundle; all direct versions are pinned.
-RUN npm install --ignore-scripts --no-audit --no-fund
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
 FROM node:22-bookworm-slim AS build
 WORKDIR /app

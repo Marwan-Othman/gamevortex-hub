@@ -6,9 +6,11 @@ import Link from "next/link";
 import styles from "../../app/auth/auth.module.css";
 import { AuthTextField, AuthPasswordField } from "./AuthFields";
 import SocialLoginRow from "./SocialLoginRow";
+import { useLocale } from "@/components/ui/useLocale";
 
 export default function RegisterForm() {
   const router = useRouter();
+  const english = useLocale() === "en";
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -26,11 +28,11 @@ export default function RegisterForm() {
     setError(undefined);
 
     if (password !== confirmPassword) {
-      setError("كلمتا المرور غير متطابقتين.");
+      setError(english ? "Passwords do not match." : "كلمتا المرور غير متطابقتين.");
       return;
     }
     if (!acceptedTerms) {
-      setError("يجب الموافقة على الشروط والأحكام وسياسة الخصوصية.");
+      setError(english ? "You must accept the Terms and Privacy Policy." : "يجب الموافقة على الشروط والأحكام وسياسة الخصوصية.");
       return;
     }
 
@@ -44,18 +46,18 @@ export default function RegisterForm() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const messages: Record<string, string> = {
-          ACCOUNT_ALREADY_EXISTS: "البريد الإلكتروني أو اسم المستخدم مستخدم بالفعل.",
-          INVALID_INPUT: "تحقق من البيانات: اسم المستخدم 3-32 حرفًا (أحرف/أرقام/_) وكلمة مرور 10 أحرف على الأقل.",
-          RATE_LIMITED: "محاولات كثيرة. حاول بعد قليل.",
-          CSRF_ORIGIN_REJECTED: "طلب مرفوض. أعد تحميل الصفحة وحاول مجددًا.",
+          ACCOUNT_ALREADY_EXISTS: english ? "That email or username is already in use." : "البريد الإلكتروني أو اسم المستخدم مستخدم بالفعل.",
+          INVALID_INPUT: english ? "Check your details: username must be 3–32 letters, numbers or underscores; password at least 10 characters." : "تحقق من البيانات: اسم المستخدم 3-32 حرفًا (أحرف/أرقام/_) وكلمة مرور 10 أحرف على الأقل.",
+          RATE_LIMITED: english ? "Too many attempts. Please try again shortly." : "محاولات كثيرة. حاول بعد قليل.",
+          CSRF_ORIGIN_REJECTED: english ? "Request rejected. Reload and try again." : "طلب مرفوض. أعد تحميل الصفحة وحاول مجددًا.",
         };
-        setError(messages[data.error] || "تعذّر إنشاء الحساب. حاول مجددًا.");
+        setError(messages[data.error] || (english ? "Could not create your account. Please try again." : "تعذّر إنشاء الحساب. حاول مجددًا."));
         return;
       }
       router.push("/profile/gamer");
       router.refresh();
     } catch {
-      setError("تعذر الاتصال بالخادم. تحقق من اتصالك وحاول مجددًا.");
+      setError(english ? "Could not reach the server. Check your connection and try again." : "تعذر الاتصال بالخادم. تحقق من اتصالك وحاول مجددًا.");
     } finally {
       setBusy(false);
     }
@@ -70,30 +72,30 @@ export default function RegisterForm() {
             <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
             <path d="M18 8v5M15.5 10.5h5" />
           </svg>
-          إنشاء حساب جديد
+          {english ? "Create account" : "إنشاء حساب جديد"}
         </div>
 
-        <AuthTextField id="username" icon="user" placeholder="اسم المستخدم" required minLength={3} maxLength={32} pattern="[A-Za-z0-9_]+" value={username} onChange={setUsername} autoComplete="username" />
-        <AuthTextField id="email" icon="mail" type="email" placeholder="البريد الإلكتروني" required maxLength={320} value={email} onChange={setEmail} autoComplete="email" />
-        <AuthPasswordField id="password" placeholder="كلمة المرور" required minLength={10} maxLength={200} value={password} onChange={setPassword} visible={showPassword} onToggleVisible={() => setShowPassword((v) => !v)} autoComplete="new-password" />
-        <AuthPasswordField id="confirmPassword" placeholder="تأكيد كلمة المرور" required minLength={10} maxLength={200} value={confirmPassword} onChange={setConfirmPassword} visible={showConfirm} onToggleVisible={() => setShowConfirm((v) => !v)} autoComplete="new-password" />
+        <AuthTextField id="username" icon="user" placeholder={english ? "Username" : "اسم المستخدم"} required minLength={3} maxLength={32} pattern="[A-Za-z0-9_]+" value={username} onChange={setUsername} autoComplete="username" />
+        <AuthTextField id="email" icon="mail" type="email" placeholder={english ? "Email address" : "البريد الإلكتروني"} required maxLength={320} value={email} onChange={setEmail} autoComplete="email" />
+        <AuthPasswordField id="password" placeholder={english ? "Password" : "كلمة المرور"} required minLength={10} maxLength={200} value={password} onChange={setPassword} visible={showPassword} onToggleVisible={() => setShowPassword((v) => !v)} autoComplete="new-password" />
+        <AuthPasswordField id="confirmPassword" placeholder={english ? "Confirm password" : "تأكيد كلمة المرور"} required minLength={10} maxLength={200} value={confirmPassword} onChange={setConfirmPassword} visible={showConfirm} onToggleVisible={() => setShowConfirm((v) => !v)} autoComplete="new-password" />
 
         <div className={styles.field}>
-          <label htmlFor="referralCode">رمز إحالة (اختياري)</label>
+          <label htmlFor="referralCode">{english ? "Referral code (optional)" : "رمز إحالة (اختياري)"}</label>
           <div className={styles.inputRow}>
-            <input id="referralCode" placeholder="رمز إحالة (اختياري)" maxLength={40} value={referralCode} onChange={(e) => setReferralCode(e.target.value)} style={{ padding: "13px 14px" }} />
+            <input id="referralCode" placeholder={english ? "Referral code (optional)" : "رمز إحالة (اختياري)"} maxLength={40} value={referralCode} onChange={(e) => setReferralCode(e.target.value)} style={{ padding: "13px 14px" }} />
           </div>
         </div>
 
         <label className={styles.checkboxRow}>
           <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} />
-          أوافق على <Link href="/legal/terms">الشروط والأحكام</Link> و<Link href="/legal/privacy">سياسة الخصوصية</Link>
+          {english ? "I accept the " : "أوافق على "}<Link href="/legal/terms">{english ? "Terms" : "الشروط والأحكام"}</Link>{english ? " and " : " و"}<Link href="/legal/privacy">{english ? "Privacy Policy" : "سياسة الخصوصية"}</Link>
         </label>
 
         {error && <p className={styles.errorText} role="alert">{error}</p>}
 
         <button className={styles.submitBtn} type="submit" disabled={busy}>
-          {busy ? "جارٍ الإنشاء…" : "إنشاء حساب جديد"}
+          {busy ? (english ? "Creating account…" : "جارٍ الإنشاء…") : (english ? "Create account" : "إنشاء حساب جديد")}
           {!busy && (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
               <circle cx="9" cy="8" r="3.5" />
@@ -105,7 +107,7 @@ export default function RegisterForm() {
 
         <SocialLoginRow />
 
-        <p className={styles.switchLink}>لديك حساب بالفعل؟ <Link href="/auth/login">تسجيل الدخول</Link></p>
+        <p className={styles.switchLink}>{english ? "Already have an account?" : "لديك حساب بالفعل؟"} <Link href="/auth/login">{english ? "Sign in" : "تسجيل الدخول"}</Link></p>
       </form>
     </div>
   );

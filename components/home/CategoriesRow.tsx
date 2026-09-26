@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useLocale } from "@/components/ui/useLocale";
 import styles from "../../app/home.module.css";
 
 const CATEGORIES = [
@@ -45,6 +48,8 @@ const CATEGORIES = [
 ];
 
 export default function CategoriesRow() {
+  const english = useLocale() === "en";
+  const categoryLabels: Record<string, string> = { "أكشن": "Action", "مغامرات": "Adventure", "رياضة": "Sports", "سباقات": "Racing", "رعب": "Horror", "استراتيجية": "Strategy", "ألعاب RPG": "RPG", "المزيد": "More" };
   return (
     <section className={styles.section} aria-labelledby="categories-title">
       <div className={styles.sectionHead}>
@@ -63,10 +68,10 @@ export default function CategoriesRow() {
             <circle cx="7" cy="17" r="3" />
             <circle cx="17" cy="17" r="3" />
           </svg>
-          استكشف التصنيفات
+          {english ? "Explore categories" : "استكشف التصنيفات"}
         </h2>
 
-        <Link href="/games">عرض الكل ←</Link>
+        <Link href="/games">{english ? "View all →" : "عرض الكل ←"}</Link>
       </div>
 
       <div className={styles.hscroll}>
@@ -81,7 +86,7 @@ export default function CategoriesRow() {
             className={styles.categoryTile}
           >
             <span className={styles.categoryIcon}>{category.symbol}</span>
-            <span>{category.name}</span>
+            <span>{english ? categoryLabels[category.name] || category.name : category.name}</span>
           </Link>
         ))}
       </div>

@@ -37,9 +37,32 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const userId = z.string().cuid().parse(body.userId);
     const { role } = roleSchema.parse(body);
-    if (userId === owner.id && role !== Role.SUPER_ADMIN) return NextResponse.json({ error: "OWNER_ROLE_CANNOT_BE_REMOVED" }, { status: 409 });
-    const target = await db.user.findUnique({ where: { id: userId }, select: { id: true, role: true, username: true, email: true } });
-    if (!target) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+    if (userId === owner.id && role !== Role.SUPER_ADMIN) {
+      return NextResponse.json({ error: "OWNER_ROLE_CANNOT_BE_REMOVED" }, { status: 409 });
+    }
+
+    const target = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, username: true, email: true },
+    });
+    if (!target) {
+      return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+    }
+
+    // There is exactly one owner. A SUPER_ADMIN role may only belong to the
+    // configured owner account. The API is the authoritative security boundary;
+    // the admin UI must never be trusted to enforce this rule by itself.
+    const configuredOwnerEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
+    if (role === Role.SUPER_ADMIN) {
+      if (!configuredOwnerEmail) {
+        return NextResponse.json({ error: "OWNER_EMAIL_NOT_CONFIGURED" }, { status: 500 });
+      }
+
+      if (target.email.trim().toLowerCase() !== configuredOwnerEmail) {
+        return NextResponse.json({ error: "ONLY_CONFIGURED_OWNER_CAN_BE_SUPER_ADMIN" }, { status: 409 });
+      }
+    }
+
     const updated = await db.$transaction(async (tx) => {
       const user = await tx.user.update({ where: { id: userId }, data: { role }, select: { id: true, role: true, username: true, email: true } });
       await tx.auditLog.create({ data: { actorUserId: owner.id, action: "OWNER_ROLE_CHANGED", entityType: "User", entityId: user.id, metadata: { from: target.role, to: role, username: target.username, email: target.email } } });

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLocale } from "@/components/ui/useLocale";
 
 function HomeIcon() {
   return (
@@ -75,41 +76,12 @@ function CrownIcon() {
 
 
 const navigationItems = [
-  {
-    href: "/",
-    label: "Home",
-    Icon: HomeIcon,
-  },
-  {
-    href: "/games",
-    label: "Games",
-    Icon: GameIcon,
-  },
-  {
-    href: "/vip",
-    label: "VIP",
-    Icon: CrownIcon,
-  },
-  {
-    href: "/library",
-    label: "Vault",
-    Icon: GridIcon,
-  },
-  {
-    href: "/rewards",
-    label: "Rewards",
-    Icon: GiftIcon,
-  },
-  {
-    href: "/gift-cards",
-    label: "Store",
-    Icon: CardIcon,
-  },
-  {
-    href: "/profile/gamer",
-    label: "Profile",
-    Icon: UserIcon,
-  },
+  { href: "/", label: "Home", Icon: HomeIcon },
+  { href: "/games", label: "Games", Icon: GameIcon },
+  { href: "/apps", label: "Apps", Icon: GridIcon },
+  { href: "/library", label: "Vault", Icon: GridIcon },
+  { href: "/vip", label: "VIP", Icon: CrownIcon },
+  { href: "/profile/gamer", label: "Profile", Icon: UserIcon },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -125,11 +97,17 @@ function isActivePath(pathname: string, href: string) {
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const locale = useLocale();
+  const labels: Record<string, string> = locale === "ar"
+    ? { Home: "الرئيسية", Games: "الألعاب", Apps: "التطبيقات", VIP: "VIP", Vault: "المكتبة", Profile: "حسابي" }
+    : { Home: "Home", Games: "Games", VIP: "VIP", Vault: "Library", Profile: "Profile" };
 
   return (
     <nav
       className="gv-bottom-nav"
       aria-label="التنقل الرئيسي"
+      lang={locale}
+      dir={locale === "ar" ? "rtl" : "ltr"}
       style={{
         gridTemplateColumns: `repeat(${navigationItems.length}, 1fr)`,
       }}
@@ -145,7 +123,7 @@ export default function MobileBottomNav() {
             aria-current={active ? "page" : undefined}
           >
             <Icon />
-            <span>{label}</span>
+            <span>{labels[label] || label}</span>
           </Link>
         );
       })}

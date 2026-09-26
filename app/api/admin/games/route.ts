@@ -4,6 +4,7 @@ import {
   getPlatformEnum,
   normalizePlatform,
 } from "@/lib/platforms";
+import { ensureCategoryIds } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         gamePlatforms: true,
+        gameCategories: { include: { category: true } },
       },
       orderBy: {
         createdAt: "desc",
@@ -222,6 +224,16 @@ export async function POST(request: NextRequest) {
           ? descriptionEn.trim()
           : null;
 
+    const categoryValues = Array.isArray(body.categoryIds)
+      ? body.categoryIds
+      : typeof category === "string" && category.trim()
+        ? [category.trim()]
+        : typeof genre === "string" && genre.trim()
+          ? [genre.trim()]
+          : [];
+
+    const categoryIds = await ensureCategoryIds(prisma, categoryValues);
+
     const normalizedGenre =
       typeof genre === "string" && genre.trim()
         ? genre.trim()
@@ -264,8 +276,8 @@ export async function POST(request: NextRequest) {
         genre: normalizedGenre,
 
         platform:
-          typeof platform === "string"
-            ? normalizePlatform(platform)
+          platformValues.length > 0
+            ? platformValues.join(",")
             : null,
 
         priceCents: normalizedPriceCents,
@@ -305,6 +317,13 @@ export async function POST(request: NextRequest) {
                 create: platformValues.map((item) => ({
                   platform: item,
                 })),
+              }
+            : undefined,
+
+        gameCategories:
+          categoryIds.length > 0
+            ? {
+                create: categoryIds.map((categoryId) => ({ categoryId })),
               }
             : undefined,
       },

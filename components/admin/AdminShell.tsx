@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import styles from "../../app/admin/admin.module.css";
+import { useLocale } from "@/components/ui/useLocale";
 
 type NavItem = {
   label: string;
@@ -43,8 +44,13 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         label: "التطبيقات",
+        href: "/admin/apps",
         icon: <IconApps />,
-        soon: true,
+      },
+      {
+        label: "صحة المحتوى",
+        href: "/admin/content-health",
+        icon: <IconShield />,
       },
       {
         label: "القرآن",
@@ -114,13 +120,8 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "الذكاء والأنظمة",
+    title: "الأنظمة",
     items: [
-      {
-        label: "الذكاء الاصطناعي",
-        icon: <IconAI />,
-        soon: true,
-      },
       {
         label: "الإحصائيات والتقارير",
         href: "/admin",
@@ -159,6 +160,17 @@ export default function AdminShell({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const english = useLocale() === "en";
+  const translated: Record<string, string> = {
+    "الرئيسية": "Overview", "لوحة التحكم": "Dashboard", "مركز تحكم المالك": "Owner control center",
+    "إدارة المحتوى": "Content", "الألعاب": "Games", "التطبيقات": "Apps", "صحة المحتوى": "Content Health", "القرآن": "Quran", "المراجعة والمحتوى": "Moderation",
+    "المتجر والمبيعات": "Store & sales", "المتجر": "Store", "البطاقات والهدايا": "Gift cards", "الطلبات": "Orders", "المشتريات": "Purchases",
+    "المستخدمون والبرامج": "Users & programs", "المستخدمون": "Users", "المكافآت والنقاط": "Rewards & points",
+    "الأنظمة": "Systems", "الإحصائيات والتقارير": "Analytics & reports",
+    "المدفوعات وسجل الأخطاء": "Payments & error log", "النظام": "System", "الإعدادات": "Settings", "السحوبات": "Draws", "الأخطاء": "Errors",
+    "الرسائل والإشعارات": "Messages & notifications", "عرض الموقع": "View site", "قائمة إدارة المالك": "Owner administration",
+  };
+  const tx = (value: string) => english ? translated[value] || value : value;
 
   const initial =
     ownerLabel.trim().charAt(0).toUpperCase() || "O";
@@ -188,7 +200,7 @@ export default function AdminShell({
             >
               <path
                 d="M20 3 36 30H4z"
-                stroke="#a78bfa"
+                stroke="#ffe492"
                 strokeWidth="2.5"
                 fill="none"
               />
@@ -198,7 +210,7 @@ export default function AdminShell({
           </div>
 
           <nav
-            aria-label="قائمة إدارة المالك"
+            aria-label={tx("قائمة إدارة المالك")}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -215,7 +227,7 @@ export default function AdminShell({
                     fontWeight: 700,
                   }}
                 >
-                  {section.title}
+                  {tx(section.title)}
                 </div>
 
                 {section.items.map((item) => {
@@ -227,24 +239,8 @@ export default function AdminShell({
                           pathname.startsWith(`${item.href}/`)
                         : false;
 
-                  if (item.soon || !item.href) {
-                    return (
-                      <span
-                        key={item.label}
-                        className={`${styles.navLink} ${styles.soon}`}
-                      >
-                        {item.icon}
-
-                        <span style={{ flex: 1 }}>
-                          {item.label}
-                        </span>
-
-                        <span className={styles.soonBadge}>
-                          قريبًا
-                        </span>
-                      </span>
-                    );
-                  }
+                  // Do not present planned/unwired controls as usable admin features.
+                  if (item.soon || !item.href) return null;
 
                   return (
                     <Link
@@ -256,7 +252,7 @@ export default function AdminShell({
                       onClick={() => setOpen(false)}
                     >
                       {item.icon}
-                      <span>{item.label}</span>
+                      <span>{tx(item.label)}</span>
                     </Link>
                   );
                 })}

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useLocale } from "@/components/ui/useLocale";
 import styles from "../../app/home.module.css";
 import { vortexScore } from "../../lib/game-score";
 
@@ -32,15 +35,17 @@ export default function GameRow({
   href: string;
   games: Game[];
 }) {
+  const english = useLocale() === "en";
+  const translatedTitle = english ? ({ "أحدث الألعاب": "Latest games", "الأعلى تقييمًا": "Top rated", "الأكثر لعبًا": "Most played" } as Record<string, string>)[title] || title : title;
   return (
-    <section className={styles.section} aria-label={title}>
+    <section className={styles.section} aria-label={translatedTitle}>
       <div className={styles.sectionHead}>
         <h2>
           {icon}
-          {title}
+          {translatedTitle}
         </h2>
 
-        <Link href={href}>عرض الكل ←</Link>
+        <Link href={href}>{english ? "View all →" : "عرض الكل ←"}</Link>
       </div>
 
       <div className={styles.hscroll}>
@@ -72,7 +77,7 @@ export default function GameRow({
 
                 {game.featured && (
                   <span className={styles.featuredBadge}>
-                    مميز
+                    {english ? "Featured" : "مميز"}
                   </span>
                 )}
 
@@ -104,7 +109,7 @@ export default function GameRow({
 
         {!games.length && (
           <div className={styles.emptyGames}>
-            لا توجد ألعاب متاحة حاليًا.
+            {english ? "No games are available right now." : "لا توجد ألعاب متاحة حاليًا."}
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const platformParam = searchParams.get("platform");
     const category = searchParams.get("category");
     const search = searchParams.get("search");
+    const sortParam = searchParams.get("sort");
     const pageParam = Number(searchParams.get("page") ?? "1");
     const limitParam = Number(searchParams.get("limit") ?? "24");
 
@@ -29,12 +30,26 @@ export async function GET(request: NextRequest) {
 
     const platform = getPlatformEnum(platformParam);
 
+    const sort = ["rating", "popular", "newest", "views"].includes(sortParam ?? "")
+      ? sortParam!
+      : "newest";
+
     const where: Prisma.GameWhereInput = {
       published: true,
     };
 
     if (category?.trim()) {
-      where.genre = category.trim();
+      where.gameCategories = {
+        some: {
+          category: {
+            OR: [
+              { slug: category.trim().toLowerCase() },
+              { nameEn: { equals: category.trim(), mode: "insensitive" } },
+              { nameAr: { equals: category.trim(), mode: "insensitive" } },
+            ],
+          },
+        },
+      };
     }
 
     if (search?.trim()) {
@@ -75,10 +90,34 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           gamePlatforms: true,
+          gameCategories: {
+            include: { category: true },
+          },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy:
+          sort === "popular"
+            ? [
+                { playCount: "desc" },
+                { viewCount: "desc" },
+                { id: "desc" },
+              ]
+            : sort === "views"
+              ? [
+                  { viewCount: "desc" },
+                  { playCount: "desc" },
+                  { id: "desc" },
+                ]
+              : sort === "rating"
+                ? [
+                    { featured: "desc" },
+                    { ratingAverage: "desc" },
+                    { ratingCount: "desc" },
+                    { id: "desc" },
+                  ]
+                : [
+                    { createdAt: "desc" },
+                    { id: "desc" },
+                  ],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -95,6 +134,7 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         total,
+        sort,
         pages: Math.ceil(total / limit),
       },
     });

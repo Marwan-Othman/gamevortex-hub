@@ -3,6 +3,7 @@ import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
 import { guardMutation } from "@/lib/api";
 import type { PlatformType, Prisma } from "@prisma/client";
+import { ensureCategoryIds } from "@/lib/categories";
 
 const RAWG_PLATFORM_IDS = new Set(["3", "21"]);
 const STORE_PRIORITY = [
@@ -161,8 +162,11 @@ async function runImport(request: NextRequest) {
 
     for (const g of games) {
       const mappedPlatforms = mapRawgPlatforms(g.platforms);
-      const platformNames = g.platforms?.map((p) => p.platform?.name).filter(Boolean).join(", ") || null;
+      const platformNames = mappedPlatforms.length > 0
+        ? mappedPlatforms.join(",")
+        : null;
       const genre = g.genres?.[0]?.name ?? null;
+      const categoryIds = await ensureCategoryIds(db, genre ? [genre] : []);
 
       let description: string | null = null;
       let officialUrl: string | null = null;
@@ -208,6 +212,9 @@ async function runImport(request: NextRequest) {
               gamePlatforms: {
                 create: mappedPlatforms.map((platform) => ({ platform })),
               },
+              gameCategories: {
+                create: categoryIds.map((categoryId) => ({ categoryId })),
+              },
             },
           });
           void created;
@@ -223,6 +230,14 @@ async function runImport(request: NextRequest) {
           coverUrl: g.background_image ?? undefined,
           ratingAverage: g.rating ?? undefined,
           ratingCount: g.ratings_count ?? undefined,
+          gamePlatforms: {
+            deleteMany: {},
+            create: mappedPlatforms.map((platform) => ({ platform })),
+          },
+          gameCategories: {
+            deleteMany: {},
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
         };
         if (!existing.officialUrl && officialUrl) {
           data.officialUrl = officialUrl;

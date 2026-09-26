@@ -361,18 +361,6 @@ export async function activateVipSubscription(
             provider:
               input.provider,
 
-            chatCredits:
-              subscription.plan
-                .chatCredits,
-
-            imageCredits:
-              subscription.plan
-                .imageCredits,
-
-            videoCredits:
-              subscription.plan
-                .videoCredits,
-
             lastRewardAt:
               null,
 
@@ -644,18 +632,6 @@ export async function renewVipSubscription(
 
             provider:
               input.provider,
-
-            chatCredits:
-              subscription.plan
-                .chatCredits,
-
-            imageCredits:
-              subscription.plan
-                .imageCredits,
-
-            videoCredits:
-              subscription.plan
-                .videoCredits,
 
             nextRewardAt:
               expiresAt,
@@ -1032,13 +1008,10 @@ export async function getVipSubscriptionStatus(
       expiresAt: null,
       points: user.points,
       pointsMultiplier: 1,
-      ...OWNER_AI_ENTITLEMENTS,
     };
   }
 
   const now = new Date();
-
-  const freeCredits = { chat: 0, image: 0, video: 0 };
 
   const subscription =
     await db.vipSubscription.findFirst({
@@ -1071,12 +1044,6 @@ export async function getVipSubscriptionStatus(
       expiresAt: null,
       points: user.points,
       pointsMultiplier: 1,
-      chatCredits:
-        freeCredits.chat,
-      imageCredits:
-        freeCredits.image,
-      videoCredits:
-        freeCredits.video,
     };
   }
 
@@ -1116,12 +1083,6 @@ export async function getVipSubscriptionStatus(
         subscription.expiresAt,
       points: user.points,
       pointsMultiplier: 1,
-      chatCredits:
-        freeCredits.chat,
-      imageCredits:
-        freeCredits.image,
-      videoCredits:
-        freeCredits.video,
     };
   }
 
@@ -1151,11 +1112,5 @@ export async function getVipSubscriptionStatus(
       multiplier >= 1
         ? multiplier
         : 1,
-    chatCredits:
-      subscription.chatCredits,
-    imageCredits:
-      subscription.imageCredits,
-    videoCredits:
-      subscription.videoCredits,
   };
 }

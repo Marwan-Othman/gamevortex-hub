@@ -93,6 +93,12 @@ export default async function GameDetails({
     include: {
       gamePlatforms: true,
 
+      gameCategories: {
+        include: {
+          category: true,
+        },
+      },
+
       reviews: {
         orderBy: {
           createdAt: "desc",
@@ -232,7 +238,7 @@ export default async function GameDetails({
 
           <div className="stat-row">
             <span>
-              {game.genre || "ألعاب"}
+              {game.gameCategories[0]?.category.nameAr || game.genre || "ألعاب"}
             </span>
 
             <span>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
+import { ensureCategoryIds } from "@/lib/categories";
 import { guardMutation } from "@/lib/api";
 import { PlatformType, SourceStatus } from "@prisma/client";
 
@@ -164,6 +165,9 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      const categoryValue = game.genres?.[0]?.name || null;
+      const categoryIds = await ensureCategoryIds(db, categoryValue ? [categoryValue] : []);
+
       const existing = await db.game.findUnique({
         where: {
           slug: game.slug,
@@ -182,7 +186,7 @@ export async function POST(request: NextRequest) {
           typeof detail.description_raw === "string"
             ? detail.description_raw.slice(0, 4000)
             : null,
-        platform: mapped.join(", "),
+        platform: mapped.join(","),
         genre: game.genres?.[0]?.name || null,
         coverUrl: game.background_image || null,
         officialUrl,
@@ -203,6 +207,9 @@ export async function POST(request: NextRequest) {
                 platform,
               })),
             },
+            gameCategories: {
+              create: categoryIds.map((categoryId) => ({ categoryId })),
+            },
           },
         });
 
@@ -212,7 +219,13 @@ export async function POST(request: NextRequest) {
           where: {
             id: existing.id,
           },
-          data: common,
+          data: {
+            ...common,
+            gameCategories: {
+              deleteMany: {},
+              create: categoryIds.map((categoryId) => ({ categoryId })),
+            },
+          },
         });
 
         for (const platform of mapped) {

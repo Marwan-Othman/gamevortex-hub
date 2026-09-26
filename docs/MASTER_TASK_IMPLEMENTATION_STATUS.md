@@ -1,5 +1,7 @@
 # GameVortex Hub — Master Task Implementation Status
 
+> **أرشيف تاريخي:** هذه الحالة كُتبت قبل اعتماد محركات AI المستضافة ذاتيًا. أي ذكر لمزودي AI خارجيين أو خطوات إعدادهم أدناه لم يعد دليلًا على بنية المشروع الحالية. المرجع التشغيلي المعتمد هو [`GAMEVORTEX_AI.md`](GAMEVORTEX_AI.md).
+
 هذه الوثيقة هي سجل تنفيذ واقعي للنسخة الحالية من المشروع. تم استخدام المشروع الحالي كأساس، وليس إنشاء مشروع جديد.
 
 ## 1. ما تم تعديله في هذه الجولة
@@ -17,16 +19,12 @@
 - تمت إضافة روابط هذه الأقسام إلى AdminShell.
 
 ### GameVortex AI
-- Owner AI access يعتمد على `SUPER_ADMIN` فقط.
-- Owner لا يستهلك `chatCredits`.
-- Owner لا يستهلك `imageCredits`.
-- Owner لا يستهلك `videoCredits`.
-- الاستخدام يظل مسجلًا في `AiUsage` للمراقبة والمحاسبة الداخلية، بدون خصم رصيد من المالك.
-- Owner يظهر له `∞` في لوحة AI.
-- تم توحيد سياسة Owner AI في `lib/ai/entitlements.ts`.
-- تمت إضافة اختبارات للوصول غير المحدود حسب الدور.
-- Chat / Image / Video تستمر في العمل فقط عند وجود provider حقيقي، ولا يتم إنشاء Fake provider.
-- idempotency وrelease-on-provider-failure موجودان في مسارات AI الحالية.
+- توجد واجهة محادثة جديدة على `/ai` مع سجل محادثات مملوك للمستخدم وبث وإيقاف وإعادة توليد.
+- يتصل الخادم بمحرك Ollama مستضاف ذاتيًا عبر بوابة GameVortex AI؛ لا يحتوي المشروع على أوزان نموذج.
+- لا توجد أدوات موقع مسجلة للمحادثة، لذلك لا تمنح المحادثة صلاحية Admin أو Owner.
+- إعداد المحرك البعيد يحتاج عنوان HTTPS ورمز البوابة في متغيرات Vercel السرية.
+- التشغيل الحقيقي يتطلب تشغيل Ollama والنموذج على خادم تملكه؛ راجع [`GAMEVORTEX_AI.md`](GAMEVORTEX_AI.md) و[`../self-hosted-ai/README.md`](../self-hosted-ai/README.md).
+- لا توجد ردود محفوظة بديلة عند غياب المحرك؛ تعرض الواجهة سبب الإعداد أو الاتصال.
 
 ## 2. أجزاء كبيرة موجودة أصلًا في المشروع وتم الحفاظ عليها
 
@@ -46,9 +44,7 @@
 - Owner Wallet / Owner Ledger.
 - Withdrawals foundation.
 - VIP plans / subscriptions / rewards / purchases.
-- AI Chat + conversations/messages.
-- AI image provider adapter لـ fal.ai.
-- AI video provider adapter لـ MiniMax.
+- GameVortex AI chat + conversations/messages على محرك Ollama ذاتي الاستضافة.
 - Quran provider foundation.
 - FazerCards integration foundation.
 - RAWG/mobile game import foundation.
@@ -69,35 +65,29 @@
 
 1. تشغيل migrations على PostgreSQL الإنتاجي والتحقق من الحالة.
 2. ضبط جميع Environment Variables في Vercel Production/Preview.
-3. اختبار OpenAI API بمفتاح حقيقي وموديل متاح للحساب.
-4. اختبار fal.ai image generation بمفتاح حقيقي وحصة متاحة.
-5. اختبار MiniMax video generation بمفتاح حقيقي وcallback/status حقيقي.
-6. اختبار Stripe/PayPal/HMAC webhook الحقيقي.
-7. اختبار شراء VIP بأموال حقيقية أو sandbox موثوق.
-8. اختبار refunds/chargebacks/reconciliation.
-9. اختبار payout provider الحقيقي وسحب الأموال.
-10. اختبار Quran provider credentials والـlicense/source policy.
-11. اختبار RAWG catalog import بمفتاح حقيقي ومراجعة مصادر المتجر.
-12. اختبار Steam OAuth/API الفعلي إذا تم تفعيل المسار.
-13. أي Xbox/PlayStation/Nintendo integration تحتاج credentials/provider حقيقي.
-14. Push notifications تحتاج provider حقيقي.
-15. Email يحتاج Resend أو provider حقيقي مع domain verification.
-16. CDN/storage/media retention يحتاج مزودًا حقيقيًا إذا كانت النتائج ستُخزن بشكل دائم.
-17. Domain/DNS/HTTPS/Vercel production configuration.
-18. External security assessment.
-19. Legal/privacy/terms review.
-20. Production operational approval.
+3. تشغيل بوابة Ollama الذاتية وربطها بVercel عبر HTTPS واختبار المحادثة من الموقع.
+4. فحص وظائف الدفع والـwebhook باستخدام sandbox موثوق.
+5. اختبار شراء VIP بأموال حقيقية أو sandbox موثوق.
+6. اختبار refunds/chargebacks/reconciliation.
+7. اختبار payout provider الحقيقي وسحب الأموال.
+8. اختبار Quran provider credentials والـlicense/source policy.
+9. اختبار RAWG catalog import بمفتاح حقيقي ومراجعة مصادر المتجر.
+10. اختبار Steam OAuth/API الفعلي إذا تم تفعيل المسار.
+11. أي Xbox/PlayStation/Nintendo integration تحتاج credentials/provider حقيقي.
+12. Push notifications تحتاج provider حقيقي.
+13. Email يحتاج Resend أو provider حقيقي مع domain verification.
+14. CDN/storage/media retention يحتاج مزودًا حقيقيًا إذا كانت النتائج ستُخزن بشكل دائم.
+15. Domain/DNS/HTTPS/Vercel production configuration.
+16. External security assessment.
+17. Legal/privacy/terms review.
+18. Production operational approval.
 
 ## 5. المهام التي تم تجهيز الهيكل لها لكن تحتاج تنفيذ خارجي
 
-### AI
-- AI Smart Search provider/ranking layer.
-- AI Recommendations provider mode.
-- AI Game Discovery provider mode.
-- AI Admin Analytics.
-- AI Content Moderation.
-- Prompt injection / tool injection red-team testing.
-- AI cost monitoring الحقيقي حسب provider billing.
+### GameVortex AI
+- Site action tools, memory, and usage metering remain disabled until separately designed and authorization-tested.
+- Prompt-injection tests must continue to verify that chat cannot access site tools or privileged data.
+- Model capacity and response quality require testing against the actual self-hosted model and host.
 
 ### Gaming Tracker / Social
 - Public Collections.
@@ -133,7 +123,7 @@
 8. تشغيل migrations على Preview DB.
 9. تشغيل migrations على Production DB بعد backup.
 10. ضبط Vercel Environment Variables.
-11. اختبار AI providers.
+11. تشغيل واختبار محرك GameVortex AI المستضاف ذاتيًا.
 12. اختبار Payments/Webhooks.
 13. اختبار Wallet/Withdrawals.
 14. اختبار Marketplace fulfillment.
@@ -141,12 +131,6 @@
 16. Security regression.
 17. Production smoke test.
 
-## 8. حالة Owner AI المطلوبة
+## 8. صلاحيات Owner داخل GameVortex AI
 
-الحالة البرمجية المقصودة:
-
-`SUPER_ADMIN -> Owner VIP -> chat = unlimited -> image = unlimited -> video = unlimited`
-
-لا يوجد خصم من رصيد VIP للمالك.
-
-لكن كلمة unlimited هنا تعني **لا يوجد quota داخل نظام GameVortex**. لا تعني أن OpenAI/fal.ai/MiniMax أو أي provider خارجي يلغي حدود الحساب أو التكلفة أو سياسات الخدمة.
+المحادثة لا تملك أدوات أو صلاحيات خاصة. أي أدوات مستقبلية يجب أن تتحقق من جلسة المستخدم ودوره وصلاحيات الموقع على الخادم لكل عملية. دور `SUPER_ADMIN` لا يتجاوز تسجيل الدخول أو التفويض.

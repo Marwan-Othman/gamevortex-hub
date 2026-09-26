@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function RegisterPage() {
   return (
-    <AuthShell heading="مرحباً بعودتك!" subtitle="سجل دخولك أو أنشئ حساب جديد للاستمتاع بتجربة الألعاب الأكثر تميزًا">
+    <AuthShell heading="أنشئ حسابك وابدأ رحلتك" subtitle="انضم إلى مجتمع GameVortex واكتشف الألعاب والمكافآت">
       <Suspense fallback={<div className="card">جارٍ التحميل…</div>}>
         <RegisterForm />
       </Suspense>

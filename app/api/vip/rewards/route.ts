@@ -69,9 +69,6 @@ export async function GET(
         nameAr: true,
         nameEn: true,
         points: true,
-        chatCredits: true,
-        imageCredits: true,
-        videoCredits: true,
         planId: true,
       },
     });
@@ -178,45 +175,6 @@ export async function POST(
             }
           }
 
-          const activeSubscription =
-            await tx.vipSubscription.findFirst({
-              where: {
-                userId:
-                  user.id,
-                status:
-                  VipSubscriptionStatus.ACTIVE,
-                OR: [
-                  {
-                    expiresAt:
-                      null,
-                  },
-                  {
-                    expiresAt: {
-                      gt:
-                        new Date(),
-                    },
-                  },
-                ],
-              },
-              orderBy: {
-                expiresAt:
-                  "desc",
-              },
-            });
-
-          if (
-            !activeSubscription &&
-            (
-              reward.chatCredits > 0 ||
-              reward.imageCredits > 0 ||
-              reward.videoCredits > 0
-            )
-          ) {
-            throw new Error(
-              "VIP_REWARD_REQUIRES_ACTIVE_VIP",
-            );
-          }
-
           await tx.user.update({
             where: {
               id:
@@ -230,31 +188,6 @@ export async function POST(
             },
           });
 
-          if (
-            activeSubscription
-          ) {
-            await tx.vipSubscription.update({
-              where: {
-                id:
-                  activeSubscription.id,
-              },
-              data: {
-                chatCredits: {
-                  increment:
-                    reward.chatCredits,
-                },
-                imageCredits: {
-                  increment:
-                    reward.imageCredits,
-                },
-                videoCredits: {
-                  increment:
-                    reward.videoCredits,
-                },
-              },
-            });
-          }
-
           const claim =
             await tx.vipRewardClaim.create({
               data: {
@@ -262,16 +195,8 @@ export async function POST(
                   user.id,
                 rewardId:
                   reward.id,
-                subscriptionId:
-                  activeSubscription?.id,
                 points:
                   reward.points,
-                chatCredits:
-                  reward.chatCredits,
-                imageCredits:
-                  reward.imageCredits,
-                videoCredits:
-                  reward.videoCredits,
                 idempotencyKey:
                   input.idempotencyKey,
                 metadata: {
@@ -296,12 +221,6 @@ export async function POST(
                   reward.id,
                 points:
                   reward.points,
-                chatCredits:
-                  reward.chatCredits,
-                imageCredits:
-                  reward.imageCredits,
-                videoCredits:
-                  reward.videoCredits,
               },
             },
           });

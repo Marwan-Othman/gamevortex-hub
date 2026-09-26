@@ -3,6 +3,7 @@ import { db } from "@/lib/prisma";
 import BrandGrid, { type BrandSummary } from "@/components/gift-cards/BrandGrid";
 import { brandSlug, splitCategoryName } from "@/lib/gift-card-brands";
 import styles from "./gift-cards.module.css";
+import LocaleText from "@/components/ui/LocaleText";
 
 export const dynamic = "force-dynamic";
 
@@ -55,19 +56,19 @@ export default async function GiftCardsPage() {
     .sort((a, b) => a.brand.localeCompare(b.brand));
 
   return (
-    <main className="wrap" dir="rtl">
+    <main className="wrap">
       <header className={styles.header}>
         <div className="eyebrow">VORTEX STORE</div>
-        <h1>بطاقات الهدايا</h1>
+        <LocaleText as="h1" ar="بطاقات الهدايا" en="Gift cards" />
         <p className="muted">
-          اختر نوع البطاقة ثم المنطقة والفئة. تُسلَّم البطاقة كودًا رقميًا بعد إتمام الدفع.
+          <LocaleText ar="اختر نوع البطاقة ثم المنطقة والفئة. تُسلَّم البطاقة كودًا رقميًا بعد إتمام الدفع." en="Choose a card, region and denomination. Digital codes are delivered after payment is confirmed." />
         </p>
       </header>
 
       {brands.length ? (
         <BrandGrid brands={brands} />
       ) : (
-        <p className={styles.empty}>لا توجد بطاقات متاحة حاليًا. سنضيفها هنا قريبًا.</p>
+        <p className={styles.empty}><LocaleText ar="لا توجد بطاقات متاحة للبيع حاليًا." en="No gift cards are currently available for sale." /></p>
       )}
     </main>
   );

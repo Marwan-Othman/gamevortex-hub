@@ -18,7 +18,7 @@
   "priceHistory": false,
   "aiAssistant": false,
   "aiSmartSearch": false,
-  "aiRecommendations": true,
+  "aiRecommendations": false,
   "aiDiscovery": false,
   "aiModeration": false,
   "payments": false,

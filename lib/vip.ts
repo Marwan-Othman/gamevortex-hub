@@ -11,9 +11,6 @@ export type VipAccess = {
   startedAt: Date | null;
   expiresAt: Date | null;
   pointsMultiplier: number;
-  chatCredits: number;
-  imageCredits: number;
-  videoCredits: number;
 };
 
 function decimalToNumber(value: Prisma.Decimal | number): number {
@@ -74,7 +71,6 @@ export async function getVipAccess(
       startedAt: null,
       expiresAt: null,
       pointsMultiplier: 1,
-      ...OWNER_AI_ENTITLEMENTS,
     };
   }
 
@@ -119,9 +115,6 @@ export async function getVipAccess(
       startedAt: null,
       expiresAt: null,
       pointsMultiplier: 1,
-      chatCredits: 0,
-      imageCredits: 0,
-      videoCredits: 0,
     };
   }
 
@@ -138,9 +131,6 @@ export async function getVipAccess(
     pointsMultiplier: safeMultiplier(
       subscription.plan.pointsMultiplier,
     ),
-    chatCredits: subscription.chatCredits,
-    imageCredits: subscription.imageCredits,
-    videoCredits: subscription.videoCredits,
   };
 }
 

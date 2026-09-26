@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "../../app/home.module.css";
+import { useLocale } from "@/components/ui/useLocale";
 
 const SLIDES = [
   {
@@ -13,8 +14,8 @@ const SLIDES = [
       "PLAY • EARN • CREATE • CONNECT",
     href: "/games",
     cta: "استكشف الألعاب",
-    accent: "#6C63FF",
-    accent2: "#00E5FF",
+    accent: "#21e6ff",
+    accent2: "#7b5cff",
     badge: "NEXT LEVEL GAMING",
     visual: "GV",
   },
@@ -26,8 +27,8 @@ const SLIDES = [
       "Explore worlds beyond reality.",
     href: "/games?sort=newest",
     cta: "شاهد الإصدارات الجديدة",
-    accent: "#00D4FF",
-    accent2: "#8B5CF6",
+    accent: "#7b5cff",
+    accent2: "#ff7a45",
     badge: "NEW WORLDS",
     visual: "PLAY",
   },
@@ -39,14 +40,15 @@ const SLIDES = [
       "Your games, rewards, library and VIP in one vortex.",
     href: "/rewards",
     cta: "اكتشف VIP",
-    accent: "#A855F7",
-    accent2: "#FFD166",
+    accent: "#ff7a45",
+    accent2: "#21e6ff",
     badge: "VIP ACCESS",
     visual: "VIP",
   },
 ];
 
 export default function HeroCarousel() {
+  const english = useLocale() === "en";
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -61,6 +63,31 @@ export default function HeroCarousel() {
   }, [isPaused]);
 
   const slide = SLIDES[index];
+  const englishCopy: Record<string, string> = {
+    "WELCOME TO GAMEVORTEX": "WELCOME TO GAMEVORTEX",
+    "DISCOVER YOUR NEXT GAME": "DISCOVER YOUR NEXT GAME",
+    "كل شيء في مكان واحد": "Everything in one place",
+    "PLAY • EARN • CREATE • CONNECT": "PLAY • EARN • CREATE • CONNECT",
+    "Explore worlds beyond reality.": "Explore worlds beyond reality.",
+    "شاهد الإصدارات الجديدة": "See new releases",
+    "اكتشف VIP": "Discover VIP",
+    "تصفح المنصة": "Explore the hub",
+    "استكشف الألعاب": "Explore games",
+    "أحدث العوالم": "New worlds",
+    "كل ما تحتاجه في مكان واحد": "Everything in one place",
+  };
+
+  const arabicCopy: Record<string, string> = {
+    "WELCOME TO GAMEVORTEX": "مرحبًا بك في GAMEVORTEX",
+    "DISCOVER YOUR NEXT GAME": "اكتشف لعبتك القادمة",
+    "PLAY • EARN • CREATE • CONNECT": "العب • اكسب • أنشئ • تواصل",
+    "Explore worlds beyond reality.": "اكتشف عوالم تتجاوز الواقع.",
+    "Everything in one place": "كل ما تحتاجه في مكان واحد",
+    "NEXT LEVEL GAMING": "تجربة ألعاب من مستوى آخر",
+    "NEW WORLDS": "عوالم جديدة",
+    "VIP ACCESS": "وصول VIP",
+  };
+  const localized = (value: string) => english ? englishCopy[value] || value : arabicCopy[value] || value;
 
   const go = (delta: number) => {
     setIndex(
@@ -73,7 +100,7 @@ export default function HeroCarousel() {
     <>
       <section
         className={`${styles.hero} gv-new-hero`}
-        aria-label="محتوى GameVortex المميز"
+        aria-label={english ? "Featured GameVortex content" : "محتوى GameVortex المميز"}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -113,9 +140,9 @@ export default function HeroCarousel() {
                 ),
                 linear-gradient(
                   135deg,
-                  #070914 0%,
-                  #0B1020 48%,
-                  #080914 100%
+                  #ffffff 0%,
+                  #fffaf2 48%,
+                  #ffeff2 100%
                 )
               `,
             } as React.CSSProperties
@@ -134,15 +161,15 @@ export default function HeroCarousel() {
             </div>
 
             <div className="gv-hero-title-wrap">
-              <span className="gv-hero-badge">{slide.badge}</span>
+              <span className="gv-hero-badge">{localized(slide.badge)}</span>
 
               <h1 key={slide.title} className="gv-hero-title">
-                {slide.title}
+                {localized(slide.title)}
               </h1>
             </div>
 
             <p key={slide.subtitle} className="gv-hero-subtitle">
-              {slide.subtitle}
+              {localized(slide.subtitle)}
             </p>
 
             <div className="gv-hero-actions">
@@ -150,7 +177,7 @@ export default function HeroCarousel() {
                 href={slide.href}
                 className={`${styles.heroCta} gv-primary-button`}
               >
-                <span>{slide.cta}</span>
+                <span>{localized(slide.cta)}</span>
 
                 <svg
                   width="18"
@@ -167,7 +194,7 @@ export default function HeroCarousel() {
               </Link>
 
               <Link href="/games" className="gv-secondary-button">
-                تصفح المنصة
+                {localized("تصفح المنصة")}
               </Link>
             </div>
           </div>
@@ -313,7 +340,7 @@ export default function HeroCarousel() {
           overflow: hidden;
           min-height: clamp(430px, 58vw, 650px);
           border-radius: 28px;
-          background: #070914;
+          background: #160b06;
           border: 1px solid rgba(255, 255, 255, 0.09);
           box-shadow:
             0 25px 80px rgba(0, 0, 0, 0.45),
@@ -610,7 +637,7 @@ export default function HeroCarousel() {
             linear-gradient(
               145deg,
               var(--visual-accent),
-              #11152c 48%,
+              #301b0f 48%,
               var(--visual-accent-2)
             );
           box-shadow:
@@ -634,7 +661,7 @@ export default function HeroCarousel() {
           justify-content: center;
           border-radius: 26%;
           border: 1px solid rgba(255, 255, 255, 0.2);
-          background: rgba(4, 6, 18, 0.58);
+          background: rgba(20, 9, 3, 0.58);
           backdrop-filter: blur(12px);
           transform: rotate(8deg);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
@@ -664,7 +691,7 @@ export default function HeroCarousel() {
           padding: 11px 14px;
           border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 14px;
-          background: rgba(10, 13, 30, 0.6);
+          background: rgba(33, 17, 8, 0.6);
           backdrop-filter: blur(18px);
           box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }

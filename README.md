@@ -164,7 +164,9 @@ The public sitemap is also generated dynamically from the database.
 
 ## External integrations
 
-The project deliberately does not fake external integrations. Payment, payout/blockchain, AI, gaming-account import, email/push and external game/audio sources require real provider credentials and provider-specific adapters.
+GameVortex AI runtime setup and implementation limits are documented in [docs/GAMEVORTEX_AI.md](docs/GAMEVORTEX_AI.md).
+
+The project deliberately does not fake external integrations. Payment, payout/blockchain, gaming-account import, email/push and external game/audio sources require real provider credentials and provider-specific adapters. GameVortex AI uses a self-hosted Ollama-compatible chat runtime. This repository does not bundle model weights; deploy the authenticated gateway from [`self-hosted-ai`](self-hosted-ai/README.md) and follow its Vercel setup before expecting real answers.
 
 Do not mark an integration as production-ready merely because its interface exists. A provider is production-ready only after:
 
