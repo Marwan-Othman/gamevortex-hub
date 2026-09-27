@@ -1,4 +1,40 @@
-متع بالميزات الأساسية داخل GameVortex Hub.", en: "Start for free and enjoy the core GameVortex Hub features." },
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+import styles from "./vip.module.css";
+import { useLocale } from "@/components/ui/useLocale";
+
+type Plan = {
+  code: string;
+  kind: string;
+  emoji: string;
+  nameAr: string;
+  nameEn: string;
+  priceCents: number;
+  priceLabel: string;
+  currency: string;
+  durationMonths: number | null;
+  purchasable: boolean;
+  pointsMultiplier: number;
+};
+
+type Status = {
+  isOwner: boolean;
+  isVip: boolean;
+  status: string;
+  planCode: string;
+  subscriptionId: string | null;
+  startedAt: string | null;
+  expiresAt: string | null;
+  points: number;
+  pointsMultiplier: number;
+};
+
+const PLAN_DESCRIPTIONS: Record<string, { ar: string; en: string }> = {
+  FREE:
+    { ar: "ابدأ مجانًا واستمتع بالميزات الأساسية داخل GameVortex Hub.", en: "Start for free and enjoy the core GameVortex Hub features." },
 
   VIP_1M:
     { ar: "خطة مناسبة لتجربة مزايا VIP والحصول على نقاط أكثر.", en: "A great way to try VIP benefits and earn more points." },
