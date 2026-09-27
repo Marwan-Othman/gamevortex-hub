@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardRead } from "@/lib/api";
 import { db } from "@/lib/prisma";
+import { getOptionalUser } from "@/lib/auth";
 import {
   type VipPlanKind,
 } from "@/lib/vip-plans";
@@ -10,12 +11,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/vip/plans
  * قائمة باقات VIP (عامة، لا تحتاج تسجيل دخول). الأسعار والمدد من الخادم.
- *
- * ملاحظة مهمة:
- * باقة OWNER مستثناة عمدًا من هذه القائمة العامة.
- * عضوية المالك ليست باقة يمكن لأي مستخدم أن يراها أو يختارها —
- * هي مشتقة من دور الحساب (SUPER_ADMIN) فقط، ولها قسم منفصل
- * وثابت في واجهة صفحة VIP لا يعتمد على هذه القائمة إطلاقًا.
+ * خطة OWNER تُستثنى دائمًا إلا لحساب SUPER_ADMIN نفسه.
  */
 export async function GET(request: NextRequest) {
   const blocked = await guardRead(request, "vip:plans", 120);
@@ -24,13 +20,20 @@ export async function GET(request: NextRequest) {
     return blocked;
   }
 
+  const currentUser = await getOptionalUser();
+  const isOwner = currentUser?.role === "SUPER_ADMIN";
+
   const plans =
     await db.vipPlan.findMany({
       where: {
         active: true,
-        code: {
-          not: "OWNER",
-        },
+        ...(isOwner
+          ? {}
+          : {
+              code: {
+                not: "OWNER",
+              },
+            }),
       },
       orderBy: {
         sortOrder:
