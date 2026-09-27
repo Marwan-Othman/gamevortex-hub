@@ -140,9 +140,9 @@ export default function HeroCarousel() {
                 ),
                 linear-gradient(
                   135deg,
-                  #ffffff 0%,
-                  #fffaf2 48%,
-                  #ffeff2 100%
+                  rgba(5, 8, 22, 0.98) 0%,
+                  rgba(10, 17, 40, 0.96) 48%,
+                  rgba(28, 8, 35, 0.98) 100%
                 )
               `,
             } as React.CSSProperties
