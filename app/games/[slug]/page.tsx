@@ -121,6 +121,33 @@ export default async function GameDetails({
     notFound();
   }
 
+  const relatedCategoryIds = game.gameCategories.map(
+    (item) => item.categoryId,
+  );
+
+  const relatedGames = relatedCategoryIds.length
+    ? await db.game.findMany({
+        where: {
+          published: true,
+          id: {
+            not: game.id,
+          },
+          gameCategories: {
+            some: {
+              categoryId: {
+                in: relatedCategoryIds,
+              },
+            },
+          },
+        },
+        orderBy: [
+          { ratingAverage: "desc" },
+          { ratingCount: "desc" },
+        ],
+        take: 6,
+      })
+    : [];
+
   const score = vortexScore(game);
 
   const platformItems = game.gamePlatforms
@@ -268,6 +295,45 @@ export default async function GameDetails({
           )}
         </div>
       </section>
+
+      {relatedGames.length > 0 && (
+        <section>
+          <h2>ألعاب ذات صلة</h2>
+
+          <div className="grid">
+            {relatedGames.map((related) => (
+              <Link
+                href={`/games/${related.slug}`}
+                className="glass card"
+                key={related.id}
+              >
+                {related.coverUrl && (
+                  <img
+                    src={related.coverUrl}
+                    alt={related.titleEn}
+                    style={{
+                      width: "100%",
+                      borderRadius: 12,
+                      marginBottom: 8,
+                    }}
+                  />
+                )}
+
+                <h3>{related.titleAr}</h3>
+
+                <p className="muted">
+                  {related.titleEn}
+                </p>
+
+                <p>
+                  ★ {related.ratingAverage.toFixed(1)}{" "}
+                  ({related.ratingCount})
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <GameActions gameId={game.id} />
 
