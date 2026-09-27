@@ -863,6 +863,19 @@ export async function POST(
         "PAYPAL_ERROR",
       ]);
 
+    /*
+     * لا نكشف رسالة الخطأ الحقيقية للمستخدم (قد تحتوي
+     * على تفاصيل داخلية من مزود الدفع)، لكن نسجّلها هنا
+     * بسجلات السيرفر (Vercel Runtime Logs) حتى يمكن
+     * تشخيص أي خطأ غير متوقع لاحقًا دون تخمين.
+     */
+    if (!knownErrors.has(message)) {
+      console.error(
+        "[vip-checkout] unexpected error:",
+        message,
+      );
+    }
+
     const status =
       message === "UNAUTHORIZED"
         ? 401
