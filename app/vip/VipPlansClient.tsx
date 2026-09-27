@@ -1,40 +1,4 @@
-"use client";
-
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-
-import styles from "./vip.module.css";
-import { useLocale } from "@/components/ui/useLocale";
-
-type Plan = {
-  code: string;
-  kind: string;
-  emoji: string;
-  nameAr: string;
-  nameEn: string;
-  priceCents: number;
-  priceLabel: string;
-  currency: string;
-  durationMonths: number | null;
-  purchasable: boolean;
-  pointsMultiplier: number;
-};
-
-type Status = {
-  isOwner: boolean;
-  isVip: boolean;
-  status: string;
-  planCode: string;
-  subscriptionId: string | null;
-  startedAt: string | null;
-  expiresAt: string | null;
-  points: number;
-  pointsMultiplier: number;
-};
-
-const PLAN_DESCRIPTIONS: Record<string, { ar: string; en: string }> = {
-  FREE:
-    { ar: "ابدأ مجانًا واستمتع بالميزات الأساسية داخل GameVortex Hub.", en: "Start for free and enjoy the core GameVortex Hub features." },
+متع بالميزات الأساسية داخل GameVortex Hub.", en: "Start for free and enjoy the core GameVortex Hub features." },
 
   VIP_1M:
     { ar: "خطة مناسبة لتجربة مزايا VIP والحصول على نقاط أكثر.", en: "A great way to try VIP benefits and earn more points." },
@@ -715,50 +679,50 @@ export default function VipPlansClient() {
         </div>
       </section>
 
-      <section className={styles.ownerCard}>
-        <div className={styles.ownerIcon}>
-          <CrownIcon />
-        </div>
-
-        <div
-          className={styles.ownerContent}
-        >
-          <div
-            className={styles.ownerTitleRow}
-          >
-            <span>OWNER VIP</span>
-            <small>SPECIAL</small>
+      {status?.isOwner ? (
+        <section className={styles.ownerCard}>
+          <div className={styles.ownerIcon}>
+            <CrownIcon />
           </div>
 
-          <h2>
-            {english ? "Permanent owner membership" : "عضوية المالك الدائمة"}
-          </h2>
+          <div
+            className={styles.ownerContent}
+          >
+            <div
+              className={styles.ownerTitleRow}
+            >
+              <span>OWNER VIP</span>
+              <small>SPECIAL</small>
+            </div>
 
-          <p>
-            {english ? "For SUPER_ADMIN accounts only. Includes VIP benefits and owner permissions." : "مخصصة لحساب SUPER_ADMIN فقط. تشمل جميع مزايا VIP مع الوصول إلى صلاحيات المالك والميزات الخاصة."}
-          </p>
+            <h2>
+              {english ? "Permanent owner membership" : "عضوية المالك الدائمة"}
+            </h2>
+
+            <p>
+              {english ? "For SUPER_ADMIN accounts only. Includes VIP benefits and owner permissions." : "مخصصة لحساب SUPER_ADMIN فقط. تشمل جميع مزايا VIP مع الوصول إلى صلاحيات المالك والميزات الخاصة."}
+            </p>
+
+            <div
+              className={styles.ownerFeatures}
+            >
+              <span>{english ? "♾ Lifetime VIP" : "♾ VIP دائم"}</span>
+              <span>{english ? "👑 All benefits" : "👑 جميع المزايا"}</span>
+              <span>{english ? "⚙️ Owner permissions" : "⚙️ صلاحيات المالك"}</span>
+            </div>
+          </div>
 
           <div
-            className={styles.ownerFeatures}
+            className={styles.ownerAccess}
           >
-            <span>{english ? "♾ Lifetime VIP" : "♾ VIP دائم"}</span>
-            <span>{english ? "👑 All benefits" : "👑 جميع المزايا"}</span>
-            <span>{english ? "⚙️ Owner permissions" : "⚙️ صلاحيات المالك"}</span>
+            <strong>{english ? "Free" : "مجاني"}</strong>
+
+            <span>
+              {english ? "Owner VIP is active" : "تم تفعيل Owner VIP"}
+            </span>
           </div>
-        </div>
-
-        <div
-          className={styles.ownerAccess}
-        >
-          <strong>{english ? "Free" : "مجاني"}</strong>
-
-          <span>
-            {status?.isOwner
-              ? (english ? "Owner VIP is active" : "تم تفعيل Owner VIP")
-              : (english ? "Owner only" : "مخصص للمالك")}
-          </span>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className={styles.whySection}>
         <div
