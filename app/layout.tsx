@@ -23,6 +23,10 @@ export const metadata = {
   title: "GameVortex Hub",
   description: "بوابتك الموحدة لجميع منصات الألعاب",
   metadataBase: getMetadataBase(),
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport = {
