@@ -192,6 +192,59 @@ async function paypalAccessToken() {
   return data.access_token;
 }
 
+/**
+ * يبني رسالة خطأ مفصّلة من استجابة PayPal.
+ *
+ * PayPal بيرجع بمعظم الأخطاء حقل "details" فيه Array من
+ * { issue, description } — هاد هو السبب الحقيقي والدقيق.
+ * الرسالة العلوية (message/name) عادة عامة جدًا ("UNPROCESSABLE_ENTITY").
+ *
+ * منحتفظ كمان بـ debug_id يلي PayPal بيرجعه، لأنه بيلزم
+ * لو احتجنا نفتح تذكرة دعم فني مع PayPal.
+ */
+function buildPayPalErrorMessage(
+  data: Record<string, unknown>,
+): string {
+  const baseMessage = String(
+    data?.message || data?.name || "PAYPAL_ERROR",
+  );
+
+  const details =
+    Array.isArray(data?.details)
+      ? (data.details as Array<Record<string, unknown>>)
+          .map((detail) => {
+            const issue =
+              typeof detail?.issue === "string"
+                ? detail.issue
+                : "";
+
+            const description =
+              typeof detail?.description === "string"
+                ? detail.description
+                : "";
+
+            return [issue, description]
+              .filter(Boolean)
+              .join(": ");
+          })
+          .filter(Boolean)
+          .join(" | ")
+      : "";
+
+  const debugId =
+    typeof data?.debug_id === "string"
+      ? data.debug_id
+      : "";
+
+  return [
+    baseMessage,
+    details,
+    debugId ? `debug_id=${debugId}` : "",
+  ]
+    .filter(Boolean)
+    .join(" — ");
+}
+
 async function paypalRequest(
   path: string,
   body: unknown,
@@ -218,11 +271,7 @@ async function paypalRequest(
 
   if (!response.ok) {
     throw new Error(
-      String(
-        data?.message ||
-          data?.name ||
-          "PAYPAL_ERROR",
-      ),
+      buildPayPalErrorMessage(data),
     );
   }
 
