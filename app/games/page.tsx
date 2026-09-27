@@ -181,9 +181,9 @@ export default async function Games({
       search.set("sort", sort);
     }
 
-    if (page > 1) {
-      search.set("page", String(page));
-    }
+    // لا نحافظ على رقم الصفحة الحالي هنا: تغيير فلتر المنصة
+    // يجب أن يرجع دائمًا إلى الصفحة 1، لأن نتائج الفلتر الجديد
+    // قد لا تملك نفس عدد الصفحات.
 
     const query = search.toString();
 
