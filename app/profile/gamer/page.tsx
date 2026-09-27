@@ -80,14 +80,10 @@ export default async function GamerProfilePage() {
   );
 
   /*
-   * تم فصل الاستعلامات عن Promise.all الكبير.
-   *
-   * السبب:
-   * كان db.referralsMade غير موجود في Prisma Client،
-   * وهذا أدى إلى كسر استنتاج الأنواع في بقية الصفحة.
-   *
-   * سيتم ربط الإحالات بالـ Prisma model الصحيح بعد
-   * التأكد من الاسم الموجود فعليًا في schema.prisma.
+   * ملاحظة: كانت هذه الاستعلامات مفصولة سابقًا عن Promise.all
+   * الرئيسي بسبب خطأ في استعلام الإحالات (تم إصلاحه أدناه).
+   * الفصل لم يعد ضروريًا تقنيًا، لكن تُركت الاستعلامات منفصلة
+   * الآن لتفادي أي تغيير غير ضروري في البنية.
    */
 
   const achievementsCount =
@@ -202,16 +198,22 @@ export default async function GamerProfilePage() {
   /*
    * الإحالات:
    *
-   * db.referralsMade غير موجود في Prisma Client الحالي.
-   *
-   * نضع القيم 0 مؤقتًا بدل استخدام Model غير موجود
-   * أو تعطيل بناء المشروع بالكامل.
-   *
-   * بعد معرفة Model الإحالات الصحيح من schema.prisma
-   * نستبدل هذين السطرين فقط بالاستعلام الحقيقي.
+   * تم إصلاح المشكلة — الـ Model الصحيح في schema.prisma هو
+   * `Referral` (وليس referralsMade)، والعلاقة بالمُحيل هي
+   * referrerId. نجلب العدد الحقيقي من قاعدة البيانات.
    */
-  const referralsCount = 0;
-  const rewardedReferralsCount = 0;
+  const referralsCount = await db.referral.count({
+    where: {
+      referrerId: user.id,
+    },
+  });
+
+  const rewardedReferralsCount = await db.referral.count({
+    where: {
+      referrerId: user.id,
+      status: "REWARDED",
+    },
+  });
 
   const dayBuckets = Array.from({
     length: 7,
