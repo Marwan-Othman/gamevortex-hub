@@ -11,6 +11,8 @@ const PLATFORMS = [
   { name: "VIP", en: "VIP", href: "/vip", icon: <span>✦</span> },
   { name: "الذكاء", en: "AI", href: "/ai", icon: <span>✧</span> },
   { name: "المكافآت", en: "Rewards", href: "/rewards", icon: <span>★</span> },
+  { name: "القرآن الكريم", en: "Quran", href: "/quran", icon: <span>۞</span> },
+  { name: "السحوبات", en: "Draws", href: "/draws", icon: <span>◎</span> },
 ];
 
 export default function PlatformRow() {
