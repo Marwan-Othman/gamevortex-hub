@@ -78,9 +78,8 @@ function CrownIcon() {
 const navigationItems = [
   { href: "/", label: "Home", Icon: HomeIcon },
   { href: "/games", label: "Games", Icon: GameIcon },
-  { href: "/apps", label: "Apps", Icon: GridIcon },
+  { href: "/ai", label: "Vortex", Icon: GridIcon },
   { href: "/library", label: "Vault", Icon: GridIcon },
-  { href: "/vip", label: "VIP", Icon: CrownIcon },
   { href: "/profile/gamer", label: "Profile", Icon: UserIcon },
 ];
 
@@ -99,8 +98,8 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const locale = useLocale();
   const labels: Record<string, string> = locale === "ar"
-    ? { Home: "الرئيسية", Games: "الألعاب", Apps: "التطبيقات", VIP: "VIP", Vault: "المكتبة", Profile: "حسابي" }
-    : { Home: "Home", Games: "Games", VIP: "VIP", Vault: "Library", Profile: "Profile" };
+    ? { Home: "الرئيسية", Games: "الألعاب", Vortex: "Vortex", Vault: "الخزنة", Profile: "حسابي" }
+    : { Home: "Home", Games: "Games", Vortex: "Vortex", Vault: "Vault", Profile: "Profile" };
 
   return (
     <nav
