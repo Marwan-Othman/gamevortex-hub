@@ -1,9 +1,60 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { db } from "@/lib/prisma";
 import { getPlatformSlugFromEnum } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  const app = await db.app.findFirst({
+    where: { slug, published: true },
+    select: {
+      nameAr: true,
+      nameEn: true,
+      descriptionAr: true,
+      descriptionEn: true,
+      coverUrl: true,
+      iconUrl: true,
+      slug: true,
+    },
+  });
+
+  if (!app) {
+    return { title: "التطبيق غير موجود | GameVortex Hub" };
+  }
+
+  const title = `${app.nameAr} | GameVortex Hub`;
+
+  const description = (
+    app.descriptionAr ||
+    app.descriptionEn ||
+    `اكتشف ${app.nameEn} على GameVortex Hub.`
+  ).slice(0, 160);
+
+  const base = process.env.APP_ORIGIN?.trim() || "http://localhost:3000";
+  const canonical = `${base}/apps/${app.slug}`;
+  const image = app.coverUrl || app.iconUrl;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      images: image ? [{ url: image }] : [],
+    },
+  };
+}
 
 export default async function AppDetails({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
