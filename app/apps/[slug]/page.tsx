@@ -15,8 +15,6 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
 
   if (!app) notFound();
 
-  await db.app.update({ where: { id: app.id }, data: { viewCount: { increment: 1 } } });
-
   const relatedCategoryIds = app.appCategories.map((item) => item.categoryId);
 
   const relatedApps = relatedCategoryIds.length
