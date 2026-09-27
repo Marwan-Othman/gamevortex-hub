@@ -19,7 +19,9 @@ const NAV_LINKS = [
   { href: "/marketplace", label: "Store", icon: StoreIcon },
   { href: "/library", label: "Library", icon: LibraryIcon },
   { href: "/wallet", label: "Wallet", icon: WalletIcon },
+  { href: "/gift-cards", label: "Gift Cards", icon: GiftCardIcon },
   { href: "/rewards", label: "Rewards", icon: GiftIcon },
+  { href: "/draws", label: "Draws", icon: DrawsIcon },
   { href: "/referrals", label: "Referrals", icon: UsersIcon },
   { href: "/rankings", label: "Rank", icon: TrophyIcon },
   { href: "/quran", label: "Quran", icon: BookIcon },
@@ -111,6 +113,25 @@ function GiftIcon() {
       <path d="M12 9v11" />
       <path d="M12 9H8.5a2.5 2.5 0 1 1 2.5-2.5V9Z" />
       <path d="M12 9h3.5a2.5 2.5 0 1 0-2.5-2.5V9Z" />
+    </Icon>
+  );
+}
+
+function GiftCardIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="6" width="18" height="12" rx="2.5" />
+      <path d="M3 10h18" />
+      <path d="M7 15h4" />
+    </Icon>
+  );
+}
+
+function DrawsIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4l3 2" />
     </Icon>
   );
 }
@@ -286,7 +307,7 @@ export default function SiteHeader() {
 
   const profileHref = "/profile/gamer";
   const translateNav = (label: string) => language === "ar"
-    ? ({ Games: "الألعاب", Apps: "التطبيقات", VIP: "VIP", Store: "المتجر", Library: "المكتبة", Wallet: "المحفظة", Rewards: "المكافآت", Referrals: "الإحالات", Rank: "الترتيب", Quran: "القرآن", Profile: "الملف الشخصي", "GameVortex AI": "GameVortex AI", "الإدارة": "الإدارة" } as Record<string, string>)[label] || label
+    ? ({ Games: "الألعاب", Apps: "التطبيقات", VIP: "VIP", Store: "المتجر", Library: "المكتبة", Wallet: "المحفظة", "Gift Cards": "بطاقات الهدايا", Rewards: "المكافآت", Draws: "السحوبات", Referrals: "الإحالات", Rank: "الترتيب", Quran: "القرآن", Profile: "الملف الشخصي", "GameVortex AI": "GameVortex AI", "الإدارة": "الإدارة" } as Record<string, string>)[label] || label
     : ({ "GameVortex AI": "GameVortex AI", "الإدارة": "Admin" } as Record<string, string>)[label] || label;
 
   const publicNavLinks = isOwner
