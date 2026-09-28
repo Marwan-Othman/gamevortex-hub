@@ -13,6 +13,7 @@ const areas = [
   ["المراجعة", "Moderation", "/admin/moderation", "البلاغات وإجراءات الإشراف.", "Reports and moderation actions."],
   ["القرآن", "Quran", "/admin/quran", "القراء ومصادر المحتوى.", "Reciters and content sources."],
   ["الأخطاء", "Errors", "/admin/errors", "أخطاء النظام وسجل التشغيل.", "System errors and runtime logs."],
+  ["GameVortex AI Trading", "GameVortex AI Trading", "/admin/trading", "تخصيص رصيد التداول وإدارة نظام التداول (للمالك فقط).", "Trading balance allocation and trading system (owner only)."],
   ["الإعدادات", "Settings", "/admin/settings", "إعدادات النظام والتكاملات.", "System and integration settings."],
 ] as const;
 export default async function OwnerControlPage() {

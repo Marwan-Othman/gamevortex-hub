@@ -35,8 +35,14 @@ export async function createAllocation(input: {
   const key = input.idempotencyKey;
 
   return db.$transaction(async (tx) => {
-    const wallet = await tx.ownerWallet.findUnique({ where: { ownerId: input.ownerId } });
-    if (!wallet) throw new Error("OWNER_WALLET_NOT_FOUND");
+    // The wallet row is normally created by the first payment credit. Creating
+    // it here is harmless (0 points) and gives the owner the accurate
+    // INSUFFICIENT_POINTS error instead of "wallet not found".
+    const wallet = await tx.ownerWallet.upsert({
+      where: { ownerId: input.ownerId },
+      update: {},
+      create: { ownerId: input.ownerId },
+    });
 
     const existing = await tx.tradingAllocation.findUnique({ where: { idempotencyKey: key } });
     if (existing) {
