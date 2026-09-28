@@ -182,3 +182,30 @@ export function assertShariahApproved(decision: ShariahDecision): void {
     throw new Error(`SHARIAH_${decision.status}`);
   }
 }
+
+/** State of the stored policy row (ShariahPolicy) that a decision was made under. */
+export type PolicyReviewState = {
+  status: "ACTIVE" | "INACTIVE";
+  reviewedAt: Date | string | null;
+};
+
+/**
+ * Review gate: a policy that is not ACTIVE and reviewed by a qualified
+ * specialist can never produce APPROVED. APPROVED is downgraded to REVIEW;
+ * REVIEW and REJECTED are unchanged. Missing policy state also fails closed.
+ */
+export function applyPolicyReviewGate(
+  decision: ShariahDecision,
+  policyState: PolicyReviewState | null | undefined,
+): ShariahDecision {
+  if (decision.status !== "APPROVED") return decision;
+
+  const reviewed = !!policyState && policyState.status === "ACTIVE" && !!policyState.reviewedAt;
+  if (reviewed) return decision;
+
+  return {
+    ...decision,
+    status: "REVIEW",
+    reasons: [...decision.reasons, "POLICY_NOT_REVIEWED_OR_NOT_ACTIVE"],
+  };
+}

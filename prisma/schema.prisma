@@ -108,6 +108,8 @@ model User {
   ownerWallet OwnerWallet?
   tradingAccount TradingAccount?
   tradingRiskConfig TradingRiskConfig?
+  tradingControl TradingControl?
+  shariahAuditLogs ShariahAuditLog[]
 
   pointLedger PointLedger[]
 
@@ -1532,6 +1534,7 @@ model ShariahPolicy {
 
   rules ShariahRule[]
   assetProfiles AssetShariahProfile[]
+  auditLogs ShariahAuditLog[]
 
   @@index([status, createdAt])
 }
@@ -1597,4 +1600,44 @@ model TradingRiskConfig {
   owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
   @@index([enabled, updatedAt])
+}
+
+// ---------------------------------------------------------------------------
+// GameVortex AI Trading — Phase 2b: Shariah audit trail + Emergency Stop /
+// Circuit Breaker state. ShariahAuditLog is append-only (DB trigger).
+// ---------------------------------------------------------------------------
+
+model ShariahAuditLog {
+  id String @id @default(cuid())
+  actorUserId String?
+  policyId String
+  policyVersion String
+  symbol String
+  status ShariahStatus
+  reasons String[]
+  input Json
+  source String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  policy ShariahPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@index([symbol, createdAt])
+  @@index([policyId, createdAt])
+  @@index([status, createdAt])
+}
+
+model TradingControl {
+  id String @id @default(cuid())
+  ownerId String @unique
+
+  emergencyStopped Boolean @default(false)
+  emergencyStoppedAt DateTime?
+  emergencyReason String?
+  circuitBreakerReasons String[]
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
