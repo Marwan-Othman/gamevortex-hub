@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gamevortex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gamevortex
+      POSTGRES_PASSWORD: gamevortex_password
+      POSTGRES_DB: gamevortex
+    ports:
+      - "5432:5432"
+    volumes:
+      - gamevortex_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamevortex -d gamevortex"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  gamevortex_pgdata:

@@ -1,0 +1,97 @@
+/* GameVortex design system: pine ground, ember accent, sand ink. Loaded last so it recolors every legacy --gv-* variable in one place. */
+:root{color-scheme:dark;--bg:#050507;--panel:#0D0B14;--panel2:#171322;--ink:#F7F3EA;--muted:#9B96A8;--line:rgba(244,236,221,.12);
+--ember:#7C3AED;--gold:#F4C95D;--mint:#8B5CF6;--copper:#D6A83F;--on-accent:#1a0c07;
+--a:var(--ember);--b:var(--gold);--c:var(--mint);
+--gv-bg:var(--bg);--gv-bg-2:var(--panel);--gv-panel:var(--panel);--gv-panel-strong:var(--panel2);--gv-surface:var(--panel);--gv-surface-2:var(--panel2);
+--gv-text:var(--ink);--gv-muted:var(--muted);--gv-line:var(--line);--gv-border:var(--line);--gv-header-border:var(--line);
+--gv-cyan:var(--ember);--gv-neon-cyan:var(--ember);--gv-blue:var(--copper);--gv-neon-blue:var(--copper);--gv-purple:var(--gold);--gv-purple-2:var(--gold);--gv-neon-purple:var(--gold);--gv-violet:var(--gold);
+--gv-pink:var(--ember);--gv-neon-pink:var(--ember);--gv-gold:var(--gold);--gv-green:var(--mint);--gv-orange:var(--ember);
+--gv-cosmic-bg:var(--bg);--gv-cosmic-line:var(--line);--gv-cosmic-cyan:var(--ember);--gv-cosmic-violet:var(--gold);--gv-cosmic-orange:var(--ember);
+--font-d:var(--font-display),Lalezar,system-ui,sans-serif;--font-b:var(--font-body),"IBM Plex Sans Arabic",system-ui,sans-serif}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--font-b);line-height:1.7;background-image:none}
+body:before{content:none}
+h1,h2,h3,.brand,.gv-brand-text{font-family:var(--font-d);font-weight:400;letter-spacing:0}
+.site-header,.gv-header{background:rgba(11,22,20,.88);border-color:var(--line);box-shadow:none;backdrop-filter:blur(12px)}
+.gv-nav-link,.site-header nav a{color:var(--muted)}
+.gv-nav-link:hover,.site-header nav a:hover{color:var(--ink);background:var(--panel2)}
+.gv-nav-link.is-active{color:var(--on-accent);background:var(--ember)}
+.hero,.card,.stat,.glass{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:none}
+.hero:after{content:none}
+.btn{background:var(--ember);color:var(--on-accent);border:0;border-radius:10px;box-shadow:none;font-weight:700}
+.btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.badge,.pill{background:var(--panel2)!important;border-color:var(--line)!important;color:var(--gold)!important}
+.input,.platform-chip{background:var(--panel2)!important;border-color:var(--line)!important;color:var(--ink)!important}
+.mobile-bottom-nav,.gv-bottom-nav{background:var(--panel);border-color:var(--line);box-shadow:none}
+.mobile-bottom-nav a.active,.gv-bottom-nav a.active{color:var(--ember)}
+.footer,.gv-footer{border-color:var(--line);color:var(--muted)}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+/* ============================================================
+   GAMEVORTEX LUXURY PURPLE + GOLD MASTER THEME
+   Applied across public pages, auth, VIP, AI, profile and owner/admin.
+   ============================================================ */
+:root{
+  --gv-black:#050507;
+  --gv-obsidian:#08080d;
+  --gv-panel-lux:#0d0b14;
+  --gv-panel-2-lux:#171322;
+  --gv-purple-lux:#8b5cf6;
+  --gv-violet-lux:#6d28d9;
+  --gv-purple-soft:#c084fc;
+  --gv-gold-lux:#f4c95d;
+  --gv-gold-soft:#ffe9a8;
+  --gv-ivory:#f7f3ea;
+  --gv-muted-lux:#9b96a8;
+  --gv-line-lux:rgba(244,201,93,.14);
+}
+html,body{background:#050507!important;color:#f7f3ea!important}
+body{
+ background:
+ radial-gradient(900px 500px at 12% -5%,rgba(139,92,246,.14),transparent 62%),
+ radial-gradient(760px 460px at 92% 8%,rgba(244,201,93,.09),transparent 64%),
+ linear-gradient(180deg,#050507 0%,#08070d 52%,#050507 100%)!important;
+}
+body:before{opacity:.055!important;background-size:52px 52px!important}
+.site-header,.gv-header{
+ background:rgba(5,5,7,.78)!important;
+ border-color:rgba(244,201,93,.14)!important;
+ box-shadow:0 14px 50px rgba(0,0,0,.32)!important;
+ backdrop-filter:blur(22px)!important;
+}
+.brand-mark{background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(244,201,93,.18))!important;border-color:rgba(244,201,93,.35)!important;box-shadow:0 0 35px rgba(139,92,246,.2)!important}
+.site-header nav a:hover,.gv-nav-link:hover{background:rgba(139,92,246,.12)!important;color:#fff!important}
+.site-header nav a.is-active,.gv-nav-link.is-active{background:linear-gradient(135deg,#7c3aed,#8b5cf6)!important;color:#fff!important;box-shadow:0 8px 28px rgba(124,58,237,.25)!important}
+.hero,.card,.stat,.glass{
+ background:linear-gradient(145deg,rgba(20,16,30,.92),rgba(8,8,13,.94))!important;
+ border-color:rgba(244,201,93,.13)!important;
+ box-shadow:0 22px 70px rgba(0,0,0,.32),inset 0 1px rgba(255,255,255,.035)!important;
+}
+.btn{background:linear-gradient(135deg,#7c3aed,#8b5cf6)!important;color:#fff!important;box-shadow:0 10px 30px rgba(124,58,237,.24)!important}
+.btn.secondary{background:rgba(255,255,255,.025)!important;color:#f7f3ea!important;border-color:rgba(244,201,93,.22)!important}
+.badge,.pill{background:rgba(139,92,246,.10)!important;border-color:rgba(139,92,246,.24)!important;color:#d8b4fe!important}
+.input,.platform-chip{background:rgba(10,9,15,.82)!important;border-color:rgba(244,201,93,.14)!important;color:#f7f3ea!important}
+.mobile-bottom-nav,.gv-bottom-nav{background:rgba(8,7,12,.92)!important;border-color:rgba(244,201,93,.16)!important;box-shadow:0 -10px 40px rgba(0,0,0,.35)!important;backdrop-filter:blur(20px)!important}
+.mobile-bottom-nav a.active,.gv-bottom-nav a.active{color:#f4c95d!important}
+.footer,.gv-footer{border-color:rgba(244,201,93,.12)!important}
+a:focus-visible,button:focus-visible,input:focus-visible{outline-color:#f4c95d!important}
+
+/* universal page surfaces */
+[class*="page"]{scroll-margin-top:90px}
+[class*="page"] [class*="card"],
+[class*="page"] [class*="Card"],
+[class*="page"] [class*="panel"],
+[class*="page"] [class*="Panel"],
+[class*="page"] [class*="tile"],
+[class*="page"] [class*="Tile"]{
+ border-color:rgba(244,201,93,.13)!important;
+ box-shadow:0 18px 55px rgba(0,0,0,.25)!important;
+}
+
+/* Luxury accent utility */
+.vip,.premium,[class*="vip" i],[class*="premium" i]{--lux-accent:#f4c95d}
+
+@media(max-width:700px){
+ .site-header nav{gap:2px}
+ .hero,.card{border-radius:20px!important}
+}
