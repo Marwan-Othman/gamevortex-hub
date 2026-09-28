@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import { getTradingSummary } from "@/lib/trading/allocation";
 import { tradingMaxAllocationUsd, TRADING_MIN_ALLOCATION_USD } from "@/lib/trading/money";
+import AdminShell from "@/components/admin/AdminShell";
 import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
 import styles from "../admin.module.css";
 
@@ -20,8 +21,8 @@ export default async function TradingPage() {
   const summary = await getTradingSummary(result.owner.id);
 
   return (
-    <main className="wrap" dir="rtl">
-      <section className={`${styles.ownerCard} glass`}>
+    <AdminShell ownerLabel={result.owner.username || result.owner.email}>
+      <section className={styles.ownerCard}>
         <div className={styles.ownerCardName}>GameVortex AI Trading — Owner Edition</div>
         <p className="muted">
           وضع التطوير: لا يوجد تداول حقيقي بعد. هذه المرحلة تخصّص رصيد التداول فقط (Owner Wallet ← Trading Balance)، وكل حركة مسجلة في Ledger لا يمكن تعديله.
@@ -45,6 +46,6 @@ export default async function TradingPage() {
         minUsd={TRADING_MIN_ALLOCATION_USD}
         maxUsd={tradingMaxAllocationUsd()}
       />
-    </main>
+    </AdminShell>
   );
 }

@@ -208,6 +208,7 @@ export default async function Admin() {
           <Link href="/admin/draws" className={styles.actionBtn}><IconDraws /> إدارة السحوبات</Link>
           <Link href="/admin/moderation" className={styles.actionBtn}><IconShield /> المراجعة والمحتوى</Link>
           <Link href="/admin/gift-cards" className={styles.actionBtn}><IconCards /> جلب البطاقات</Link>
+          <Link href="/admin/trading" className={styles.actionBtn}><IconShield /> GameVortex AI Trading</Link>
         </div>
       </section>
 
