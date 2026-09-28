@@ -3,12 +3,13 @@ import SiteHeader from "@/components/layout/SiteHeader";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import SiteFooter from "@/components/layout/SiteFooter";
 import PwaRegister from "@/components/pwa/PwaRegister";
-import { Lalezar, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Tajawal, Cairo } from "next/font/google";
 import "./styles.css";
 import "./theme.css";
+import "./redesign.css";
 
-const fontDisplay = Lalezar({ subsets: ["arabic", "latin"], weight: "400", variable: "--font-display", display: "swap" });
-const fontBody = IBM_Plex_Sans_Arabic({ subsets: ["arabic", "latin"], weight: ["400", "500", "700"], variable: "--font-body", display: "swap" });
+const fontDisplay = Tajawal({ subsets: ["arabic", "latin"], weight: ["700", "800", "900"], variable: "--font-display", display: "swap" });
+const fontBody = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-body", display: "swap" });
 
 function getMetadataBase() {
   const origin = process.env.APP_ORIGIN?.trim();
@@ -38,7 +39,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#0B1614",
+  themeColor: "#0A0C10",
   colorScheme: "dark",
 };
 

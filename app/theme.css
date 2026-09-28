@@ -1,28 +1,18 @@
-/* GameVortex design system: pine ground, ember accent, sand ink. Loaded last so it recolors every legacy --gv-* variable in one place. */
-:root{color-scheme:dark;--bg:#0B1614;--panel:#12211E;--panel2:#1A2D29;--ink:#F4ECDD;--muted:#A3B3A9;--line:rgba(244,236,221,.12);
---ember:#FF6B3D;--gold:#F2C14E;--mint:#5EE0B0;--copper:#D08A55;--on-accent:#1a0c07;
---a:var(--ember);--b:var(--gold);--c:var(--mint);
+/* GameVortex design system v2: graphite ground, lime primary, electric-blue secondary, amber scores. Single source of truth for colors. */
+:root{color-scheme:dark;
+--bg:#0A0C10;--panel:#12151C;--panel2:#1A1F2A;--ink:#EEF2F7;--muted:#97A0B3;--line:rgba(255,255,255,.09);
+--primary:#B4F03C;--secondary:#4C8DFF;--amber:#FFB020;--teal:#34D399;--danger:#FF5C6C;--on-accent:#0A0C10;
+--ember:var(--primary);--gold:var(--amber);--mint:var(--teal);--copper:#F59E5B;--a:var(--primary);--b:var(--secondary);--c:var(--teal);
 --gv-bg:var(--bg);--gv-bg-2:var(--panel);--gv-panel:var(--panel);--gv-panel-strong:var(--panel2);--gv-surface:var(--panel);--gv-surface-2:var(--panel2);
 --gv-text:var(--ink);--gv-muted:var(--muted);--gv-line:var(--line);--gv-border:var(--line);--gv-header-border:var(--line);
---gv-cyan:var(--ember);--gv-neon-cyan:var(--ember);--gv-blue:var(--copper);--gv-neon-blue:var(--copper);--gv-purple:var(--gold);--gv-purple-2:var(--gold);--gv-neon-purple:var(--gold);--gv-violet:var(--gold);
---gv-pink:var(--ember);--gv-neon-pink:var(--ember);--gv-gold:var(--gold);--gv-green:var(--mint);--gv-orange:var(--ember);
---gv-cosmic-bg:var(--bg);--gv-cosmic-line:var(--line);--gv-cosmic-cyan:var(--ember);--gv-cosmic-violet:var(--gold);--gv-cosmic-orange:var(--ember);
---font-d:var(--font-display),Lalezar,system-ui,sans-serif;--font-b:var(--font-body),"IBM Plex Sans Arabic",system-ui,sans-serif}
+--gv-cyan:var(--primary);--gv-neon-cyan:var(--primary);--gv-blue:var(--secondary);--gv-neon-blue:var(--secondary);
+--gv-purple:var(--secondary);--gv-purple-2:var(--secondary);--gv-neon-purple:var(--secondary);--gv-violet:var(--secondary);
+--gv-pink:var(--primary);--gv-neon-pink:var(--primary);--gv-gold:var(--amber);--gv-green:var(--teal);--gv-orange:var(--amber);
+--gv-cosmic-bg:var(--bg);--gv-cosmic-line:var(--line);--gv-cosmic-cyan:var(--primary);--gv-cosmic-violet:var(--secondary);--gv-cosmic-orange:var(--amber);
+--r-sm:10px;--r-md:14px;--r-lg:20px;
+--font-d:var(--font-display),Tajawal,system-ui,sans-serif;--font-b:var(--font-body),Cairo,system-ui,sans-serif}
 html,body{background:var(--bg);color:var(--ink)}
 body{font-family:var(--font-b);line-height:1.7;background-image:none}
 body:before{content:none}
-h1,h2,h3,.brand,.gv-brand-text{font-family:var(--font-d);font-weight:400;letter-spacing:0}
-.site-header,.gv-header{background:rgba(11,22,20,.88);border-color:var(--line);box-shadow:none;backdrop-filter:blur(12px)}
-.gv-nav-link,.site-header nav a{color:var(--muted)}
-.gv-nav-link:hover,.site-header nav a:hover{color:var(--ink);background:var(--panel2)}
-.gv-nav-link.is-active{color:var(--on-accent);background:var(--ember)}
-.hero,.card,.stat,.glass{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:none}
-.hero:after{content:none}
-.btn{background:var(--ember);color:var(--on-accent);border:0;border-radius:10px;box-shadow:none;font-weight:700}
-.btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
-.badge,.pill{background:var(--panel2)!important;border-color:var(--line)!important;color:var(--gold)!important}
-.input,.platform-chip{background:var(--panel2)!important;border-color:var(--line)!important;color:var(--ink)!important}
-.mobile-bottom-nav,.gv-bottom-nav{background:var(--panel);border-color:var(--line);box-shadow:none}
-.mobile-bottom-nav a.active,.gv-bottom-nav a.active{color:var(--ember)}
-.footer,.gv-footer{border-color:var(--line);color:var(--muted)}
-a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+h1,h2,h3,.brand,.gv-brand-text{font-family:var(--font-d);font-weight:800;letter-spacing:0}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--primary);outline-offset:3px}

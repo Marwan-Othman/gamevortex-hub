@@ -11,7 +11,7 @@
 .primaryButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 20px;border-radius:10px;background:var(--ember);color:var(--on-accent);font-weight:700;font-size:15px;border:0;box-shadow:none;transition:transform .15s}
 .primaryButton:hover{transform:translateY(-2px)}
 .largeButton{min-height:52px;padding:0 24px}
-.heroCrown{aspect-ratio:1;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 20px,rgba(242,193,78,.28) 20px 21px)}
+.heroCrown{aspect-ratio:1;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 20px,rgba(176, 242, 78, .28) 20px 21px)}
 .crownRing{width:96px;height:96px;display:grid;place-items:center;border-radius:50%;background:var(--gold);color:var(--on-accent)}
 .crownRing .svg{width:44px;height:44px}
 .heroCrownTitle{font-family:var(--font-d);font-size:26px}
@@ -38,7 +38,7 @@
 .planButton:hover:not(:disabled){background:var(--tier);color:var(--on-accent)}
 .currentButton,.planButton:disabled{opacity:.65;cursor:default;border-style:dashed}
 .ownerContent,.ownerAccess{display:grid;gap:12px}
-.errorBox{padding:14px 16px;border:1px solid var(--ember);border-radius:10px;background:rgba(255,107,61,.1)}
+.errorBox{padding:14px 16px;border:1px solid var(--ember);border-radius:10px;background:rgba(177, 255, 61, .1)}
 .loadingCard{min-height:50vh;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center}
 .loadingOrb{width:72px;height:72px;display:grid;place-items:center;border-radius:50%;background:var(--panel2);color:var(--gold);animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{50%{transform:scale(1.08)}}

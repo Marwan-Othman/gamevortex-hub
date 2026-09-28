@@ -257,7 +257,7 @@ export default async function Games({
         </div>
 
         <form
-          className="glass card filters"
+          className="glass card filters games-filters"
           method="get"
         >
           <input
@@ -265,7 +265,7 @@ export default async function Games({
             name="q"
             defaultValue={q}
             maxLength={80}
-            placeholder="Search for games, genres..."
+            placeholder="ابحث عن لعبة أو نوع… / Search games"
             aria-label="Search for a game"
           />
 
@@ -281,12 +281,7 @@ export default async function Games({
               <LocaleText as="option" value="" ar="كل المنصات" en="All platforms" />
 
               {GAME_PLATFORMS.map((item) => (
-                <option
-                  key={item.slug}
-                  value={item.slug}
-                >
-                  <LocaleText as="option" value={item.slug} ar={item.nameAr} en={item.nameEn} />
-                </option>
+                <LocaleText key={item.slug} as="option" value={item.slug} ar={item.nameAr} en={item.nameEn} />
               ))}
             </select>
 
@@ -334,7 +329,7 @@ export default async function Games({
         بيانات الألعاب المستوردة من RAWG تستخدم وفق شروط المصدر، مع روابط المتاجر الرسمية عند توفرها. <a href="https://rawg.io" target="_blank" rel="noreferrer">RAWG</a>
       </p>
 
-      <div className="grid">
+      <div className="grid games-grid">
         {games.map((game) => (
           <Link
             href={`/games/${game.slug}`}
@@ -363,9 +358,7 @@ export default async function Games({
 
             <h2><LocaleText ar={game.titleAr} en={game.titleEn || game.titleAr} /></h2>
 
-            <p>{game.titleEn}</p>
-
-            <div className="game-platform-list">
+                        <div className="game-platform-list">
               {game.gamePlatforms.length > 0 ? (
                 game.gamePlatforms.map(
                   (item) => {
