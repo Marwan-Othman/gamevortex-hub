@@ -35,38 +35,6 @@ html[dir="ltr"] .glitch:before,html[dir="ltr"] .glitch:after{direction:ltr;left:
 [dir="rtl"] .success-button-secondary{margin-left:0;margin-right:.75rem}
 [dir="ltr"] .success-button-secondary{margin-left:.75rem;margin-right:0}
 
-/* GameVortex refreshed light-spectrum theme. Keep accents colorful but surfaces calm and readable. */
-:root{color-scheme:light;--bg:#fff8f5;--panel:#fff;--panel2:#fff4f0;--ink:#3f2a1e;--muted:#957468;--line:rgba(121, 70, 50, .14);--a:#ffba65;--b:#ee0744;--c:#6bff73}
-body{background:radial-gradient(ellipse at 8% 4%,rgba(104, 237, 255, .22),transparent 27%),radial-gradient(ellipse at 94% 9%,rgba(243, 84, 136, .18),transparent 30%),radial-gradient(ellipse at 65% 70%,rgba(255, 249, 177, .15),transparent 35%),#fcf8f7;color:var(--ink)}
-body:before{opacity:.18;background-image:linear-gradient(rgba(158, 101, 81, .045) 1px,transparent 1px),linear-gradient(90deg,rgba(158, 101, 81, .045) 1px,transparent 1px)}
-.site-header{background:rgba(255, 255, 255, .88);border-color:var(--line);box-shadow:0 5px 24px rgba(113, 72, 50, .06)}
-.brand-mark{background:linear-gradient(135deg,#ffe7f9,#fff9ee 60%,#effff1);border-color:rgba(255, 186, 101, .25);box-shadow:0 5px 18px rgba(255, 186, 101, .12)}
-.site-header nav a:hover,.filter-list a:hover{color:var(--ink);background:#fff3ed}
-.hero{background:linear-gradient(125deg,rgba(255, 255, 255, .97),rgba(255, 251, 249, .96));box-shadow:0 22px 65px rgba(112, 73, 49, .1);border-color:rgba(215, 164, 110, .18)}
-.hero:after{background:radial-gradient(circle,rgba(248, 116, 147, .24),transparent 66%)}
-.vortex-core:before{background:#fff;color:#6a4f29}.vortex-core{box-shadow:0 0 70px rgba(252, 161, 114, .2)}
-.btn{background:linear-gradient(110deg,#ffc36b,#e62060 55%,#e58ddc);color:#fff;border-color:transparent;box-shadow:0 7px 18px rgba(255, 186, 101, .16)}
-.btn.secondary{background:#fff;color:var(--ink);border-color:var(--line);box-shadow:none}
-.stat,.card{background:rgba(255, 255, 255, .9);border-color:var(--line);box-shadow:0 12px 32px rgba(112, 66, 43, .07)}
-.badge{background:#fdf4fb;border-color:#f2c2e5;color:#990c67}
-.input{background:#fff;color:var(--ink);border-color:#f5e6e1}
-.mobile-bottom-nav{background:rgba(255, 255, 255, .96);border-color:rgba(255, 186, 101, .2);box-shadow:0 8px 34px rgba(98, 63, 40, .16)}
-.mobile-bottom-nav a{color:#957669}
-.language-switcher button{background:#fff;color:var(--ink);border-color:var(--line)}
-.progress-track{background:#fbf5f3}.success{background:#fff;box-shadow:0 18px 60px rgba(94, 52, 35, .14)}
-.glass{border-color:rgba(255, 186, 101, .18);box-shadow:0 10px 36px rgba(112, 73, 49, .08),inset 0 1px 0 rgba(255, 255, 255, .8)}
-.detail-cover{background:#f9efec;box-shadow:0 16px 38px rgba(98, 60, 42, .15)}
-.gamevortex-ai,.ai-shell,.ai-card,.admin-shell,.admin-card,.auth-shell{color:var(--ink)}
-/* Shared module-scoped surfaces used by AI/admin/auth pages. */
-[class*="ai_"],[class*="ai-"]{color:var(--ink)}
-[class*="chatPanel"],[class*="toolPanel"],[class*="gallery"],[class*="mediaCard"],[class*="adminPanel"],[class*="ownerCard"],[class*="statTile"],[class*="authCard"]{background-color:#fff!important;border-color:var(--line)!important;color:var(--ink)!important;box-shadow:0 12px 34px rgba(110, 66, 44, .08)}
-[class*="chatHeader"],[class*="composer"],[class*="panelHead"]{border-color:var(--line)!important}
-[class*="welcome"],[class*="toolHeading"],[class*="fieldLabel"],[class*="mediaInfo"],[class*="ownerCardMeta"],[class*="label"]{color:var(--muted)!important}
-[class*="welcome"] h3,[class*="chatHeader"] h2,[class*="toolHeading"] h2,[class*="panelTitle"] h2{color:var(--ink)!important}
-[class*="message"],[class*="fieldLabel"] textarea,[class*="fieldLabel"] input,[class*="fieldLabel"] select,[class*="composer"] textarea{background:#fef9f6!important;color:var(--ink)!important;border-color:#f5e9e4!important}
-[class*="creditPill"]{background:#ffeaed!important;color:#ae0a32!important;border-color:#ffced7!important}
-[class*="mediaPending"]{background:linear-gradient(135deg,#fff9ed,#fff4f7)!important;color:#885d51!important}
-[class*="downloadLink"]{color:#e59e43!important}
 input,textarea,select{color:var(--ink)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media(max-width:800px){.language-switcher{margin-inline-start:auto}.notifications-container{inset-inline-end:12px;bottom:76px}.glitch{font-size:20px}}
@@ -2231,66 +2199,6 @@ main.wrap>.hero:has(.platform-list) h1{font-size:clamp(42px,6vw,70px)!important;
  .gameCard{flex-basis:155px!important}
  .gv-brand-text small{display:none}
 }
-
-/* Final theme layer: placed last to override legacy dark component rules. */
-.gv-header,.gv-bottom-nav{background:rgba(255, 255, 255, .94)!important;border-color:rgba(149, 94, 67, .16)!important;box-shadow:0 8px 28px rgba(110, 66, 44, .10)!important;color:#3f2a1e!important}
-.gv-nav-link,.gv-profile-label,.gv-menu-button,.gv-icon-button{color:#77584a!important}
-.gv-nav-link.is-active{color:#fff!important;background:linear-gradient(120deg,#fabf61,#ef3247)!important}
-.gv-new-hero{background:linear-gradient(125deg,#fff,#fff8f3 58%,#ffeaef)!important;border-color:rgba(255, 186, 101, .18)!important;box-shadow:0 20px 55px rgba(112, 73, 49, .1)!important}
-.gv-hero-title{background-image:linear-gradient(90deg,#664f2d,#ebb251 52%,#cb0839)!important}
-.gv-hero-eyebrow,.gv-status-dot{color:#b32f41!important}
-.gv-hero-badge{background:#ffedef!important;color:#a91c3b!important;border-color:#f9d3dd!important}
-.gv-floating-card{background:rgba(255, 255, 255, .94)!important;border-color:rgba(255, 186, 101, .18)!important;box-shadow:0 14px 35px rgba(119, 77, 54, .12)!important;color:#493423!important}
-.gameCard,.gameInfo,.filters{background:#fff!important;border-color:rgba(149, 94, 67, .15)!important;color:#3f2a1e!important;box-shadow:0 10px 30px rgba(110, 66, 44, .08)!important}
-.gameInfo{background:linear-gradient(180deg,rgba(255, 255, 255, .18),rgba(255, 255, 255, .97))!important}
-.gameTitle,.grid .game-card h2,.grid .game-card h3{color:#463322!important}
-.gameEnglishTitle{color:#957468!important}
-.platform-chip{background:#fff!important;color:#7c5c4f!important}
-.platform-chip.active{color:#fff!important;background:linear-gradient(100deg,#f8bf63,#df2e5d)!important}
-.gv-bottom-nav a{color:#8b6e62!important}
-.gv-bottom-nav a.active{color:#e1a44e!important;text-shadow:none!important}
-.gv-bottom-nav a.active:before{background:linear-gradient(90deg,#fdd371,#ea446c)!important;box-shadow:none!important}
-[class*="chatPanel"],[class*="toolPanel"],[class*="gallery"],[class*="mediaCard"],[class*="adminPanel"],[class*="ownerCard"],[class*="statTile"]{background:#fff!important;color:#3f2a1e!important;border-color:rgba(149, 94, 67, .15)!important}
-[class*="chatHeader"] h2,[class*="welcome"] h3,[class*="toolHeading"] h2,[class*="panelTitle"] h2,[class*="mediaCard"] p{color:#493424!important}
-[class*="message"]{background:#fdf5f1!important;color:#453122!important;border-color:#f6ece8!important}
-[class*="fieldLabel"] textarea,[class*="fieldLabel"] input,[class*="fieldLabel"] select,[class*="composer"] textarea{background:#fef9f6!important;color:#3f2a1e!important;border-color:#f5e5e0!important}
-[class*="fieldLabel"],[class*="uploadField"],[class*="emptyLarge"] h3{color:#715044!important}
-[class*="creditPill"]{background:#ffeaed!important;color:#ae0a32!important}
-[class*="adminPanel"] a,[class*="ownerCard"] a{color:#cb8c43!important}
-html[dir="ltr"] [dir="rtl"]{direction:ltr!important;text-align:left!important}
-html[dir="ltr"] .referral-table th,html[dir="ltr"] .referral-table td{text-align:left!important}
-html[dir="ltr"] .referral-copy,html[dir="ltr"] .draw-actions{direction:ltr!important}
-/* CSS-module surfaces are hashed, so target their stable local class names. */
-[class*="home_page__"]{color:#3f2a1e!important;background:linear-gradient(180deg,#fcf8f7,#fff5f2 55%,#fffcfb)!important}
-[class*="home_hero__"],[class*="home_heroSlide__"]{background-color:#fff!important;border-color:rgba(255, 186, 101, .18)!important;box-shadow:0 20px 55px rgba(112, 73, 49, .11)!important}
-[class*="home_heroContent__"] p,[class*="home_sectionHead__"] h2,[class*="home_sectionHead__"] a{color:#6b4c40!important}
-[class*="home_gameCard__"],[class*="home_categoryTile__"],[class*="home_platformTile__"]{background:#fff!important;border-color:rgba(149, 94, 67, .14)!important;color:#493123!important;box-shadow:0 10px 28px rgba(110, 66, 44, .08)!important}
-[class*="home_gameInfo__"]{background:linear-gradient(180deg,rgba(255, 255, 255, .2),#fff 65%)!important}
-[class*="home_gameTitle__"]{color:#493123!important}
-[class*="home_gameEnglishTitle__"]{color:#957468!important}
-[class*="home_vipHomeCard__"],[class*="home_vip__"]{background:linear-gradient(125deg,#fff,#fffaf0 58%,#ffeaef)!important;color:#463322!important;border-color:rgba(255, 186, 101, .18)!important;box-shadow:0 15px 40px rgba(110, 66, 44, .1)!important}
-[class*="ai_page__"]{color:#453122!important}
-[class*="ai_hero__"],[class*="ai_panel__"],[class*="ai_chatPanel__"],[class*="ai_toolPanel__"],[class*="ai_gallery__"],[class*="ai_mediaCard__"]{background:#fff!important;color:#453122!important;border-color:rgba(149, 94, 67, .15)!important;box-shadow:0 12px 32px rgba(110, 66, 44, .08)!important}
-[class*="ai_hero__"] p,[class*="ai_welcome__"],[class*="ai_fieldLabel__"],[class*="ai_uploadField__"]{color:#846358!important}
-[class*="ai_chatPanel__"] h2,[class*="ai_welcome__"] h3,[class*="ai_toolHeading__"] h2,[class*="ai_gallery__"] h2{color:#493123!important}
-[class*="ai_message__"]{background:#fcf4f0!important;color:#493123!important;border-color:#f6ece8!important}
-[class*="ai_composer__"] textarea,[class*="ai_fieldLabel__"] textarea,[class*="ai_fieldLabel__"] input,[class*="ai_fieldLabel__"] select{background:#fdf9f8!important;color:#493123!important;border-color:#f5e5e0!important}
-[class*="ai_uploadField__"]{background:#fdf9f8!important}
-[class*="ai_notice__"]{background:#ffeef0!important;color:#6e3831!important;border-color:#fac6d3!important}
-[class*="_page__"]{color:#3f2a1e!important;background-color:transparent!important}
-[class*="_card__"],[class*="_panel__"],[class*="_tile__"],[class*="_box__"],[class*="_benefits__"],[class*="_planCard__"],[class*="_stat__"],[class*="_statTile__"],[class*="_sectionCard__"]{background-color:#fff!important;color:#493123!important;border-color:rgba(149, 94, 67, .16)!important;box-shadow:0 10px 32px rgba(110, 66, 44, .08)!important}
-[class*="_page__"] h1,[class*="_page__"] h2,[class*="_page__"] h3,[class*="_card__"] h1,[class*="_card__"] h2,[class*="_card__"] h3,[class*="_panel__"] h1,[class*="_panel__"] h2,[class*="_panel__"] h3{color:#493123!important}
-[class*="_page__"] p,[class*="_card__"] p,[class*="_panel__"] p,[class*="_muted__"],[class*="_subtitle__"]{color:#957468!important}
-[class*="auth_page__"]{background:radial-gradient(ellipse at 12% 10%,#e6faff,transparent 35%),linear-gradient(145deg,#fcf8f7,#fff0ee)!important;color:#493123!important}
-[class*="auth_card__"]{background:#fff!important;color:#493123!important;border-color:#bde5ef!important;box-shadow:0 20px 60px rgba(25, 62, 72, .12)!important}
-[class*="auth_card__"] input{background:#fff!important;color:#493123!important;border-color:#d8e9ec!important}
-[class*="auth_submitBtn__"]{color:#002225!important}
-[class*="vip_page__"]{background:radial-gradient(ellipse at 8% 5%,rgba(102, 240, 255, .18),transparent 28%),radial-gradient(ellipse at 88% 15%,rgba(254, 187, 113, .13),transparent 30%),#fdf8f5!important;color:#493123!important}
-[class*="vip_hero__"],[class*="vip_planCard__"],[class*="vip_benefits__"],[class*="vip_feature__"]{background:#fff!important;color:#493123!important;border-color:rgba(255, 186, 101, .17)!important;box-shadow:0 16px 46px rgba(110, 66, 44, .09)!important}
-[class*="vip_hero__"] h1,[class*="vip_hero__"] h2,[class*="vip_planCard__"] h2,[class*="vip_planCard__"] h3{color:#493123!important}
-[class*="admin_shell__"],[class*="admin_layout__"]{background:#fdf6f4!important;color:#493123!important}
-[class*="admin_sidebar__"],[class*="admin_main__"],[class*="admin_content__"]{background:#fff!important;color:#493123!important;border-color:rgba(149, 94, 67, .15)!important}
-[class*="admin_panel__"],[class*="admin_ownerCard__"],[class*="admin_statTile__"],[class*="admin_overviewTile__"],[class*="admin_actionBtn__"]{background:#fff!important;color:#493123!important;border-color:rgba(149, 94, 67, .15)!important}
 
 /* =========================================================
    GAMEVORTEX REFERENCE MATCH — 2026
