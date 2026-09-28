@@ -62,4 +62,23 @@ describe('Shariah Guard', () => {
     const result = evaluateShariah({ ...approvedInput, ownershipSettlementVerified: false }, policy);
     expect(() => assertShariahApproved(result)).toThrow('SHARIAH_REVIEW');
   });
+
+  it('returns REVIEW (never APPROVED) when business activity is missing or empty', () => {
+    for (const businessActivity of [undefined, '', '   ']) {
+      const result = evaluateShariah({ ...approvedInput, businessActivity }, policy);
+      expect(result.status).toBe('REVIEW');
+      expect(result.reasons).toContain('BUSINESS_ACTIVITY_UNKNOWN');
+    }
+  });
+
+  it('never approves a trading method outside the allowlist', () => {
+    const result = evaluateShariah({ ...approvedInput, tradingMethod: 'CFD' as never }, policy);
+    expect(result.status).toBe('REVIEW');
+    expect(result.reasons).toContain('TRADING_METHOD_NOT_ALLOWED:CFD');
+  });
+
+  it('screens Arabic prohibited-business keywords in the default policy', () => {
+    const result = evaluateShariah({ ...approvedInput, businessActivity: 'شركة كازينو' }, DEFAULT_SHARIAH_POLICY);
+    expect(result.status).toBe('REJECTED');
+  });
 });

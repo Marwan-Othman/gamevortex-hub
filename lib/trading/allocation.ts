@@ -54,6 +54,16 @@ export async function createAllocation(input: {
 
     const account = await lockedAccount(tx, input.ownerId);
 
+    // Re-check under the account lock: a concurrent request with the same key
+    // may have committed while we waited, and must replay instead of failing.
+    const racedExisting = await tx.tradingAllocation.findUnique({ where: { idempotencyKey: key } });
+    if (racedExisting) {
+      if (racedExisting.sourceWalletId !== wallet.id || racedExisting.amountUsd !== amountUsd) {
+        throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+      }
+      return { allocation: racedExisting, replayed: true };
+    }
+
     // Atomic guard: fails if another request already spent these points.
     const debited = await tx.ownerWallet.updateMany({
       where: { id: wallet.id, availablePoints: { gte: points } },

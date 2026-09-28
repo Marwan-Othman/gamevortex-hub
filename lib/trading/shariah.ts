@@ -39,6 +39,8 @@ export type ShariahPolicy = {
   version: string;
   prohibitedBusinessKeywords: readonly string[];
   prohibitedMethods: readonly TradingMethod[];
+  /** Allowlist. Anything not listed here can never be APPROVED. Defaults to SPOT only. */
+  allowedMethods?: readonly TradingMethod[];
   maxInterestBearingDebtRatio?: number;
   maxInterestIncomeRatio?: number;
   maxImpermissibleIncomeRatio?: number;
@@ -65,9 +67,20 @@ export const DEFAULT_SHARIAH_POLICY: ShariahPolicy = {
     "pork",
     "conventional bank",
     "interest-based lending",
+    "خمور",
+    "قمار",
+    "مقامرة",
+    "ميسر",
+    "مراهنات",
+    "كازينو",
+    "إباحية",
+    "مخدرات",
+    "بنك ربوي",
   ],
   prohibitedMethods: ["MARGIN", "LEVERAGED", "SHORT", "FUTURES", "OPTIONS", "UNKNOWN"],
 };
+
+const DEFAULT_ALLOWED_METHODS: readonly TradingMethod[] = ["SPOT"];
 
 function normalized(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase();
@@ -102,13 +115,23 @@ export function evaluateShariah(
     reasons.push("ASSET_IDENTITY_INCOMPLETE");
   }
 
+  // Fail closed: an unknown business activity can never pass screening.
+  if (!activity) {
+    reasons.push("BUSINESS_ACTIVITY_UNKNOWN");
+  }
+
   const prohibitedBusiness = containsProhibitedBusiness(activity, policy);
   if (prohibitedBusiness) {
     reasons.push(`PROHIBITED_BUSINESS:${prohibitedBusiness}`);
   }
 
+  // Method must be explicitly prohibited (REJECTED) or explicitly allowed (else REVIEW).
+  // A value outside the TS union (e.g. from JSON) must not slip through.
+  const allowedMethods = policy.allowedMethods ?? DEFAULT_ALLOWED_METHODS;
   if (policy.prohibitedMethods.includes(method)) {
     reasons.push(`PROHIBITED_TRADING_METHOD:${method}`);
+  } else if (!allowedMethods.includes(method)) {
+    reasons.push(`TRADING_METHOD_NOT_ALLOWED:${String(method)}`);
   }
 
   if (!input.ownershipSettlementVerified) {
