@@ -31,19 +31,19 @@ export default function RevenueLineChart({
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="150" preserveAspectRatio="none">
         <defs>
           <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ffdf5d" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#ffdf5d" stopOpacity="0" />
+            <stop offset="0%" stopColor="#FF835D" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#FF835D" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#revenueFill)" />
-        <path d={linePath} fill="none" stroke="#ffe492" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="#FFAB92" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         {coords.map((c) => (
-          <circle key={c.label} cx={c.x} cy={c.y} r="3" fill="#fcf2ed" stroke="#ffdf5d" strokeWidth="1.5" />
+          <circle key={c.label} cx={c.x} cy={c.y} r="3" fill="#F4EEE1" stroke="#FF835D" strokeWidth="1.5" />
         ))}
       </svg>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
         {points.map((p) => (
-          <span key={p.label} style={{ fontSize: 10, color: "#cbae9d" }}>{p.label}</span>
+          <span key={p.label} style={{ fontSize: 10, color: "#FF8C69" }}>{p.label}</span>
         ))}
       </div>
     </div>

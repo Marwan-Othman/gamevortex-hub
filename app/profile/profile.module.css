@@ -5,9 +5,9 @@
 
 .page {
   background:
-    radial-gradient(ellipse 700px 420px at 85% 0%, rgba(255, 223, 93, 0.18), transparent 60%),
-    #160c05;
-  color: #fcf2ed;
+    radial-gradient(ellipse 700px 420px at 85% 0%, rgba(255,131,93,0.18), transparent 60%),
+    #091210;
+  color: #F4EEE1;
   padding: 16px 14px 90px;
   display: flex;
   flex-direction: column;
@@ -19,9 +19,9 @@
 
 /* ---- profile hero card ---- */
 .hero {
-  border: 1px solid rgba(255, 223, 93, 0.3);
+  border: 1px solid rgba(255,131,93,0.3);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(255, 223, 93, 0.14), rgba(43, 34, 14, 0.6));
+  background: linear-gradient(135deg, rgba(255,131,93,0.14), rgba(20,37,34,0.6));
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -37,25 +37,25 @@
   width: 66px;
   height: 66px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffdf5d, #ff7059);
+  background: linear-gradient(135deg, #FF835D, #FF8059);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   font-size: 22px;
-  border: 2px solid rgba(102, 232, 255, 0.6);
+  border: 2px solid rgba(255,138,102,0.6);
 }
 .levelBadge {
   position: absolute;
   bottom: -4px;
   inset-inline-end: -4px;
-  background: linear-gradient(135deg, #b5efff, #66e8ff);
-  color: #002225;
+  background: linear-gradient(135deg, #EBE0C9, #FF8A66);
+  color: #0D1816;
   font-size: 11px;
   font-weight: 800;
   padding: 2px 6px;
   border-radius: 999px;
-  border: 2px solid #160c05;
+  border: 2px solid #091210;
 }
 .identity { flex: 1; min-width: 0; }
 .name {
@@ -73,9 +73,9 @@
   font-weight: 700;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(102, 232, 255, 0.15);
-  border: 1px solid rgba(102, 232, 255, 0.4);
-  color: #66e8ff;
+  background: rgba(255,138,102,0.15);
+  border: 1px solid rgba(255,138,102,0.4);
+  color: #FF8A66;
   margin-top: 4px;
   width: fit-content;
 }
@@ -89,15 +89,15 @@
   flex: 1;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(244,238,225,0.06);
   overflow: hidden;
 }
 .progressFill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #ffdf5d, #ff7059);
+  background: linear-gradient(90deg, #FF835D, #FF8059);
 }
-.progressLabel { font-size: 11px; color: #cbae9d; white-space: nowrap; }
+.progressLabel { font-size: 11px; color: #FF8C69; white-space: nowrap; }
 
 .actionRow {
   display: grid;
@@ -107,9 +107,9 @@
 .actionBtn {
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 223, 93, 0.35);
-  background: rgba(255, 223, 93, 0.1);
-  color: #fcf2ed;
+  border: 1px solid rgba(255,131,93,0.35);
+  background: rgba(255,131,93,0.1);
+  color: #F4EEE1;
   font-size: 12.5px;
   font-weight: 700;
   text-align: center;
@@ -123,9 +123,9 @@
 }
 @media (min-width: 600px) { .statsGrid { grid-template-columns: repeat(4, 1fr); } }
 .statTile {
-  border: 1px solid rgba(255, 223, 93, 0.25);
+  border: 1px solid rgba(255,131,93,0.25);
   border-radius: 14px;
-  background: rgba(43, 34, 14, 0.4);
+  background: rgba(20,37,34,0.4);
   padding: 12px;
   text-align: center;
 }
@@ -137,17 +137,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 223, 93, 0.15);
-  color: #ffe492;
+  background: rgba(255,131,93,0.15);
+  color: #FFAB92;
 }
 .statTile strong { display: block; font-size: 16px; }
-.statTile span { font-size: 10.5px; color: #cbae9d; }
+.statTile span { font-size: 10.5px; color: #FF8C69; }
 
 /* ---- panels / charts ---- */
 .panel {
-  border: 1px solid rgba(255, 223, 93, 0.25);
+  border: 1px solid rgba(255,131,93,0.25);
   border-radius: 18px;
-  background: rgba(43, 34, 14, 0.4);
+  background: rgba(20,37,34,0.4);
   padding: 14px;
 }
 .panelHead {
@@ -158,15 +158,15 @@
   align-items: center;
   justify-content: space-between;
 }
-.panelHead a { font-size: 12px; color: #ffe492; font-weight: 600; }
+.panelHead a { font-size: 12px; color: #FFAB92; font-weight: 600; }
 
 .chartsGrid { display: grid; gap: 14px; }
 @media (min-width: 780px) { .chartsGrid { grid-template-columns: 1.2fr 1fr; } }
 
 .legendRow { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.legendItem { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #ecd9cc; }
+.legendItem { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #ECE1CC; }
 .legendDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.legendItem strong { margin-inline-start: auto; color: #fcf2ed; }
+.legendItem strong { margin-inline-start: auto; color: #F4EEE1; }
 
 /* ---- purchases / list rows ---- */
 .listItem {
@@ -174,7 +174,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 223, 93, 0.12);
+  border-bottom: 1px solid rgba(255,131,93,0.12);
   font-size: 12.5px;
 }
 .listItem:last-child { border-bottom: none; }
@@ -182,24 +182,24 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: rgba(255, 223, 93, 0.15);
+  background: rgba(255,131,93,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #ffe492;
+  color: #FFAB92;
 }
 .listMain { flex: 1; min-width: 0; }
 .listMain strong { display: block; font-size: 12.5px; }
-.listMain span { font-size: 10.5px; color: #cbae9d; }
+.listMain span { font-size: 10.5px; color: #FF8C69; }
 .listPrice { font-weight: 700; font-size: 12.5px; }
 .statusBadge {
   font-size: 10px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(225, 54, 235, 0.15);
-  color: #e136eb;
-  border: 1px solid rgba(225, 54, 235, 0.35);
+  background: rgba(242,190,47,0.15);
+  color: #F2BE2F;
+  border: 1px solid rgba(242,190,47,0.35);
   margin-inline-start: 6px;
 }
 
@@ -216,35 +216,35 @@
   flex: 0 0 130px;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255, 223, 93, 0.2);
+  border: 1px solid rgba(255,131,93,0.2);
   text-decoration: none;
   color: inherit;
 }
-.gameCoverWrap { aspect-ratio: 3/4; background: #2e220f; }
+.gameCoverWrap { aspect-ratio: 3/4; background: #152824; }
 .gameCoverWrap img { width: 100%; height: 100%; object-fit: cover; }
 .gameInfo { padding: 7px 8px 9px; }
 .gameInfo strong { display: block; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gameInfo span { font-size: 10px; color: #cbae9d; }
+.gameInfo span { font-size: 10px; color: #FF8C69; }
 
 /* ---- free cards banner ---- */
 .banner {
   border-radius: 18px;
-  border: 1px solid rgba(102, 232, 255, 0.35);
-  background: linear-gradient(135deg, #423918, #27200a 60%);
+  border: 1px solid rgba(255,138,102,0.35);
+  background: linear-gradient(135deg, #203B35, #11201D 60%);
   padding: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
 }
-.bannerText h2 { font-size: 14.5px; margin: 0 0 4px; color: #85ebff; }
-.bannerText p { font-size: 11.5px; color: #ecd9cc; margin: 0 0 10px; }
+.bannerText h2 { font-size: 14.5px; margin: 0 0 4px; color: #FFA185; }
+.bannerText p { font-size: 11.5px; color: #ECE1CC; margin: 0 0 10px; }
 .bannerBtn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(135deg, #b5efff, #66e8ff);
-  color: #002225;
+  background: linear-gradient(135deg, #EBE0C9, #FF8A66);
+  color: #0D1816;
   font-weight: 800;
   font-size: 12.5px;
   padding: 9px 16px;
@@ -255,12 +255,12 @@
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  background: rgba(102, 232, 255, 0.15);
-  border: 1px solid rgba(102, 232, 255, 0.4);
+  background: rgba(255,138,102,0.15);
+  border: 1px solid rgba(255,138,102,0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #66e8ff;
+  color: #FF8A66;
 }
 
 /* ---- achievements ---- */
@@ -274,16 +274,16 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  border: 1px solid rgba(255, 223, 93, 0.2);
+  border: 1px solid rgba(255,131,93,0.2);
   border-radius: 12px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(244,238,225,0.02);
 }
 .achievementIcon {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(102, 232, 255, 0.12);
+  background: rgba(255,138,102,0.12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -291,8 +291,8 @@
   flex-shrink: 0;
 }
 .achievementMeta strong { display: block; font-size: 12.5px; }
-.achievementMeta p { margin: 2px 0; font-size: 11px; color: #cbae9d; }
-.achievementMeta span { font-size: 10px; color: #66e8ff; text-transform: uppercase; }
+.achievementMeta p { margin: 2px 0; font-size: 11px; color: #FF8C69; }
+.achievementMeta span { font-size: 10px; color: #FF8A66; text-transform: uppercase; }
 
 .soonBtn { opacity: 0.5; cursor: default; }
 
@@ -305,18 +305,18 @@
   margin-top: 14px;
   padding: 10px 22px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ffdf5d, #ead31f);
+  background: linear-gradient(135deg, #FF835D, #F0B719);
   color: #fff;
   font-weight: 700;
   text-decoration: none;
 }
 
 
-.page{background:radial-gradient(650px 400px at 85% 0%,rgba(255, 41, 139, .11),transparent 62%),radial-gradient(600px 450px at 5% 35%,rgba(245, 255, 69, .1),transparent 62%),transparent!important}
-.hero,.panel,.statTile,.achievementCard{border-color:rgba(255, 41, 139, .13)!important;background:linear-gradient(145deg,rgba(33, 16, 11, .9),rgba(20, 9, 6, .75))!important;box-shadow:0 20px 65px rgba(0, 0, 0, .35),inset 0 1px rgba(255, 255, 255, .04)!important}
-.avatar{background:linear-gradient(135deg,#ff1d76,#ffc256 55%,#c1ff35)!important;box-shadow:0 0 35px rgba(255, 41, 139, .25)!important}
-.progressFill{background:linear-gradient(90deg,var(--gv-cyan),var(--gv-purple),var(--gv-pink))!important;box-shadow:0 0 15px rgba(255, 41, 139, .25)}
-.statIcon,.listIcon{background:rgba(255, 41, 139, .07)!important;color:var(--gv-cyan)!important}
-.actionBtn{border-color:rgba(255, 41, 139, .18)!important;background:rgba(255, 41, 139, .055)!important}
+.page{background:radial-gradient(650px 400px at 85% 0%,rgba(242,192,54,.11),transparent 62%),radial-gradient(600px 450px at 5% 35%,rgba(244,200,80,.1),transparent 62%),transparent!important}
+.hero,.panel,.statTile,.achievementCard{border-color:rgba(242,192,54,.13)!important;background:linear-gradient(145deg,rgba(15,29,26,.9),rgba(9,17,15,.75))!important;box-shadow:0 20px 65px rgba(7,13,12,.35),inset 0 1px rgba(244,238,225,.04)!important}
+.avatar{background:linear-gradient(135deg,#F1BC2B,#FF7D56 55%,#55DFAC)!important;box-shadow:0 0 35px rgba(242,192,54,.25)!important}
+.progressFill{background:linear-gradient(90deg,var(--gv-cyan),var(--gv-purple),var(--gv-pink))!important;box-shadow:0 0 15px rgba(242,192,54,.25)}
+.statIcon,.listIcon{background:rgba(242,192,54,.07)!important;color:var(--gv-cyan)!important}
+.actionBtn{border-color:rgba(242,192,54,.18)!important;background:rgba(242,192,54,.055)!important}
 .vipBadge{color:var(--gv-gold)!important}
 

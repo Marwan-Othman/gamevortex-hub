@@ -14,8 +14,8 @@ const SLIDES = [
       "PLAY • EARN • CREATE • CONNECT",
     href: "/games",
     cta: "استكشف الألعاب",
-    accent: "#21e6ff",
-    accent2: "#7b5cff",
+    accent: "#FF5521",
+    accent2: "#FF825C",
     badge: "NEXT LEVEL GAMING",
     visual: "GV",
   },
@@ -27,8 +27,8 @@ const SLIDES = [
       "Explore worlds beyond reality.",
     href: "/games?sort=newest",
     cta: "شاهد الإصدارات الجديدة",
-    accent: "#7b5cff",
-    accent2: "#ff7a45",
+    accent: "#FF825C",
+    accent2: "#FF7045",
     badge: "NEW WORLDS",
     visual: "PLAY",
   },
@@ -40,8 +40,8 @@ const SLIDES = [
       "Your games, rewards, library and VIP in one vortex.",
     href: "/rewards",
     cta: "اكتشف VIP",
-    accent: "#ff7a45",
-    accent2: "#21e6ff",
+    accent: "#FF7045",
+    accent2: "#FF5521",
     badge: "VIP ACCESS",
     visual: "VIP",
   },
@@ -140,9 +140,9 @@ export default function HeroCarousel() {
                 ),
                 linear-gradient(
                   135deg,
-                  rgba(5, 8, 22, 0.98) 0%,
-                  rgba(10, 17, 40, 0.96) 48%,
-                  rgba(28, 8, 35, 0.98) 100%
+                  rgba(9,18,16,0.98) 0%,
+                  rgba(18,32,30,0.96) 48%,
+                  rgba(15,28,25,0.98) 100%
                 )
               `,
             } as React.CSSProperties
@@ -340,11 +340,11 @@ export default function HeroCarousel() {
           overflow: hidden;
           min-height: clamp(430px, 58vw, 650px);
           border-radius: 28px;
-          background: #160b06;
-          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: #0A1211;
+          border: 1px solid rgba(244,238,225,0.09);
           box-shadow:
-            0 25px 80px rgba(0, 0, 0, 0.45),
-            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            0 25px 80px rgba(7,13,12,0.45),
+            inset 0 1px 0 rgba(244,238,225,0.06);
         }
 
         .gv-hero-background {
@@ -362,12 +362,12 @@ export default function HeroCarousel() {
             translateY(35%);
           background-image:
             linear-gradient(
-              rgba(255, 255, 255, 0.06) 1px,
+              rgba(244,238,225,0.06) 1px,
               transparent 1px
             ),
             linear-gradient(
               90deg,
-              rgba(255, 255, 255, 0.06) 1px,
+              rgba(244,238,225,0.06) 1px,
               transparent 1px
             );
           background-size: 45px 45px;
@@ -437,7 +437,7 @@ export default function HeroCarousel() {
           font-size: 11px;
           letter-spacing: 0.25em;
           font-weight: 800;
-          color: rgba(255, 255, 255, 0.38);
+          color: rgba(244,238,225,0.38);
           writing-mode: vertical-rl;
         }
 
@@ -446,7 +446,7 @@ export default function HeroCarousel() {
           align-items: center;
           gap: 9px;
           margin-bottom: 16px;
-          color: rgba(255, 255, 255, 0.62);
+          color: rgba(244,238,225,0.62);
           font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.14em;
@@ -469,10 +469,10 @@ export default function HeroCarousel() {
           display: inline-flex;
           margin-bottom: 10px;
           padding: 5px 10px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(244,238,225,0.1);
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.045);
-          color: rgba(255, 255, 255, 0.58);
+          background: rgba(244,238,225,0.045);
+          color: rgba(244,238,225,0.58);
           font-size: 9px;
           font-weight: 800;
           letter-spacing: 0.16em;
@@ -487,14 +487,14 @@ export default function HeroCarousel() {
           letter-spacing: -0.045em;
           color: #fff;
           text-wrap: balance;
-          text-shadow: 0 15px 50px rgba(0, 0, 0, 0.35);
+          text-shadow: 0 15px 50px rgba(7,13,12,0.35);
           animation: gv-title-in 0.5s ease both;
         }
 
         .gv-hero-subtitle {
           max-width: 620px;
           margin: 22px 0 0;
-          color: rgba(255, 255, 255, 0.64);
+          color: rgba(244,238,225,0.64);
           font-size: clamp(13px, 1.6vw, 16px);
           line-height: 1.9;
           animation: gv-content-in 0.6s ease both;
@@ -516,7 +516,7 @@ export default function HeroCarousel() {
           min-height: 48px;
           padding: 0 22px;
           border-radius: 14px;
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          border: 1px solid rgba(244,238,225,0.15);
           background:
             linear-gradient(
               135deg,
@@ -531,7 +531,7 @@ export default function HeroCarousel() {
                 var(--gv-accent) 25%,
                 transparent
               ),
-            inset 0 1px 0 rgba(255, 255, 255, 0.28);
+            inset 0 1px 0 rgba(244,238,225,0.28);
           transition:
             transform 0.25s ease,
             box-shadow 0.25s ease;
@@ -546,7 +546,7 @@ export default function HeroCarousel() {
                 var(--gv-accent) 35%,
                 transparent
               ),
-            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            inset 0 1px 0 rgba(244,238,225,0.3);
         }
 
         .gv-secondary-button {
@@ -556,9 +556,9 @@ export default function HeroCarousel() {
           min-height: 48px;
           padding: 0 19px;
           border-radius: 14px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(255, 255, 255, 0.045);
-          color: rgba(255, 255, 255, 0.78);
+          border: 1px solid rgba(244,238,225,0.1);
+          background: rgba(244,238,225,0.045);
+          color: rgba(244,238,225,0.78);
           backdrop-filter: blur(14px);
           transition:
             background 0.25s ease,
@@ -566,7 +566,7 @@ export default function HeroCarousel() {
         }
 
         .gv-secondary-button:hover {
-          background: rgba(255, 255, 255, 0.09);
+          background: rgba(244,238,225,0.09);
           transform: translateY(-2px);
         }
 
@@ -631,13 +631,13 @@ export default function HeroCarousel() {
           background:
             radial-gradient(
               circle at 35% 25%,
-              rgba(255, 255, 255, 0.28),
+              rgba(244,238,225,0.28),
               transparent 18%
             ),
             linear-gradient(
               145deg,
               var(--visual-accent),
-              #301b0f 48%,
+              #162925 48%,
               var(--visual-accent-2)
             );
           box-shadow:
@@ -647,8 +647,8 @@ export default function HeroCarousel() {
                 var(--visual-accent) 35%,
                 transparent
               ),
-            inset 0 1px 1px rgba(255, 255, 255, 0.4),
-            inset 0 -20px 50px rgba(0, 0, 0, 0.45);
+            inset 0 1px 1px rgba(244,238,225,0.4),
+            inset 0 -20px 50px rgba(7,13,12,0.45);
           animation: gv-float 5s ease-in-out infinite;
         }
 
@@ -660,15 +660,15 @@ export default function HeroCarousel() {
           align-items: center;
           justify-content: center;
           border-radius: 26%;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          background: rgba(20, 9, 3, 0.58);
+          border: 1px solid rgba(244,238,225,0.2);
+          background: rgba(8,15,14,0.58);
           backdrop-filter: blur(12px);
           transform: rotate(8deg);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+          box-shadow: inset 0 1px 0 rgba(244,238,225,0.15);
         }
 
         .gv-core-small {
-          color: rgba(255, 255, 255, 0.5);
+          color: rgba(244,238,225,0.5);
           font-size: 8px;
           font-weight: 900;
           letter-spacing: 0.3em;
@@ -689,15 +689,15 @@ export default function HeroCarousel() {
           gap: 4px;
           min-width: 90px;
           padding: 11px 14px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          border: 1px solid rgba(244,238,225,0.12);
           border-radius: 14px;
-          background: rgba(33, 17, 8, 0.6);
+          background: rgba(14,27,24,0.6);
           backdrop-filter: blur(18px);
-          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 15px 40px rgba(7,13,12,0.3);
         }
 
         .gv-floating-card span {
-          color: rgba(255, 255, 255, 0.42);
+          color: rgba(244,238,225,0.42);
           font-size: 7px;
           font-weight: 800;
           letter-spacing: 0.12em;
@@ -732,8 +732,8 @@ export default function HeroCarousel() {
           width: 42px !important;
           height: 42px !important;
           border-radius: 13px !important;
-          border: 1px solid rgba(255, 255, 255, 0.1) !important;
-          background: rgba(255, 255, 255, 0.045) !important;
+          border: 1px solid rgba(244,238,225,0.1) !important;
+          background: rgba(244,238,225,0.045) !important;
           backdrop-filter: blur(12px);
           transition:
             transform 0.2s ease,
@@ -742,7 +742,7 @@ export default function HeroCarousel() {
 
         .gv-hero-arrow:hover {
           transform: scale(1.08);
-          background: rgba(255, 255, 255, 0.1) !important;
+          background: rgba(244,238,225,0.1) !important;
         }
 
         .gv-dot,
@@ -763,7 +763,7 @@ export default function HeroCarousel() {
         .gv-dot-active span {
           font-size: 8px;
           font-weight: 800;
-          color: rgba(255, 255, 255, 0.35);
+          color: rgba(244,238,225,0.35);
         }
 
         .gv-dot::after,
@@ -774,7 +774,7 @@ export default function HeroCarousel() {
           width: 5px;
           height: 5px;
           border-radius: 50%;
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(244,238,225,0.2);
         }
 
         .gv-dot-active span {
@@ -794,7 +794,7 @@ export default function HeroCarousel() {
           left: 0;
           right: 0;
           height: 2px;
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(244,238,225,0.05);
         }
 
         .gv-hero-progress span {
@@ -817,7 +817,7 @@ export default function HeroCarousel() {
           display: flex;
           align-items: center;
           gap: 9px;
-          color: rgba(255, 255, 255, 0.28);
+          color: rgba(244,238,225,0.28);
           font-size: 7px;
           font-weight: 800;
           letter-spacing: 0.18em;
@@ -826,7 +826,7 @@ export default function HeroCarousel() {
         .gv-hero-bottom-label i {
           width: 20px;
           height: 1px;
-          background: rgba(255, 255, 255, 0.18);
+          background: rgba(244,238,225,0.18);
         }
 
         @keyframes gv-title-in {

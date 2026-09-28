@@ -27,13 +27,13 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
   return (
     <html lang="ar" dir="rtl">
-      <body style={{ background: "#0e0906", color: "#faf8f5", fontFamily: "system-ui, sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <body style={{ background: "#070D0C", color: "#F4EEE1", fontFamily: "system-ui, sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center", padding: 24 }}>
           <h1 style={{ fontSize: 24, marginBottom: 12 }}>حدث خطأ غير متوقع في الموقع</h1>
           <p style={{ opacity: 0.7, marginBottom: 20 }}>تم تسجيل الخطأ. برجاء إعادة تحميل الصفحة.</p>
           <button
             onClick={() => reset()}
-            style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(255, 255, 255, 0.2)", background: "rgba(255, 255, 255, 0.08)", color: "#fff", cursor: "pointer" }}
+            style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(244,238,225,0.2)", background: "rgba(244,238,225,0.08)", color: "#fff", cursor: "pointer" }}
           >
             إعادة المحاولة
           </button>

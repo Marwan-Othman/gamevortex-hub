@@ -205,7 +205,7 @@ export default function AdminShell({
             >
               <path
                 d="M20 3 36 30H4z"
-                stroke="#ffe492"
+                stroke="#FFAB92"
                 strokeWidth="2.5"
                 fill="none"
               />

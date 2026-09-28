@@ -19,7 +19,7 @@ export default function PlatformLibraryDonut({
       <div className={styles.panelHead}><span>توزيع الألعاب حسب المنصة</span></div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <svg viewBox="0 0 100 100" width="120" height="120" style={{ flexShrink: 0 }}>
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255, 255, 255, 0.06)" strokeWidth="14" />
+          <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(244,238,225,0.06)" strokeWidth="14" />
           {segments.map((s) => {
             const fraction = s.value / total;
             const dash = fraction * circumference;
@@ -40,8 +40,8 @@ export default function PlatformLibraryDonut({
             offset += dash;
             return circle;
           })}
-          <text x="50" y="47" textAnchor="middle" fontSize="14" fontWeight="800" fill="#fcf2ed">{centerValue}</text>
-          <text x="50" y="60" textAnchor="middle" fontSize="7" fill="#cbae9d">{centerLabel}</text>
+          <text x="50" y="47" textAnchor="middle" fontSize="14" fontWeight="800" fill="#F4EEE1">{centerValue}</text>
+          <text x="50" y="60" textAnchor="middle" fontSize="7" fill="#FF8C69">{centerLabel}</text>
         </svg>
         <div className={styles.legendRow} style={{ flex: 1, marginTop: 0 }}>
           {segments.map((s) => (
@@ -51,7 +51,7 @@ export default function PlatformLibraryDonut({
               <strong>{s.value}</strong>
             </div>
           ))}
-          {!segments.length && <span style={{ color: "#cbae9d", fontSize: 11.5 }}>مكتبتك فارغة حتى الآن.</span>}
+          {!segments.length && <span style={{ color: "#FF8C69", fontSize: 11.5 }}>مكتبتك فارغة حتى الآن.</span>}
         </div>
       </div>
     </div>

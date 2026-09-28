@@ -37,7 +37,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(33, 19, 14, 0.92), rgba(22, 11, 8, 0.9));
+  background: linear-gradient(180deg, rgba(16,31,28,0.92), rgba(10,20,18,0.9));
   transition: transform 0.2s, border-color 0.2s;
 }
 
@@ -56,7 +56,7 @@
 
 .brandTile:hover {
   transform: translateY(-4px);
-  border-color: rgba(255, 118, 225, 0.35);
+  border-color: rgba(247,215,126,0.35);
 }
 
 .monogram {
@@ -69,7 +69,7 @@
   font-weight: 900;
   color: #fff;
   background: linear-gradient(135deg, var(--from), var(--to));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(7,13,12,0.35);
 }
 
 .monogramLarge {
@@ -136,7 +136,7 @@
   border-radius: 14px;
   color: var(--muted);
   font-size: 13px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(244,238,225,0.03);
 }
 
 .regionNav {
@@ -155,7 +155,7 @@
   border-radius: 999px;
   font-size: 13px;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(244,238,225,0.03);
 }
 
 .regionBox {
@@ -164,7 +164,7 @@
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(33, 19, 14, 0.9), rgba(22, 11, 8, 0.88));
+  background: linear-gradient(180deg, rgba(16,31,28,0.9), rgba(10,20,18,0.88));
 }
 
 .regionHead {
@@ -198,7 +198,7 @@
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(244,238,225,0.03);
 }
 
 .denomLabel {

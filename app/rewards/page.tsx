@@ -237,7 +237,7 @@ export default async function RewardsPage() {
             height: 12,
             borderRadius: 999,
             background:
-              "rgba(255, 255, 255, .08)",
+              "rgba(244,238,225,.08)",
             overflow: "hidden",
             marginTop: 18,
           }}
@@ -248,7 +248,7 @@ export default async function RewardsPage() {
               height: "100%",
               borderRadius: 999,
               background:
-                "linear-gradient(90deg,#ead31f,#ff196e)",
+                "linear-gradient(90deg,#F0B719,#F1BB27)",
               transition:
                 "width .3s ease",
             }}
@@ -298,11 +298,11 @@ export default async function RewardsPage() {
                 key={tier.key}
                 style={{
                   borderColor: active
-                    ? "rgba(255, 25, 110, .65)"
+                    ? "rgba(241,187,39,.65)"
                     : undefined,
 
                   boxShadow: active
-                    ? "0 0 30px rgba(255, 25, 110, .12)"
+                    ? "0 0 30px rgba(241,187,39,.12)"
                     : undefined,
                 }}
               >

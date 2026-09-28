@@ -28,12 +28,12 @@ const WEEKDAYS_AR = [
 ];
 
 const PLATFORM_COLORS = [
-  "#ffdf5d",
-  "#ff7059",
-  "#e136eb",
-  "#66e8ff",
-  "#76ffa6",
-  "#ff3d79",
+  "#FF835D",
+  "#FF8059",
+  "#F2BE2F",
+  "#FF8A66",
+  "#8CE9C7",
+  "#F3C649",
 ];
 
 function platformOf(
@@ -991,7 +991,7 @@ export default async function GamerProfilePage() {
 
           <span
             style={{
-              color: "#ffe492",
+              color: "#FFAB92",
             }}
           >
             {achievementsCount} إنجاز

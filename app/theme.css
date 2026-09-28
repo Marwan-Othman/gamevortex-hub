@@ -26,3 +26,8 @@ h1,h2,h3,.brand,.gv-brand-text{font-family:var(--font-d);font-weight:400;letter-
 .mobile-bottom-nav a.active,.gv-bottom-nav a.active{color:var(--ember)}
 .footer,.gv-footer{border-color:var(--line);color:var(--muted)}
 a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+/* Legacy files still ship a few !important rules; these five keep primary controls consistent. */
+.btn{background:var(--ember)!important;color:var(--on-accent)!important;box-shadow:none!important}
+.gv-nav-link.is-active,.gv-drawer-link.is-active{background:var(--ember)!important;color:var(--on-accent)!important;box-shadow:none!important}
+.gv-nav-link:hover,.gv-drawer-link:hover{background:var(--panel2)!important;color:var(--ink)!important}
+.gv-bottom-nav a.active{background:transparent!important;color:var(--ember)!important;box-shadow:none!important}

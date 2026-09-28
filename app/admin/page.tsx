@@ -10,7 +10,7 @@ import styles from "./admin.module.css";
 export const dynamic = "force-dynamic";
 
 const WEEKDAYS_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-const PLATFORM_COLORS = ["#ffdf5d", "#ff7059", "#e136eb", "#66e8ff", "#76ffa6", "#ff3d79"];
+const PLATFORM_COLORS = ["#FF835D", "#FF8059", "#F2BE2F", "#FF8A66", "#8CE9C7", "#F3C649"];
 
 const AUDIT_LABELS: Record<string, string> = {
   GAMES_BULK_IMPORT_RAWG_DETAILED: "تم استيراد ألعاب من RAWG",
@@ -154,12 +154,12 @@ export default async function Admin() {
   const initial = (owner.username || owner.email).trim().charAt(0).toUpperCase();
 
   const overview = [
-    { label: "الألعاب", value: games, color: "#ffdf5d", icon: <IconGames /> },
-    { label: "المستخدمون", value: users, color: "#ff7059", icon: <IconUsers /> },
-    { label: "الطلبات", value: ordersTotal, color: "#e136eb", icon: <IconOrders /> },
-    { label: "طلبات معلقة", value: pendingOrders, color: "#66e8ff", icon: <IconClock /> },
-    { label: "سحوبات معلقة", value: withdrawalsPending, color: "#76ffa6", icon: <IconWithdraw /> },
-    { label: "بلاغات معلقة", value: reportsPending, color: "#ff3d79", icon: <IconFlag /> },
+    { label: "الألعاب", value: games, color: "#FF835D", icon: <IconGames /> },
+    { label: "المستخدمون", value: users, color: "#FF8059", icon: <IconUsers /> },
+    { label: "الطلبات", value: ordersTotal, color: "#F2BE2F", icon: <IconOrders /> },
+    { label: "طلبات معلقة", value: pendingOrders, color: "#FF8A66", icon: <IconClock /> },
+    { label: "سحوبات معلقة", value: withdrawalsPending, color: "#8CE9C7", icon: <IconWithdraw /> },
+    { label: "بلاغات معلقة", value: reportsPending, color: "#F3C649", icon: <IconFlag /> },
   ];
 
   return (
@@ -243,7 +243,7 @@ export default async function Admin() {
       </div>
 
       <section className={styles.panel}>
-        <div className={styles.panelHead}><span>أحدث الألعاب المضافة</span><Link href="/admin/games" style={{ color: "#ffe492", fontSize: 12 }}>عرض الكل</Link></div>
+        <div className={styles.panelHead}><span>أحدث الألعاب المضافة</span><Link href="/admin/games" style={{ color: "#FFAB92", fontSize: 12 }}>عرض الكل</Link></div>
         <div className={styles.mediaRow}>
           {latestGames.map((g) => (
             <Link href={`/games/${g.slug}`} key={g.id} className={styles.mediaCard}>
@@ -280,7 +280,7 @@ export default async function Admin() {
           <div className={styles.indicatorTile}><strong>{openDraws}</strong><span>سحوبات مفتوحة</span></div>
           <div className={styles.indicatorTile}><strong>{pendingReferrals}</strong><span>إحالات بانتظار التأهل</span></div>
           <div className={styles.indicatorTile}><strong>{recentErrors}</strong><span>أخطاء آخر 24 ساعة</span></div>
-          <Link href="/admin/errors" className={styles.indicatorTile} style={{ color: "#ffe492" }}><strong>→</strong><span>سجل الأخطاء الكامل</span></Link>
+          <Link href="/admin/errors" className={styles.indicatorTile} style={{ color: "#FFAB92" }}><strong>→</strong><span>سجل الأخطاء الكامل</span></Link>
         </section>
       )}
     </AdminShell>
