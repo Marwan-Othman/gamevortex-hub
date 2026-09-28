@@ -107,6 +107,7 @@ model User {
   walletDeposits WalletDeposit[]
   ownerWallet OwnerWallet?
   tradingAccount TradingAccount?
+  tradingRiskConfig TradingRiskConfig?
 
   pointLedger PointLedger[]
 
@@ -1501,4 +1502,99 @@ model TradingLedger {
 
   @@index([accountId, createdAt])
   @@index([allocationId])
+}
+
+// ---------------------------------------------------------------------------
+// GameVortex AI Trading — Phase 2: Shariah Guard + Risk Manager foundations
+// ---------------------------------------------------------------------------
+
+enum ShariahStatus {
+  APPROVED
+  REVIEW
+  REJECTED
+}
+
+enum ShariahRuleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model ShariahPolicy {
+  id String @id @default(cuid())
+  version String @unique
+  status ShariahRuleStatus @default(ACTIVE)
+  description String
+  source String?
+  notes String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rules ShariahRule[]
+  assetProfiles AssetShariahProfile[]
+
+  @@index([status, createdAt])
+}
+
+model ShariahRule {
+  id String @id @default(cuid())
+  policyId String
+  ruleKey String
+  name String
+  description String
+  status ShariahRuleStatus @default(ACTIVE)
+  source String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  policy ShariahPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([policyId, ruleKey])
+  @@index([policyId, status])
+}
+
+model AssetShariahProfile {
+  id String @id @default(cuid())
+  policyId String
+  symbol String
+  assetType String
+  issuer String?
+  businessActivity String?
+  status ShariahStatus
+  reason String
+  source String?
+  lastCheckedAt DateTime @default(now())
+  ruleVersion String
+  financialRatios Json?
+  tradingMethod String?
+  ownershipSettlementVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  policy ShariahPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([symbol, policyId])
+  @@index([symbol, status])
+  @@index([policyId, status])
+}
+
+model TradingRiskConfig {
+  id String @id @default(cuid())
+  ownerId String @unique
+  maxTradeAmountUsd Decimal @db.Decimal(18,8)
+  maxDailyLossUsd Decimal @db.Decimal(18,8)
+  maxOpenTrades Int
+  maxExposureUsd Decimal @db.Decimal(18,8)
+  maxExposurePerAssetUsd Decimal @db.Decimal(18,8)
+  maxConsecutiveLosses Int
+  requireStopLoss Boolean @default(true)
+  requireTakeProfit Boolean @default(false)
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([enabled, updatedAt])
 }
