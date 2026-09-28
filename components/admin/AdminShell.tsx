@@ -32,6 +32,11 @@ const NAV_SECTIONS: NavSection[] = [
         href: "/admin/owner-control",
         icon: <IconShield />,
       },
+      {
+        label: "GameVortex AI Trading",
+        href: "/admin/trading",
+        icon: <IconReports />,
+      },
     ],
   },
   {

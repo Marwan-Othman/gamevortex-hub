@@ -77,6 +77,8 @@ enum LedgerType {
   PAYOUT_SETTLED
   PAYOUT_FAILED
   POINTS_RETURNED
+  TRADING_ALLOCATED
+  TRADING_RETURNED
 }
 
 enum PointLedgerType {
@@ -104,6 +106,7 @@ model User {
   walletTransactions WalletTransaction[]
   walletDeposits WalletDeposit[]
   ownerWallet OwnerWallet?
+  tradingAccount TradingAccount?
 
   pointLedger PointLedger[]
 
@@ -332,6 +335,7 @@ model OwnerWallet {
 
   ledger OwnerLedger[]
   withdrawals WithdrawalRequest[]
+  tradingAllocations TradingAllocation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1413,4 +1417,88 @@ model VipPurchase {
   @@unique([provider, providerPaymentId])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// GameVortex AI Trading (Owner Edition) — Phase 2: Trading Wallet Allocation
+// Owner Wallet (points) -> TradingAllocation (whole USD) -> TradingAccount.
+// TradingLedger is append-only (enforced by a DB trigger in the migration).
+// ---------------------------------------------------------------------------
+
+enum TradingAllocationStatus {
+  ACTIVE
+  RELEASED
+}
+
+enum TradingLedgerType {
+  ALLOCATION_IN
+  ALLOCATION_RETURN
+}
+
+model TradingAccount {
+  id String @id @default(cuid())
+  ownerId String @unique
+
+  balanceUsd Decimal @default(0) @db.Decimal(18,8)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  allocations TradingAllocation[]
+  ledger TradingLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TradingAllocation {
+  id String @id @default(cuid())
+  accountId String
+  sourceWalletId String
+
+  amountUsd Int
+  points Int
+  conversionRate Int
+
+  status TradingAllocationStatus @default(ACTIVE)
+  idempotencyKey String @unique
+
+  relatedTradeId String?
+  releasedAt DateTime?
+
+  account TradingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  sourceWallet OwnerWallet @relation(fields: [sourceWalletId], references: [id], onDelete: Restrict)
+
+  ledger TradingLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId, status])
+  @@index([sourceWalletId])
+}
+
+model TradingLedger {
+  id String @id @default(cuid())
+  accountId String
+  allocationId String?
+
+  type TradingLedgerType
+
+  amountUsd Decimal @db.Decimal(18,8)
+  balanceBeforeUsd Decimal @db.Decimal(18,8)
+  balanceAfterUsd Decimal @db.Decimal(18,8)
+
+  relatedTradeId String?
+  status String @default("POSTED")
+
+  idempotencyKey String @unique
+  metadata Json?
+
+  account TradingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  allocation TradingAllocation? @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([allocationId])
 }
