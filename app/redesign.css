@@ -1,0 +1,2114 @@
+/* =====================================================================
+   GameVortex Hub — Unified Premium Redesign
+   Source of truth: Obsidian / Black + GameVortex Purple + Luxury Gold
+   Applied globally so every route shares one visual language.
+   ===================================================================== */
+
+:root {
+  --gv-black: #030305;
+  --gv-obsidian: #07070b;
+  --gv-surface: #0b0a11;
+  --gv-surface-2: #11101a;
+  --gv-surface-3: #171522;
+  --gv-purple: #8b5cf6;
+  --gv-purple-2: #a855f7;
+  --gv-purple-soft: rgba(139, 92, 246, .16);
+  --gv-gold: #f4c95d;
+  --gv-gold-2: #d6a83f;
+  --gv-gold-soft: rgba(244, 201, 93, .14);
+  --gv-cyan: #55d9ff;
+  --gv-text: #f8f7fb;
+  --gv-muted: #92909e;
+  --gv-line: rgba(255,255,255,.08);
+  --gv-line-purple: rgba(139,92,246,.30);
+  --gv-line-gold: rgba(244,201,93,.28);
+  --gv-radius: 20px;
+  --gv-radius-sm: 13px;
+  --gv-shadow: 0 24px 80px rgba(0,0,0,.48);
+  --gv-glow: 0 0 0 1px rgba(139,92,246,.20), 0 0 34px rgba(139,92,246,.18);
+}
+
+html { background: var(--gv-black) !important; }
+body {
+  background:
+    radial-gradient(850px 500px at 8% -8%, rgba(139,92,246,.18), transparent 62%),
+    radial-gradient(750px 500px at 96% 8%, rgba(244,201,93,.075), transparent 62%),
+    radial-gradient(900px 560px at 50% 110%, rgba(85,217,255,.045), transparent 65%),
+    linear-gradient(180deg, #030305 0%, #07070b 48%, #030305 100%) !important;
+  color: var(--gv-text) !important;
+}
+
+body::before {
+  content: "" !important;
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+  opacity: .18 !important;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) !important;
+  background-size: 52px 52px !important;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 78%) !important;
+}
+
+/* Main shell */
+.gv-app-main {
+  width: 100%;
+  min-height: calc(100vh - 72px);
+}
+
+.gv-app-main > * { max-width: 100%; }
+
+/* Header */
+.gv-header {
+  background: rgba(3,3,5,.76) !important;
+  border-bottom: 1px solid var(--gv-line-purple) !important;
+  box-shadow: 0 14px 45px rgba(0,0,0,.38) !important;
+  backdrop-filter: blur(22px) saturate(135%) !important;
+}
+.gv-header-inner { min-height: 74px !important; }
+.gv-brand-name {
+  background: linear-gradient(90deg, #fff 0%, #d8c7ff 46%, var(--gv-gold) 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+.gv-brand-mark { filter: drop-shadow(0 0 14px rgba(139,92,246,.72)) !important; }
+.gv-nav-link { color: #d9d6e5 !important; }
+.gv-nav-link:hover { color: #fff !important; background: var(--gv-purple-soft) !important; }
+.gv-nav-link.is-active {
+  color: #fff !important;
+  background: linear-gradient(135deg, rgba(139,92,246,.24), rgba(244,201,93,.07)) !important;
+  border-color: var(--gv-line-purple) !important;
+  box-shadow: var(--gv-glow) !important;
+}
+.gv-search input,
+.gv-icon-button,
+.gv-menu-button,
+.gv-profile-button {
+  background: rgba(12,11,18,.88) !important;
+  border-color: var(--gv-line) !important;
+}
+.gv-icon-button:hover,
+.gv-menu-button:hover,
+.gv-profile-button:hover { border-color: var(--gv-line-purple) !important; box-shadow: var(--gv-glow) !important; }
+.gv-profile-avatar { background: linear-gradient(135deg, #6d28d9, #a855f7 58%, #f4c95d) !important; }
+.gv-auth-signup {
+  background: linear-gradient(135deg, #ffe28b, #f4c95d 52%, #c99a32) !important;
+  color: #171003 !important;
+  box-shadow: 0 10px 30px rgba(244,201,93,.16) !important;
+}
+.gv-mobile-tabs {
+  border-bottom: 1px solid var(--gv-line) !important;
+}
+.gv-mobile-tabs a.is-active {
+  color: var(--gv-gold) !important;
+  border-bottom-color: var(--gv-gold) !important;
+  text-shadow: 0 0 16px rgba(244,201,93,.45) !important;
+}
+
+/* Universal surfaces */
+.hero,
+.card,
+.stat,
+.glass,
+.panel,
+.section,
+.accountCard,
+.whyCard,
+.benefit,
+.ownerCard,
+.planCard,
+.feature,
+.sideCard,
+.promoCard,
+.achievementCard,
+.loginPrompt,
+.tableWrap,
+.formCard,
+.emptyState,
+.noticeCard {
+  background: linear-gradient(145deg, rgba(17,15,25,.88), rgba(7,7,11,.94)) !important;
+  border: 1px solid var(--gv-line) !important;
+  box-shadow: var(--gv-shadow), inset 0 1px rgba(255,255,255,.035) !important;
+  backdrop-filter: blur(16px) saturate(125%) !important;
+}
+
+.hero,
+.card,
+.panel,
+.section,
+.accountCard,
+.whyCard,
+.benefit,
+.ownerCard,
+.planCard { border-radius: var(--gv-radius) !important; }
+
+.hero:hover,
+.card:hover,
+.game-card:hover,
+.planCard:hover,
+.promoCard:hover,
+.sideCard:hover,
+.achievementCard:hover {
+  border-color: var(--gv-line-purple) !important;
+}
+
+/* Typography */
+h1,h2,h3,h4 { color: var(--gv-text) !important; }
+.muted,
+.hero p,
+.card p,
+.section p { color: var(--gv-muted) !important; }
+
+/* Buttons */
+.btn,
+.primaryButton,
+.submitBtn,
+.planButton,
+.actionBtn,
+.viewSiteBtn {
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, filter .18s ease !important;
+}
+.btn,
+.submitBtn,
+.primaryButton {
+  background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 48%, #6d28d9 100%) !important;
+  color: #fff !important;
+  border: 1px solid rgba(196,158,255,.28) !important;
+  box-shadow: 0 12px 32px rgba(109,40,217,.24) !important;
+}
+.btn:hover,
+.submitBtn:hover,
+.primaryButton:hover { transform: translateY(-2px) !important; box-shadow: 0 16px 42px rgba(139,92,246,.28) !important; }
+.btn.secondary,
+.secondaryButton {
+  background: rgba(12,11,18,.86) !important;
+  color: #fff !important;
+  border: 1px solid var(--gv-line-purple) !important;
+  box-shadow: none !important;
+}
+.btn.secondary:hover,
+.secondaryButton:hover { box-shadow: var(--gv-glow) !important; }
+
+/* Premium gold accents */
+.product-price,
+.priceBlock,
+.sectionKicker,
+.heroBadge,
+.activeBadge,
+.ownerBadge,
+.vipBadge,
+.gold,
+[data-premium="true"] {
+  color: var(--gv-gold) !important;
+}
+
+.badge,
+.pill {
+  background: linear-gradient(135deg, rgba(139,92,246,.14), rgba(244,201,93,.07)) !important;
+  border: 1px solid var(--gv-line-purple) !important;
+  color: #d8c8ff !important;
+}
+
+/* Forms */
+.input,
+input,
+select,
+textarea,
+.inputRow,
+.composer textarea {
+  color: #fff !important;
+  background: rgba(7,7,11,.78) !important;
+  border-color: var(--gv-line) !important;
+  border-radius: var(--gv-radius-sm) !important;
+}
+.input:focus,
+input:focus,
+select:focus,
+textarea:focus,
+.inputRow:focus-within {
+  border-color: var(--gv-purple) !important;
+  box-shadow: 0 0 0 3px rgba(139,92,246,.13), 0 0 28px rgba(139,92,246,.12) !important;
+}
+input::placeholder,
+textarea::placeholder { color: #656170 !important; }
+
+/* Home / generic content */
+.wrap,
+.page,
+.aiHub,
+.profilePage,
+.libraryPage,
+.marketplacePage,
+.categoriesPage,
+.recommendationsPage,
+.rankingsPage,
+.rewardsPage,
+.referralsPage,
+.quranPage,
+.giftCardsPage {
+  position: relative;
+}
+
+.section-head { margin-top: 44px !important; }
+.section-head h2 { letter-spacing: -.02em !important; }
+.game-card { overflow: hidden !important; }
+.cover,
+.mediaCover,
+.gameCard img,
+.productCard img {
+  border-radius: 14px !important;
+}
+
+/* Home hero */
+.hero-home,
+.heroGrid {
+  border-radius: 28px !important;
+  border-color: var(--gv-line-purple) !important;
+  background:
+    radial-gradient(520px 300px at 86% 22%, rgba(139,92,246,.18), transparent 70%),
+    radial-gradient(420px 280px at 92% 90%, rgba(244,201,93,.08), transparent 72%),
+    linear-gradient(145deg, rgba(18,16,28,.95), rgba(6,6,10,.94)) !important;
+  box-shadow: 0 30px 100px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.05) !important;
+}
+.hero h1,
+.heroTitle {
+  background: linear-gradient(100deg, #fff 0%, #e7ddff 36%, #a855f7 72%, #f4c95d 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+.vortex-core {
+  background: conic-gradient(from 30deg, #6d28d9, #a855f7, #f4c95d, #55d9ff, #6d28d9) !important;
+  box-shadow: 0 0 90px rgba(139,92,246,.24), 0 0 160px rgba(244,201,93,.06) !important;
+}
+.vortex-core:before { background: #07070b !important; }
+
+/* Grids / cards */
+.grid,
+.feature-grid,
+.plansGrid,
+.whyGrid,
+.benefits {
+  gap: 16px !important;
+}
+.stat,
+.statTile,
+.indicatorTile,
+.overviewTile {
+  background: linear-gradient(145deg, rgba(20,18,29,.82), rgba(9,8,13,.90)) !important;
+  border-color: var(--gv-line) !important;
+}
+.stat strong { color: #fff !important; }
+
+/* VIP */
+.planCard,
+.heroCrown,
+.accountCard,
+.whyCard,
+.benefit,
+.ownerCard {
+  border-color: var(--gv-line) !important;
+}
+.planCard:hover { transform: translateY(-5px) !important; box-shadow: 0 0 0 1px rgba(139,92,246,.18), 0 24px 70px rgba(0,0,0,.56) !important; }
+.planButton {
+  border-color: var(--gv-line-purple) !important;
+  color: #fff !important;
+  background: rgba(139,92,246,.05) !important;
+}
+.planButton:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a855f7, #6d28d9) !important;
+  color: #fff !important;
+}
+.heroCrown { background: radial-gradient(circle at center, rgba(244,201,93,.14), rgba(139,92,246,.04) 42%, transparent 68%) !important; }
+.crownRing { background: linear-gradient(135deg, #ffe28b, #f4c95d, #c99a32) !important; color: #201605 !important; box-shadow: 0 0 42px rgba(244,201,93,.18) !important; }
+
+/* AI */
+.aiHub .sidebar,
+.aiHub .chatPanel {
+  background: linear-gradient(145deg, rgba(17,15,25,.90), rgba(7,7,11,.96)) !important;
+  border-color: var(--gv-line) !important;
+  box-shadow: var(--gv-shadow) !important;
+}
+.aiHub .userMessage { background: linear-gradient(135deg, rgba(109,40,217,.58), rgba(139,92,246,.30)) !important; }
+.aiHub .aiMessage { background: rgba(255,255,255,.035) !important; border: 1px solid var(--gv-line) !important; }
+.aiHub .composer { border-color: var(--gv-line) !important; }
+.aiHub .composer button { background: linear-gradient(135deg, #a855f7, #6d28d9) !important; }
+
+/* Admin */
+[class*="shell"] {
+  background:
+    radial-gradient(700px 420px at 88% 0%, rgba(244,201,93,.08), transparent 62%),
+    radial-gradient(700px 480px at 0% 10%, rgba(139,92,246,.12), transparent 62%),
+    #050507 !important;
+}
+[class*="topbar"] {
+  background: rgba(5,5,7,.80) !important;
+  border-bottom-color: var(--gv-line-purple) !important;
+}
+[class*="sidebar"] {
+  background: linear-gradient(180deg, #0c0b12, #050507) !important;
+  border-color: var(--gv-line-purple) !important;
+}
+[class*="navLink"] { color: #c6c2d2 !important; }
+[class*="navLink"]:hover { background: var(--gv-purple-soft) !important; color: #fff !important; }
+[class*="navLink"][class*="active"] { background: linear-gradient(135deg, rgba(139,92,246,.20), rgba(244,201,93,.06)) !important; border-color: var(--gv-line-purple) !important; color: #fff !important; }
+[class*="panel"],
+[class*="ownerCard"],
+[class*="statTile"],
+[class*="overviewTile"],
+[class*="indicatorTile"],
+[class*="mediaCard"],
+[class*="actionBtn"] {
+  border-color: var(--gv-line) !important;
+  background: linear-gradient(145deg, rgba(18,16,28,.84), rgba(8,8,12,.92)) !important;
+}
+[class*="actionBtn"]:hover { border-color: var(--gv-line-purple) !important; box-shadow: var(--gv-glow) !important; }
+[class*="viewSiteBtn"] { background: linear-gradient(135deg, #ffe28b, #f4c95d, #c99a32) !important; color: #201605 !important; }
+
+/* Auth: same universe, not a random separate login website */
+[class*="auth-module_page"] {
+  background:
+    radial-gradient(700px 450px at 12% 12%, rgba(139,92,246,.20), transparent 64%),
+    radial-gradient(600px 420px at 90% 88%, rgba(244,201,93,.08), transparent 66%),
+    linear-gradient(180deg, #030305, #07070b 58%, #030305) !important;
+}
+
+/* Footer / bottom navigation */
+.gv-footer {
+  background: linear-gradient(180deg, transparent, rgba(5,5,7,.86)) !important;
+  border-top: 1px solid var(--gv-line) !important;
+  color: var(--gv-muted) !important;
+}
+.gv-footer strong { color: var(--gv-gold) !important; }
+.gv-bottom-nav {
+  background: rgba(8,7,12,.88) !important;
+  border: 1px solid var(--gv-line-purple) !important;
+  box-shadow: 0 20px 55px rgba(0,0,0,.55), 0 0 30px rgba(139,92,246,.08) !important;
+  backdrop-filter: blur(22px) saturate(135%) !important;
+}
+.gv-bottom-nav a { color: #888493 !important; }
+.gv-bottom-nav a.active { color: var(--gv-gold) !important; }
+.gv-bottom-nav a.active svg { filter: drop-shadow(0 0 7px rgba(244,201,93,.35)); }
+
+/* Drawers / dialogs / menus */
+.gv-drawer {
+  background: linear-gradient(180deg, #0c0b12, #030305) !important;
+  border-color: var(--gv-line-purple) !important;
+}
+.gv-drawer-link:hover { background: var(--gv-purple-soft) !important; }
+.gv-drawer-link.is-active { background: rgba(139,92,246,.18) !important; border-color: var(--gv-line-purple) !important; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; }
+th,td { border-bottom: 1px solid var(--gv-line) !important; padding: 12px !important; }
+th { color: #d8c8ff !important; font-weight: 700 !important; background: rgba(139,92,246,.06) !important; }
+tr:hover td { background: rgba(139,92,246,.035) !important; }
+
+/* Mobile */
+@media (max-width: 999px) {
+  .wrap { width: min(100% - 22px, var(--wrap)) !important; padding: 22px 0 !important; }
+  .hero { border-radius: 22px !important; }
+  .hero-home { min-height: 0 !important; padding: 28px 22px !important; }
+  .hero h1 { font-size: clamp(38px, 12vw, 58px) !important; letter-spacing: -2px !important; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .feature-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 620px) {
+  .grid { grid-template-columns: 1fr !important; }
+  .hero-home { padding: 24px 18px !important; }
+  .card, .panel, .planCard, .accountCard, .whyCard, .benefit { border-radius: 17px !important; }
+  .section-head { margin-top: 34px !important; }
+  .footer { padding-bottom: 90px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+
+
+/* ================================================================
+   GameVortex Hub — APPROVED REFERENCE REBUILD
+   Visual target: deep black/navy glass + electric violet + cyan
+   utility accents + premium gold CTAs. Desktop/mobile unified.
+   This layer is intentionally last so every existing route inherits
+   the same visual language without changing application logic.
+   ================================================================ */
+
+:root{
+  --ref-bg:#04050b;
+  --ref-bg2:#07091a;
+  --ref-panel:rgba(10,13,31,.88);
+  --ref-panel2:rgba(14,17,40,.82);
+  --ref-panel3:rgba(22,20,53,.72);
+  --ref-purple:#8b3dff;
+  --ref-purple2:#b95cff;
+  --ref-purple3:#6d2de0;
+  --ref-cyan:#27d7ff;
+  --ref-blue:#4388ff;
+  --ref-gold:#ffd45a;
+  --ref-gold2:#e4ab2d;
+  --ref-text:#f7f8ff;
+  --ref-muted:#9298b5;
+  --ref-border:rgba(145,76,255,.30);
+  --ref-border-soft:rgba(255,255,255,.08);
+  --ref-radius:16px;
+  --ref-radius-lg:22px;
+  --ref-shadow:0 20px 70px rgba(0,0,0,.52);
+  --ref-purple-glow:0 0 0 1px rgba(139,61,255,.24),0 0 34px rgba(139,61,255,.18);
+  --ref-cyan-glow:0 0 0 1px rgba(39,215,255,.20),0 0 30px rgba(39,215,255,.15);
+  --ref-gold-glow:0 0 0 1px rgba(255,212,90,.25),0 0 30px rgba(255,212,90,.15);
+}
+
+html,body{
+  background:var(--ref-bg)!important;
+  color:var(--ref-text)!important;
+}
+body{
+  background:
+    radial-gradient(900px 540px at 7% -12%,rgba(139,61,255,.23),transparent 62%),
+    radial-gradient(700px 500px at 97% 7%,rgba(39,215,255,.08),transparent 62%),
+    radial-gradient(700px 500px at 55% 110%,rgba(255,212,90,.045),transparent 65%),
+    linear-gradient(180deg,#03040a 0%,#07091a 48%,#03040a 100%)!important;
+}
+body:after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background-image:
+    linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px);
+  background-size:48px 48px;
+  mask-image:linear-gradient(to bottom,#000,transparent 88%);
+}
+
+/* shared shell */
+.gv-app-main{min-height:calc(100vh - 72px);position:relative}
+.wrap,.page{position:relative}
+.wrap{width:min(1440px,calc(100% - 32px))!important;margin-inline:auto}
+section,.section{scroll-margin-top:90px}
+h1,h2,h3,h4{color:#fff!important}
+p{color:inherit}
+.muted,.heroText,.description,.subtitle,.sectionKicker{color:var(--ref-muted)!important}
+
+/* header */
+.gv-header{
+  background:rgba(3,4,10,.84)!important;
+  border-bottom:1px solid rgba(139,61,255,.25)!important;
+  box-shadow:0 12px 55px rgba(0,0,0,.52),0 0 30px rgba(139,61,255,.06)!important;
+  backdrop-filter:blur(22px)!important;
+}
+.gv-header-inner{min-height:70px!important}
+.gv-brand-name{
+  font-weight:900!important;
+  background:linear-gradient(90deg,#fff 20%,#d8b7ff 58%,var(--ref-cyan))!important;
+  -webkit-background-clip:text!important;background-clip:text!important;color:transparent!important;
+}
+.gv-brand-mark{filter:drop-shadow(0 0 14px rgba(139,61,255,.65))!important}
+.gv-nav-link{color:#cfd3e8!important}
+.gv-nav-link:hover{background:rgba(139,61,255,.12)!important;color:#fff!important}
+.gv-nav-link.is-active{
+  background:linear-gradient(135deg,rgba(139,61,255,.25),rgba(39,215,255,.07))!important;
+  border-color:rgba(139,61,255,.55)!important;
+  box-shadow:var(--ref-purple-glow)!important;
+  color:#fff!important;
+}
+.gv-search input{
+  height:42px!important;background:rgba(7,9,23,.88)!important;
+  border-color:rgba(139,61,255,.25)!important;
+}
+.gv-icon-button,.gv-menu-button,.gv-profile-button{
+  background:rgba(9,11,27,.9)!important;
+  border-color:rgba(139,61,255,.30)!important;
+}
+.gv-icon-button:hover,.gv-menu-button:hover,.gv-profile-button:hover{
+  border-color:var(--ref-purple)!important;box-shadow:var(--ref-purple-glow)!important;
+}
+.gv-auth-signup,.btn,.primaryButton,.heroCta,.vipBtn,.dealBtn,.submitBtn{
+  background:linear-gradient(135deg,#ffe58b 0%,var(--ref-gold) 48%,#dda522 100%)!important;
+  color:#171004!important;
+  border-color:transparent!important;
+  box-shadow:var(--ref-gold-glow)!important;
+}
+.gv-auth-login,.gv-logout-button,.btn.secondary,.heroGhost{
+  background:rgba(139,61,255,.10)!important;
+  border-color:rgba(139,61,255,.50)!important;color:#fff!important;
+}
+.gv-mobile-tabs a.is-active{
+  color:var(--ref-cyan)!important;border-bottom-color:var(--ref-cyan)!important;
+  text-shadow:0 0 16px rgba(39,215,255,.75)!important;
+}
+
+/* universal glass */
+.hero,.card,.stat,.glass,.panel,.product,.sideCard,.overviewTile,.statTile,.ownerCard,.accountCard,.whyCard{
+  background:
+    linear-gradient(145deg,rgba(17,19,45,.88),rgba(5,7,18,.94))!important;
+  border:1px solid var(--ref-border)!important;
+  border-radius:var(--ref-radius-lg)!important;
+  box-shadow:var(--ref-shadow)!important;
+  backdrop-filter:blur(18px)!important;
+}
+.hero:hover,.card:hover,.glass:hover,.product:hover,.sideCard:hover{
+  border-color:rgba(185,92,255,.62)!important;
+}
+.badge,.pill,.statusBadge,.tag,.chip{
+  background:rgba(139,61,255,.13)!important;
+  border-color:rgba(139,61,255,.32)!important;
+  color:#dcaeff!important;
+  border-radius:999px!important;
+}
+.input,.platform-chip,input,select,textarea{
+  background:rgba(5,8,21,.92)!important;
+  border:1px solid rgba(139,61,255,.28)!important;
+  color:#fff!important;
+  border-radius:12px!important;
+}
+input::placeholder,textarea::placeholder{color:#6f7694!important}
+input:focus,select:focus,textarea:focus{
+  border-color:var(--ref-purple)!important;
+  box-shadow:var(--ref-purple-glow)!important;
+}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--ref-cyan)!important;outline-offset:3px;
+}
+
+/* buttons */
+.btn,.primaryButton,.planButton,.actionBtn,.promoBtn,.sideBtn{
+  min-height:42px;border-radius:11px!important;font-weight:800!important;
+}
+.btn:hover,.primaryButton:hover,.vipBtn:hover,.submitBtn:hover{
+  transform:translateY(-2px);filter:brightness(1.05);
+}
+.btn.secondary:hover{box-shadow:var(--ref-purple-glow)!important}
+
+/* grids / cards */
+.grid{gap:14px!important}
+.game-card,.gameCard{
+  background:linear-gradient(145deg,rgba(14,17,39,.96),rgba(6,8,19,.96))!important;
+  border:1px solid rgba(139,61,255,.24)!important;
+  border-radius:14px!important;
+  overflow:hidden;
+}
+.game-card:hover,.gameCard:hover{
+  transform:translateY(-4px)!important;
+  border-color:rgba(185,92,255,.72)!important;
+  box-shadow:var(--ref-purple-glow)!important;
+}
+.cover,.detail-cover{background:#080a14!important}
+.gameRating,.rating,.stars{color:var(--ref-gold)!important}
+.product-price,.price,.priceBlock{color:var(--ref-gold)!important}
+
+/* tabs, filters, tables */
+.tabs,.filter-row,.draw-actions,.actions{gap:8px!important}
+.tabs>*{
+  border:1px solid rgba(139,61,255,.24);
+  background:rgba(9,11,27,.7);
+  border-radius:10px;
+}
+table{border-collapse:separate!important;border-spacing:0!important;width:100%}
+th{
+  color:#b8bdd3!important;background:rgba(139,61,255,.08)!important;
+  font-weight:800!important;
+}
+td,th{border-color:rgba(139,61,255,.16)!important}
+tr:hover td{background:rgba(139,61,255,.045)!important}
+
+/* home */
+.heroGrid .hero{
+  min-height:390px;
+  border-color:rgba(139,61,255,.44)!important;
+  box-shadow:0 0 0 1px rgba(139,61,255,.10),0 0 65px rgba(139,61,255,.18),0 30px 90px rgba(0,0,0,.62)!important;
+}
+.heroTitle{
+  background:linear-gradient(180deg,#fff 20%,#e9ddff 65%,#b85cff 100%)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+}
+.heroEyebrow{color:var(--ref-cyan)!important}
+.heroTag{
+  background:linear-gradient(90deg,var(--ref-purple2),var(--ref-cyan),var(--ref-gold))!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+}
+.heroStat i{color:var(--ref-cyan)!important;background:rgba(39,215,255,.08)!important;border-color:rgba(39,215,255,.22)!important}
+.pill:hover,.genreTile:hover,.promoCard:hover{
+  border-color:var(--ref-purple2)!important;box-shadow:var(--ref-purple-glow)!important;
+}
+.pill svg,.categoryIcon,.platformIcon,.genreSym{color:var(--ref-cyan)!important}
+.vipWide{
+  border-color:rgba(255,212,90,.40)!important;
+  background:
+    radial-gradient(500px 250px at 70% 50%,rgba(139,61,255,.34),transparent 65%),
+    radial-gradient(340px 220px at 35% 100%,rgba(255,212,90,.18),transparent 65%),
+    linear-gradient(135deg,#150d29,#05060d)!important;
+}
+
+/* games/store/marketplace/search layouts */
+.store-shell{grid-template-columns:235px minmax(0,1fr)!important}
+.side-panel{top:88px!important}
+.filters{padding:14px!important}
+.filter-row{display:flex;align-items:center}
+.filter-row .input{min-height:42px}
+.product{padding:14px!important}
+.product .cover{border-radius:11px!important}
+.game-detail{gap:28px!important}
+.detail-cover{box-shadow:0 24px 70px rgba(0,0,0,.55)!important}
+
+/* profile */
+.page:has(.avatar),.page:has(.statsGrid){
+  background:transparent!important;
+}
+.page:has(.avatar) .hero{
+  border-color:rgba(255,212,90,.28)!important;
+  background:
+    radial-gradient(420px 220px at 90% 0%,rgba(139,61,255,.22),transparent 70%),
+    linear-gradient(145deg,rgba(18,19,42,.92),rgba(6,8,18,.94))!important;
+}
+.page:has(.avatar) .avatar{
+  background:linear-gradient(135deg,var(--ref-purple),var(--ref-cyan))!important;
+  border-color:rgba(255,212,90,.45)!important;
+  box-shadow:0 0 28px rgba(139,61,255,.30)!important;
+}
+.page:has(.avatar) .levelBadge{
+  background:linear-gradient(135deg,var(--ref-gold),#e4a52c)!important;
+}
+
+/* VIP */
+.page:has(.planCard) .hero{
+  border-color:rgba(255,212,90,.40)!important;
+  background:
+    radial-gradient(500px 260px at 85% 20%,rgba(139,61,255,.30),transparent 70%),
+    linear-gradient(145deg,rgba(24,18,43,.95),rgba(6,8,18,.96))!important;
+}
+.planCard{border-color:rgba(139,61,255,.28)!important;background:linear-gradient(145deg,rgba(14,17,40,.96),rgba(5,7,18,.96))!important}
+.planCard:hover{box-shadow:var(--ref-purple-glow)!important}
+.priceBlock{color:var(--ref-gold)!important}
+.planButton:hover:not(:disabled){background:var(--ref-purple)!important;color:#fff!important}
+
+/* AI */
+.page:has(.ai),body:has(.ai){
+  --ai-purple:var(--ref-purple);
+}
+.ai,.ai *{--ai-accent:var(--ref-purple)}
+.status-ready{color:var(--ref-cyan)!important}
+.ai button,.ai .btn{border-radius:11px!important}
+
+/* admin universal */
+[class*="admin"] .card,[class*="admin"] .panel,[class*="admin"] .statTile,[class*="admin"] .overviewTile{
+  border-color:rgba(139,61,255,.26)!important;
+  background:linear-gradient(145deg,rgba(15,18,40,.94),rgba(5,7,17,.96))!important;
+}
+[class*="admin"] .navLink.active{
+  background:linear-gradient(135deg,rgba(139,61,255,.22),rgba(39,215,255,.06))!important;
+  color:#fff!important;border-color:rgba(139,61,255,.48)!important;
+}
+[class*="admin"] .viewSiteBtn{
+  background:linear-gradient(135deg,#ffe58b,var(--ref-gold),#dda522)!important;color:#171004!important;
+}
+
+/* auth pages use the same visual system but remain standalone */
+.page:has(.inputRow) .inputRow{
+  background:rgba(5,8,21,.86)!important;
+  border-color:rgba(139,61,255,.30)!important;
+}
+.page:has(.inputRow) .inputRow:focus-within{
+  border-color:var(--ref-purple)!important;box-shadow:var(--ref-purple-glow)!important;
+}
+.page:has(.inputRow) .submitBtn{
+  background:linear-gradient(135deg,#ffe58b,var(--ref-gold),#dda522)!important;
+  color:#171004!important;
+}
+.page:has(.inputRow) .brandText strong span{color:var(--ref-purple2)!important}
+
+/* footer */
+.footer{
+  border-top-color:rgba(139,61,255,.20)!important;
+  color:var(--ref-muted)!important;
+}
+
+/* mobile: match the narrow reference boards */
+@media(max-width:999px){
+  .wrap{width:calc(100% - 22px)!important}
+  .hero{border-radius:18px!important}
+  .heroGrid .hero{min-height:430px}
+  .store-shell{grid-template-columns:1fr!important}
+  .side-panel{position:static!important}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .feature-grid{grid-template-columns:1fr!important}
+}
+@media(max-width:560px){
+  .wrap{width:calc(100% - 16px)!important}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+  .card,.glass,.product{border-radius:14px!important;padding:12px!important}
+  .section-head{margin:26px 0 12px!important}
+  .section-head h2{font-size:21px!important}
+  .game-card{padding:8px!important}
+  .game-card .cover{border-radius:9px!important}
+  .btn{padding-inline:13px!important}
+  .gv-bottom-nav{background:rgba(4,5,14,.94)!important;border-color:rgba(139,61,255,.30)!important}
+}
+
+/* =====================================================================
+   GameVortex Hub — FINAL COMPLETE COVERAGE PASS
+   This layer intentionally sits at the end of the global stylesheet so
+   legacy/module pages inherit the approved visual language too.
+   ===================================================================== */
+:root{
+  --gv-final-bg:#03040a;
+  --gv-final-surface:#080a14;
+  --gv-final-surface-2:#0d1020;
+  --gv-final-surface-3:#13162b;
+  --gv-final-purple:#9b4dff;
+  --gv-final-purple-hot:#c15cff;
+  --gv-final-cyan:#21d4ff;
+  --gv-final-gold:#ffd45a;
+  --gv-final-text:#f7f8ff;
+  --gv-final-muted:#9ba2bb;
+  --gv-final-border:rgba(155,77,255,.30);
+  --gv-final-radius:18px;
+  --gv-final-shadow:0 22px 70px rgba(0,0,0,.52),0 0 0 1px rgba(155,77,255,.08);
+}
+
+/* Every normal content route gets the same canvas and readable rhythm. */
+.gv-app-main{
+  position:relative;
+  isolation:isolate;
+}
+.gv-app-main::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto;
+  height:420px;
+  pointer-events:none;
+  z-index:-1;
+  background:
+    radial-gradient(620px 280px at 12% 0%,rgba(155,77,255,.12),transparent 70%),
+    radial-gradient(540px 260px at 88% 2%,rgba(33,212,255,.06),transparent 72%);
+}
+
+/* Headings, links and separators */
+main h1{font-size:clamp(28px,4vw,48px);line-height:1.08;letter-spacing:-.02em}
+main h2{font-size:clamp(20px,2.4vw,30px)}
+main h3{font-size:clamp(16px,2vw,22px)}
+main p{line-height:1.75}
+main hr{border:0;border-top:1px solid rgba(155,77,255,.18);margin:20px 0}
+main a:not(.btn):not(.heroCta):not(.heroGhost):not(.vipBtn):not(.dealBtn){
+  text-decoration-color:rgba(33,212,255,.25);
+  text-underline-offset:3px;
+}
+
+/* Consistent generic page shells. */
+.wrap,
+.page,
+.store-shell,
+.game-detail,
+.filters,
+.tableWrap,
+.formCard,
+.emptyState,
+.noticeCard{
+  position:relative;
+}
+.wrap{padding-top:24px;padding-bottom:50px}
+.page{padding-bottom:48px}
+
+/* Forms and controls on every route. */
+button,select,input,textarea{font:inherit}
+button:not(:disabled){cursor:pointer}
+button:disabled{opacity:.58;cursor:not-allowed}
+input[type="checkbox"],input[type="radio"]{accent-color:var(--gv-final-purple)}
+select{appearance:auto}
+
+.btn,.primaryButton,.submitBtn,.planButton,.actionBtn,.viewSiteBtn,.heroCta,.heroGhost,.vipBtn,.dealBtn{
+  min-height:44px!important;
+  border-radius:12px!important;
+  padding-inline:18px!important;
+}
+.btn,.primaryButton,.submitBtn,.planButton,.actionBtn{
+  background:linear-gradient(135deg,var(--gv-final-purple-hot),var(--gv-final-purple) 55%,#7135e8)!important;
+  color:#fff!important;
+  border:1px solid rgba(193,92,255,.38)!important;
+  box-shadow:0 12px 34px rgba(155,77,255,.20)!important;
+}
+.btn.secondary,.secondary,.secondaryButton{
+  background:rgba(155,77,255,.08)!important;
+  color:#fff!important;
+  border:1px solid rgba(155,77,255,.38)!important;
+}
+
+/* Universal cards, including older route implementations. */
+.card,.glass,.panel,.product,.stat,.section,.filters,.tableWrap,.formCard,.emptyState,.noticeCard,
+.accountCard,.whyCard,.benefit,.ownerCard,.feature,.sideCard,.planCard,.loginPrompt,
+[class*="Card"]{
+  border-color:rgba(155,77,255,.24);
+  box-shadow:var(--gv-final-shadow);
+}
+.card,.glass,.panel,.product,.stat,.section,.filters,.tableWrap,.formCard,.emptyState,.noticeCard,
+.accountCard,.whyCard,.benefit,.ownerCard,.feature,.sideCard,.planCard,.loginPrompt{
+  background:linear-gradient(145deg,rgba(15,18,42,.86),rgba(5,7,17,.96));
+}
+
+/* Tables and dense dashboard blocks. */
+.tableWrap,.referral-table,[class*="tableWrap"],[class*="table"]{
+  overflow:auto;
+  border-radius:16px;
+}
+table{min-width:620px}
+th,td{padding:11px 12px}
+th{background:rgba(155,77,255,.09)!important;color:#e8d9ff!important}
+tbody tr:nth-child(even) td{background:rgba(255,255,255,.012)}
+tbody tr:hover td{background:rgba(33,212,255,.035)!important}
+
+/* Tabs / filters / action bars. */
+.tabs,.filter-row,.draw-actions,.actions,.action-row,.game-actions{
+  display:flex;flex-wrap:wrap;align-items:center;gap:9px;
+}
+.tabs{margin-block:8px}
+.tabs a,.tabs button,.tabs>*{
+  border-radius:10px!important;
+  border:1px solid rgba(155,77,255,.22);
+  background:rgba(7,10,24,.74);
+}
+.tabs a:hover,.tabs button:hover{border-color:rgba(33,212,255,.35)}
+
+/* Detail pages: poster + information become a deliberate product panel. */
+.game-detail{
+  width:min(1320px,calc(100% - 24px));
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:minmax(220px,360px) minmax(0,1fr);
+  align-items:start;
+}
+.detail-cover,.game-detail .cover{
+  border:1px solid rgba(155,77,255,.30)!important;
+  border-radius:18px!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.58),0 0 36px rgba(155,77,255,.14)!important;
+}
+.game-platform,.game-platform-list,.platform-list{display:flex;flex-wrap:wrap;gap:8px}
+.game-platform,.platform-icon{color:var(--gv-final-cyan)}
+
+/* Marketplace / store cards */
+.store-shell{width:min(1320px,calc(100% - 24px));margin:0 auto;padding-top:24px;padding-bottom:50px}
+.side-panel{border-radius:18px}
+.product{min-width:0;overflow:hidden}
+.product-meta{display:flex;flex-wrap:wrap;gap:7px}
+.product-price{font-size:22px;font-weight:900;color:var(--gv-final-gold)!important}
+
+/* Profile, wallet, orders, rewards, referrals and community use the same
+   information architecture even when their original CSS modules differ. */
+[class*="statsGrid"],[class*="statGrid"],[class*="overviewGrid"]{
+  display:grid;
+  gap:12px;
+}
+[class*="statTile"],[class*="overviewTile"],[class*="achievementCard"]{
+  background:linear-gradient(145deg,rgba(13,16,36,.94),rgba(5,7,17,.98));
+  border:1px solid rgba(155,77,255,.22);
+  border-radius:15px;
+  box-shadow:0 18px 50px rgba(0,0,0,.34);
+}
+
+/* VIP is the premium gold page, while keeping the purple identity around it. */
+.page:has(.planCard) .planCard,
+.page:has([class*="planCard"]) [class*="planCard"]{
+  position:relative;
+  overflow:hidden;
+}
+.page:has(.planCard) .planCard::before,
+.page:has([class*="planCard"]) [class*="planCard"]::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto;
+  height:2px;
+  background:linear-gradient(90deg,transparent,var(--gv-final-gold),transparent);
+  opacity:.8;
+}
+.page:has(.planCard) .priceBlock,
+.page:has([class*="planCard"]) [class*="price"]{
+  color:var(--gv-final-gold)!important;
+}
+
+/* AI hub / chat surface */
+[class*="ai"] .card,[class*="ai"] .panel,[class*="ai"] textarea,[class*="ai"] input{
+  border-color:rgba(33,212,255,.22);
+}
+[class*="ai"] .card:hover,[class*="ai"] .panel:hover{
+  box-shadow:0 0 0 1px rgba(33,212,255,.16),0 0 34px rgba(33,212,255,.10),0 22px 70px rgba(0,0,0,.48);
+}
+
+/* Auth pages are intentionally standalone, but visually belong to the same site. */
+.page:has(.cardWrap),
+.page:has([class*="cardWrap"]){
+  min-height:calc(100vh - 20px);
+  background:
+    radial-gradient(700px 520px at 15% 25%,rgba(155,77,255,.18),transparent 65%),
+    radial-gradient(520px 420px at 90% 75%,rgba(33,212,255,.08),transparent 65%),
+    linear-gradient(180deg,#03040a,#070817 58%,#03040a);
+}
+.page:has(.cardWrap)::after,
+.page:has([class*="cardWrap"])::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:radial-gradient(circle at 50% 45%,rgba(155,77,255,.07),transparent 28%);
+}
+[class*="cardWrap"] [class*="card"]{
+  border-color:rgba(155,77,255,.45)!important;
+  background:linear-gradient(145deg,rgba(12,15,34,.90),rgba(4,6,15,.97))!important;
+  box-shadow:0 0 0 1px rgba(155,77,255,.08),0 0 60px rgba(155,77,255,.18),0 26px 80px rgba(0,0,0,.62)!important;
+}
+[class*="cardWrap"] [class*="submitBtn"]{
+  background:linear-gradient(135deg,#ffe58a,var(--gv-final-gold) 50%,#dca426)!important;
+  color:#171003!important;
+  border:0!important;
+  box-shadow:0 12px 32px rgba(255,212,90,.20)!important;
+}
+[class*="cardWrap"] [class*="inputRow"]{
+  background:rgba(4,7,18,.84)!important;
+  border-color:rgba(155,77,255,.28)!important;
+}
+[class*="cardWrap"] [class*="inputRow"]:focus-within{
+  border-color:var(--gv-final-cyan)!important;
+  box-shadow:0 0 0 3px rgba(33,212,255,.10),0 0 30px rgba(33,212,255,.08)!important;
+}
+
+/* Admin / owner centre. CSS modules compile to hashes, so substring selectors
+   deliberately catch the original semantic class names on every admin route. */
+[class*="shell"]{background:#03040a!important}
+[class*="topbar"]{
+  background:rgba(5,7,17,.88)!important;
+  border-bottom-color:rgba(155,77,255,.28)!important;
+  box-shadow:0 12px 45px rgba(0,0,0,.42)!important;
+}
+[class*="sidebar"]{
+  background:linear-gradient(180deg,#090b19,#04050c)!important;
+  border-color:rgba(155,77,255,.25)!important;
+}
+[class*="navLink"]{color:#c8cde0!important}
+[class*="navLink"].active,
+[class*="navLink"][class*="active"]{
+  background:linear-gradient(135deg,rgba(155,77,255,.22),rgba(33,212,255,.06))!important;
+  border-color:rgba(155,77,255,.45)!important;
+  color:#fff!important;
+  box-shadow:0 0 26px rgba(155,77,255,.12)!important;
+}
+[class*="content"]{background:transparent!important}
+[class*="ownerCard"],[class*="panel"],[class*="statTile"],[class*="overviewTile"]{
+  background:linear-gradient(145deg,rgba(13,16,36,.94),rgba(5,7,17,.98))!important;
+  border-color:rgba(155,77,255,.24)!important;
+}
+[class*="menuBtn"],[class*="searchBar"]{
+  border-color:rgba(155,77,255,.30)!important;
+  background:rgba(7,10,24,.88)!important;
+}
+[class*="viewSiteBtn"]{
+  background:linear-gradient(135deg,#ffe58a,var(--gv-final-gold),#dca426)!important;
+  color:#171003!important;
+}
+
+/* Footer / mobile navigation */
+.gv-footer,.footer{background:rgba(3,4,10,.45)}
+.gv-bottom-nav{border-color:rgba(155,77,255,.28)!important}
+
+/* Responsive board: desktop matches the wide reference, mobile becomes a
+   two-column game/product grid and keeps controls thumb-friendly. */
+@media(min-width:1000px){
+  .gv-header-inner{min-height:76px}
+  .gv-brand-name{font-size:23px}
+  .wrap{width:min(1320px,calc(100% - 40px))}
+  .game-detail{grid-template-columns:minmax(260px,390px) minmax(0,1fr);gap:30px}
+}
+@media(max-width:999px){
+  .game-detail{grid-template-columns:1fr;width:calc(100% - 20px)}
+  .store-shell{width:calc(100% - 20px)}
+  .filters .filter-row{display:grid;grid-template-columns:1fr 1fr}
+  .filters .filter-row .btn{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .wrap{width:calc(100% - 16px)!important;padding-top:16px!important}
+  .store-shell{width:calc(100% - 16px)}
+  main h1{font-size:30px}
+  main h2{font-size:21px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+  .card,.glass,.panel,.product,.stat,.section,.filters{border-radius:14px!important}
+  .filters .filter-row{grid-template-columns:1fr}
+  .filters .filter-row .btn{grid-column:auto}
+  .game-detail{width:calc(100% - 16px)}
+  .detail-cover,.game-detail .cover{max-height:520px;object-fit:cover}
+  table{min-width:560px}
+}
+
+
+/* =====================================================================
+   FINAL COMPLETENESS PASS — state pages, financial surfaces, legal pages,
+   admin exceptions and mobile polish. These rules are intentionally last.
+   They complete the visual system without changing application logic.
+   ===================================================================== */
+
+/* Global states: error / 404 / loading / empty. */
+.gv-state-page{
+  min-height:calc(100vh - 80px);
+  display:grid;
+  place-items:center;
+  padding:32px 16px 64px;
+}
+.gv-state-card{
+  width:min(720px,100%);
+  text-align:center;
+  padding:clamp(24px,5vw,48px);
+  border:1px solid rgba(155,77,255,.34)!important;
+  border-radius:24px!important;
+  background:linear-gradient(145deg,rgba(15,18,42,.92),rgba(5,7,17,.98))!important;
+  box-shadow:0 0 0 1px rgba(155,77,255,.08),0 0 70px rgba(155,77,255,.16),0 28px 90px rgba(0,0,0,.62)!important;
+  backdrop-filter:blur(20px);
+}
+.gv-state-icon{
+  width:74px;height:74px;margin:0 auto 18px;border-radius:22px;display:grid;place-items:center;
+  background:linear-gradient(135deg,rgba(155,77,255,.22),rgba(33,212,255,.10));
+  border:1px solid rgba(155,77,255,.36);box-shadow:0 0 32px rgba(155,77,255,.16);font-size:30px;
+}
+.gv-state-card h1{margin:0 0 10px;font-size:clamp(26px,5vw,42px)}
+.gv-state-card p{margin:0 auto 22px;max-width:560px;color:var(--gv-final-muted)!important}
+
+/* Payment return / processing surface. */
+.gv-payment-state{
+  min-height:calc(100vh - 90px);display:grid;place-items:center;padding:28px 16px 70px;
+}
+.gv-payment-card{
+  width:min(760px,100%);text-align:center;padding:42px 24px;
+  border:1px solid rgba(255,212,90,.30)!important;border-radius:26px!important;
+  background:linear-gradient(145deg,rgba(18,18,40,.92),rgba(5,7,17,.98))!important;
+  box-shadow:0 0 0 1px rgba(255,212,90,.06),0 0 70px rgba(155,77,255,.14),0 28px 90px rgba(0,0,0,.62)!important;
+}
+.gv-payment-orb{
+  width:84px;height:84px;border-radius:50%;margin:0 auto 20px;display:grid;place-items:center;
+  border:1px solid rgba(255,212,90,.42);background:radial-gradient(circle,rgba(255,212,90,.22),rgba(155,77,255,.10) 55%,transparent 72%);
+  box-shadow:0 0 45px rgba(255,212,90,.16),0 0 70px rgba(155,77,255,.12);font-size:32px;
+}
+.gv-payment-card .eyebrow{color:var(--gv-final-gold)!important}
+.gv-payment-card h1{margin:6px 0 12px}
+.gv-payment-card p{color:var(--gv-final-muted)!important}
+
+/* Wallet / money surfaces. */
+.gv-wallet-grid{align-items:stretch}
+.gv-wallet-balance{position:relative;overflow:hidden}
+.gv-wallet-balance::before{content:"";position:absolute;inset:auto -20% -55% 25%;height:180px;background:radial-gradient(circle,rgba(33,212,255,.16),transparent 65%);pointer-events:none}
+.gv-wallet-amount{font-size:clamp(32px,6vw,48px)!important;font-weight:950;letter-spacing:-.04em;color:#fff!important;text-shadow:0 0 28px rgba(33,212,255,.16)}
+.gv-wallet-actions{display:flex;gap:10px;flex-wrap:wrap}
+.gv-wallet-amounts .btn{min-width:64px}
+.gv-wallet-table{width:100%;border-collapse:separate!important;border-spacing:0;overflow:hidden;border:1px solid rgba(155,77,255,.20);border-radius:16px}
+.gv-wallet-table th,.gv-wallet-table td{border-bottom:1px solid rgba(255,255,255,.055);padding:13px 12px}
+.gv-wallet-table th{background:rgba(155,77,255,.11)!important}
+.gv-wallet-table tr:last-child td{border-bottom:0}
+.gv-wallet-table tbody tr:hover td{background:rgba(33,212,255,.035)!important}
+
+/* Legal pages: long-form reading surface instead of generic card soup. */
+.gv-legal-card{max-width:980px;margin:0 auto;line-height:1.9}
+.gv-legal-card h2{margin-top:28px;padding-top:18px;border-top:1px solid rgba(155,77,255,.16)}
+.gv-legal-card h2:first-child{margin-top:0;padding-top:0;border-top:0}
+.gv-legal-card ul{padding-inline-start:22px;color:var(--gv-final-muted)}
+.gv-legal-card li{margin:7px 0}
+
+/* Admin AI page had an older light-theme exception. Bring it back into the
+   same visual system as every other Owner surface. */
+[class*="aiAdmin"]{
+  color:var(--gv-final-text)!important;
+  background:transparent!important;
+}
+[class*="aiAdmin"] h1,[class*="aiAdmin"] h2,[class*="aiAdmin"] h3{color:#fff!important}
+[class*="aiAdmin"] p{color:var(--gv-final-muted)!important}
+[class*="aiAdmin"] input,[class*="aiAdmin"] select,[class*="aiAdmin"] textarea{
+  background:rgba(5,7,17,.88)!important;color:#fff!important;border-color:rgba(155,77,255,.28)!important;
+}
+[class*="aiAdmin"] table{background:transparent!important}
+
+/* Dense admin forms and tables. */
+[class*="content"] form,[class*="panel"] form{display:grid;gap:12px}
+[class*="content"] label{color:#cfd4e6}
+[class*="content"] textarea{min-height:110px;resize:vertical}
+[class*="content"] table{width:100%;border-collapse:separate;border-spacing:0}
+[class*="content"] th,[class*="content"] td{border-bottom:1px solid rgba(255,255,255,.055)}
+
+/* Community/feed cards. */
+.orb{filter:drop-shadow(0 0 24px rgba(155,77,255,.28))}
+.feature-grid{gap:12px!important}
+.stats{gap:12px!important}
+.stats .stat{min-width:0}
+.referral-table{border:1px solid rgba(155,77,255,.20)!important;background:rgba(5,7,17,.42)}
+
+/* Search and filter controls. */
+input[type="search"]{appearance:none}
+input[type="search"]::-webkit-search-cancel-button{filter:invert(1);opacity:.6}
+
+/* Focus visibility for keyboard users. */
+:where(a,button,input,select,textarea):focus-visible{
+  outline:2px solid rgba(33,212,255,.78)!important;
+  outline-offset:2px;
+}
+
+/* Prevent horizontal overflow from dense legacy components. */
+html,body{overflow-x:hidden}
+img,svg,video,canvas{max-width:100%}
+
+/* Small-screen corrections for every page family. */
+@media(max-width:600px){
+  .gv-state-page{padding:20px 12px 90px}
+  .gv-state-card{padding:28px 18px;border-radius:20px!important}
+  .gv-payment-state{padding:18px 12px 90px}
+  .gv-payment-card{padding:32px 18px;border-radius:20px!important}
+  .gv-wallet-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gv-wallet-actions .btn{width:100%}
+  .gv-legal-card{line-height:1.8}
+  .feature-grid{grid-template-columns:1fr!important}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  [class*="content"]{padding-inline:12px!important}
+}
+
+.gv-loading-bar{width:min(320px,100%);height:4px;margin:4px auto 0;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08);position:relative}
+.gv-loading-bar::after{content:"";position:absolute;inset:0 auto 0 0;width:42%;border-radius:inherit;background:linear-gradient(90deg,var(--gv-final-purple),var(--gv-final-cyan),var(--gv-final-gold));box-shadow:0 0 18px rgba(155,77,255,.45);animation:gv-load 1.15s ease-in-out infinite}
+@keyframes gv-load{0%{transform:translateX(-120%)}50%{transform:translateX(130%)}100%{transform:translateX(270%)}}
+@media(prefers-reduced-motion:reduce){.gv-loading-bar::after{animation:none;transform:none;width:100%}}
+
+
+/* =====================================================================
+   GAMEVORTEX FINAL COMPLETION LAYER
+   Route coverage: user pages, auth, commerce, wallet, content, admin,
+   owner, error/loading/empty states, tables, forms, mobile and a11y.
+   This layer intentionally comes LAST and does not alter business logic.
+   ===================================================================== */
+
+:root {
+  --gv-gold-bright: #ffe39a;
+  --gv-purple-bright: #b77cff;
+  --gv-cyan-bright: #65e5ff;
+  --gv-danger: #ff5f7a;
+  --gv-success: #55e6a5;
+  --gv-panel-glass: rgba(12, 10, 19, .82);
+  --gv-panel-deep: rgba(6, 6, 10, .94);
+  --gv-radius-xl: 28px;
+  --gv-radius-lg: 22px;
+  --gv-radius-md: 16px;
+  --gv-radius-sm: 12px;
+}
+
+/* ---------- page rhythm / containers ---------- */
+main, [role="main"] { min-width: 0; }
+main > * { min-width: 0; }
+main section, main article { scroll-margin-top: 96px; }
+
+.wrap,
+.container,
+.page,
+.pageContainer,
+.page-shell,
+.content,
+.contentWrap,
+.adminPage,
+.adminShell,
+.dashboard,
+.dashboardPage,
+.profilePage,
+.storePage,
+.gamesPage,
+.walletPage,
+.quranPage,
+.aiPage,
+.communityPage {
+  width: min(1440px, calc(100% - 32px));
+  margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .wrap,
+  .container,
+  .page,
+  .pageContainer,
+  .page-shell,
+  .content,
+  .contentWrap,
+  .adminPage,
+  .adminShell,
+  .dashboard,
+  .dashboardPage,
+  .profilePage,
+  .storePage,
+  .gamesPage,
+  .walletPage,
+  .quranPage,
+  .aiPage,
+  .communityPage {
+    width: min(100% - 20px, 1440px);
+  }
+}
+
+/* ---------- shared page hero / title system ---------- */
+.pageHero,
+.page-header,
+.pageHeader,
+.sectionHero,
+.storeHero,
+.gamesHero,
+.profileHero,
+.walletHero,
+.quranHero,
+.communityHero,
+.adminHero,
+.dashboardHero,
+.searchHero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin: 22px auto 24px;
+  padding: clamp(24px, 4vw, 44px);
+  border: 1px solid rgba(139,92,246,.24);
+  border-radius: var(--gv-radius-xl);
+  background:
+    radial-gradient(500px 220px at 100% 0%, rgba(244,201,93,.10), transparent 70%),
+    radial-gradient(520px 260px at 0% 100%, rgba(139,92,246,.18), transparent 72%),
+    linear-gradient(145deg, rgba(20,17,30,.96), rgba(7,7,11,.94));
+  box-shadow: 0 30px 90px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.045);
+}
+
+.pageHero::after,
+.page-header::after,
+.pageHeader::after,
+.sectionHero::after,
+.storeHero::after,
+.gamesHero::after,
+.profileHero::after,
+.walletHero::after,
+.quranHero::after,
+.communityHero::after,
+.adminHero::after,
+.dashboardHero::after,
+.searchHero::after {
+  content: "";
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  right: -100px;
+  top: -130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(183,124,255,.18), transparent 68%);
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.pageHero h1,
+.page-header h1,
+.pageHeader h1,
+.sectionHero h1,
+.storeHero h1,
+.gamesHero h1,
+.profileHero h1,
+.walletHero h1,
+.quranHero h1,
+.communityHero h1,
+.adminHero h1,
+.dashboardHero h1,
+.searchHero h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 58px);
+  line-height: 1.08;
+  letter-spacing: -.025em;
+}
+
+.pageHero p,
+.page-header p,
+.pageHeader p,
+.sectionHero p,
+.storeHero p,
+.gamesHero p,
+.profileHero p,
+.walletHero p,
+.quranHero p,
+.communityHero p,
+.adminHero p,
+.dashboardHero p,
+.searchHero p {
+  color: var(--gv-muted);
+  max-width: 820px;
+}
+
+/* ---------- universal interactive controls ---------- */
+button,
+a[role="button"],
+[role="button"],
+.btn,
+.primaryButton,
+.secondaryButton,
+.primary,
+.secondary,
+.actionBtn,
+.submitBtn,
+.saveBtn,
+.deleteBtn,
+.cancelBtn,
+.filterBtn,
+.tabButton,
+.iconButton {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled,
+.btn:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+button,
+.btn,
+.primaryButton,
+.primary,
+.actionBtn,
+.submitBtn,
+.saveBtn {
+  min-height: 42px;
+}
+
+.danger,
+.dangerButton,
+.deleteBtn {
+  color: #fff !important;
+  border-color: rgba(255,95,122,.42) !important;
+  background: linear-gradient(135deg, rgba(255,95,122,.18), rgba(90,8,25,.42)) !important;
+}
+
+.success,
+.successButton {
+  color: #07170f !important;
+  background: linear-gradient(135deg, #8ff5c7, #55e6a5) !important;
+}
+
+button:hover,
+.btn:hover,
+.primaryButton:hover,
+.primary:hover,
+.actionBtn:hover,
+.submitBtn:hover,
+.saveBtn:hover,
+.deleteBtn:hover {
+  transform: translateY(-2px);
+}
+
+/* ---------- forms / auth / checkout / settings ---------- */
+form,
+.form,
+.formCard,
+.authCard,
+.auth-panel,
+.loginCard,
+.registerCard,
+.checkoutCard,
+.settingsCard,
+.filterPanel,
+.searchPanel {
+  color: var(--gv-text);
+}
+
+label {
+  color: #e8e4f2;
+  font-weight: 650;
+}
+
+input,
+select,
+textarea,
+.input,
+.searchInput,
+.formInput,
+.formControl {
+  width: 100%;
+  min-height: 44px;
+  color: #fff !important;
+  background: rgba(9,8,14,.88) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-radius: var(--gv-radius-sm) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+}
+
+textarea { min-height: 120px; resize: vertical; }
+
+input::placeholder,
+textarea::placeholder { color: rgba(255,255,255,.38) !important; }
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: rgba(139,92,246,.34) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(183,124,255,.82) !important;
+  box-shadow: 0 0 0 3px rgba(139,92,246,.12), 0 0 28px rgba(139,92,246,.14) !important;
+  outline: none !important;
+}
+
+.authCard,
+.auth-panel,
+.loginCard,
+.registerCard {
+  width: min(560px, calc(100% - 24px));
+  margin: 36px auto;
+  padding: clamp(22px, 5vw, 42px);
+  border-radius: var(--gv-radius-xl);
+  background:
+    radial-gradient(500px 260px at 50% -15%, rgba(139,92,246,.16), transparent 70%),
+    linear-gradient(145deg, rgba(18,16,28,.96), rgba(6,6,10,.98));
+  border: 1px solid rgba(139,92,246,.24);
+  box-shadow: 0 35px 100px rgba(0,0,0,.52);
+}
+
+.authCard .logo,
+.auth-panel .logo,
+.loginCard .logo,
+.registerCard .logo {
+  filter: drop-shadow(0 0 22px rgba(139,92,246,.5));
+}
+
+.authCard a,
+.auth-panel a,
+.loginCard a,
+.registerCard a { color: var(--gv-gold-bright); }
+
+/* ---------- tabs / chips / filters ---------- */
+.tabs,
+.tabList,
+.filterBar,
+.filters,
+.chips,
+.categoryTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tabs button,
+.tabs a,
+.tabList button,
+.tabList a,
+.filterBar button,
+.filterBar a,
+.chips button,
+.chips a,
+.categoryTabs button,
+.categoryTabs a {
+  color: #c9c4d5;
+  background: rgba(10,9,15,.72);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px;
+  padding: 9px 14px;
+  transition: .18s ease;
+}
+
+.tabs .active,
+.tabs button[aria-selected="true"],
+.tabList .active,
+.tabList button[aria-selected="true"],
+.categoryTabs .active {
+  color: #fff;
+  border-color: rgba(183,124,255,.55);
+  background: linear-gradient(135deg, rgba(139,92,246,.25), rgba(244,201,93,.08));
+  box-shadow: 0 0 24px rgba(139,92,246,.12);
+}
+
+/* ---------- tables / admin data ---------- */
+.tableWrap,
+.table-container,
+.dataTable,
+.tableCard {
+  overflow: auto;
+  border-radius: var(--gv-radius-lg);
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(8,8,13,.76);
+  box-shadow: 0 22px 65px rgba(0,0,0,.28);
+}
+
+table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: #e9e4f5;
+  background: rgba(17,15,25,.96);
+  border-bottom: 1px solid rgba(139,92,246,.22);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+th, td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+  text-align: start;
+}
+
+tbody tr:hover td {
+  background: rgba(139,92,246,.055);
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+
+/* ---------- cards / grids ---------- */
+.grid,
+.cardsGrid,
+.cardGrid,
+.productsGrid,
+.gamesGrid,
+.appsGrid,
+.plansGrid,
+.statsGrid,
+.featuresGrid,
+.achievementsGrid,
+.adminGrid,
+.dashboardGrid {
+  min-width: 0;
+}
+
+.product-card,
+.productCard,
+.game-card,
+.gameCard,
+.app-card,
+.appCard,
+.plan-card,
+.planCard,
+.reward-card,
+.rewardCard,
+.achievement-card,
+.achievementCard,
+.draw-card,
+.drawCard,
+.order-card,
+.orderCard,
+.notification-card,
+.notificationCard,
+.result-card,
+.resultCard {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: var(--gv-radius-lg);
+  background:
+    linear-gradient(145deg, rgba(18,16,28,.92), rgba(7,7,11,.96));
+  box-shadow: 0 22px 65px rgba(0,0,0,.30), inset 0 1px rgba(255,255,255,.025);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.product-card:hover,
+.productCard:hover,
+.game-card:hover,
+.gameCard:hover,
+.app-card:hover,
+.appCard:hover,
+.plan-card:hover,
+.planCard:hover,
+.reward-card:hover,
+.rewardCard:hover,
+.achievement-card:hover,
+.achievementCard:hover,
+.draw-card:hover,
+.drawCard:hover,
+.order-card:hover,
+.orderCard:hover {
+  transform: translateY(-4px);
+  border-color: rgba(183,124,255,.34);
+  box-shadow: 0 28px 80px rgba(0,0,0,.42), 0 0 30px rgba(139,92,246,.09);
+}
+
+/* ---------- product / game media ---------- */
+.product-card img,
+.productCard img,
+.game-card img,
+.gameCard img,
+.app-card img,
+.appCard img,
+.cover,
+.productCover,
+.gameCover {
+  background: #0b0a10;
+  object-fit: cover;
+}
+
+.product-card img,
+.productCard img,
+.game-card img,
+.gameCard img {
+  transition: transform .35s ease, filter .35s ease;
+}
+
+.product-card:hover img,
+.productCard:hover img,
+.game-card:hover img,
+.gameCard:hover img {
+  transform: scale(1.035);
+  filter: saturate(1.08) contrast(1.03);
+}
+
+/* ---------- price / status language ---------- */
+.price,
+.product-price,
+.amount,
+.balance,
+.total,
+.currency {
+  color: var(--gv-gold-bright) !important;
+  font-weight: 850;
+}
+
+.status,
+.badge,
+.pill,
+.tag,
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #d9c9ff;
+  background: rgba(139,92,246,.12);
+  border: 1px solid rgba(139,92,246,.22);
+}
+
+.status-success,
+.badge-success,
+.status-active,
+.status-paid { color: #75f0b6 !important; border-color: rgba(85,230,165,.25) !important; background: rgba(85,230,165,.09) !important; }
+
+.status-error,
+.badge-error,
+.status-failed,
+.status-cancelled { color: #ff8499 !important; border-color: rgba(255,95,122,.28) !important; background: rgba(255,95,122,.08) !important; }
+
+.status-pending,
+.badge-pending { color: var(--gv-gold-bright) !important; border-color: rgba(244,201,93,.28) !important; background: rgba(244,201,93,.08) !important; }
+
+/* ---------- wallet / checkout / orders ---------- */
+.walletBalance,
+.balanceCard,
+.moneyCard,
+.checkoutSummary,
+.orderSummary,
+.paymentSummary {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--gv-radius-xl);
+  padding: clamp(22px, 4vw, 34px);
+  border: 1px solid rgba(244,201,93,.22);
+  background:
+    radial-gradient(420px 180px at 100% 0%, rgba(244,201,93,.13), transparent 70%),
+    linear-gradient(145deg, rgba(27,22,18,.88), rgba(9,8,12,.96));
+  box-shadow: 0 28px 80px rgba(0,0,0,.38);
+}
+
+.walletBalance strong,
+.balanceCard strong,
+.moneyCard strong {
+  color: var(--gv-gold-bright);
+  font-size: clamp(30px, 6vw, 54px);
+  line-height: 1;
+}
+
+/* ---------- VIP ---------- */
+.vip,
+.vipPage,
+.vipShell,
+.vipHero,
+.vipCard {
+  --vip-accent: var(--gv-gold);
+}
+
+.vipHero,
+.vipPage .hero,
+.vipShell .hero {
+  border-color: rgba(244,201,93,.30) !important;
+  background:
+    radial-gradient(520px 260px at 80% 0%, rgba(244,201,93,.16), transparent 70%),
+    radial-gradient(520px 280px at 10% 100%, rgba(139,92,246,.20), transparent 70%),
+    linear-gradient(145deg, #17120d, #09080b 72%);
+}
+
+.vipCard,
+.planCard {
+  position: relative;
+}
+
+.vipCard::before,
+.planCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(244,201,93,.06);
+}
+
+/* ---------- AI ---------- */
+.aiShell,
+.aiPage,
+.aiStudio,
+.chatShell,
+.chatPanel,
+.aiCard,
+.studioCard {
+  border-color: rgba(139,92,246,.20);
+}
+
+.chatPanel,
+.chatShell {
+  background:
+    radial-gradient(500px 240px at 50% 0%, rgba(139,92,246,.10), transparent 72%),
+    rgba(7,7,11,.90);
+  border-radius: var(--gv-radius-xl);
+  box-shadow: 0 30px 90px rgba(0,0,0,.45);
+}
+
+.chatMessage,
+.message,
+.aiMessage {
+  max-width: min(86%, 820px);
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(18,16,28,.78);
+}
+
+.userMessage,
+.message.user,
+.aiMessage.user {
+  background: linear-gradient(135deg, rgba(139,92,246,.22), rgba(79,39,130,.18));
+  border-color: rgba(139,92,246,.25);
+}
+
+/* ---------- Quran / content reading ---------- */
+.quranReader,
+.reader,
+.article,
+.prose,
+.legalPage,
+.legalContent {
+  color: #e9e6ef;
+}
+
+.quranReader,
+.reader,
+.legalPage,
+.legalContent {
+  border-radius: var(--gv-radius-xl);
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(9,8,13,.76);
+  box-shadow: 0 24px 70px rgba(0,0,0,.28);
+}
+
+.quranAyah,
+.ayah,
+.verse,
+.readerItem {
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  padding: 20px 0;
+}
+
+.quranAyah:last-child,
+.ayah:last-child,
+.verse:last-child,
+.readerItem:last-child { border-bottom: 0; }
+
+/* ---------- community / profile ---------- */
+.profileHeader,
+.profileHero,
+.coverHeader,
+.userHero {
+  overflow: hidden;
+  border-radius: var(--gv-radius-xl);
+  border: 1px solid rgba(139,92,246,.22);
+  background:
+    linear-gradient(135deg, rgba(20,17,30,.94), rgba(7,7,11,.96));
+  box-shadow: 0 28px 85px rgba(0,0,0,.38);
+}
+
+.avatar,
+.profileAvatar,
+.userAvatar {
+  border: 2px solid rgba(244,201,93,.52);
+  box-shadow: 0 0 0 5px rgba(139,92,246,.10), 0 0 30px rgba(139,92,246,.22);
+}
+
+/* ---------- admin / owner ---------- */
+.adminPage,
+.adminShell,
+.ownerShell,
+.controlCenter,
+.ownerControl,
+.adminDashboard {
+  color: var(--gv-text);
+}
+
+.adminSidebar,
+.ownerSidebar,
+.controlSidebar {
+  background: rgba(6,6,10,.88);
+  border-inline-end: 1px solid rgba(139,92,246,.16);
+  backdrop-filter: blur(18px);
+}
+
+.adminNav a,
+.ownerNav a,
+.controlNav a {
+  color: #aaa5b8;
+  border-radius: 12px;
+  transition: .18s ease;
+}
+
+.adminNav a:hover,
+.ownerNav a:hover,
+.controlNav a:hover,
+.adminNav a.active,
+.ownerNav a.active,
+.controlNav a.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(139,92,246,.18), rgba(244,201,93,.05));
+  box-shadow: inset 2px 0 var(--gv-purple-bright);
+}
+
+.adminCard,
+.ownerCard,
+.controlCard,
+.dashboardCard,
+.metricCard,
+.statCard {
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: var(--gv-radius-lg);
+  background: linear-gradient(145deg, rgba(17,15,25,.92), rgba(7,7,11,.96));
+  box-shadow: 0 22px 65px rgba(0,0,0,.30);
+}
+
+/* ---------- empty / loading / error / success ---------- */
+.emptyState,
+.empty-state,
+.noResults,
+.no-results,
+.notFound,
+.not-found,
+.errorState,
+.error-state,
+.loadingState,
+.loading-state,
+.successState,
+.success-state {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 34px;
+  border-radius: var(--gv-radius-xl);
+  border: 1px dashed rgba(139,92,246,.24);
+  background:
+    radial-gradient(300px 180px at 50% 0%, rgba(139,92,246,.10), transparent 70%),
+    rgba(8,8,13,.72);
+}
+
+.errorState,
+.error-state { border-color: rgba(255,95,122,.25); }
+
+.successState,
+.success-state { border-color: rgba(85,230,165,.24); }
+
+.loadingState::before,
+.loading-state::before {
+  content: "";
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.10);
+  border-top-color: var(--gv-purple-bright);
+  border-right-color: var(--gv-gold);
+  animation: gv-spin .75s linear infinite;
+}
+
+@keyframes gv-spin { to { transform: rotate(360deg); } }
+
+/* ---------- alerts / notices ---------- */
+.alert,
+.notice,
+.noticeCard,
+.flash,
+.toast,
+.formError,
+.formSuccess {
+  border-radius: var(--gv-radius-md);
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(12,11,18,.84);
+  box-shadow: 0 16px 45px rgba(0,0,0,.28);
+}
+
+.alert-error,
+.formError { border-color: rgba(255,95,122,.30); color: #ff9aac; }
+
+.alert-success,
+.formSuccess { border-color: rgba(85,230,165,.26); color: #8df2c4; }
+
+/* ---------- footer ---------- */
+footer,
+.site-footer,
+.gv-footer {
+  border-top: 1px solid rgba(139,92,246,.14);
+  background:
+    radial-gradient(600px 180px at 50% 0%, rgba(139,92,246,.08), transparent 70%),
+    rgba(4,4,7,.94);
+}
+
+/* ---------- scrollbar ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139,92,246,.55) rgba(255,255,255,.04);
+}
+
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: rgba(255,255,255,.025); }
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(139,92,246,.70), rgba(244,201,93,.45));
+  border-radius: 999px;
+}
+
+/* ---------- mobile completion pass ---------- */
+@media (max-width: 900px) {
+  .adminSidebar,
+  .ownerSidebar,
+  .controlSidebar {
+    position: relative;
+    width: 100%;
+    border-inline-end: 0;
+    border-bottom: 1px solid rgba(139,92,246,.16);
+  }
+
+  .adminNav,
+  .ownerNav,
+  .controlNav {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+
+  .adminNav a,
+  .ownerNav a,
+  .controlNav a {
+    flex: 0 0 auto;
+  }
+
+  .pageHero,
+  .page-header,
+  .pageHeader,
+  .sectionHero,
+  .storeHero,
+  .gamesHero,
+  .profileHero,
+  .walletHero,
+  .quranHero,
+  .communityHero,
+  .adminHero,
+  .dashboardHero,
+  .searchHero {
+    padding: 24px;
+    border-radius: 22px;
+  }
+
+  .tableWrap,
+  .table-container,
+  .dataTable,
+  .tableCard {
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .pageHero,
+  .page-header,
+  .pageHeader,
+  .sectionHero,
+  .storeHero,
+  .gamesHero,
+  .profileHero,
+  .walletHero,
+  .quranHero,
+  .communityHero,
+  .adminHero,
+  .dashboardHero,
+  .searchHero {
+    margin-top: 14px;
+    padding: 20px;
+  }
+
+  .pageHero h1,
+  .page-header h1,
+  .pageHeader h1,
+  .sectionHero h1,
+  .storeHero h1,
+  .gamesHero h1,
+  .profileHero h1,
+  .walletHero h1,
+  .quranHero h1,
+  .communityHero h1,
+  .adminHero h1,
+  .dashboardHero h1,
+  .searchHero h1 {
+    font-size: clamp(26px, 9vw, 38px);
+  }
+
+  .authCard,
+  .auth-panel,
+  .loginCard,
+  .registerCard {
+    width: calc(100% - 16px);
+    margin: 18px auto;
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .chatMessage,
+  .message,
+  .aiMessage {
+    max-width: 94%;
+  }
+
+  th, td { padding: 11px 12px; }
+
+  .walletBalance,
+  .balanceCard,
+  .moneyCard,
+  .checkoutSummary,
+  .orderSummary,
+  .paymentSummary {
+    border-radius: 20px;
+    padding: 20px;
+  }
+}
+
+/* Prevent accidental horizontal overflow from legacy page-specific styles. */
+html, body { overflow-x: clip; }
+img, video, canvas, svg { max-width: 100%; }
+pre, code { max-width: 100%; overflow-x: auto; }
+
+/* Respect reduced-motion users. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+  }
+}

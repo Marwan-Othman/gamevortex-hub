@@ -1,0 +1,3004 @@
+/* ============================================================
+   GameVortex Hub
+   Admin / Owner Control Center
+   FINAL RESPONSIVE CSS
+   ============================================================ */
+
+.shell,
+.shell *,
+.shell *::before,
+.shell *::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   ROOT
+   ============================================================ */
+
+.shell {
+  position: relative;
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+
+  margin: 0;
+  padding: 0;
+
+  overflow-x: hidden;
+
+  background:
+    radial-gradient(
+      900px 500px at 100% 0%,
+      rgba(139, 61, 255, 0.12),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 450px at 0% 30%,
+      rgba(39, 215, 255, 0.06),
+      transparent 60%
+    ),
+    #07060b;
+
+  color: #f7f8ff;
+}
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
+
+.layout {
+  position: relative;
+
+  display: flex;
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+
+  overflow: visible;
+}
+
+/* ============================================================
+   MAIN AREA
+   ============================================================ */
+
+.mainArea {
+  flex: 1 1 0;
+
+  width: calc(100% - 250px);
+  max-width: calc(100% - 250px);
+
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+.sidebar {
+  position: sticky;
+
+  top: 0;
+
+  width: 250px;
+  min-width: 250px;
+  max-width: 250px;
+
+  height: 100vh;
+  height: 100dvh;
+
+  flex: 0 0 250px;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 16px 12px;
+
+  gap: 4px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  z-index: 250;
+
+  background:
+    linear-gradient(
+      180deg,
+      #090b18 0%,
+      #070817 55%,
+      #04050c 100%
+    );
+
+  border-inline-end:
+    1px solid rgba(139, 61, 255, 0.24);
+
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    rgba(139, 61, 255, 0.35)
+    transparent;
+}
+
+/* ============================================================
+   SIDEBAR BRAND
+   ============================================================ */
+
+.sidebarBrand {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 8px 6px 18px;
+
+  overflow: hidden;
+}
+
+.brandMark {
+  width: 34px;
+  min-width: 34px;
+
+  height: 34px;
+  min-height: 34px;
+
+  border-radius: 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #d8c4ff;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139, 61, 255, 0.28),
+      rgba(39, 215, 255, 0.12)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.35);
+
+  box-shadow:
+    0 0 24px rgba(139, 61, 255, 0.12);
+
+  flex: 0 0 34px;
+}
+
+.brandText {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+.brandText strong {
+  font-size: 13px;
+
+  letter-spacing: 1.2px;
+
+  white-space: nowrap;
+}
+
+.brandText span {
+  margin-top: 2px;
+
+  font-size: 8px;
+
+  letter-spacing: 1.3px;
+
+  color: #7f88a9;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   SIDEBAR OWNER
+   ============================================================ */
+
+.sidebarOwner {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 10px;
+
+  margin-bottom: 10px;
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139, 61, 255, 0.12),
+      rgba(39, 215, 255, 0.04)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.18);
+
+  overflow: hidden;
+}
+
+.sidebarOwnerAvatar {
+  width: 34px;
+  min-width: 34px;
+
+  height: 34px;
+  min-height: 34px;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 34px;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  color: #ffffff;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8b3dff,
+      #27d7ff
+    );
+
+  border:
+    2px solid rgba(255, 212, 90, 0.38);
+}
+
+.sidebarOwnerInfo {
+  flex: 1 1 0;
+
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+.sidebarOwnerInfo strong {
+  display: block;
+
+  max-width: 100%;
+
+  font-size: 11.5px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.sidebarOwnerInfo span {
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+
+  margin-top: 3px;
+
+  font-size: 8px;
+
+  color: #8c96b7;
+
+  white-space: nowrap;
+}
+
+.sidebarOwnerInfo i {
+  width: 5px;
+  min-width: 5px;
+
+  height: 5px;
+  min-height: 5px;
+
+  border-radius: 50%;
+
+  background: #76ffa6;
+
+  box-shadow:
+    0 0 8px rgba(118, 255, 166, 0.7);
+}
+
+.crown {
+  color: #ffd45a;
+
+  font-size: 16px;
+
+  flex: 0 0 auto;
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+
+.navigation {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 12px;
+
+  overflow: visible;
+}
+
+.navSection {
+  width: 100%;
+  min-width: 0;
+}
+
+.navSectionTitle {
+  padding: 4px 10px 6px;
+
+  color: #68718f;
+
+  font-size: 8px;
+
+  font-weight: 800;
+
+  letter-spacing: 1.2px;
+
+  text-transform: uppercase;
+}
+
+.navItems {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+}
+
+.navLink {
+  position: relative;
+
+  width: 100%;
+  min-width: 0;
+
+  min-height: 38px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 8px 10px;
+
+  border-radius: 10px;
+
+  color: #b8c1db;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  text-decoration: none;
+
+  overflow: hidden;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.navLink:hover {
+  color: #ffffff;
+
+  background:
+    rgba(139, 61, 255, 0.10);
+}
+
+.navLink.active {
+  color: #ffffff;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139, 61, 255, 0.22),
+      rgba(39, 215, 255, 0.06)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.30);
+
+  box-shadow:
+    0 0 24px rgba(139, 61, 255, 0.10);
+}
+
+.navLink.soon {
+  opacity: 0.48;
+
+  cursor: default;
+}
+
+.navIcon {
+  width: 18px;
+  min-width: 18px;
+
+  height: 18px;
+  min-height: 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 18px;
+}
+
+.navLabel {
+  min-width: 0;
+
+  flex: 1 1 auto;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+
+.soonBadge {
+  flex: 0 0 auto;
+
+  padding: 2px 5px;
+
+  border-radius: 999px;
+
+  color: #c15cff;
+
+  background:
+    rgba(193, 92, 255, 0.10);
+
+  border:
+    1px solid rgba(193, 92, 255, 0.22);
+
+  font-size: 7px;
+}
+
+.activeDot {
+  width: 5px;
+  min-width: 5px;
+
+  height: 5px;
+  min-height: 5px;
+
+  border-radius: 50%;
+
+  background: #27d7ff;
+
+  box-shadow:
+    0 0 10px rgba(39, 215, 255, 0.8);
+
+  flex: 0 0 5px;
+}
+
+/* ============================================================
+   VIEW SITE
+   ============================================================ */
+
+.viewSiteBtn {
+  width: 100%;
+
+  min-height: 40px;
+
+  margin-top: auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  padding: 10px;
+
+  border-radius: 11px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffe58b,
+      #ffd45a,
+      #dda522
+    );
+
+  color: #171004;
+
+  font-size: 12px;
+
+  font-weight: 800;
+
+  text-decoration: none;
+
+  box-shadow:
+    0 8px 25px rgba(255, 212, 90, 0.08);
+}
+
+.sidebarFooter {
+  padding-top: 10px;
+
+  text-align: center;
+
+  color: #8d6f27;
+
+  font-size: 8px;
+}
+
+.sidebarFooter span,
+.sidebarFooter small {
+  display: block;
+}
+
+.sidebarFooter small {
+  margin-top: 3px;
+
+  color: #505873;
+
+  font-size: 7px;
+}
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+
+.topbar {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 100;
+
+  width: 100%;
+  max-width: 100%;
+
+  min-height: 64px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 10px 18px;
+
+  background:
+    rgba(8, 7, 14, 0.90);
+
+  border-bottom:
+    1px solid rgba(139, 61, 255, 0.16);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  overflow: hidden;
+}
+
+.menuBtn {
+  display: none;
+
+  width: 38px;
+  min-width: 38px;
+
+  height: 38px;
+  min-height: 38px;
+
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 38px;
+
+  border-radius: 10px;
+
+  border:
+    1px solid rgba(139, 61, 255, 0.30);
+
+  background:
+    rgba(139, 61, 255, 0.08);
+
+  color: #ffffff;
+
+  cursor: pointer;
+}
+
+.topbarBrand {
+  display: none;
+
+  align-items: center;
+
+  gap: 8px;
+
+  flex: 0 0 auto;
+
+  min-width: 0;
+}
+
+.topbarLogo {
+  width: 30px;
+  min-width: 30px;
+
+  height: 30px;
+  min-height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #caaeff;
+
+  border-radius: 8px;
+
+  background:
+    rgba(139, 61, 255, 0.12);
+
+  border:
+    1px solid rgba(139, 61, 255, 0.22);
+}
+
+.topbarBrand strong,
+.topbarBrand span {
+  display: block;
+
+  white-space: nowrap;
+}
+
+.topbarBrand strong {
+  font-size: 11px;
+}
+
+.topbarBrand span {
+  margin-top: 2px;
+
+  color: #68718f;
+
+  font-size: 7px;
+
+  letter-spacing: 1px;
+}
+
+.searchBar {
+  flex: 1 1 0;
+
+  width: 100%;
+  min-width: 0;
+
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 8px 13px;
+
+  border-radius: 999px;
+
+  border:
+    1px solid rgba(139, 61, 255, 0.22);
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  color: #69728f;
+
+  overflow: hidden;
+}
+
+.searchBar input {
+  width: 100%;
+  min-width: 0;
+
+  flex: 1 1 0;
+
+  border: 0;
+  outline: 0;
+
+  background: transparent;
+
+  color: #f7f8ff;
+
+  font-size: 12px;
+}
+
+.searchBar input::placeholder {
+  color: #646d89;
+}
+
+.topbarActions {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  flex: 0 0 auto;
+
+  min-width: 0;
+}
+
+.iconButton {
+  position: relative;
+
+  width: 36px;
+  min-width: 36px;
+
+  height: 36px;
+  min-height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  border:
+    1px solid rgba(139, 61, 255, 0.22);
+
+  background:
+    rgba(139, 61, 255, 0.06);
+
+  color: #dbe1f3;
+
+  cursor: pointer;
+}
+
+.notificationDot {
+  position: absolute;
+
+  top: 7px;
+  right: 7px;
+
+  width: 5px;
+  min-width: 5px;
+
+  height: 5px;
+  min-height: 5px;
+
+  border-radius: 50%;
+
+  background: #ff6b9d;
+
+  box-shadow:
+    0 0 8px rgba(255, 107, 157, 0.7);
+}
+
+.ownerChip {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  min-width: 0;
+
+  max-width: 170px;
+}
+
+.ownerChipText {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+.ownerChipText strong,
+.ownerChipText span {
+  display: block;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.ownerChipText strong {
+  font-size: 10px;
+}
+
+.ownerChipText span {
+  margin-top: 2px;
+
+  color: #6f7895;
+
+  font-size: 7px;
+}
+
+.ownerAvatar {
+  width: 34px;
+  min-width: 34px;
+
+  height: 34px;
+  min-height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 34px;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8b3dff,
+      #27d7ff
+    );
+
+  border:
+    2px solid rgba(255, 212, 90, 0.38);
+
+  color: #ffffff;
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ============================================================
+   OVERLAY
+   ============================================================ */
+
+.overlay {
+  position: fixed;
+
+  inset: 0;
+
+  width: 100vw;
+  height: 100dvh;
+
+  z-index: 200;
+
+  border: 0;
+
+  background:
+    rgba(0, 0, 0, 0.70);
+
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+
+  cursor: pointer;
+}
+
+/* ============================================================
+   CONTENT
+   ============================================================ */
+
+.content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  flex: 1 1 auto;
+
+  padding: 22px 22px 90px;
+
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.contentInner {
+  width: 100%;
+  max-width: 1500px;
+
+  min-width: 0;
+
+  margin-inline: auto;
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+
+.dashboard {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 22px;
+
+  overflow: hidden;
+}
+
+/* ============================================================
+   OWNER CARD
+   ============================================================ */
+
+.ownerCard {
+  width: 100%;
+  min-width: 0;
+
+  padding: 20px;
+
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.95),
+      rgba(5, 7, 18, 0.98)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.28);
+
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.20);
+
+  overflow: hidden;
+}
+
+.ownerCardTop {
+  display: flex;
+  align-items: center;
+
+  gap: 13px;
+
+  min-width: 0;
+
+  margin-bottom: 18px;
+}
+
+.ownerCardAvatar {
+  width: 52px;
+  min-width: 52px;
+
+  height: 52px;
+  min-height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 52px;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8b3dff,
+      #27d7ff
+    );
+
+  border:
+    2px solid rgba(255, 212, 90, 0.42);
+
+  font-weight: 900;
+}
+
+.ownerIdentity {
+  min-width: 0;
+
+  flex: 1 1 auto;
+
+  overflow: hidden;
+}
+
+.ownerCardName {
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+
+  min-width: 0;
+
+  font-size: 16px;
+
+  font-weight: 900;
+}
+
+.verifiedBadge {
+  width: 17px;
+  min-width: 17px;
+
+  height: 17px;
+  min-height: 17px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 17px;
+
+  border-radius: 50%;
+
+  color: #ffffff;
+
+  background: #27d7ff;
+
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.ownerCardMeta {
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+
+  margin-top: 5px;
+
+  min-width: 0;
+
+  color: #8993b1;
+
+  font-size: 10px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.dot {
+  width: 6px;
+  min-width: 6px;
+
+  height: 6px;
+  min-height: 6px;
+
+  border-radius: 50%;
+
+  background: #76ffa6;
+
+  box-shadow:
+    0 0 9px rgba(118, 255, 166, 0.65);
+}
+
+.metaSeparator {
+  color: #4e5874;
+}
+
+.ownerRole {
+  padding: 3px 6px;
+
+  border-radius: 5px;
+
+  color: #bd9aff;
+
+  background:
+    rgba(139, 61, 255, 0.10);
+
+  border:
+    1px solid rgba(139, 61, 255, 0.20);
+
+  font-size: 8px;
+
+  font-weight: 800;
+}
+
+/* ============================================================
+   STAT GRID
+   ============================================================ */
+
+.statGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+
+  width: 100%;
+  min-width: 0;
+}
+
+.statTile {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 13px;
+
+  border-radius: 13px;
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  border:
+    1px solid rgba(139, 61, 255, 0.17);
+
+  overflow: hidden;
+}
+
+.statIcon {
+  width: 34px;
+  min-width: 34px;
+
+  height: 34px;
+  min-height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 34px;
+
+  border-radius: 9px;
+
+  color: #d6bdff;
+
+  background:
+    rgba(139, 61, 255, 0.12);
+
+  font-size: 15px;
+
+  font-weight: 900;
+}
+
+.statTile > div {
+  min-width: 0;
+}
+
+.statTile strong {
+  display: block;
+
+  max-width: 100%;
+
+  font-size: 15px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.label {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #79829e;
+
+  font-size: 9px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+
+.section {
+  width: 100%;
+  min-width: 0;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  margin-bottom: 11px;
+
+  color: #e8ebf7;
+
+  font-size: 13px;
+
+  font-weight: 800;
+}
+
+.titleAccent {
+  width: 4px;
+  min-width: 4px;
+
+  height: 18px;
+  min-height: 18px;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #8b3dff,
+      #27d7ff
+    );
+
+  box-shadow:
+    0 0 12px rgba(139, 61, 255, 0.40);
+}
+
+/* ============================================================
+   OVERVIEW
+   ============================================================ */
+
+.overviewGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(6, minmax(0, 1fr));
+
+  gap: 10px;
+
+  width: 100%;
+  min-width: 0;
+}
+
+.overviewTile {
+  min-width: 0;
+
+  padding: 13px 8px;
+
+  text-align: center;
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.90),
+      rgba(5, 7, 18, 0.96)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.20);
+
+  overflow: hidden;
+}
+
+.overviewIcon {
+  width: 34px;
+  min-width: 34px;
+
+  height: 34px;
+  min-height: 34px;
+
+  margin: 0 auto 7px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--icon-color, #ffd45a) 16%,
+      transparent
+    );
+
+  color:
+    var(--icon-color, #ffd45a);
+}
+
+.overviewTile strong {
+  display: block;
+
+  font-size: 14px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.overviewTile span:last-child {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #7e87a4;
+
+  font-size: 8px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+
+.chartsGrid {
+  width: 100%;
+  min-width: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.35fr)
+    minmax(0, 1fr);
+
+  gap: 14px;
+
+  overflow: hidden;
+}
+
+.chartPanel {
+  width: 100%;
+  min-width: 0;
+
+  min-height: 270px;
+
+  padding: 15px;
+
+  border-radius: 18px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.82),
+      rgba(5, 7, 18, 0.94)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.20);
+
+  overflow: hidden;
+
+  position: relative;
+}
+
+.chartPanel svg,
+.chartPanel canvas {
+  display: block;
+
+  max-width: 100%;
+}
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+
+.actionGrid {
+  width: 100%;
+  min-width: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+}
+
+.actionBtn {
+  min-width: 0;
+
+  min-height: 76px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  padding: 12px 8px;
+
+  border-radius: 14px;
+
+  border:
+    1px solid rgba(139, 61, 255, 0.20);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(139, 61, 255, 0.10),
+      rgba(21, 17, 31, 0.50)
+    );
+
+  color: #f7f8ff;
+
+  text-decoration: none;
+
+  font-size: 10px;
+
+  font-weight: 800;
+
+  text-align: center;
+
+  overflow: hidden;
+
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.actionBtn:hover {
+  transform: translateY(-2px);
+
+  border-color:
+    rgba(139, 61, 255, 0.45);
+
+  background:
+    rgba(139, 61, 255, 0.13);
+}
+
+.tradingBtn {
+  border-color:
+    rgba(39, 215, 255, 0.24);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(39, 215, 255, 0.10),
+      rgba(139, 61, 255, 0.10)
+    );
+}
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+
+.panel {
+  width: 100%;
+  min-width: 0;
+
+  padding: 15px;
+
+  border-radius: 17px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.70),
+      rgba(5, 7, 18, 0.85)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.18);
+
+  overflow: hidden;
+}
+
+.panelHead {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin-bottom: 10px;
+
+  color: #e8ebf7;
+
+  font-size: 12px;
+
+  font-weight: 800;
+}
+
+.panelBadge {
+  flex: 0 0 auto;
+
+  padding: 3px 7px;
+
+  border-radius: 999px;
+
+  color: #9c83d8;
+
+  background:
+    rgba(139, 61, 255, 0.08);
+
+  border:
+    1px solid rgba(139, 61, 255, 0.17);
+
+  font-size: 7px;
+
+  letter-spacing: 0.8px;
+}
+
+.panelLink {
+  flex: 0 0 auto;
+
+  color: #b792ff;
+
+  font-size: 9px;
+
+  text-decoration: none;
+}
+
+.listGrid {
+  width: 100%;
+  min-width: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 14px;
+}
+
+.listItem {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 9px 0;
+
+  border-bottom:
+    1px solid rgba(139, 61, 255, 0.10);
+
+  overflow: hidden;
+}
+
+.listItem:last-child {
+  border-bottom: 0;
+}
+
+.listAvatar {
+  width: 29px;
+  min-width: 29px;
+
+  height: 29px;
+  min-height: 29px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 29px;
+
+  border-radius: 50%;
+
+  color: #cdb5ff;
+
+  background:
+    rgba(139, 61, 255, 0.12);
+
+  font-size: 12px;
+}
+
+.listMain {
+  flex: 1 1 0;
+
+  width: 0;
+
+  min-width: 0;
+
+  overflow: hidden;
+}
+
+.listMain strong {
+  display: block;
+
+  width: 100%;
+
+  font-size: 10.5px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.listMain span {
+  display: block;
+
+  margin-top: 2px;
+
+  color: #727c99;
+
+  font-size: 9px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.listTime {
+  flex: 0 0 auto;
+
+  color: #ffd45a;
+
+  font-size: 8px;
+
+  white-space: nowrap;
+}
+
+.emptyState {
+  margin: 12px 0;
+
+  color: #68718e;
+
+  font-size: 10px;
+
+  text-align: center;
+}
+
+/* ============================================================
+   MEDIA
+   ============================================================ */
+
+.mediaRow {
+  width: 100%;
+  min-width: 0;
+
+  display: flex;
+
+  gap: 10px;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  padding-bottom: 4px;
+
+  scrollbar-width: thin;
+
+  -webkit-overflow-scrolling: touch;
+}
+
+.mediaCard {
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+
+  flex: 0 0 120px;
+
+  border-radius: 12px;
+
+  overflow: hidden;
+
+  color: inherit;
+
+  text-decoration: none;
+
+  background:
+    rgba(15, 18, 42, 0.50);
+
+  border:
+    1px solid rgba(139, 61, 255, 0.16);
+}
+
+.mediaCover {
+  width: 100%;
+
+  aspect-ratio: 3 / 4;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #171222;
+
+  color: #ffd45a;
+
+  font-size: 9px;
+
+  overflow: hidden;
+}
+
+.mediaCover img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+}
+
+.mediaInfo {
+  width: 100%;
+
+  padding: 6px 7px 8px;
+
+  overflow: hidden;
+}
+
+.mediaInfo strong,
+.mediaInfo span {
+  display: block;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.mediaInfo strong {
+  font-size: 9.5px;
+}
+
+.mediaInfo span {
+  margin-top: 3px;
+
+  color: #7b85a1;
+
+  font-size: 8px;
+}
+
+/* ============================================================
+   INDICATORS
+   ============================================================ */
+
+.indicatorRow {
+  width: 100%;
+  min-width: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+}
+
+.indicatorTile {
+  min-width: 0;
+
+  padding: 13px 8px;
+
+  border-radius: 12px;
+
+  text-align: center;
+
+  background:
+    rgba(255, 255, 255, 0.02);
+
+  border:
+    1px solid rgba(139, 61, 255, 0.15);
+
+  overflow: hidden;
+}
+
+.indicatorTile strong {
+  display: block;
+
+  font-size: 14px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.indicatorTile span {
+  display: block;
+
+  margin-top: 4px;
+
+  color: #77819e;
+
+  font-size: 8px;
+
+  line-height: 1.4;
+}
+
+/* ============================================================
+   ALERTS
+   ============================================================ */
+
+.alertGrid {
+  width: 100%;
+  min-width: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+}
+
+.alertTile,
+.errorLink {
+  min-width: 0;
+
+  min-height: 66px;
+
+  padding: 11px;
+
+  border-radius: 13px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+
+  overflow: hidden;
+}
+
+.alertTile {
+  background:
+    rgba(255, 212, 90, 0.05);
+
+  border:
+    1px solid rgba(255, 212, 90, 0.14);
+}
+
+.alertTile strong {
+  color: #ffd45a;
+
+  font-size: 15px;
+}
+
+.alertTile span {
+  margin-top: 3px;
+
+  color: #8a93ad;
+
+  font-size: 8px;
+}
+
+.errorLink {
+  color: #ff91b5;
+
+  background:
+    rgba(255, 107, 157, 0.05);
+
+  border:
+    1px solid rgba(255, 107, 157, 0.15);
+
+  text-decoration: none;
+}
+
+.errorLink strong {
+  font-size: 17px;
+}
+
+.errorLink span {
+  margin-top: 3px;
+
+  font-size: 8px;
+}
+
+/* ============================================================
+   MOBILE ADMIN NAVIGATION
+   Sidebar removed from mobile.
+   Navigation lives inside the page.
+   ============================================================ */
+
+.mobileAdminNav {
+  display: none;
+}
+
+.adminMain {
+  min-width: 0;
+
+  width: 100%;
+  max-width: 100%;
+}
+
+.mobileAdminHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 14px;
+
+  width: 100%;
+  min-width: 0;
+
+  padding: 16px;
+
+  border:
+    1px solid rgba(139, 61, 255, 0.24);
+
+  border-radius: 18px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.94),
+      rgba(5, 7, 18, 0.96)
+    );
+
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.25);
+}
+
+.mobileAdminHeader > div:first-child {
+  min-width: 0;
+}
+
+.mobileAdminHeader h2 {
+  margin: 4px 0 3px;
+
+  font-size: 18px;
+  font-weight: 800;
+
+  color: #f7f8ff;
+}
+
+.mobileAdminHeader p {
+  margin: 0;
+
+  font-size: 11px;
+
+  color: #9fa8c7;
+}
+
+.mobileAdminEyebrow {
+  display: block;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  letter-spacing: 1.8px;
+
+  color: #27d7ff;
+}
+
+.mobileAdminIcon {
+  width: 46px;
+  min-width: 46px;
+
+  height: 46px;
+  min-height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+
+  color: #b56cff;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139, 61, 255, 0.22),
+      rgba(39, 215, 255, 0.08)
+    );
+
+  border:
+    1px solid rgba(139, 61, 255, 0.3);
+
+  box-shadow:
+    0 0 25px rgba(139, 61, 255, 0.1);
+}
+
+.mobileAdminSections {
+  display: flex;
+  flex-direction: column;
+
+  gap: 12px;
+
+  width: 100%;
+  min-width: 0;
+}
+
+.mobileAdminSection {
+  width: 100%;
+  min-width: 0;
+}
+
+.mobileAdminSectionTitle {
+  margin-bottom: 7px;
+
+  padding-inline: 3px;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  color: #7f89ad;
+}
+
+.mobileAdminGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 9px;
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mobileAdminLink,
+.mobileAdminLinkSoon {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  min-height: 62px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 11px;
+
+  border-radius: 14px;
+
+  text-decoration: none;
+
+  color: #e9ecfa;
+
+  border:
+    1px solid rgba(139, 61, 255, 0.22);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.9),
+      rgba(7, 8, 20, 0.95)
+    );
+
+  overflow: hidden;
+
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.mobileAdminLink:active {
+  transform: scale(0.98);
+}
+
+.mobileAdminLink:hover {
+  border-color:
+    rgba(139, 61, 255, 0.45);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(139, 61, 255, 0.12),
+      rgba(7, 8, 20, 0.96)
+    );
+}
+
+.mobileAdminLinkActive {
+  border-color:
+    rgba(139, 61, 255, 0.55);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139, 61, 255, 0.2),
+      rgba(39, 215, 255, 0.06)
+    );
+
+  box-shadow:
+    0 0 22px rgba(139, 61, 255, 0.12);
+}
+
+.mobileAdminLinkText {
+  flex: 1 1 auto;
+
+  min-width: 0;
+  max-width: 100%;
+
+  font-size: 11.5px;
+  font-weight: 700;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+
+.mobileAdminLinkSoon {
+  opacity: 0.52;
+
+  cursor: default;
+}
+
+.mobileAdminSoonBadge {
+  flex: 0 0 auto;
+
+  padding: 3px 6px;
+
+  border-radius: 999px;
+
+  font-size: 8px;
+  font-weight: 700;
+
+  color: #c15cff;
+
+  background:
+    rgba(193, 92, 255, 0.12);
+
+  border:
+    1px solid rgba(193, 92, 255, 0.25);
+}
+
+.mobileAdminViewSite {
+  width: 100%;
+  max-width: 100%;
+
+  min-height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  border-radius: 13px;
+
+  text-decoration: none;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  color: #171004;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffe58b,
+      #ffd45a,
+      #dda522
+    );
+
+  border:
+    1px solid rgba(255, 212, 90, 0.35);
+
+  box-shadow:
+    0 8px 25px rgba(255, 212, 90, 0.08);
+}
+
+/* ============================================================
+   GLOBAL CONTENT SAFETY
+   ============================================================ */
+
+.content img,
+.content video,
+.content iframe,
+.content canvas,
+.content svg {
+  max-width: 100%;
+}
+
+.content table {
+  max-width: 100%;
+}
+
+.content pre {
+  max-width: 100%;
+
+  overflow-x: auto;
+}
+
+.content input,
+.content select,
+.content textarea,
+.content button {
+  max-width: 100%;
+}
+
+/* ============================================================
+   RTL
+   ============================================================ */
+
+[dir="rtl"] .sidebar {
+  border-inline-end: 0;
+
+  border-inline-start:
+    1px solid rgba(139, 61, 255, 0.24);
+}
+
+/* ============================================================
+   BODY LOCK
+   ============================================================ */
+
+:global(body.gv-admin-mode) {
+  margin: 0;
+
+  max-width: 100%;
+
+  overflow-x: hidden;
+}
+
+:global(body.gv-admin-drawer-open) {
+  overflow: hidden;
+}
+
+/* ============================================================
+   DESKTOP
+   ============================================================ */
+
+@media (min-width: 960px) {
+
+  .sidebar {
+    display: flex;
+  }
+
+  .mobileAdminNav {
+    display: none !important;
+  }
+
+  .menuBtn {
+    display: none !important;
+  }
+
+  .overlay {
+    display: none;
+  }
+}
+
+/* ============================================================
+   MOBILE
+   Sidebar completely removed.
+   Mobile navigation is displayed inside the page.
+   ============================================================ */
+
+@media (max-width: 959px) {
+
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    overflow-x: hidden;
+  }
+
+  .layout {
+    display: block;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    min-height: 100dvh;
+
+    overflow-x: hidden;
+  }
+
+  .mainArea {
+    display: flex;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    min-height: 100dvh;
+
+    flex-direction: column;
+
+    overflow-x: hidden;
+  }
+
+  /* ========================================================
+     SIDEBAR OFF
+     ======================================================== */
+
+  .sidebar {
+    display: none !important;
+  }
+
+  .overlay {
+    display: none !important;
+  }
+
+  .menuBtn {
+    display: none !important;
+  }
+
+  /* ========================================================
+     TOPBAR
+     ======================================================== */
+
+  .topbar {
+    position: sticky;
+
+    top: 0;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    min-height: 60px;
+
+    padding:
+      9px
+      10px;
+
+    gap: 8px;
+
+    z-index: 100;
+  }
+
+  .topbarBrand {
+    display: none;
+  }
+
+  .searchBar {
+    flex: 1 1 0;
+
+    width: 0;
+    min-width: 0;
+    max-width: none;
+
+    height: 38px;
+
+    padding-inline: 10px;
+  }
+
+  .searchBar input {
+    min-width: 0;
+
+    font-size: 11px;
+  }
+
+  .topbarActions {
+    gap: 5px;
+
+    min-width: 0;
+  }
+
+  .iconButton {
+    width: 34px;
+    min-width: 34px;
+
+    height: 34px;
+    min-height: 34px;
+
+    flex: 0 0 34px;
+  }
+
+  .ownerChip {
+    max-width: 38px;
+  }
+
+  .ownerChipText {
+    display: none;
+  }
+
+  .ownerAvatar {
+    width: 32px;
+    min-width: 32px;
+
+    height: 32px;
+    min-height: 32px;
+
+    flex: 0 0 32px;
+  }
+
+  /* ========================================================
+     MOBILE ADMIN NAV
+     ======================================================== */
+
+  .mobileAdminNav {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 12px;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    padding:
+      10px
+      10px
+      0;
+
+    overflow: hidden;
+  }
+
+  .mobileAdminSections {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .mobileAdminSection {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .mobileAdminGrid {
+    display: grid !important;
+
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+
+    gap: 9px !important;
+  }
+
+  .mobileAdminLink,
+  .mobileAdminLinkSoon {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+
+    min-height: 62px !important;
+
+    overflow: hidden !important;
+  }
+
+  .mobileAdminLinkText {
+    min-width: 0 !important;
+    max-width: 100% !important;
+
+    overflow: hidden !important;
+
+    white-space: nowrap !important;
+
+    text-overflow: ellipsis !important;
+  }
+
+  .mobileAdminViewSite {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ========================================================
+     CONTENT
+     ======================================================== */
+
+  .content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    padding:
+      12px
+      10px
+      86px;
+
+    overflow-x: hidden;
+  }
+
+  .contentInner {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .adminMain {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    gap: 15px;
+  }
+
+  /* ========================================================
+     OWNER CARD
+     ======================================================== */
+
+  .ownerCard {
+    padding: 13px;
+
+    border-radius: 16px;
+  }
+
+  .ownerCardTop {
+    margin-bottom: 13px;
+  }
+
+  .ownerCardAvatar {
+    width: 45px;
+    min-width: 45px;
+
+    height: 45px;
+    min-height: 45px;
+
+    flex-basis: 45px;
+  }
+
+  .ownerCardName {
+    font-size: 14px;
+  }
+
+  .ownerCardMeta {
+    font-size: 9px;
+
+    gap: 5px;
+  }
+
+  .ownerRole {
+    font-size: 7px;
+  }
+
+  /* ========================================================
+     STATS
+     ======================================================== */
+
+  .statGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .statTile {
+    padding: 10px;
+
+    gap: 8px;
+  }
+
+  .statIcon {
+    width: 30px;
+    min-width: 30px;
+
+    height: 30px;
+    min-height: 30px;
+
+    flex-basis: 30px;
+  }
+
+  .statTile strong {
+    font-size: 13px;
+  }
+
+  .label {
+    font-size: 8px;
+  }
+
+  /* ========================================================
+     SECTIONS
+     ======================================================== */
+
+  .sectionTitle {
+    font-size: 12px;
+  }
+
+  /* ========================================================
+     OVERVIEW
+     ======================================================== */
+
+  .overviewGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .overviewTile {
+    padding: 11px 6px;
+  }
+
+  .overviewIcon {
+    width: 31px;
+    min-width: 31px;
+
+    height: 31px;
+    min-height: 31px;
+  }
+
+  .overviewTile strong {
+    font-size: 13px;
+  }
+
+  .overviewTile span:last-child {
+    font-size: 8px;
+  }
+
+  /* ========================================================
+     CHARTS
+     ======================================================== */
+
+  .chartsGrid {
+    grid-template-columns:
+      minmax(0, 1fr);
+
+    gap: 10px;
+  }
+
+  .chartPanel {
+    min-height: 235px;
+
+    padding: 10px;
+
+    border-radius: 15px;
+  }
+
+  /* ========================================================
+     ACTIONS
+     ======================================================== */
+
+  .actionGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  .actionBtn {
+    min-height: 70px;
+
+    padding:
+      10px
+      6px;
+
+    font-size: 9px;
+  }
+
+  /* ========================================================
+     LISTS
+     ======================================================== */
+
+  .listGrid {
+    grid-template-columns:
+      minmax(0, 1fr);
+
+    gap: 10px;
+  }
+
+  .panel {
+    padding: 11px;
+
+    border-radius: 15px;
+  }
+
+  /* ========================================================
+     INDICATORS
+     ======================================================== */
+
+  .indicatorRow {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  /* ========================================================
+     ALERTS
+     ======================================================== */
+
+  .alertGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+  }
+
+  /* ========================================================
+     MEDIA
+     ======================================================== */
+
+  .mediaCard {
+    width: 105px;
+    min-width: 105px;
+    max-width: 105px;
+
+    flex-basis: 105px;
+  }
+}
+
+/* ============================================================
+   SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 480px) {
+
+  .topbar {
+    padding-inline: 7px;
+
+    gap: 6px;
+  }
+
+  .searchBar {
+    height: 36px;
+
+    padding-inline: 9px;
+  }
+
+  .searchBar input {
+    font-size: 10px;
+  }
+
+  .iconButton {
+    display: none;
+  }
+
+  .ownerAvatar {
+    width: 31px;
+    min-width: 31px;
+
+    height: 31px;
+    min-height: 31px;
+
+    flex-basis: 31px;
+  }
+
+  .mobileAdminNav {
+    padding-inline: 8px;
+  }
+
+  .mobileAdminHeader {
+    padding: 13px;
+
+    border-radius: 15px;
+  }
+
+  .mobileAdminHeader h2 {
+    font-size: 16px;
+  }
+
+  .mobileAdminHeader p {
+    font-size: 10px;
+  }
+
+  .mobileAdminIcon {
+    width: 42px;
+    min-width: 42px;
+
+    height: 42px;
+    min-height: 42px;
+  }
+
+  .mobileAdminGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 8px !important;
+  }
+
+  .mobileAdminLink,
+  .mobileAdminLinkSoon {
+    min-height: 58px !important;
+
+    padding: 9px !important;
+
+    border-radius: 12px !important;
+
+    gap: 7px !important;
+  }
+
+  .mobileAdminLinkText {
+    font-size: 10.5px !important;
+  }
+
+  .mobileAdminSoonBadge {
+    font-size: 7px;
+
+    padding:
+      2px
+      5px;
+  }
+
+  .content {
+    padding-inline: 7px;
+
+    padding-bottom: 78px;
+  }
+
+  .ownerCard {
+    padding: 11px;
+  }
+
+  .ownerCardAvatar {
+    width: 42px;
+    min-width: 42px;
+
+    height: 42px;
+    min-height: 42px;
+
+    flex-basis: 42px;
+  }
+
+  .ownerCardMeta {
+    font-size: 8px;
+  }
+
+  .statGrid {
+    gap: 7px;
+  }
+
+  .statTile {
+    padding: 9px;
+  }
+
+  .statIcon {
+    display: none;
+  }
+
+  .statTile strong {
+    font-size: 12px;
+  }
+
+  .overviewGrid {
+    gap: 7px;
+  }
+
+  .overviewTile {
+    padding: 10px 5px;
+  }
+
+  .overviewTile strong {
+    font-size: 12px;
+  }
+
+  .overviewTile span:last-child {
+    font-size: 7px;
+  }
+
+  .actionGrid {
+    gap: 7px;
+  }
+
+  .actionBtn {
+    min-height: 66px;
+
+    font-size: 8px;
+  }
+
+  .panel {
+    padding: 9px;
+  }
+
+  .panelHead {
+    font-size: 11px;
+  }
+
+  .mediaCard {
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
+
+    flex-basis: 96px;
+  }
+
+  .indicatorRow,
+  .alertGrid {
+    gap: 7px;
+  }
+
+  .indicatorTile {
+    padding: 10px 5px;
+  }
+
+  .indicatorTile strong {
+    font-size: 12px;
+  }
+
+  .indicatorTile span,
+  .alertTile span,
+  .errorLink span {
+    font-size: 7px;
+  }
+}
+
+/* ============================================================
+   EXTRA SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 360px) {
+
+  .content {
+    padding-inline: 5px;
+  }
+
+  .topbar {
+    padding-inline: 5px;
+  }
+
+  .ownerAvatar {
+    width: 29px;
+    min-width: 29px;
+
+    height: 29px;
+    min-height: 29px;
+
+    flex-basis: 29px;
+  }
+
+  .mobileAdminNav {
+    padding-inline: 6px;
+  }
+
+  .mobileAdminGrid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 6px !important;
+  }
+
+  .mobileAdminLink,
+  .mobileAdminLinkSoon {
+    min-height: 54px !important;
+
+    padding: 8px !important;
+
+    gap: 6px !important;
+  }
+
+  .mobileAdminLinkText {
+    font-size: 9.5px !important;
+  }
+
+  .statTile strong {
+    font-size: 11px;
+  }
+
+  .overviewTile strong {
+    font-size: 11px;
+  }
+
+  .actionBtn {
+    min-height: 62px;
+
+    font-size: 7px;
+  }
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .sidebar,
+  .navLink,
+  .actionBtn,
+  .menuBtn,
+  .mobileAdminLink,
+  .mobileAdminLinkSoon {
+    transition: none;
+  }
+   }

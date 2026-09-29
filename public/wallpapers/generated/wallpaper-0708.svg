@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" role="img" aria-label="GameVortex CARS wallpaper 708">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#6366f1"/></linearGradient><radialGradient id="r"><stop stop-color="#ffffff" stop-opacity=".35"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>
+<rect width="100%" height="100%" fill="#05030a"/><rect width="100%" height="100%" fill="url(#g)" opacity=".78"/>
+<circle cx="216.0" cy="384.0" r="259.2" fill="url(#r)"/><circle cx="885.5999999999999" cy="1382.3999999999999" r="367.20000000000005" fill="url(#r)" opacity=".55"/>
+<g fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="3"><path d="M0 120 Q 540.0 40 1080 120"/><path d="M0 300 Q 540.0 220 1080 300"/><path d="M0 480 Q 540.0 400 1080 480"/><path d="M0 660 Q 540.0 580 1080 660"/><path d="M0 840 Q 540.0 760 1080 840"/><path d="M0 1020 Q 540.0 940 1080 1020"/><path d="M0 1200 Q 540.0 1120 1080 1200"/><path d="M0 1380 Q 540.0 1300 1080 1380"/><path d="M0 1560 Q 540.0 1480 1080 1560"/><path d="M0 1740 Q 540.0 1660 1080 1740"/></g>
+<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="#fff" fill-opacity=".9" font-family="Arial,sans-serif" font-size="59" font-weight="700">GAMEVORTEX</text>
+<text x="50%" y="56%" text-anchor="middle" fill="#fff" fill-opacity=".62" font-family="Arial,sans-serif" font-size="27">CARS • 0708</text></svg>

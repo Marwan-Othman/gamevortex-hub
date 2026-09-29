@@ -1,0 +1,1831 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  STAFF
+  USER
+}
+
+enum AuthProvider {
+  GOOGLE
+  APPLE
+  STEAM
+}
+
+enum PlatformType {
+  PC
+  PLAYSTATION
+  XBOX
+  NINTENDO
+  ANDROID
+  IOS
+  MAC
+  LINUX
+  STEAM_DECK
+  WEB
+}
+
+enum WallpaperType {
+  MOBILE
+  DESKTOP
+}
+
+enum SourceStatus {
+  VERIFIED
+  NEEDS_SOURCE
+  PENDING_REVIEW
+  UNPUBLISHED
+  OFFICIAL_SOURCE
+  LICENSED_FOR_DISTRIBUTION
+  OPEN_SOURCE
+  FREEWARE_REDISTRIBUTABLE
+  NEEDS_LICENSE
+  STREAM_ONLY
+}
+
+enum LibraryStatus {
+  WANT
+  PLAYING
+  BEATEN
+  ARCHIVED
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  PENDING
+  PROCESSING
+  PAID
+  SETTLED
+  FAILED
+  REJECTED
+  CANCELLED
+  REVERSED
+}
+
+enum LedgerType {
+  CREDIT_POINTS
+  CREDIT_REVENUE
+  DEBIT_PAYOUT
+  REFUND
+  REVERSAL
+  ADJUSTMENT
+  PENDING
+  SETTLED
+  POINTS_WITHDRAWAL_REQUESTED
+  POINTS_RESERVED
+  POINTS_DEBITED
+  PAYOUT_PENDING
+  PAYOUT_SETTLED
+  PAYOUT_FAILED
+  POINTS_RETURNED
+  TRADING_ALLOCATED
+  TRADING_RETURNED
+}
+
+enum PointLedgerType {
+  CREDIT
+  DEBIT
+  REFUND
+  REVERSAL
+  ADJUSTMENT
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  username String? @unique
+  role Role @default(USER)
+  passwordHash String?
+  sessionVersion Int @default(1)
+  emailVerifiedAt DateTime?
+  points Int @default(0)
+  ownerPoints Int @default(0)
+  vipTier VipTier @default(BRONZE)
+  referralCode String? @unique
+
+  wallet Wallet?
+  walletTransactions WalletTransaction[]
+  walletDeposits WalletDeposit[]
+  ownerWallet OwnerWallet?
+  tradingAccount TradingAccount?
+  tradingRiskConfig TradingRiskConfig?
+  tradingControl TradingControl?
+  shariahAuditLogs ShariahAuditLog[]
+
+  pointLedger PointLedger[]
+
+  library GameLibraryItem[]
+  reviews Review[]
+  favorites FavoriteGame[]
+  wishlist WishlistGame[]
+  auditLogs AuditLog[]
+
+  wallpapers Wallpaper[]
+  wallpaperFavorites WallpaperFavorite[]
+  wallpaperReports WallpaperReport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gamerProfile GamerProfile?
+
+  following UserFollow[] @relation("Following")
+  followers UserFollow[] @relation("Followers")
+
+  activities Activity[]
+  notifications Notification[]
+  orders Order[]
+
+  referralsMade Referral[] @relation("ReferralReferrer")
+  referralReceived Referral? @relation("ReferralReferred")
+
+  raffleEntries RaffleEntry[]
+  raffleWins Raffle[] @relation("RaffleWinner")
+
+  entitlements Entitlement[]
+
+  reportsFiled ContentReport[] @relation("ReporterReports")
+  moderationActions ModerationAction[]
+  reportsModerated ContentReport[] @relation("ModeratorReports")
+
+  vipSubscriptions VipSubscription[]
+  vipRewardClaims VipRewardClaim[]
+  vipPurchases VipPurchase[]
+  oauthAccounts OAuthAccount[]
+
+  conversations Conversation[]
+  gameVortexAiConversations GameVortexAiConversation[]
+  aiMediaJobs AiMediaJob[]
+  aiMediaCreditBalance AiCreditBalance?
+  aiCreditLedger AiCreditLedger[]
+}
+
+model OAuthAccount {
+  id String @id @default(cuid())
+  userId String
+  provider AuthProvider
+  providerAccountId String
+  email String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider])
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ChatMessageStatus {
+  PENDING
+  STREAMING
+  COMPLETE
+  STOPPED
+  ERROR
+}
+
+model Conversation {
+  id String @id @default(cuid())
+  userId String
+  title String @default("New Chat")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, createdAt])
+}
+
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  role ChatMessageRole
+  status ChatMessageStatus @default(COMPLETE)
+  content String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId, role, createdAt])
+}
+
+model GameVortexAiConversation {
+  id String @id @default(cuid())
+  userId String
+  title String @default("New conversation") @db.VarChar(100)
+  systemInstructions String? @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages GameVortexAiMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model GameVortexAiMessage {
+  id String @id @default(cuid())
+  conversationId String
+  role String @db.VarChar(16)
+  content String @db.Text
+  createdAt DateTime @default(now())
+
+  conversation GameVortexAiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model PointLedger {
+  id String @id @default(cuid())
+
+  userId String
+  type PointLedgerType
+
+  amount Int
+  balanceAfter Int
+
+  reason String
+  sourceId String?
+  idempotencyKey String @unique
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([sourceId])
+}
+
+model Wallet {
+  id String @id @default(cuid())
+  userId String @unique
+
+  balance Decimal @default(0) @db.Decimal(18,2)
+  pendingBalance Decimal @default(0) @db.Decimal(18,2)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum WalletTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  PURCHASE
+  REFUND
+  ADJUSTMENT
+}
+
+enum WalletDepositStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model WalletDeposit {
+  id String @id @default(cuid())
+  userId String
+  amountCents Int
+  currency String @default("USD")
+  provider String
+  providerPaymentId String?
+  status WalletDepositStatus @default(PENDING)
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerPaymentId])
+  @@index([userId, status, createdAt])
+}
+
+model WalletTransaction {
+  id String @id @default(cuid())
+  userId String
+  walletId String
+  type WalletTransactionType
+  amount Decimal @db.Decimal(18,2)
+  balanceBefore Decimal @db.Decimal(18,2)
+  balanceAfter Decimal @db.Decimal(18,2)
+  currency String @default("USD")
+  referenceType String?
+  referenceId String?
+  idempotencyKey String @unique
+  metadata Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model OwnerWallet {
+  id String @id @default(cuid())
+  ownerId String @unique
+
+  availablePoints Int @default(0)
+  pendingPoints Int @default(0)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  ledger OwnerLedger[]
+  withdrawals WithdrawalRequest[]
+  tradingAllocations TradingAllocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OwnerLedger {
+  id String @id @default(cuid())
+
+  walletId String
+  type LedgerType
+
+  points Int @default(0)
+  usdAmount Decimal? @db.Decimal(18,2)
+
+  currency String?
+  conversionRate Int?
+
+  withdrawalId String?
+  provider String?
+  providerTransactionId String?
+  transactionHash String?
+
+  idempotencyKey String @unique
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  wallet OwnerWallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+}
+
+model Game {
+  id String @id @default(cuid())
+
+  slug String @unique
+
+  titleAr String
+  titleEn String
+
+  description String?
+
+  platform String?
+  genre String?
+
+  priceCents Int @default(0)
+  discountPercent Int @default(0)
+
+  coverUrl String?
+  officialUrl String?
+  downloadSource String?
+
+  sourceStatus SourceStatus @default(NEEDS_SOURCE)
+  sourceProvider String?
+
+  ratingAverage Float @default(0)
+  ratingCount Int @default(0)
+
+  playCount Int @default(0)
+  viewCount Int @default(0)
+  downloadCount Int @default(0)
+
+  published Boolean @default(false)
+  featured Boolean @default(false)
+
+  reviews Review[]
+  libraryItems GameLibraryItem[]
+  activities Activity[]
+  products GameProduct[]
+
+  gamePlatforms GamePlatform[]
+
+  entitlements Entitlement[]
+  favorites FavoriteGame[]
+  wishlists WishlistGame[]
+  gameCategories GameCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id String @id @default(cuid())
+
+  slug String @unique
+  nameAr String
+  nameEn String
+
+  descriptionAr String?
+  descriptionEn String?
+
+  active Boolean @default(true)
+  sortOrder Int @default(0)
+
+  gameCategories GameCategory[]
+  appCategories AppCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+model GameCategory {
+  id String @id @default(cuid())
+
+  gameId String
+  categoryId String
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([gameId, categoryId])
+  @@index([categoryId, gameId])
+}
+
+model GamePlatform {
+  id String @id @default(cuid())
+
+  gameId String
+  platform PlatformType
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([gameId, platform])
+  @@index([platform, gameId])
+}
+
+model App {
+  id String @id @default(cuid())
+  slug String @unique
+  nameAr String
+  nameEn String
+  descriptionAr String?
+  descriptionEn String?
+  developer String?
+  publisher String?
+  iconUrl String?
+  coverUrl String?
+  officialUrl String?
+  downloadSource String?
+  sourceStatus SourceStatus @default(NEEDS_SOURCE)
+  sourceProvider String?
+  priceCents Int @default(0)
+  discountPercent Int @default(0)
+  ratingAverage Float @default(0)
+  ratingCount Int @default(0)
+  viewCount Int @default(0)
+  downloadCount Int @default(0)
+  published Boolean @default(false)
+  featured Boolean @default(false)
+  appPlatforms AppPlatform[]
+  appCategories AppCategory[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, featured])
+  @@index([sourceStatus])
+}
+
+model AppPlatform {
+  id String @id @default(cuid())
+  appId String
+  platform PlatformType
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([appId, platform])
+  @@index([platform, appId])
+}
+
+model AppCategory {
+  id String @id @default(cuid())
+  appId String
+  categoryId String
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([appId, categoryId])
+  @@index([categoryId, appId])
+}
+
+model Review {
+  id String @id @default(cuid())
+
+  userId String
+  gameId String
+
+  rating Int
+  text String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, gameId])
+  @@index([gameId, rating])
+  @@index([userId, createdAt])
+}
+
+model GameLibraryItem {
+  id String @id @default(cuid())
+
+  userId String
+  gameId String
+
+  status LibraryStatus @default(WANT)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, gameId])
+  @@index([userId, status, updatedAt])
+  @@index([gameId, status])
+}
+
+model WithdrawalRequest {
+  id String @id @default(cuid())
+
+  ownerWalletId String
+
+  points Int
+  usdAmount Decimal @db.Decimal(18,2)
+
+  conversionRate Int @default(30)
+  currency String @default("USD")
+
+  provider String?
+  providerTransactionId String?
+  transactionHash String?
+
+  status WithdrawalStatus @default(REQUESTED)
+
+  failureReason String?
+
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+
+  ownerWallet OwnerWallet @relation(fields: [ownerWalletId], references: [id], onDelete: Restrict)
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  actorUserId String?
+
+  action String
+  entityType String
+  entityId String?
+
+  ip String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorUserId, createdAt])
+  @@index([createdAt])
+}
+
+model SystemError {
+  id String @id @default(cuid())
+
+  scope String
+  message String
+
+  statusCode Int?
+
+  userId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([scope, createdAt])
+  @@index([createdAt])
+}
+
+model QuranReciter {
+  id String @id @default(cuid())
+
+  nameAr String
+  nameEn String
+
+  riwayah String?
+  style String?
+  quality String?
+
+  provider String
+
+  legalSourceUrl String
+  licenseUrl String?
+  licenseStatus String
+
+  sourceVerificationStatus SourceStatus @default(PENDING_REVIEW)
+
+  verificationDate DateTime?
+  verifiedBy String?
+
+  audioBaseUrl String
+
+  availableSurahs Json?
+
+  notes String?
+
+  sortOrder Int @default(0)
+  active Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sourceVerificationStatus, sortOrder])
+}
+
+model FavoriteGame {
+  id String @id @default(cuid())
+
+  userId String
+  gameId String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+  @@index([gameId])
+  @@index([userId, createdAt])
+}
+
+model WishlistGame {
+  id String @id @default(cuid())
+
+  userId String
+  gameId String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+  @@index([gameId])
+  @@index([userId, createdAt])
+}
+
+/* =========================================================
+   GAMER PROGRESS SYSTEM
+   ========================================================= */
+
+enum AchievementRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+model GamerProfile {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  displayName String?
+  bio String?
+  avatarUrl String?
+  bannerUrl String?
+
+  favoritePlatform String?
+  country String?
+
+  level Int @default(1)
+  xp Int @default(0)
+
+  totalPlayMinutes Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  achievements UserAchievement[]
+  xpEvents XpEvent[]
+
+  @@index([level])
+  @@index([xp])
+}
+
+model Achievement {
+  id String @id @default(cuid())
+
+  key String @unique
+
+  name String
+  description String
+
+  icon String?
+
+  rarity AchievementRarity @default(COMMON)
+
+  xpReward Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id String @id @default(cuid())
+
+  profileId String
+  achievementId String
+
+  unlockedAt DateTime @default(now())
+
+  profile GamerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, achievementId])
+  @@index([profileId])
+}
+
+model XpEvent {
+  id String @id @default(cuid())
+
+  profileId String
+
+  amount Int
+  reason String
+
+  sourceId String?
+
+  createdAt DateTime @default(now())
+
+  profile GamerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
+}
+
+enum ActivityType {
+  FAVORITED_GAME
+  WISHLISTED_GAME
+  REVIEWED_GAME
+  ADDED_TO_LIBRARY
+  COMPLETED_GAME
+  ACHIEVEMENT_UNLOCKED
+  LEVEL_UP
+  REFERRAL_REWARDED
+  RAFFLE_ENTERED
+  RAFFLE_WON
+}
+
+model UserFollow {
+  id String @id @default(cuid())
+
+  followerId String
+  followingId String
+
+  createdAt DateTime @default(now())
+
+  follower User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId, createdAt])
+  @@index([followerId, createdAt])
+}
+
+model Activity {
+  id String @id @default(cuid())
+
+  userId String
+
+  type ActivityType
+
+  gameId String?
+
+  message String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([gameId, createdAt])
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+
+  type String
+  title String
+  body String?
+
+  readAt DateTime?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/* =========================================================
+   MARKETPLACE
+   ========================================================= */
+
+enum ProductKind {
+  GAME_KEY
+  GIFT_CARD
+  TOP_UP
+  DLC
+  SUBSCRIPTION
+  DIGITAL_ITEM
+}
+
+enum DeliveryType {
+  CODE
+  ACCOUNT_TOPUP
+  EXTERNAL_LINK
+  MANUAL
+}
+
+enum DigitalKeyStatus {
+  AVAILABLE
+  DELIVERED
+  REVOKED
+}
+
+enum VipTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+  APEX
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  REJECTED
+}
+
+enum RaffleStatus {
+  DRAFT
+  OPEN
+  DRAWN
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLING
+  COMPLETED
+  REFUNDED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentStatus {
+  CREATED
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum VipSubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELED
+  REFUNDED
+  PAYMENT_FAILED
+}
+
+enum VipSubscriptionEventType {
+  CREATED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  ACTIVATED
+  RENEWED
+  UPGRADED
+  CANCELED
+  EXPIRED
+  REFUNDED
+  CREDITS_RESET
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  FRAUD
+  COPYRIGHT
+  NSFW
+  MISLEADING
+  OTHER
+}
+
+model GameProduct {
+  id String @id @default(cuid())
+
+  gameId String
+
+  sku String @unique
+
+  title String
+  description String?
+
+  priceCents Int
+
+  currency String @default("USD")
+
+  active Boolean @default(true)
+
+  inventory Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kind ProductKind @default(GAME_KEY)
+
+  deliveryType DeliveryType @default(CODE)
+
+  region String?
+  country String?
+
+  denominationCents Int?
+
+  provider String?
+
+  fazerCategoryId String?
+  fazerCardId String?
+
+  redemptionInstructions String?
+
+  sourceUrl String?
+
+  supplierVerified Boolean @default(false)
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  orderItems OrderItem[]
+  digitalKeys DigitalKey[]
+
+  @@index([gameId, active])
+}
+
+model Order {
+  id String @id @default(cuid())
+
+  userId String
+
+  status OrderStatus @default(PENDING)
+
+  subtotalCents Int
+  totalCents Int
+
+  currency String @default("USD")
+
+  paymentStatus PaymentStatus @default(CREATED)
+
+  paymentProvider String?
+  providerOrderId String?
+
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  items OrderItem[]
+  payments Payment[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id String @id @default(cuid())
+
+  orderId String
+  productId String
+
+  quantity Int @default(1)
+
+  unitPriceCents Int
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product GameProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  digitalKeys DigitalKey[]
+
+  @@index([productId])
+}
+
+model DigitalKey {
+  id String @id @default(cuid())
+
+  productId String
+  orderItemId String?
+
+  ciphertext String
+
+  fingerprint String @unique
+
+  status DigitalKeyStatus @default(AVAILABLE)
+
+  deliveredAt DateTime?
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product GameProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  @@index([productId, status, createdAt])
+  @@index([orderItemId, status])
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  orderId String
+
+  provider String
+  providerPaymentId String?
+
+  status PaymentStatus @default(CREATED)
+
+  amountCents Int
+
+  currency String @default("USD")
+
+  rawEvent Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerPaymentId])
+  @@index([orderId, createdAt])
+}
+
+model Entitlement {
+  id String @id @default(cuid())
+
+  userId String
+  gameId String
+
+  orderItemId String?
+
+  grantedAt DateTime @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, gameId])
+  @@index([userId, revokedAt])
+}
+
+/* =========================================================
+   MODERATION
+   ========================================================= */
+
+model ContentReport {
+  id String @id @default(cuid())
+
+  reporterId String
+
+  targetType String
+  targetId String
+
+  reason ReportReason
+
+  details String?
+
+  status ModerationStatus @default(PENDING)
+
+  moderatorId String?
+
+  resolutionNote String?
+
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  reporter User @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Restrict)
+  moderator User? @relation("ModeratorReports", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+model ModerationAction {
+  id String @id @default(cuid())
+
+  moderatorId String
+
+  targetType String
+  targetId String
+
+  action String
+
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  moderator User @relation(fields: [moderatorId], references: [id], onDelete: Restrict)
+
+  @@index([targetType, targetId, createdAt])
+}
+
+/* =========================================================
+   REFERRALS
+   ========================================================= */
+
+model Referral {
+  id String @id @default(cuid())
+
+  referrerId String
+  referredId String @unique
+
+  status ReferralStatus @default(PENDING)
+
+  rewardPoints Int @default(0)
+
+  qualifiedAt DateTime?
+  rewardedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  referrer User @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Restrict)
+  referred User @relation("ReferralReferred", fields: [referredId], references: [id], onDelete: Restrict)
+
+  @@index([referrerId, status, createdAt])
+}
+
+/* =========================================================
+   RAFFLES
+   ========================================================= */
+
+model Raffle {
+  id String @id @default(cuid())
+
+  title String
+  description String?
+
+  prize String
+
+  ticketCost Int @default(0)
+
+  maxEntries Int?
+
+  status RaffleStatus @default(DRAFT)
+
+  drawAt DateTime?
+
+  winnerId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries RaffleEntry[]
+
+  winner User? @relation("RaffleWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([status, drawAt])
+  @@index([winnerId])
+}
+
+model RaffleEntry {
+  id String @id @default(cuid())
+
+  raffleId String
+  userId String
+
+  tickets Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raffleId, userId])
+  @@index([userId, createdAt])
+}
+
+/* =========================================================
+   GAMEVORTEX VIP / SUBSCRIPTIONS
+   ========================================================= */
+
+model VipPlan {
+  id String @id @default(cuid())
+
+  code String @unique
+  nameAr String
+  nameEn String
+  descriptionAr String?
+  descriptionEn String?
+
+  priceCents Int
+  currency String @default("USD")
+  durationMonths Int?
+
+  pointsMultiplier Decimal @default(1.0) @db.Decimal(5,2)
+
+  active Boolean @default(true)
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions VipSubscription[]
+  rewards VipReward[]
+
+  @@index([active, sortOrder])
+}
+
+model VipSubscription {
+  id String @id @default(cuid())
+
+  userId String
+  planId String
+
+  status VipSubscriptionStatus @default(PENDING)
+
+  startedAt DateTime?
+  expiresAt DateTime?
+
+  paymentId String? @unique
+  provider String?
+  providerSubscriptionId String?
+
+  lastRewardAt DateTime?
+  nextRewardAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan VipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  events VipSubscriptionEvent[]
+  rewards VipRewardClaim[]
+  purchase VipPurchase?
+
+  @@index([userId, status, expiresAt])
+  @@index([planId, status])
+  @@index([expiresAt, status])
+  @@index([provider, providerSubscriptionId])
+}
+
+model VipSubscriptionEvent {
+  id String @id @default(cuid())
+
+  subscriptionId String
+  type VipSubscriptionEventType
+
+  provider String?
+  providerEventId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  subscription VipSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerEventId])
+  @@index([subscriptionId, createdAt])
+  @@index([type, createdAt])
+}
+
+model VipReward {
+  id String @id @default(cuid())
+
+  planId String?
+  code String @unique
+  nameAr String
+  nameEn String
+
+  points Int @default(0)
+
+  active Boolean @default(true)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plan VipPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  claims VipRewardClaim[]
+
+  @@index([planId, active])
+}
+
+model VipRewardClaim {
+  id String @id @default(cuid())
+
+  userId String
+  rewardId String
+  subscriptionId String?
+
+  points Int @default(0)
+
+  idempotencyKey String @unique
+  claimedAt DateTime @default(now())
+  metadata Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward VipReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  subscription VipSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, claimedAt])
+  @@index([rewardId, claimedAt])
+}
+
+model VipPurchase {
+  id String @id @default(cuid())
+
+  userId String
+  subscriptionId String @unique
+
+  amountCents Int
+  currency String @default("USD")
+  provider String
+  providerPaymentId String
+
+  status PaymentStatus @default(CREATED)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subscription VipSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerPaymentId])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+/* =========================================================
+   GAMEVORTEX AI TRADING
+   ========================================================= */
+
+enum TradingAllocationStatus {
+  ACTIVE
+  RELEASED
+}
+
+enum TradingLedgerType {
+  ALLOCATION_IN
+  ALLOCATION_RETURN
+}
+
+model TradingAccount {
+  id String @id @default(cuid())
+  ownerId String @unique
+
+  balanceUsd Decimal @default(0) @db.Decimal(18,8)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  allocations TradingAllocation[]
+  ledger TradingLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TradingAllocation {
+  id String @id @default(cuid())
+  accountId String
+  sourceWalletId String
+
+  amountUsd Int
+  points Int
+  conversionRate Int
+
+  status TradingAllocationStatus @default(ACTIVE)
+  idempotencyKey String @unique
+
+  relatedTradeId String?
+  releasedAt DateTime?
+
+  account TradingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  sourceWallet OwnerWallet @relation(fields: [sourceWalletId], references: [id], onDelete: Restrict)
+
+  ledger TradingLedger[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId, status])
+  @@index([sourceWalletId])
+}
+
+model TradingLedger {
+  id String @id @default(cuid())
+  accountId String
+  allocationId String?
+
+  type TradingLedgerType
+
+  amountUsd Decimal @db.Decimal(18,8)
+  balanceBeforeUsd Decimal @db.Decimal(18,8)
+  balanceAfterUsd Decimal @db.Decimal(18,8)
+
+  relatedTradeId String?
+  status String @default("POSTED")
+
+  idempotencyKey String @unique
+  metadata Json?
+
+  account TradingAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  allocation TradingAllocation? @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([allocationId])
+}
+
+/* =========================================================
+   SHARIAH GUARD + RISK MANAGER
+   ========================================================= */
+
+enum ShariahStatus {
+  APPROVED
+  REVIEW
+  REJECTED
+}
+
+enum ShariahRuleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model ShariahPolicy {
+  id String @id @default(cuid())
+  version String @unique
+  status ShariahRuleStatus @default(ACTIVE)
+  description String
+  source String?
+  notes String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rules ShariahRule[]
+  assetProfiles AssetShariahProfile[]
+  auditLogs ShariahAuditLog[]
+
+  @@index([status, createdAt])
+}
+
+model ShariahRule {
+  id String @id @default(cuid())
+  policyId String
+  ruleKey String
+  name String
+  description String
+  status ShariahRuleStatus @default(ACTIVE)
+  source String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  policy ShariahPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([policyId, ruleKey])
+  @@index([policyId, status])
+}
+
+model AssetShariahProfile {
+  id String @id @default(cuid())
+  policyId String
+  symbol String
+  assetType String
+  issuer String?
+  businessActivity String?
+  status ShariahStatus
+  reason String
+  source String?
+  lastCheckedAt DateTime @default(now())
+  ruleVersion String
+  financialRatios Json?
+  tradingMethod String?
+  ownershipSettlementVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  policy ShariahPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([symbol, policyId])
+  @@index([symbol, status])
+  @@index([policyId, status])
+}
+
+model TradingRiskConfig {
+  id String @id @default(cuid())
+  ownerId String @unique
+  maxTradeAmountUsd Decimal @db.Decimal(18,8)
+  maxDailyLossUsd Decimal @db.Decimal(18,8)
+  maxOpenTrades Int
+  maxExposureUsd Decimal @db.Decimal(18,8)
+  maxExposurePerAssetUsd Decimal @db.Decimal(18,8)
+  maxConsecutiveLosses Int
+  requireStopLoss Boolean @default(true)
+  requireTakeProfit Boolean @default(false)
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([enabled, updatedAt])
+}
+
+model ShariahAuditLog {
+  id String @id @default(cuid())
+  actorUserId String?
+  policyId String
+  policyVersion String
+  symbol String
+  status ShariahStatus
+  reasons String[]
+  input Json
+  source String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  policy ShariahPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@index([symbol, createdAt])
+  @@index([policyId, createdAt])
+  @@index([status, createdAt])
+}
+
+model TradingControl {
+  id String @id @default(cuid())
+  ownerId String @unique
+
+  emergencyStopped Boolean @default(false)
+  emergencyStoppedAt DateTime?
+  emergencyReason String?
+  circuitBreakerReasons String[]
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AiMediaKind {
+  IMAGE
+  VIDEO
+}
+
+enum AiMediaJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AiMediaProvider {
+  FAL
+  MINIMAX
+}
+
+enum AiCreditKind {
+  CHAT
+  IMAGE
+  VIDEO
+}
+
+model AiMediaJob {
+  id String @id @default(cuid())
+  userId String
+  kind AiMediaKind
+  provider AiMediaProvider
+  providerTaskId String? @unique
+  providerFileId String?
+  model String?
+  prompt String
+  status AiMediaJobStatus @default(QUEUED)
+  resultUrl String?
+  errorCode String?
+  errorMessage String?
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
+}
+
+model AiCreditBalance {
+  id String @id @default(cuid())
+  userId String @unique
+  chatCredits Int @default(0)
+  imageCredits Int @default(0)
+  videoCredits Int @default(0)
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AiCreditLedger {
+  id String @id @default(cuid())
+  userId String
+  kind AiCreditKind
+  delta Int
+  reason String
+  referenceId String?
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, kind, createdAt])
+}
+
+/* =========================================================
+   GAMEVORTEX WALLPAPERS
+   ========================================================= */
+
+enum WallpaperMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum WallpaperModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Wallpaper {
+  id String @id @default(cuid())
+
+  titleAr String
+  titleEn String
+  slug String @unique
+
+  descriptionAr String?
+  descriptionEn String?
+
+  imageUrl String
+  thumbnailUrl String?
+  downloadUrl String?
+  originalFilename String?
+  mimeType String?
+  fileSizeBytes BigInt?
+  isAnimated Boolean @default(false)
+  mediaUrl String?
+  mediaType WallpaperMediaType @default(IMAGE)
+  durationSeconds Int?
+
+  sourceUrl String?
+  sourceProvider String?
+  licenseUrl String?
+  licenseStatus String?
+  attribution String?
+  sourceStatus SourceStatus @default(NEEDS_SOURCE)
+
+  type WallpaperType
+  orientation String @default("LANDSCAPE")
+  deviceType String @default("DESKTOP")
+  category String @default("OTHER")
+  tags String[] @default([])
+  width Int?
+  height Int?
+  resolution String?
+
+  isVip Boolean @default(false)
+  published Boolean @default(false)
+  featured Boolean @default(false)
+
+  sortOrder Int @default(0)
+
+  downloadCount Int @default(0)
+  viewCount Int @default(0)
+
+  uploadedById String?
+  moderationStatus WallpaperModerationStatus @default(APPROVED)
+  rejectionReason String?
+  reviewedById String?
+  reviewedAt DateTime?
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  favorites WallpaperFavorite[]
+  reports WallpaperReport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, published, sortOrder])
+  @@index([published, featured])
+  @@index([published, isVip, createdAt])
+  @@index([category, published])
+  @@index([deviceType, orientation, published])
+  @@index([uploadedById])
+  @@index([createdAt])
+}
+
+model WallpaperFavorite {
+  id String @id @default(cuid())
+  userId String
+  wallpaperId String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallpaper Wallpaper @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wallpaperId])
+  @@index([userId, createdAt])
+  @@index([wallpaperId, createdAt])
+}
+
+
+model WallpaperReport {
+  id String @id @default(cuid())
+  wallpaperId String
+  reporterId String
+  reason String
+  details String?
+  status String @default("PENDING")
+  resolvedById String?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallpaper Wallpaper @relation(fields: [wallpaperId], references: [id], onDelete: Cascade)
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([wallpaperId, status, createdAt])
+  @@index([reporterId, createdAt])
+}
