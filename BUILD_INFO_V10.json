@@ -1,0 +1,15 @@
+{
+  "version": "10.3-independent-store",
+  "status": "hardened-production-foundation",
+  "upgrades": [
+    "owner identity binding",
+    "session invalidation",
+    "secure registration",
+    "admin game lifecycle",
+    "source-gated publishing",
+    "expanded health checks"
+  ],
+  "database": "Prisma/PostgreSQL",
+  "runtime": "Next.js 15 + React 19",
+  "notes": "Original GameVortex visual system and independent store/rewards extensions"
+}

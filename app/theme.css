@@ -1,0 +1,259 @@
+/* =====================================================================
+   GameVortex Design System v2 — Black + Purple + Gold (Luxury Gaming)
+   Loaded LAST in layout.tsx so it re-themes every page in one place.
+   Black = base · Purple = identity · Gold = premium / CTA only.
+   ===================================================================== */
+:root{
+  color-scheme:dark;
+  /* base */
+  --bg:#050507; --bg-2:#08080D; --panel:#0B0A12; --panel2:#12101C; --panel3:#191627;
+  --ink:#F7F7FA; --muted:#8E8E9A;
+  /* purple */
+  --purple:#7C3AED; --purple-600:#6D28D9; --purple-500:#8B5CF6; --purple-400:#A855F7;
+  /* gold */
+  --gold:#F4C95D; --gold-2:#D6A83F; --gold-3:#E7B84B; --gold-4:#FFD978;
+  --emerald:#34D399; --danger:#F43F5E; --on-gold:#1a1204;
+  /* lines / glow / radius / motion */
+  --line:rgba(139,92,246,.22); --line-soft:rgba(255,255,255,.08); --line-gold:rgba(244,201,93,.45);
+  --glow-purple:0 0 0 1px rgba(139,92,246,.35),0 0 28px rgba(124,58,237,.28);
+  --glow-gold:0 0 0 1px rgba(244,201,93,.4),0 0 28px rgba(244,201,93,.22);
+  --shadow:0 18px 50px rgba(0,0,0,.6);
+  --r-sm:12px; --r-md:16px; --r-lg:22px; --r-xl:28px; --r-pill:999px;
+  --ease:.28s cubic-bezier(.2,.7,.2,1);
+  --wrap:1440px;
+  /* legacy aliases so ALL existing pages pick up the new palette */
+  --a:var(--purple-500); --b:var(--gold); --c:var(--emerald);
+  --ember:var(--purple-500); --copper:var(--gold-2); --mint:var(--emerald);
+  --on-accent:#1a1204;
+  --gv-bg:var(--bg); --gv-bg-2:var(--bg-2); --gv-panel:var(--panel); --gv-panel-strong:var(--panel2);
+  --gv-surface:var(--panel); --gv-surface-2:var(--panel2);
+  --gv-text:var(--ink); --gv-muted:var(--muted); --gv-line:var(--line); --gv-border:var(--line); --gv-header-border:var(--line);
+  --gv-cyan:var(--purple-500); --gv-neon-cyan:var(--purple-500); --gv-blue:var(--purple-600); --gv-neon-blue:var(--purple-600);
+  --gv-purple:var(--purple); --gv-purple-2:var(--purple-400); --gv-neon-purple:var(--purple-400); --gv-violet:var(--purple-500);
+  --gv-pink:var(--purple-400); --gv-neon-pink:var(--purple-400); --gv-gold:var(--gold); --gv-green:var(--emerald); --gv-orange:var(--gold-3);
+  --gv-cosmic-bg:var(--bg); --gv-cosmic-line:var(--line); --gv-cosmic-cyan:var(--purple-500); --gv-cosmic-violet:var(--purple); --gv-cosmic-orange:var(--gold);
+  --font-d:var(--font-body),"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --font-b:var(--font-body),"IBM Plex Sans Arabic",system-ui,sans-serif;
+}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--font-b);line-height:1.65;min-height:100vh;
+  background:
+   radial-gradient(900px 500px at 8% -5%,rgba(124,58,237,.20),transparent 60%),
+   radial-gradient(800px 500px at 100% 20%,rgba(124,58,237,.12),transparent 60%),
+   radial-gradient(700px 400px at 50% 110%,rgba(244,201,93,.06),transparent 60%),
+   var(--bg)}
+body:before{content:none}
+h1,h2,h3,.brand,.gv-brand-text{font-family:var(--font-d);font-weight:800;letter-spacing:0}
+::selection{background:rgba(139,92,246,.45)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+/* ---------- generic surfaces (used by every inner page) ---------- */
+.hero,.card,.stat,.glass{background:linear-gradient(180deg,rgba(18,16,28,.92),rgba(9,8,15,.92));border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);backdrop-filter:blur(10px)}
+.hero:after{content:none}
+.game-card,.card{transition:transform var(--ease),border-color var(--ease),box-shadow var(--ease)}
+.game-card:hover,.card:hover{transform:translateY(-4px);border-color:var(--purple-500);box-shadow:var(--glow-purple)}
+.btn{background:linear-gradient(180deg,var(--gold-4),var(--gold) 45%,var(--gold-2));color:var(--on-gold);border:0;border-radius:var(--r-pill);font-weight:800;box-shadow:0 8px 24px rgba(244,201,93,.22);transition:transform var(--ease),box-shadow var(--ease)}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--glow-gold)}
+.btn.secondary{background:rgba(5,5,7,.6);color:var(--ink);border:1px solid var(--purple-500);box-shadow:none}
+.btn.secondary:hover{box-shadow:var(--glow-purple)}
+.badge,.pill{background:rgba(124,58,237,.14)!important;border:1px solid var(--line)!important;color:var(--purple-400)!important;border-radius:var(--r-pill)}
+.product-price{color:var(--gold)}
+.input,.platform-chip,input,select,textarea{background:rgba(18,16,28,.9)!important;border:1px solid var(--line)!important;color:var(--ink)!important;border-radius:var(--r-sm)}
+input:focus,select:focus,textarea:focus{border-color:var(--purple-500)!important;box-shadow:var(--glow-purple)}
+.muted{color:var(--muted)}
+.language-switcher button{background:var(--panel2);border-radius:var(--r-pill);font-size:12px;padding:6px 12px}
+.language-switcher button[aria-pressed="true"]{outline:0;border-color:var(--purple-500);box-shadow:var(--glow-purple)}
+
+/* ---------- HEADER ---------- */
+.gv-header{position:sticky;top:0;z-index:60;background:rgba(5,5,7,.82);backdrop-filter:blur(16px);border:0;border-bottom:1px solid var(--line);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.gv-header::after{content:none}
+.gv-header-inner{width:min(var(--wrap),calc(100% - 24px));margin:0 auto;min-height:64px;display:flex;align-items:center;gap:14px;padding:0}
+.gv-brand{display:flex;align-items:center;gap:10px;flex:none}
+.gv-brand-mark{width:38px;height:38px;display:grid;place-items:center;border:0;background:none;box-shadow:none;filter:drop-shadow(0 0 10px rgba(139,92,246,.75))}
+.gv-brand-mark svg{width:38px;height:38px}
+.gv-brand-name{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:.2px}
+.gv-desktop-nav{display:none;align-items:center;gap:4px;flex:none}
+.gv-nav-link{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:var(--r-sm);color:var(--ink);font-size:14px;font-weight:600;border:1px solid transparent;background:none;cursor:pointer;font-family:inherit;transition:var(--ease)}
+.gv-nav-link svg{display:none}
+.gv-nav-link:hover{background:rgba(124,58,237,.14)}
+.gv-nav-link.is-active{color:#fff;background:rgba(124,58,237,.22);border-color:var(--purple-500);box-shadow:var(--glow-purple)}
+.gv-search{display:none;flex:1;max-width:520px;min-width:0;position:relative}
+.gv-search input{width:100%;height:42px;padding:0 44px 0 16px;border-radius:var(--r-pill);font:inherit;font-size:13px;background:rgba(18,16,28,.85)!important;border:1px solid var(--line)!important}
+[dir="rtl"] .gv-search input{padding:0 16px 0 44px}
+.gv-search button{position:absolute;inset-block:0;inset-inline-end:14px;background:none;border:0;color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.gv-search svg{width:18px;height:18px}
+.gv-header-actions{display:flex;align-items:center;gap:8px;margin-inline-start:auto}
+.gv-icon-button,.gv-menu-button,.gv-profile-button{position:relative;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:rgba(18,16,28,.9);border:1px solid var(--line);color:var(--ink);cursor:pointer;transition:var(--ease);padding:0}
+.gv-icon-button:hover,.gv-menu-button:hover,.gv-profile-button:hover{border-color:var(--purple-500);box-shadow:var(--glow-purple)}
+.gv-icon-button svg,.gv-menu-button svg{width:19px;height:19px}
+.gv-notification-dot{position:absolute;top:8px;inset-inline-end:9px;width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.gv-profile-button{width:auto;min-width:40px;border-radius:var(--r-pill);gap:8px;padding:0 4px}
+.gv-profile-avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--purple-400));color:#fff}
+.gv-profile-label{display:none;font-size:13px;padding-inline-end:10px}
+.gv-auth-login,.gv-auth-signup,.gv-logout-button{display:none;align-items:center;justify-content:center;height:40px;padding:0 18px;border-radius:var(--r-pill);font:inherit;font-size:13px;font-weight:800;cursor:pointer;transition:var(--ease);white-space:nowrap}
+.gv-auth-login,.gv-logout-button{color:var(--ink);background:rgba(124,58,237,.12);border:1px solid var(--purple-500)}
+.gv-auth-login:hover,.gv-logout-button:hover{box-shadow:var(--glow-purple)}
+.gv-auth-signup{color:var(--on-gold);border:0;background:linear-gradient(180deg,var(--gold-4),var(--gold) 45%,var(--gold-2))}
+.gv-auth-signup:hover{box-shadow:var(--glow-gold)}
+.language-switcher{margin:0}
+.language-switcher button{padding:5px 9px;font-size:11px}
+
+/* mobile tab strip under the header (reference: Home · Games · Apps · Marketplace · VIP · AI) */
+.gv-mobile-tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;width:min(var(--wrap),calc(100% - 24px));margin:0 auto;padding:0 0 2px}
+.gv-mobile-tabs::-webkit-scrollbar{display:none}
+.gv-mobile-tabs a{flex:1 0 auto;text-align:center;padding:10px 12px;font-size:14px;font-weight:600;color:var(--ink);border-bottom:2px solid transparent;white-space:nowrap}
+.gv-mobile-tabs a.is-active{color:var(--purple-400);border-bottom-color:var(--purple-500);text-shadow:0 0 14px rgba(139,92,246,.8)}
+.gv-menu-button{order:9}
+
+@media(min-width:1000px){
+  .gv-desktop-nav,.gv-search,.gv-auth-login,.gv-auth-signup,.gv-logout-button,.gv-profile-label{display:flex}
+  .gv-mobile-tabs,.gv-menu-button{display:none}
+  .gv-header-inner{min-height:72px}
+}
+@media(max-width:999px){.gv-header-actions .language-switcher{display:none}}
+
+/* ---------- DRAWER (all pages menu) ---------- */
+.gv-drawer{background:linear-gradient(180deg,#0B0A12,#050507);border-inline-start:1px solid var(--line);box-shadow:var(--shadow)}
+.gv-drawer-overlay.is-visible{background:rgba(5,5,7,.72);backdrop-filter:blur(4px)}
+.gv-drawer-link{border-radius:var(--r-md);color:var(--ink)}
+.gv-drawer-link.is-active{background:rgba(124,58,237,.2);border:1px solid var(--purple-500);box-shadow:var(--glow-purple)}
+.gv-drawer-icon{color:var(--purple-400)}
+.gv-drawer-kicker{color:var(--gold)}
+.gv-drawer-login,.gv-drawer-logout{border-radius:var(--r-pill);border:1px solid var(--purple-500);background:rgba(124,58,237,.14);color:var(--ink)}
+
+/* ---------- MOBILE BOTTOM NAV ---------- */
+.mobile-bottom-nav,.gv-bottom-nav{display:none}
+@media(max-width:999px){
+  body{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  .gv-bottom-nav{display:grid!important;position:fixed;inset-inline:0;bottom:0;z-index:70;margin:0;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    background:rgba(8,8,13,.92);backdrop-filter:blur(18px);border:1px solid var(--line);border-bottom:0;
+    border-radius:24px 24px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.6)}
+  .gv-bottom-nav a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px;border-radius:var(--r-md);color:var(--ink);font-size:11px;font-weight:600;transition:var(--ease)}
+  .gv-bottom-nav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .gv-bottom-nav a.active{color:#fff;background:rgba(124,58,237,.22);border:1px solid var(--purple-500);box-shadow:var(--glow-purple)}
+  .gv-bottom-nav a.premium.active{background:rgba(244,201,93,.14);border-color:var(--gold);box-shadow:var(--glow-gold);color:var(--gold)}
+}
+
+/* ---------- FOOTER ---------- */
+.gv-footer,.footer{border-top:1px solid var(--line);color:var(--muted)}
+.gv-footer strong{color:var(--ink)}
+
+/* ---------- global loader accents ---------- */
+.glitch:before{color:var(--purple-400)}.glitch:after{color:var(--gold)}
+.succes-svg{color:var(--gold)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(min-width:1000px){.gv-search-mobile{display:none}}
+.gv-nav-link{text-transform:none;letter-spacing:0;font-size:14px;min-height:0}
+.gv-nav-link.is-active:after{background:var(--purple-400);box-shadow:0 0 12px rgba(168,85,247,.8)}
+.gv-header-actions .gv-notification-button{display:grid}
+.gv-brand-mark{width:38px;height:38px;border-radius:0}
+
+/* =====================================================================
+   GameVortex Reference UI v3
+   Unified visual pass based on the approved desktop/mobile direction:
+   deep-space navy, electric purple, cyan highlights, premium gold,
+   glass panels, neon edges, compact gaming cards and responsive layouts.
+   ===================================================================== */
+:root{
+  --gv-space-0:#03040A;
+  --gv-space-1:#060817;
+  --gv-space-2:#0A0D20;
+  --gv-space-3:#10152D;
+  --gv-purple-neon:#9B4DFF;
+  --gv-purple-hot:#C15CFF;
+  --gv-cyan:#21D4FF;
+  --gv-blue:#3B82FF;
+  --gv-gold:#FFD45A;
+  --gv-gold-hot:#FFE58A;
+  --gv-glass:rgba(11,14,32,.72);
+  --gv-glass-strong:rgba(10,12,28,.92);
+  --gv-neon-border:rgba(155,77,255,.38);
+  --gv-cyan-border:rgba(33,212,255,.28);
+  --gv-gold-border:rgba(255,212,90,.38);
+  --gv-neon-shadow:0 0 0 1px rgba(155,77,255,.28),0 0 34px rgba(155,77,255,.22),0 20px 70px rgba(0,0,0,.55);
+  --gv-cyan-shadow:0 0 0 1px rgba(33,212,255,.2),0 0 28px rgba(33,212,255,.16);
+  --gv-gold-shadow:0 0 0 1px rgba(255,212,90,.28),0 0 30px rgba(255,212,90,.16);
+  --bg:var(--gv-space-0);
+  --bg-2:var(--gv-space-1);
+  --panel:var(--gv-space-2);
+  --panel2:var(--gv-space-3);
+  --purple:var(--gv-purple-neon);
+  --purple-500:var(--gv-purple-neon);
+  --purple-400:var(--gv-purple-hot);
+  --purple-600:#7135E8;
+  --gold:var(--gv-gold);
+  --gold-4:var(--gv-gold-hot);
+  --line:var(--gv-neon-border);
+  --line-soft:rgba(255,255,255,.07);
+  --line-gold:var(--gv-gold-border);
+  --a:var(--gv-purple-neon);
+  --b:var(--gv-gold);
+  --c:var(--gv-cyan);
+  --gv-neon-purple:var(--gv-purple-neon);
+  --gv-neon-pink:var(--gv-purple-hot);
+  --gv-neon-cyan:var(--gv-cyan);
+  --gv-cosmic-cyan:var(--gv-cyan);
+  --gv-cosmic-violet:var(--gv-purple-neon);
+}
+html,body{background:var(--gv-space-0)!important}
+body{
+  background:
+    radial-gradient(900px 520px at 8% -10%,rgba(155,77,255,.23),transparent 62%),
+    radial-gradient(700px 460px at 96% 10%,rgba(33,212,255,.10),transparent 64%),
+    radial-gradient(760px 460px at 50% 105%,rgba(255,212,90,.06),transparent 64%),
+    linear-gradient(180deg,var(--gv-space-0),var(--gv-space-1) 48%,var(--gv-space-0))!important;
+}
+body:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(to bottom,#000,transparent 82%)}
+
+.gv-header{background:rgba(3,4,10,.76)!important;border-bottom:1px solid rgba(155,77,255,.26)!important;box-shadow:0 12px 50px rgba(0,0,0,.5),0 0 30px rgba(155,77,255,.05)!important}
+.gv-brand-name{background:linear-gradient(90deg,#fff 15%,var(--gv-purple-hot) 58%,var(--gv-cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.gv-nav-link.is-active{background:linear-gradient(135deg,rgba(155,77,255,.24),rgba(33,212,255,.08))!important;border-color:rgba(155,77,255,.55)!important;box-shadow:var(--gv-neon-shadow)!important}
+.gv-nav-link:hover{background:rgba(155,77,255,.12)!important}
+.gv-search input{background:rgba(6,8,20,.82)!important;border-color:rgba(155,77,255,.24)!important}
+.gv-icon-button,.gv-menu-button,.gv-profile-button{background:rgba(9,12,28,.84)!important;border-color:rgba(155,77,255,.28)!important}
+.gv-icon-button:hover,.gv-menu-button:hover,.gv-profile-button:hover{border-color:var(--gv-purple-neon)!important;box-shadow:var(--gv-neon-shadow)!important}
+.gv-profile-avatar{background:linear-gradient(135deg,var(--gv-purple-neon),var(--gv-cyan))!important;box-shadow:0 0 18px rgba(155,77,255,.35)}
+.gv-auth-signup,.btn,.heroCta,.vipBtn,.dealBtn{background:linear-gradient(135deg,var(--gv-gold-hot),var(--gv-gold) 48%,#E2A928)!important;color:#171003!important;box-shadow:var(--gv-gold-shadow)!important}
+.gv-auth-login,.gv-logout-button,.btn.secondary,.heroGhost{background:rgba(155,77,255,.10)!important;border-color:rgba(155,77,255,.48)!important;color:#fff!important}
+
+.hero,.card,.stat,.glass{background:linear-gradient(145deg,rgba(15,18,42,.82),rgba(6,8,19,.94))!important;border-color:rgba(155,77,255,.28)!important;box-shadow:var(--gv-neon-shadow)!important;backdrop-filter:blur(18px)!important}
+.card:hover,.game-card:hover{border-color:rgba(193,92,255,.68)!important;box-shadow:0 0 0 1px rgba(193,92,255,.26),0 0 30px rgba(155,77,255,.22),0 20px 70px rgba(0,0,0,.55)!important}
+.badge,.pill{background:rgba(155,77,255,.12)!important;border-color:rgba(155,77,255,.32)!important;color:#DCA8FF!important}
+.input,.platform-chip,input,select,textarea{background:rgba(7,10,24,.88)!important;border-color:rgba(155,77,255,.28)!important}
+input:focus,select:focus,textarea:focus{border-color:var(--gv-purple-neon)!important;box-shadow:var(--gv-neon-shadow)!important}
+.product-price{color:var(--gv-gold)!important}
+.section-head h2,.sectionHead h2{color:#fff}
+.section-head a,.sectionHead a{color:var(--gv-cyan)!important}
+
+.gv-mobile-tabs a.is-active{color:var(--gv-cyan)!important;border-bottom-color:var(--gv-cyan)!important;text-shadow:0 0 14px rgba(33,212,255,.72)!important}
+.gv-bottom-nav a.active{background:linear-gradient(135deg,rgba(155,77,255,.24),rgba(33,212,255,.08))!important;border-color:rgba(155,77,255,.55)!important;box-shadow:var(--gv-neon-shadow)!important}
+.gv-bottom-nav a.premium.active{color:var(--gv-gold)!important;border-color:var(--gv-gold)!important;box-shadow:var(--gv-gold-shadow)!important}
+
+/* Home */
+.heroGrid .hero{border-color:rgba(155,77,255,.42)!important;box-shadow:0 0 0 1px rgba(155,77,255,.12),0 0 55px rgba(155,77,255,.20),0 28px 90px rgba(0,0,0,.62)!important}
+.heroTitle{background:linear-gradient(180deg,#fff 28%,#E7D9FF 68%,#B56AFF)!important;-webkit-background-clip:text!important;background-clip:text!important}
+.heroTag{background:linear-gradient(90deg,var(--gv-purple-hot),var(--gv-cyan),var(--gv-gold))!important;-webkit-background-clip:text!important;background-clip:text!important}
+.heroEyebrow{color:var(--gv-cyan)!important}
+.heroStat i{background:rgba(33,212,255,.10)!important;border-color:rgba(33,212,255,.24)!important;color:var(--gv-cyan)!important}
+.sideAi{border-color:rgba(33,212,255,.35)!important;background:radial-gradient(320px 200px at 88% 30%,rgba(33,212,255,.22),transparent 65%),linear-gradient(135deg,#0A0E25,#08080D)!important}
+.sideAi:hover{box-shadow:var(--gv-cyan-shadow)!important}
+.sideAi .sideBtn{border-color:var(--gv-cyan)!important;background:rgba(33,212,255,.10)!important}
+.pill:hover,.genreTile:hover,.promoCard:hover{border-color:var(--gv-purple-hot)!important;box-shadow:var(--gv-neon-shadow)!important}
+.pill svg,.categoryIcon,.platformIcon,.genreSym{color:var(--gv-cyan)!important}
+.gameRating{color:var(--gv-gold)!important}
+.vortexScore{color:var(--gv-cyan)!important}
+.vipWide{border-color:var(--gv-gold-border)!important;background:radial-gradient(520px 250px at 70% 50%,rgba(155,77,255,.34),transparent 65%),radial-gradient(360px 220px at 35% 100%,rgba(255,212,90,.20),transparent 65%),linear-gradient(135deg,#140D27,#05060D)!important}
+
+/* Generic inner pages */
+.gv-app-main{min-height:calc(100vh - 72px)}
+.page{isolation:isolate}
+button,.btn,a{transition:transform .22s cubic-bezier(.2,.7,.2,1),box-shadow .22s ease,border-color .22s ease,background .22s ease}
+button:hover:not(:disabled),a:hover{ }
+
+/* Keep mobile layouts compact like the reference boards. */
+@media(max-width:700px){
+  .wrap{width:calc(100% - 20px)!important;padding:18px 0!important}
+  .hero{border-radius:20px!important}
+  .card{border-radius:16px!important}
+}

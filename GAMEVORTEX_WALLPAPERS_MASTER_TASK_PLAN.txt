@@ -1,0 +1,618 @@
+GAMEVORTEX HUB
+WALLPAPERS + VIP + AI WALLPAPERS
+MASTER IMPLEMENTATION TASK PLAN
+
+==================================================
+IMPORTANT WORKING RULES
+==================================================
+
+1. لا تبدأ بتعديل أي ملف قبل فحص المشروع الحالي وفهم بنيته.
+2. المشروع الحالي هو Next.js + TypeScript + Prisma + PostgreSQL.
+3. يوجد بالفعل نظام Wallpapers في المشروع، لذلك لا تعيد بناء شيء موجود قبل فحصه.
+4. حافظ على الميزات الحالية التي تعمل بشكل صحيح.
+5. لا تحذف أي نظام موجود إلا إذا ثبت أنه غير مستخدم أو مكسور، وبعد توثيق السبب.
+6. لا تفترض أسماء ملفات أو Models أو APIs. افحصها أولًا.
+7. لا تستخدم API Keys أو Secrets داخل Git.
+8. جميع صلاحيات VIP يجب أن تكون Server-Side، وليس مجرد إخفاء أزرار في الواجهة.
+9. SUPER_ADMIN / OWNER يجب أن يحصل على صلاحيات Owner الحالية الموجودة في المشروع.
+10. لا تستخدم صورًا محمية بحقوق النشر أو تستخرج صورًا من تطبيقات أخرى بدون ترخيص.
+11. أي صورة يتم إدخالها إلى النظام يجب أن يكون مصدرها وترخيص استخدامها معروفين.
+12. لا تضع آلاف الصور داخل GitHub.
+13. استخدم Storage/CDN مناسبًا للصور، وقاعدة البيانات تحفظ metadata وروابط الملفات.
+14. كل مرحلة يجب اختبارها قبل الانتقال للمرحلة التالية.
+15. لا تعتبر المهمة مكتملة بمجرد أن يعمل الكود محليًا. يجب اختبار Mobile وDesktop وAuthentication وVIP وSecurity.
+16. عند تعديل ملف موجود، حافظ على بقية وظائفه ولا تستبدل المنطق السليم بلا سبب.
+17. لا تنشئ Duplicate APIs أو Duplicate Database Models إذا كان النظام الحالي يحتوي عليها.
+18. إذا وجدت تعارضًا بين النظام الحالي وهذه الخطة، افحصه أولًا وحدد الحل الأفضل قبل التنفيذ.
+19. لا تخمّن. إذا كانت معلومة غير موجودة في المشروع، ابحث عنها في الملفات أو اطلب توضيحًا.
+20. الهدف هو أعلى دقة واستقرار ممكن، مع تقليل الأخطاء قبل الانتقال بين المراحل.
+
+==================================================
+PHASE 0 — FULL PROJECT AUDIT
+==================================================
+
+TASK 0.1 — Project Structure Audit
+افحص المشروع كاملًا وحدد:
+- app/
+- components/
+- lib/
+- prisma/
+- API routes
+- authentication
+- VIP
+- admin
+- wallpapers
+- AI
+- storage
+- configuration
+لا تعدل الكود في هذه المهمة.
+OUTPUT:
+- تقرير عن البنية الحالية.
+- الملفات المتعلقة بالWallpapers.
+- الملفات المتعلقة بالVIP.
+- الملفات المتعلقة بالAuthentication.
+- الملفات المتعلقة بالAI.
+- أي تعارضات أو ملفات مكررة.
+
+TASK 0.2 — Wallpaper System Audit
+افحص:
+- /wallpapers
+- /wallpapers/[id]
+- /admin/wallpapers
+- Wallpaper APIs
+- lib/wallpapers.ts
+- Prisma Wallpaper model
+- migrations
+- download logic
+- view logic
+- favorite logic إن وجد
+حدد ما يعمل وما هو ناقص.
+لا تعيد بناء النظام من الصفر.
+
+TASK 0.3 — VIP System Audit
+افحص:
+- Prisma VIP models
+- VIP subscription
+- VIP verification
+- VIP entitlement
+- lib/vip.ts
+- VIP middleware / server checks
+- SUPER_ADMIN permissions
+- expiration handling
+تأكد من فهم الطريقة الحالية لتحديد:
+FREE
+VIP
+SUPER_ADMIN / OWNER
+
+TASK 0.4 — Security Audit
+افحص:
+- authentication
+- authorization
+- API protection
+- admin protection
+- download endpoints
+- file URLs
+- upload endpoints
+- rate limits
+- input validation
+- IDOR vulnerabilities
+- client-side trust
+أنشئ قائمة بالمشاكل قبل الإصلاح.
+
+==================================================
+PHASE 1 — WALLPAPER DATABASE ARCHITECTURE
+==================================================
+
+TASK 1.1 — Normalize Wallpaper Model
+راجع Prisma Wallpaper model الحالي.
+يجب أن يدعم على الأقل:
+id
+title
+titleAr
+titleEn
+slug
+description
+descriptionAr
+descriptionEn
+imageUrl
+thumbnailUrl
+downloadUrl
+sourceUrl
+sourceProvider
+licenseUrl
+licenseStatus
+attribution
+sourceStatus
+category
+tags
+type
+orientation
+deviceType
+width
+height
+resolution
+isVip
+isPublished
+isFeatured
+sortOrder
+viewCount
+downloadCount
+createdAt
+updatedAt
+uploadedById
+لا تضف حقولًا مكررة إذا كانت موجودة بالفعل.
+
+TASK 1.2 — Wallpaper Categories
+نظام Categories منظم وقابل للإضافة من Admin.
+الفئات الأساسية:
+Gaming, Anime, Cars, Sports, Nature, Space, Cyberpunk, Fantasy, Abstract, Arabic, Islamic, Technology, Minimal, PC, Mobile, Tablet, 4K, AI, VIP.
+
+TASK 1.3 — Wallpaper Tags
+إنشاء Tags system يدعم البحث والفلترة.
+
+==================================================
+PHASE 2 — FREE / VIP WALLPAPER SYSTEM
+==================================================
+
+TASK 2.1 — FREE/VIP Flag
+إضافة نظام isVip:
+false = FREE
+true = VIP
+ليس كل المحتوى VIP.
+
+TASK 2.2 — Server-Side VIP Protection
+حماية تحميل Wallpaper VIP من السيرفر.
+User → Request Download → Authentication → Wallpaper check → VIP entitlement → FREE allow / VIP require active VIP / SUPER_ADMIN allow → Download.
+لا تعتمد على localStorage أو frontend state أو hidden buttons.
+
+TASK 2.3 — VIP Expiration
+عند انتهاء VIP:
+- يفقد المستخدم الوصول إلى VIP Wallpapers.
+- لا تحذف بياناته أو نقاطه أو Favorites.
+- FREE Wallpapers تبقى متاحة.
+- SUPER_ADMIN / OWNER يستمر وفق نظام Owner.
+
+TASK 2.4 — VIP UI
+إظهار VIP badge للخلفيات المحمية، وتوجيه المستخدم غير VIP إلى صفحة VIP، والسماح بالتحميل للمستخدم VIP.
+
+==================================================
+PHASE 3 — WALLPAPER GALLERY
+==================================================
+
+TASK 3.1 — Desktop Gallery
+Responsive Grid + Cards + Hover + Preview + Favorite + Download + VIP Badge.
+التصميم: Dark Gaming + Glassmorphism + Neon + GameVortex style.
+
+TASK 3.2 — Mobile Gallery
+لا تستخدم Sidebar على الهاتف.
+استخدم Horizontal Category Chips + Search + Filters + Grid.
+اختبر 360px, 375px, 390px, 412px, 430px.
+لا يوجد horizontal overflow أو عناصر مكسورة.
+
+TASK 3.3 — Search
+البحث في Title وArabic title وEnglish title وTags وCategory.
+
+TASK 3.4 — Filters
+Category, Device, Orientation, Resolution, FREE/VIP, Newest, Most Viewed, Most Downloaded, Featured.
+
+TASK 3.5 — Pagination / Infinite Loading
+لا تحمل آلاف الصور دفعة واحدة. استخدم Pagination أو Infinite Scroll مع Lazy Loading.
+
+==================================================
+PHASE 4 — WALLPAPER DETAILS
+==================================================
+
+TASK 4.1 — Wallpaper Details Page
+/wallpapers/[id] تحتوي Large Preview, Title, Description, Category, Tags, Resolution, Device, Views, Downloads, Favorite, Share, Download.
+
+TASK 4.2 — Related Wallpapers
+Related by Category وRelated by Tags مع استبعاد الحالية.
+
+TASK 4.3 — Download Tracking
+زيادة downloadCount بشكل آمن من السيرفر.
+
+TASK 4.4 — View Tracking
+زيادة viewCount بطريقة آمنة ومنع التلاعب غير الضروري.
+
+==================================================
+PHASE 5 — FAVORITES
+==================================================
+
+TASK 5.1 — Favorite Wallpaper
+Add Favorite / Remove Favorite.
+
+TASK 5.2 — My Wallpapers / Favorites
+صفحة My Favorite Wallpapers مع Grid وFilters وRemove Favorite.
+
+==================================================
+PHASE 6 — ADMIN WALLPAPER MANAGER
+==================================================
+
+TASK 6.1 — Admin Wallpaper Dashboard
+/admin/wallpapers يعرض All, Published, Draft, VIP, FREE, Featured.
+
+TASK 6.2 — Add Wallpaper
+Title, Arabic Title, English Title, Description, Image, Thumbnail, Category, Tags, Resolution, Device, Orientation, VIP, Featured, Published.
+
+TASK 6.3 — Edit Wallpaper
+تعديل metadata.
+
+TASK 6.4 — Delete Wallpaper
+حذف آمن، وحذف Storage object فقط إذا كان من الآمن ذلك.
+
+TASK 6.5 — Bulk Management
+Bulk Publish, Unpublish, VIP, FREE, Delete, Category مع Confirmation للعمليات الخطيرة.
+
+==================================================
+PHASE 7 — IMAGE STORAGE
+==================================================
+
+TASK 7.1 — Storage Architecture
+لا تخزن آلاف الصور داخل GitHub. استخدم Object Storage/CDN. قاعدة البيانات تحفظ imageUrl, thumbnailUrl, downloadUrl.
+
+TASK 7.2 — Image Optimization
+Thumbnail + Web optimized image + Original، واستخدم WebP/AVIF عند الإمكان.
+
+TASK 7.3 — Lazy Loading
+الصور لا تحمل إلا عند الحاجة.
+
+TASK 7.4 — Responsive Images
+Mobile لا يحمل نسخة Desktop ضخمة.
+
+==================================================
+PHASE 8 — LARGE WALLPAPER LIBRARY
+==================================================
+
+TASK 8.1 — Initial Library
+الهدف الأول 1000+ wallpapers، لكن ليست عشوائية.
+
+TASK 8.2 — Categories Distribution
+توزيع المكتبة على Gaming, Anime, Cars, Sports, Nature, Space, Cyberpunk, Fantasy, Arabic, Islamic, Technology, Abstract, Minimal, Mobile, Desktop, AI.
+
+TASK 8.3 — License Verification
+كل صورة لها Source وLicense status وLicense URL إن وجد وAttribution إن كان مطلوبًا. لا تستخدم صورًا محمية بدون إذن.
+
+TASK 8.4 — Seed System
+إنشاء Seed/import system آمن، قابل للتكرار وIdempotent.
+
+==================================================
+PHASE 9 — AI WALLPAPER SYSTEM
+==================================================
+
+TASK 9.1 — AI Wallpaper Generator
+إضافة /ai/wallpapers أو دمجه مع GameVortex AI الحالي. المستخدم يدخل Prompt.
+
+TASK 9.2 — Device Selection
+Phone, Tablet, Desktop, Ultrawide.
+
+TASK 9.3 — AI Styles
+Gaming, Anime, Cyberpunk, Fantasy, Realistic, Minimal, Arabic, Islamic, Abstract.
+
+TASK 9.4 — AI Credits
+ربط التوليد بنظام GameVortex AI Credits الحالي وعدم السماح بتجاوز Credits.
+
+TASK 9.5 — Generated Wallpapers
+حفظ Prompt, Generated image, User, CreatedAt, Style, Resolution, Device.
+
+==================================================
+PHASE 10 — VIP AI WALLPAPERS
+==================================================
+
+TASK 10.1
+السماح لـVIP باستخدام خصائص AI إضافية حسب نظام Credits الحالي.
+
+TASK 10.2
+إنشاء AI Wallpaper styles أو resolutions خاصة بـVIP عند الحاجة.
+
+TASK 10.3
+SUPER_ADMIN / OWNER: الوصول حسب نظام Owner الحالي.
+
+==================================================
+PHASE 11 — VIDEO WALLPAPERS
+==================================================
+
+TASK 11.1
+إضافة دعم Video Wallpapers مع:
+videoUrl, thumbnailUrl, duration, resolution, orientation, deviceType, isVip.
+
+TASK 11.2
+Video Preview بدون تحميل الملف الكامل.
+
+TASK 11.3
+Video Download Protection بنفس FREE/VIP Server-Side protection.
+
+==================================================
+PHASE 12 — USER UPLOADS
+==================================================
+
+TASK 12.1
+السماح للمستخدمين برفع Wallpapers إذا كان النظام مطلوبًا.
+
+TASK 12.2
+Moderation:
+Pending, Approved, Rejected.
+لا يظهر المحتوى للعامة قبل Approved.
+
+TASK 12.3
+Attribution:
+حفظ اسم صاحب التصميم ومصدره.
+
+TASK 12.4
+Copyright Reporting:
+إضافة Report Wallpaper.
+
+==================================================
+PHASE 13 — POINTS / CREATOR SYSTEM
+==================================================
+
+TASK 13.1
+إذا تم تفعيل User Uploads، يمكن للمستخدم الحصول على Points حسب النظام الحالي عند قبول المحتوى.
+
+TASK 13.2
+لا تمنح Points بمجرد الرفع. المنح بعد Moderation/Approval.
+
+TASK 13.3
+منع Spam uploads باستخدام Rate Limits وFile Limits وValidation.
+
+==================================================
+PHASE 14 — PERFORMANCE
+==================================================
+
+TASK 14.1
+تحسين Images, API, Database queries, Indexes, Pagination.
+
+TASK 14.2
+إضافة Database indexes للحقول المستخدمة في Search, Category, VIP, Published, CreatedAt, Featured.
+
+TASK 14.3
+منع N+1 queries.
+
+TASK 14.4
+اختبار المكتبة عند 100, 1,000, 5,000, 10,000 Wallpaper records.
+
+==================================================
+PHASE 15 — SECURITY
+==================================================
+
+TASK 15.1
+اختبار Unauthorized download, VIP bypass, Admin bypass, IDOR, API abuse, Upload abuse, URL manipulation.
+
+TASK 15.2
+Server-Side validation لكل Upload, Create, Update, Delete, Download, Favorite.
+
+TASK 15.3
+Rate Limits مناسبة لـSearch, Downloads, Views, Uploads, AI generation.
+
+==================================================
+PHASE 16 — MOBILE UI
+==================================================
+
+TASK 16.1
+اختبار 360px, 375px, 390px, 412px, 430px.
+
+TASK 16.2
+No horizontal scroll, no broken grid, no oversized images, no clipped buttons, no inaccessible controls.
+
+TASK 16.3
+Mobile navigation: لا تستخدم Sidebar الخاصة بالDesktop، وضع الميزات داخل الصفحة.
+
+==================================================
+PHASE 17 — DESKTOP UI
+==================================================
+
+TASK 17.1
+اختبار 1366, 1440, 1920, 2560.
+
+TASK 17.2
+Responsive Gallery.
+
+TASK 17.3
+Hover effects لا تؤثر على الأداء.
+
+==================================================
+PHASE 18 — ACCESSIBILITY
+==================================================
+
+TASK 18.1
+Alt text, Keyboard navigation, Focus states, Accessible buttons, ARIA عند الحاجة.
+
+TASK 18.2
+دعم Arabic RTL وEnglish LTR بدون كسر التصميم.
+
+==================================================
+PHASE 19 — SEO
+==================================================
+
+TASK 19.1
+Wallpaper pages تحتوي Title, Description, Metadata, Open Graph, Canonical URL.
+
+TASK 19.2
+إضافة Structured Data عند الحاجة.
+
+==================================================
+PHASE 20 — TESTING
+==================================================
+
+TASK 20.1 — FREE User
+Browse, Search, View, Favorite, Download FREE, Attempt VIP download.
+
+TASK 20.2 — VIP User
+Browse, Search, View, Favorite, FREE download, VIP download, AI credits, VIP expiration.
+
+TASK 20.3 — SUPER_ADMIN
+Admin access, Upload, Edit, Delete, VIP management, FREE management, All Wallpapers.
+
+TASK 20.4 — Expired VIP
+VIP access removed، FREE content remains، Favorites remain، Points remain.
+
+TASK 20.5 — Mobile Testing
+اختبار حقيقي على Android.
+
+TASK 20.6 — Desktop Testing
+اختبار Chrome/Edge/Firefox إن أمكن.
+
+==================================================
+PHASE 21 — PRODUCTION CHECK
+==================================================
+
+TASK 21.1
+Run:
+TypeScript check
+ESLint
+Prisma validation
+Prisma generate
+Database migration
+Production build
+
+TASK 21.2
+لا تعتبر Build ناجحة إذا كانت هناك TypeScript errors أو Prisma errors أو Runtime errors أو Broken routes.
+
+TASK 21.3
+اختبار Production environment بدون كشف Secrets.
+
+==================================================
+PHASE 22 — FINAL AUDIT
+==================================================
+
+TASK 22.1
+مراجعة جميع الملفات التي تم تعديلها.
+
+TASK 22.2
+مراجعة Database migrations.
+
+TASK 22.3
+مراجعة Security.
+
+TASK 22.4
+مراجعة VIP.
+
+TASK 22.5
+مراجعة Mobile.
+
+TASK 22.6
+مراجعة Performance.
+
+TASK 22.7
+مراجعة حقوق وترخيص الصور.
+
+TASK 22.8
+Production build أخيرة.
+
+==================================================
+FINAL ACCEPTANCE CRITERIA
+==================================================
+
+[ ] Gallery تعمل
+[ ] Mobile يعمل
+[ ] Desktop يعمل
+[ ] Search يعمل
+[ ] Categories تعمل
+[ ] Tags تعمل
+[ ] Filters تعمل
+[ ] Pagination/Infinite loading يعمل
+[ ] Details page تعمل
+[ ] Favorites تعمل
+[ ] Downloads تعمل
+[ ] View tracking يعمل
+[ ] FREE wallpapers تعمل
+[ ] VIP wallpapers تعمل
+[ ] VIP protection Server-Side
+[ ] SUPER_ADMIN access يعمل
+[ ] Expired VIP يعمل بشكل صحيح
+[ ] Admin management يعمل
+[ ] Storage يعمل
+[ ] Image optimization تعمل
+[ ] 1000+ wallpapers يمكن إدارتها
+[ ] License metadata موجود
+[ ] AI Wallpapers تعمل إذا تم تفعيلها
+[ ] AI Credits مرتبطة بالنظام
+[ ] Video Wallpapers تعمل إذا تم تفعيلها
+[ ] Security tests ناجحة
+[ ] TypeScript ناجح
+[ ] Prisma ناجح
+[ ] Production build ناجح
+[ ] Mobile testing ناجح
+[ ] Desktop testing ناجح
+[ ] لا توجد Secrets في Git
+[ ] لا توجد صور محمية مستخدمة بدون ترخيص
+[ ] لا توجد API routes غير محمية
+[ ] لا توجد أخطاء واضحة في Console
+[ ] لا يوجد Horizontal overflow على الهاتف
+
+==================================================
+EXECUTION ORDER
+==================================================
+
+PHASE 0
+↓
+PHASE 1
+↓
+PHASE 2
+↓
+PHASE 3
+↓
+PHASE 4
+↓
+PHASE 5
+↓
+PHASE 6
+↓
+PHASE 7
+↓
+PHASE 8
+↓
+PHASE 9
+↓
+PHASE 10
+↓
+PHASE 11
+↓
+PHASE 12
+↓
+PHASE 13
+↓
+PHASE 14
+↓
+PHASE 15
+↓
+PHASE 16
+↓
+PHASE 17
+↓
+PHASE 18
+↓
+PHASE 19
+↓
+PHASE 20
+↓
+PHASE 21
+↓
+PHASE 22
+
+==================================================
+EXECUTION PROTOCOL
+==================================================
+
+قبل كل تعديل:
+1. اقرأ الملفات الحالية.
+2. افهم dependencies.
+3. حدد الملفات المتأثرة.
+4. نفذ التعديل.
+5. شغّل الاختبارات المناسبة.
+6. راجع النتائج.
+7. أصلح الأخطاء.
+8. ثم انتقل للمرحلة التالية.
+
+DO NOT:
+- Rewrite the entire project.
+- Delete working systems.
+- Duplicate existing APIs.
+- Duplicate existing database models.
+- Hardcode secrets.
+- Trust client-side VIP checks.
+- Copy copyrighted wallpaper libraries without permission.
+- Put thousands of images in GitHub.
+- Mark the project complete without testing.
+
+GOAL:
+إنشاء نظام GameVortex Wallpapers احترافي وقابل للتوسع يحتوي على FREE + VIP + AI + Video Wallpapers، مع إدارة كاملة من Admin، وحماية Server-Side، ودعم Mobile/Desktop، وقابلية التوسع إلى آلاف الصور، مع الحفاظ على الأنظمة الحالية في GameVortex وعدم كسرها.

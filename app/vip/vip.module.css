@@ -1,0 +1,67 @@
+.page{--tier:var(--muted);width:min(1120px,calc(100% - 32px));margin:0 auto;padding:32px 0 96px;display:grid;gap:56px;color:var(--ink)}
+.svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.arrowIcon{width:18px;height:18px}
+.hero{display:grid;grid-template-columns:1fr 300px;gap:40px;align-items:center;padding:56px;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.heroGlowOne,.heroGlowTwo{display:none}
+.heroBadge,.activeBadge,.freeBadge,.ownerBadge{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;color:var(--gold);font-size:13px;font-weight:500;letter-spacing:0;text-transform:none}
+.heroTitle{font-family:var(--font-d);font-weight:400;font-size:clamp(46px,7vw,88px);line-height:1.05;margin:18px 0 14px}
+.heroTitle span{color:inherit;text-shadow:none}
+.heroText{max-width:56ch;margin:0;color:var(--muted);font-size:17px}
+.heroActions{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.primaryButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 20px;border-radius:10px;background:var(--ember);color:var(--on-accent);font-weight:700;font-size:15px;border:0;box-shadow:none;transition:transform .15s}
+.primaryButton:hover{transform:translateY(-2px)}
+.largeButton{min-height:52px;padding:0 24px}
+.heroCrown{aspect-ratio:1;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;border-radius:50%;background:repeating-radial-gradient(circle,transparent 0 20px,rgba(242, 196, 78, .28) 20px 21px)}
+.crownRing{width:96px;height:96px;display:grid;place-items:center;border-radius:50%;background:var(--gold);color:var(--on-accent)}
+.crownRing .svg{width:44px;height:44px}
+.heroCrownTitle{font-family:var(--font-d);font-size:26px}
+.heroCrownText,.smallLabel{font-size:13px;color:var(--muted)}
+.accountCard,.whyCard,.benefit,.ownerCard{padding:24px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.accountHeader,.ownerTitleRow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.accountStats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px}
+.accountStats>*{padding:14px;border:1px solid var(--line);border-radius:10px}
+.plansSection,.whySection{display:grid;gap:24px}
+.sectionHeading h2{font-size:clamp(30px,4vw,44px);margin:0}
+.sectionKicker{color:var(--muted);font-size:15px;letter-spacing:0;text-transform:none}
+.plansGrid,.whyGrid,.benefits{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.planCard{position:relative;display:flex;flex-direction:column;gap:14px;padding:24px;background:var(--panel);border:1px solid var(--line);border-block-start:4px solid var(--tier);border-radius:14px}
+.free{--tier:var(--muted)}.bronze{--tier:var(--copper)}.blue{--tier:var(--mint)}.gold{--tier:var(--gold)}.purple{--tier:var(--ember)}.owner{--tier:var(--ink)}
+.planTop{display:flex;align-items:center;gap:10px}
+.planIcon,.check,.checkIcon,.benefitIcon,.ownerIcon{color:var(--tier,var(--gold))}
+.planLabel{color:var(--tier);font-size:14px;font-weight:500}
+.popularBadge{position:absolute;inset-block-start:16px;inset-inline-end:16px;padding:4px 10px;border-radius:999px;background:var(--tier);color:var(--on-accent);font-size:12px;font-weight:700}
+.priceBlock{font-family:var(--font-d);font-size:36px;line-height:1.1}
+.planDescription{margin:0;color:var(--muted);font-size:14px}
+.featureList,.ownerFeatures{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.feature{display:flex;gap:8px;color:var(--muted);font-size:14px}
+.planButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin-top:auto;border:1px solid var(--tier);border-radius:10px;background:transparent;color:var(--ink);font:inherit;font-weight:700;cursor:pointer;transition:background .15s,color .15s}
+.planButton:hover:not(:disabled){background:var(--tier);color:var(--on-accent)}
+.currentButton,.planButton:disabled{opacity:.65;cursor:default;border-style:dashed}
+.ownerContent,.ownerAccess{display:grid;gap:12px}
+.errorBox{padding:14px 16px;border:1px solid var(--ember);border-radius:10px;background:rgba(245, 196, 71, .1)}
+.loadingCard{min-height:50vh;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center}
+.loadingOrb{width:72px;height:72px;display:grid;place-items:center;border-radius:50%;background:var(--panel2);color:var(--gold);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.primaryButton:focus-visible,.planButton:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:820px){.hero{grid-template-columns:1fr;padding:28px}.heroCrown{width:220px;margin:auto}.page{gap:40px}}
+@media(prefers-reduced-motion:reduce){.loadingOrb{animation:none}.primaryButton{transition:none}}
+
+/* Reference UI v3 override */
+.hero,.accountCard,.whyCard,.benefit,.ownerCard,.planCard{background:linear-gradient(145deg,rgba(15,18,42,.86),rgba(6,8,19,.96));border-color:rgba(155,77,255,.30);box-shadow:0 0 0 1px rgba(155,77,255,.08),0 20px 65px rgba(0,0,0,.5)}
+.hero{border-radius:24px}
+.heroBadge,.activeBadge,.freeBadge,.ownerBadge{border-color:rgba(255,212,90,.34);color:#FFD45A;background:rgba(255,212,90,.06)}
+.heroTitle{background:linear-gradient(90deg,#fff,#C15CFF,#21D4FF);-webkit-background-clip:text;background-clip:text;color:transparent}
+.primaryButton{background:linear-gradient(135deg,#C15CFF,#9B4DFF);color:#fff;box-shadow:0 10px 30px rgba(155,77,255,.25)}
+.planCard:hover{transform:translateY(-4px);border-color:rgba(193,92,255,.65);box-shadow:0 0 0 1px rgba(193,92,255,.18),0 0 35px rgba(155,77,255,.20),0 22px 70px rgba(0,0,0,.55)}
+.planButton:hover:not(:disabled){background:var(--tier);box-shadow:0 0 25px color-mix(in srgb,var(--tier) 35%,transparent)}
+.loadingOrb{box-shadow:0 0 30px rgba(155,77,255,.22)}
+
+
+/* Reference rebuild palette */
+.page{background:transparent}
+.hero,.accountCard,.whyCard,.benefit,.ownerCard,.planCard{background:linear-gradient(145deg,rgba(15,18,42,.92),rgba(5,7,18,.96));border-color:rgba(139,61,255,.30);box-shadow:0 20px 70px rgba(0,0,0,.52)}
+.hero{border-color:rgba(255,212,90,.36)}
+.primaryButton{background:linear-gradient(135deg,#ffe58b,#ffd45a 48%,#dda522);color:#171004;box-shadow:0 0 0 1px rgba(255,212,90,.25),0 0 28px rgba(255,212,90,.16)}
+.planButton{border-color:rgba(139,61,255,.55);background:rgba(139,61,255,.08)}
+.planButton:hover:not(:disabled){background:#8b3dff;color:#fff;box-shadow:0 0 0 1px rgba(139,61,255,.3),0 0 28px rgba(139,61,255,.22)}
+.priceBlock{color:#ffd45a}

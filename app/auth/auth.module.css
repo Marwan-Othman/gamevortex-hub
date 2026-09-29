@@ -1,0 +1,466 @@
+/* ============================================================
+   GameVortex Hub — Auth (Login / Register) visual theme
+   Gold / amber palette, dark near-black background, glowing
+   glass card — matches the reference design (01-login.png).
+   Mobile-first: single column by default, switches to the
+   two-column "lamp + features / form" layout from the
+   reference at the md breakpoint (768px+).
+   ============================================================ */
+
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 900px 500px at 18% 8%, rgba(155, 104, 243, 0.16), transparent 60%),
+    radial-gradient(ellipse 700px 700px at 85% 90%, rgba(104, 27, 236, 0.08), transparent 65%),
+    #040306;
+  color: #E9E0F9;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px 32px;
+  gap: 28px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.brandMark {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 8px rgba(155, 104, 243, 0.65));
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.brandText strong {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.brandText strong span {
+  color: #A171F4;
+}
+
+.brandText small {
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: #825DC3;
+}
+
+.langSwitch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(161, 113, 244, 0.45);
+  border-radius: 999px;
+  padding: 6px 8px;
+  background: rgba(155, 104, 243, 0.06);
+}
+.langSwitch button {
+  background: none;
+  border: none;
+  color: #9B7AD5;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.langSwitch button[aria-pressed="true"] {
+  background: rgba(161, 113, 244, 0.18);
+  color: #B48EF6;
+  font-weight: 700;
+}
+
+.heading {
+  text-align: center;
+}
+.heading h1 {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  background: linear-gradient(135deg, #E6FBFF, #A171F4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.heading p {
+  margin: 0;
+  color: #A58CD0;
+  font-size: 13.5px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+@media (min-width: 860px) {
+  .body {
+    flex-direction: row-reverse;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 40px;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+  .heading {
+    text-align: start;
+  }
+}
+
+/* ---- glowing form card ---- */
+.cardWrap {
+  flex: 1 1 420px;
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.card {
+  position: relative;
+  border: 1px solid rgba(161, 113, 244, 0.55);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(15, 12, 22, 0.85), rgba(5, 4, 8, 0.92));
+  box-shadow: 0 0 0 1px rgba(161, 113, 244, 0.08), 0 0 40px rgba(129, 64, 240, 0.18), 0 20px 50px rgba(0, 0, 0, 0.6);
+  padding: 22px 20px 24px;
+  backdrop-filter: blur(10px);
+}
+
+.cardTab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #B48EF6;
+  border: 1px solid rgba(161, 113, 244, 0.5);
+  border-radius: 12px;
+  padding: 10px 14px;
+  width: fit-content;
+  margin-bottom: 18px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+.field label {
+  display: none;
+}
+
+.inputRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(161, 113, 244, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.inputRow:focus-within {
+  border-color: rgba(161, 113, 244, 0.85);
+  box-shadow: 0 0 0 3px rgba(161, 113, 244, 0.15);
+}
+
+.inputIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline-start: 14px;
+  color: #9B7AD5;
+  flex-shrink: 0;
+}
+
+.inputRow input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #E9E0F9;
+  padding: 13px 12px;
+  font-size: 14px;
+  min-width: 0;
+}
+.inputRow input::placeholder {
+  color: #6C5693;
+}
+
+.eyeToggle {
+  background: none;
+  border: none;
+  color: #9B7AD5;
+  padding-inline-end: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 18px;
+  font-size: 12.5px;
+  color: #A58CD0;
+}
+.checkboxRow input {
+  width: 16px;
+  height: 16px;
+  accent-color: #A171F4;
+}
+.checkboxRow a {
+  color: #B48EF6;
+}
+
+.submitBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0E0B14;
+  background: linear-gradient(135deg, #D2BBF9, #A171F4 45%, #7B38EF);
+  box-shadow: 0 8px 24px rgba(123, 55, 239, 0.35);
+  cursor: pointer;
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+.submitBtn:hover { filter: brightness(1.06); }
+.submitBtn:active { transform: translateY(1px); }
+.submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.errorText {
+  color: #96FFCA;
+  font-size: 12.5px;
+  margin: -4px 0 12px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #6C5693;
+  font-size: 12px;
+  margin: 18px 0 14px;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(161, 113, 244, 0.2);
+}
+
+.socialRow {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.socialBtn {
+  width: 52px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(161, 113, 244, 0.3);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #E9E0F9;
+}
+.socialBtn:hover { border-color: rgba(161, 113, 244, 0.7); }
+
+.switchLink {
+  text-align: center;
+  font-size: 13px;
+  color: #A58CD0;
+  margin: 0;
+}
+.switchLink a {
+  color: #B48EF6;
+  font-weight: 700;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0E0B14;
+  color: #B48EF6;
+  border: 1px solid rgba(161, 113, 244, 0.5);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  z-index: 50;
+}
+
+/* ---- decorative side: lamp + feature list ---- */
+.side {
+  flex: 1 1 360px;
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+@media (min-width: 860px) {
+  .side { align-items: flex-start; }
+}
+
+.lamp {
+  filter: drop-shadow(0 0 45px rgba(148, 93, 242, 0.55));
+}
+
+.features {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.featureIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(161, 113, 244, 0.35);
+  background: rgba(161, 113, 244, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #A171F4;
+}
+.featureText strong {
+  display: block;
+  font-size: 13.5px;
+  color: #E9E0F9;
+}
+.featureText span {
+  display: block;
+  font-size: 11.5px;
+  color: #6C5693;
+}
+
+.footer {
+  text-align: center;
+  color: #4E3973;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.footer strong {
+  color: #9B7AD5;
+  font-size: 13px;
+}
+
+/* Reference UI v3 override */
+.page{background:
+  radial-gradient(700px 420px at 15% 10%,rgba(155,77,255,.25),transparent 62%),
+  radial-gradient(520px 420px at 90% 85%,rgba(33,212,255,.10),transparent 64%),
+  linear-gradient(180deg,#03040A,#070918 55%,#03040A)!important;
+  color:#F7F8FF!important;
+}
+.card{background:linear-gradient(145deg,rgba(15,18,42,.88),rgba(5,7,18,.96))!important;border-color:rgba(155,77,255,.45)!important;box-shadow:0 0 0 1px rgba(155,77,255,.15),0 0 46px rgba(155,77,255,.20),0 28px 80px rgba(0,0,0,.65)!important}
+.brandText strong span,.heading h1{color:#C15CFF}
+.heading h1{background:linear-gradient(90deg,#fff,#C15CFF,#21D4FF)!important;-webkit-background-clip:text!important;background-clip:text!important}
+.langSwitch,.inputRow,.socialBtn{border-color:rgba(155,77,255,.34)!important;background:rgba(9,12,28,.72)!important}
+.langSwitch button[aria-pressed="true"]{background:rgba(155,77,255,.18)!important;color:#E1B8FF!important}
+.inputRow:focus-within{border-color:#9B4DFF!important;box-shadow:0 0 0 3px rgba(155,77,255,.14),0 0 26px rgba(155,77,255,.18)!important}
+.inputRow input{color:#F7F8FF!important}
+.inputRow input::placeholder{color:#7180A4!important}
+.inputIcon,.eyeToggle{color:#21D4FF!important}
+.submitBtn{background:linear-gradient(135deg,#C15CFF,#9B4DFF 48%,#7135E8)!important;color:#fff!important;box-shadow:0 12px 30px rgba(155,77,255,.34)!important}
+.featureIcon{border-color:rgba(33,212,255,.25)!important;background:rgba(33,212,255,.08)!important;color:#21D4FF!important}
+.switchLink a{color:#21D4FF!important}
+
+/* Unified premium redesign: auth must be visually part of GameVortex Hub. */
+.page {
+  background:
+    radial-gradient(700px 440px at 10% 10%, rgba(139,92,246,.20), transparent 64%),
+    radial-gradient(600px 420px at 90% 88%, rgba(244,201,93,.08), transparent 66%),
+    linear-gradient(180deg, #030305, #07070b 58%, #030305) !important;
+  color: #F8F7FB !important;
+}
+.card {
+  background: linear-gradient(145deg, rgba(18,16,28,.92), rgba(7,7,11,.96)) !important;
+  border-color: rgba(139,92,246,.34) !important;
+  box-shadow: 0 0 0 1px rgba(139,92,246,.10), 0 28px 85px rgba(0,0,0,.62) !important;
+}
+.brandText strong span { color: #A855F7 !important; }
+.brandText small { color: #F4C95D !important; }
+.langSwitch { border-color: rgba(139,92,246,.34) !important; background: rgba(12,11,18,.78) !important; }
+.langSwitch button[aria-pressed="true"] { background: rgba(139,92,246,.18) !important; color: #E7D9FF !important; }
+.heading h1 { background: linear-gradient(100deg,#fff,#cdb7ff 58%,#f4c95d) !important; -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important; }
+.inputRow { background: rgba(7,7,11,.72) !important; border-color: rgba(255,255,255,.09) !important; }
+.inputRow:focus-within { border-color: #8B5CF6 !important; box-shadow: 0 0 0 3px rgba(139,92,246,.13), 0 0 28px rgba(139,92,246,.12) !important; }
+.inputIcon,.eyeToggle { color: #A855F7 !important; }
+.submitBtn { background: linear-gradient(135deg,#A855F7,#8B5CF6 48%,#6D28D9) !important; box-shadow: 0 12px 32px rgba(109,40,217,.28) !important; }
+.featureIcon { border-color: rgba(244,201,93,.25) !important; background: rgba(244,201,93,.07) !important; color: #F4C95D !important; }
+.switchLink a { color: #F4C95D !important; }
+
+
+/* Reference rebuild: auth visual alignment */
+.page{
+  background:
+    radial-gradient(700px 500px at 10% 5%,rgba(139,61,255,.22),transparent 62%),
+    radial-gradient(600px 520px at 92% 92%,rgba(39,215,255,.09),transparent 64%),
+    linear-gradient(180deg,#03040a,#07091a 55%,#03040a);
+}
+.card{
+  border-color:rgba(139,61,255,.45);
+  background:linear-gradient(145deg,rgba(16,18,43,.91),rgba(5,7,18,.96));
+  box-shadow:0 0 0 1px rgba(139,61,255,.12),0 0 50px rgba(139,61,255,.20),0 24px 70px rgba(0,0,0,.62);
+  backdrop-filter:blur(20px);
+}
+.cardTab{
+  border-color:rgba(139,61,255,.45);
+  background:rgba(139,61,255,.08);
+  color:#d9b4ff;
+}
+.inputRow{background:rgba(4,7,19,.88);border-color:rgba(139,61,255,.30)}
+.inputRow:focus-within{border-color:#8b3dff;box-shadow:0 0 0 1px rgba(139,61,255,.28),0 0 28px rgba(139,61,255,.18)}
+.inputIcon,.eyeToggle{color:#a95cff}
+.submitBtn{
+  background:linear-gradient(135deg,#ffe58b,#ffd45a 48%,#dda522);
+  color:#171004;
+  box-shadow:0 0 0 1px rgba(255,212,90,.25),0 0 28px rgba(255,212,90,.16);
+}
+.socialBtn{background:rgba(9,11,27,.84);border-color:rgba(139,61,255,.28)}
+.socialBtn:hover{border-color:#b95cff;box-shadow:0 0 24px rgba(139,61,255,.16)}
+.langSwitch{border-color:rgba(139,61,255,.40);background:rgba(139,61,255,.06)}
+.langSwitch button[aria-pressed="true"]{background:rgba(139,61,255,.20);color:#d9b4ff}
+.brandText strong span{color:#b95cff}
+.heading h1{background:linear-gradient(180deg,#fff,#e8dcff 65%,#b95cff);-webkit-background-clip:text;background-clip:text}

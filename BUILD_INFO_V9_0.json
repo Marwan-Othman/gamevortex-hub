@@ -1,0 +1,12 @@
+{
+  "version": "V9.0 Production Readiness",
+  "status": "hardening-complete-build-not-validated",
+  "productionValidationCommand": "npm run production:validate",
+  "requirements": ["Node.js 20.9-22.x", "npm 10+", "PostgreSQL", "network access to npm registry"],
+  "notes": [
+    "Environment validation tightened.",
+    "Rate limiter cleanup added.",
+    "Smoke coverage expanded.",
+    "No claim of successful production build was made without a real dependency install and database."
+  ]
+}
