@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import type { WallpaperType } from "@prisma/client";
 import { db } from "../../lib/prisma";
 import { getOptionalUser } from "../../lib/auth";
 import { getVipAccess } from "../../lib/vip";
@@ -17,7 +18,7 @@ export default async function Wallpapers({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const user = await getOptionalUser();
   const vip = user ? await getVipAccess(user.id) : null;
-  const type = params.type === "MOBILE" || params.type === "DESKTOP" ? params.type : undefined;
+  const type: WallpaperType | undefined = params.type === "MOBILE" ? "MOBILE" : params.type === "DESKTOP" ? "DESKTOP" : undefined;
   const category = params.category?.trim().toUpperCase() || undefined;
   const q = params.q?.trim().slice(0, 80) || undefined;
   const access = params.access === "VIP" ? true : params.access === "FREE" ? false : undefined;

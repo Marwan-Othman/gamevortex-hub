@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const user = await getOptionalUser();
   if (!user) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const body = bodySchema.parse(await req.json());
-  return NextResponse.json({ error: 'AI_MEDIA_PROVIDERS_DISABLED' }, { status: 503 });
+  if (process.env.AI_MEDIA_ENABLED !== 'true') return NextResponse.json({ error: 'AI_MEDIA_PROVIDERS_DISABLED' }, { status: 503 });
 
   const access = await getVipAccess(user.id);
   const kind = body.kind === 'IMAGE' ? AiCreditKind.IMAGE : AiCreditKind.VIDEO;
