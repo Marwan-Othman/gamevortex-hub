@@ -43,9 +43,51 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
       <div style={{ marginBottom: 18 }}><Link href="/wallpapers" className="btn">← <LocaleText ar="العودة للخلفيات" en="Back to wallpapers" /></Link></div>
 
       <section className="glass card">
-        <div className="wallpaper-detail-grid">
-          <div className="wallpaper-detail-media">
-            {wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? <video src={wallpaper.mediaUrl} poster={wallpaper.imageUrl} controls playsInline preload="metadata" style={{ display: "block", width: "100%", maxHeight: "78vh", objectFit: "contain", borderRadius: 14, background: "rgba(0,0,0,.25)" }} /> : <img src={wallpaper.imageUrl} alt={wallpaper.titleEn} fetchPriority="high" style={{ display: "block", width: "100%", maxHeight: "78vh", objectFit: "contain", borderRadius: 14, background: "rgba(0,0,0,.25)" }} />}
+        <div style={{ display: "grid", gap: 18 }}>
+          <div className="wallpaper-detail-media" style={{ width: "100%" }}>
+            {wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? (
+              <video
+                src={wallpaper.mediaUrl}
+                poster={wallpaper.imageUrl}
+                controls
+                playsInline
+                preload="metadata"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  maxHeight: "82vh",
+                  objectFit: "contain",
+                  borderRadius: 16,
+                  background: "rgba(0,0,0,.25)",
+                }}
+              />
+            ) : (
+              <img
+                src={wallpaper.imageUrl}
+                alt={wallpaper.titleEn}
+                fetchPriority="high"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  maxHeight: "82vh",
+                  objectFit: "contain",
+                  borderRadius: 16,
+                  background: "rgba(0,0,0,.25)",
+                }}
+              />
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {user && <FavoriteButton wallpaperId={wallpaper.id} initialFavorited={Boolean(favorite)} />}
+            {canDownload ? (
+              <a href={`/api/wallpapers/${wallpaper.id}/download`} className="btn">
+                ↓ تحميل مباشر من GameVortex
+              </a>
+            ) : (
+              <Link href="/vip" className="btn">💎 افتح VIP للتحميل</Link>
+            )}
+            <Link href="/wallpapers" className="btn secondary">استكشف المزيد</Link>
           </div>
 
           <div>
@@ -67,11 +109,6 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
 
             {wallpaper.tags.length > 0 && <div className="platform-list" style={{ marginTop: 14 }}>{wallpaper.tags.map(tag => <span className="badge" key={tag}>#{tag}</span>)}</div>}
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 20 }}>
-              {user && <FavoriteButton wallpaperId={wallpaper.id} initialFavorited={Boolean(favorite)} />}
-              {canDownload ? <a href={`/api/wallpapers/${wallpaper.id}/download`} className="btn">↓ تحميل الخلفية</a> : <Link href="/vip" className="btn">💎 افتح VIP للتحميل</Link>}
-              <Link href="/wallpapers" className="btn secondary">استكشف المزيد</Link>
-            </div>
             {!canDownload && <p className="muted" style={{ marginTop: 10 }}>هذه الخلفية مخصصة لأعضاء VIP. التحقق يتم على الخادم عند التحميل.</p>}
           </div>
         </div>

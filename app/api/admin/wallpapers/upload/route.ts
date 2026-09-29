@@ -10,14 +10,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const user = await getOptionalUser();
-  if (user?.role !== "SUPER_ADMIN") {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
   try {
     const body = (await request.json()) as HandleUploadBody;
 
@@ -26,8 +18,16 @@ export async function POST(request: NextRequest) {
       request,
       body,
       onBeforeGenerateToken: async (pathname) => {
-        const prefix = `wallpapers/${user.id}/`;
-        if (!pathname.startsWith(prefix)) {
+        // Auth is checked here (not at the top of the route) because Vercel
+        // calls this same endpoint server-to-server with "blob.upload-completed"
+        // and that request has no user session. handleUpload verifies that
+        // callback's signature itself.
+        const user = await getOptionalUser();
+        if (user?.role !== "SUPER_ADMIN") {
+          throw new Error("UNAUTHORIZED");
+        }
+
+        if (!pathname.startsWith("wallpapers/") || pathname.includes("..")) {
           throw new Error("INVALID_WALLPAPER_UPLOAD_PATH");
         }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Upload authorization failed",
       },
-      { status: 400 },
+      { status: error instanceof Error && error.message === "UNAUTHORIZED" ? 401 : 400 },
     );
   }
 }

@@ -1,6 +1,8 @@
 import { del, put } from "@vercel/blob";
 
-export const WALLPAPER_MAX_FILE_SIZE = 100 * 1024 * 1024;
+// No app-level size cap. 5 TB is Vercel Blob's own hard ceiling, kept only
+// because handleUpload requires a number.
+export const WALLPAPER_MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024 * 1024;
 
 export const WALLPAPER_IMAGE_MIME_TYPES = [
   "image/jpeg",

@@ -56,12 +56,17 @@ function isPrivateIpv4(ip: string) {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224 ||
     a === 0
   );
 }
 
 function isPrivateIpv6(ip: string) {
   const value = ip.toLowerCase();
+  const mapped = value.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapped) return isPrivateIpv4(mapped[1]);
   return (
     value === "::1" ||
     value === "::" ||
@@ -111,7 +116,7 @@ async function importRemoteWallpaper(sourceUrl: string) {
       method: "GET",
       redirect: "manual",
       cache: "no-store",
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(300_000),
       headers: {
         accept: "image/jpeg,image/png,image/webp,image/gif,image/apng,image/avif;q=0.9,*/*;q=0.1",
         "user-agent": "GameVortex-Wallpaper-Importer/1.0",
@@ -135,25 +140,34 @@ async function importRemoteWallpaper(sourceUrl: string) {
   const contentType = (response.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
   if (!isSupportedWallpaperMimeType(contentType)) throw new Error("IMAGE_SOURCE_TYPE_NOT_SUPPORTED");
 
-  const length = Number(response.headers.get("content-length") || 0);
-  if (length > WALLPAPER_MAX_FILE_SIZE) throw new Error("IMAGE_FILE_TOO_LARGE");
+  if (!response.body) throw new Error("IMAGE_FILE_EMPTY");
 
-  const bytes = await response.arrayBuffer();
-  if (bytes.byteLength === 0) throw new Error("IMAGE_FILE_EMPTY");
-  if (bytes.byteLength > WALLPAPER_MAX_FILE_SIZE) throw new Error("IMAGE_FILE_TOO_LARGE");
+  // Stream straight into Blob (no size cap, no full-file buffering in memory)
+  // while counting the bytes so the real size is stored.
+  let size = 0;
+  const counter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      size += chunk.byteLength;
+      controller.enqueue(chunk);
+    },
+  });
 
   const filename = filenameFromUrl(sourceUrl, `wallpaper-${Date.now()}`);
   const stored = await storeWallpaperFile({
     pathname: `wallpapers/imported/${Date.now()}-${sanitizeWallpaperFilename(filename)}`,
-    file: bytes,
+    file: response.body.pipeThrough(counter),
     contentType,
   });
+  if (size === 0) {
+    await del(stored.url).catch(() => undefined);
+    throw new Error("IMAGE_FILE_EMPTY");
+  }
 
   return {
     url: stored.url,
     filename,
     mimeType: contentType,
-    size: bytes.byteLength,
+    size,
     isAnimated: isAnimatedWallpaperMimeType(contentType),
     sourceUrl,
   };

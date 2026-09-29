@@ -39,7 +39,6 @@ type FormState = {
   featured: boolean;
 };
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 const emptyForm: FormState = {
   sourceMode: "IMAGE",
@@ -128,10 +127,10 @@ export default function WallpaperAdminClient({
       return;
     }
 
-    if (nextFile.size <= 0 || nextFile.size > MAX_FILE_SIZE) {
+    if (nextFile.size <= 0) {
       setFile(null);
       setPreviewUrl("");
-      setMessage("حجم الصورة يجب ألا يتجاوز 100MB.");
+      setMessage("الملف فاضي أو تالف.");
       return;
     }
 
@@ -161,7 +160,6 @@ export default function WallpaperAdminClient({
       if (form.inputMode === "FILE") {
         if (!file) throw new Error("اختر صورة من الهاتف أولًا.");
         if (!file.type.startsWith("image/")) throw new Error("صيغة الصورة غير مدعومة.");
-        if (file.size > MAX_FILE_SIZE) throw new Error("حجم الصورة أكبر من 100MB.");
 
         const blob = await upload(
           `wallpapers/${Date.now()}-${crypto.randomUUID()}-${safeFileName(file.name)}`,
@@ -302,7 +300,7 @@ export default function WallpaperAdminClient({
                 />
               </label>
               <p className="muted" style={{ fontSize: 13 }}>
-                الحد الأقصى 100MB. JPG / PNG / WebP / GIF / APNG / AVIF حسب نوع الصورة.
+                بدون حد أقصى للحجم. JPG / PNG / WebP / GIF / APNG / AVIF حسب نوع الصورة.
               </p>
             </div>
           ) : (
