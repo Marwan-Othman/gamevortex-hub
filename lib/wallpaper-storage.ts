@@ -68,7 +68,7 @@ export async function storeWallpaperFile({
 }
 
 export async function deleteWallpaperStoredFile(url: string | null | undefined) {
-  if (!isVercelBlobUrl(url)) return;
+  if (!url || !isVercelBlobUrl(url)) return;
   try {
     await del(url);
   } catch (error) {
