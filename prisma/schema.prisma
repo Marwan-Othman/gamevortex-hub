@@ -148,6 +148,11 @@ model User {
 
   raffleEntries RaffleEntry[]
   raffleWins Raffle[] @relation("RaffleWinner")
+  raffleEntryRequests RaffleEntryRequest[]
+  apiKeys GameVortexApiKey[]
+  apiAccessPurchases ApiAccessPurchase[]
+  supportTickets SupportTicket[] @relation("SupportRequester")
+  supportMessages SupportMessage[] @relation("SupportAuthor")
 
   entitlements Entitlement[]
 
@@ -949,6 +954,7 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   REFUNDED
+  NOT_REQUIRED
 }
 
 enum VipSubscriptionStatus {
@@ -1030,6 +1036,8 @@ model GameProduct {
   sourceUrl String?
 
   supplierVerified Boolean @default(false)
+
+  rewardPoints Int?
 
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
@@ -1258,6 +1266,7 @@ model Raffle {
   updatedAt DateTime @updatedAt
 
   entries RaffleEntry[]
+  entryRequests RaffleEntryRequest[]
 
   winner User? @relation("RaffleWinner", fields: [winnerId], references: [id], onDelete: SetNull)
 
@@ -1277,6 +1286,7 @@ model RaffleEntry {
 
   raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requests RaffleEntryRequest[]
 
   @@unique([raffleId, userId])
   @@index([userId, createdAt])
@@ -1831,4 +1841,152 @@ model WallpaperReport {
 
   @@index([wallpaperId, status, createdAt])
   @@index([reporterId, createdAt])
+}
+
+/* =========================================================
+   RAFFLE ENTRY REQUESTS (idempotency)
+   ========================================================= */
+
+model RaffleEntryRequest {
+  id String @id @default(cuid())
+
+  userId String
+  raffleId String
+  raffleEntryId String
+
+  tickets Int
+  pointsCharged Int @default(0)
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  raffleEntry RaffleEntry @relation(fields: [raffleEntryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([raffleId, createdAt])
+}
+
+/* =========================================================
+   PRIVATE API KEYS
+   ========================================================= */
+
+enum ApiAccessPurchaseStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model GameVortexApiKey {
+  id String @id @default(cuid())
+
+  userId String
+
+  label String @db.VarChar(80)
+  prefix String @db.VarChar(24)
+  secretHash String @unique @db.VarChar(64)
+
+  requiresPurchase Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  lastUsedAt DateTime?
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestLogs GameVortexApiRequestLog[]
+
+  @@index([userId, revokedAt, createdAt])
+}
+
+model ApiAccessPurchase {
+  id String @id @default(cuid())
+
+  userId String
+
+  amountCents Int @default(1000)
+  currency String @default("USD") @db.VarChar(3)
+
+  status ApiAccessPurchaseStatus @default(PENDING)
+
+  provider String?
+  providerPaymentId String?
+  providerCheckoutUrl String?
+
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerPaymentId])
+  @@index([userId, status, createdAt])
+}
+
+model GameVortexApiRequestLog {
+  id String @id @default(cuid())
+
+  apiKeyId String
+
+  route String @db.VarChar(100)
+  status Int
+
+  createdAt DateTime @default(now())
+
+  apiKey GameVortexApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@index([createdAt])
+}
+
+/* =========================================================
+   SUPPORT TICKETS
+   ========================================================= */
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id String @id @default(cuid())
+
+  requesterId String
+
+  subject String @db.VarChar(160)
+  status SupportTicketStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  resolvedAt DateTime?
+
+  requester User @relation("SupportRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([requesterId, updatedAt])
+  @@index([status, updatedAt])
+}
+
+model SupportMessage {
+  id String @id @default(cuid())
+
+  ticketId String
+  authorId String?
+
+  authorRole Role
+  body String
+
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User? @relation("SupportAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([authorId, createdAt])
 }
