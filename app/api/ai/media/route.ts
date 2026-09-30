@@ -26,6 +26,14 @@ function errorStatus(code: string) {
     case "GEMINI_IMAGE_TIMEOUT":
       return 504;
 
+    case "GEMINI_IMAGE_BILLING_REQUIRED":
+      return 402;
+
+    case "GEMINI_IMAGE_GENERATION_FAILED":
+    case "GEMINI_IMAGE_NOT_RETURNED":
+    case "GEMINI_INVALID_RESPONSE":
+      return 502;
+
     case "AI_VIDEO_GENERATION_NOT_ENABLED":
       return 503;
 
@@ -42,31 +50,22 @@ function serializeError(error: unknown) {
   return "AI_MEDIA_GENERATION_FAILED";
 }
 
-function dataUrlToBuffer(
-  dataUrl: string,
-) {
+function dataUrlToBuffer(dataUrl: string) {
   const match = dataUrl.match(
     /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/,
   );
 
   if (!match) {
-    throw new Error(
-      "AI_IMAGE_INVALID_DATA",
-    );
+    throw new Error("AI_IMAGE_INVALID_DATA");
   }
 
   const mimeType = match[1];
   const base64 = match[2];
 
-  const buffer = Buffer.from(
-    base64,
-    "base64",
-  );
+  const buffer = Buffer.from(base64, "base64");
 
   if (!buffer.length) {
-    throw new Error(
-      "AI_IMAGE_EMPTY",
-    );
+    throw new Error("AI_IMAGE_EMPTY");
   }
 
   return {
@@ -75,9 +74,7 @@ function dataUrlToBuffer(
   };
 }
 
-function extensionForMimeType(
-  mimeType: string,
-) {
+function extensionForMimeType(mimeType: string) {
   switch (mimeType) {
     case "image/jpeg":
       return "jpg";
@@ -94,10 +91,7 @@ function extensionForMimeType(
   }
 }
 
-function createBlobPath(
-  userId: string,
-  extension: string,
-) {
+function createBlobPath(userId: string, extension: string) {
   return [
     "ai",
     "generated",
@@ -106,9 +100,7 @@ function createBlobPath(
   ].join("/");
 }
 
-export async function GET(
-  req: NextRequest,
-) {
+export async function GET(req: NextRequest) {
   const user = await getOptionalUser();
 
   if (!user) {
@@ -122,10 +114,9 @@ export async function GET(
     );
   }
 
-  const conversationId =
-    req.nextUrl.searchParams.get(
-      "conversationId",
-    );
+  const conversationId = req.nextUrl.searchParams.get(
+    "conversationId",
+  );
 
   if (!conversationId) {
     return NextResponse.json({
@@ -133,35 +124,32 @@ export async function GET(
     });
   }
 
-  const jobs =
-    await db.aiMediaJob.findMany({
-      where: {
-        userId: user.id,
-        conversationId,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-      take: 100,
-      select: {
-        id: true,
-        kind: true,
-        status: true,
-        prompt: true,
-        resultUrl: true,
-        errorMessage: true,
-        createdAt: true,
-      },
-    });
+  const jobs = await db.aiMediaJob.findMany({
+    where: {
+      userId: user.id,
+      conversationId,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    take: 100,
+    select: {
+      id: true,
+      kind: true,
+      status: true,
+      prompt: true,
+      resultUrl: true,
+      errorMessage: true,
+      createdAt: true,
+    },
+  });
 
   return NextResponse.json({
     jobs,
   });
 }
 
-export async function POST(
-  req: NextRequest,
-) {
+export async function POST(req: NextRequest) {
   const user = await getOptionalUser();
 
   if (!user) {
@@ -190,10 +178,7 @@ export async function POST(
     );
   }
 
-  if (
-    !body ||
-    typeof body !== "object"
-  ) {
+  if (!body || typeof body !== "object") {
     return NextResponse.json(
       {
         error: "INVALID_REQUEST",
@@ -204,8 +189,7 @@ export async function POST(
     );
   }
 
-  const input =
-    body as Record<string, unknown>;
+  const input = body as Record<string, unknown>;
 
   const kind =
     typeof input.kind === "string"
@@ -262,14 +246,10 @@ export async function POST(
     );
   }
 
-  if (
-    prompt.length >
-    MAX_PROMPT_LENGTH
-  ) {
+  if (prompt.length > MAX_PROMPT_LENGTH) {
     return NextResponse.json(
       {
-        error:
-          "AI_IMAGE_PROMPT_TOO_LONG",
+        error: "AI_IMAGE_PROMPT_TOO_LONG",
       },
       {
         status: 400,
@@ -277,16 +257,11 @@ export async function POST(
     );
   }
 
-  /*
-   * Prevent duplicate requests from creating
-   * multiple Gemini generations.
-   */
-  const existing =
-    await db.aiMediaJob.findUnique({
-      where: {
-        idempotencyKey,
-      },
-    });
+  const existing = await db.aiMediaJob.findUnique({
+    where: {
+      idempotencyKey,
+    },
+  });
 
   if (existing) {
     return NextResponse.json({
@@ -295,39 +270,29 @@ export async function POST(
         kind: existing.kind,
         status: existing.status,
         prompt: existing.prompt,
-        resultUrl:
-          existing.resultUrl,
-        errorMessage:
-          existing.errorMessage,
-        createdAt:
-          existing.createdAt,
+        resultUrl: existing.resultUrl,
+        errorMessage: existing.errorMessage,
+        createdAt: existing.createdAt,
       },
     });
   }
 
-  /*
-   * Make sure the conversation belongs to
-   * the current authenticated user.
-   */
   if (conversationId) {
     const conversation =
-      await db.gameVortexAiConversation.findFirst(
-        {
-          where: {
-            id: conversationId,
-            userId: user.id,
-          },
-          select: {
-            id: true,
-          },
+      await db.gameVortexAiConversation.findFirst({
+        where: {
+          id: conversationId,
+          userId: user.id,
         },
-      );
+        select: {
+          id: true,
+        },
+      });
 
     if (!conversation) {
       return NextResponse.json(
         {
-          error:
-            "CONVERSATION_NOT_FOUND",
+          error: "CONVERSATION_NOT_FOUND",
         },
         {
           status: 404,
@@ -336,67 +301,65 @@ export async function POST(
     }
   }
 
-  /*
-   * Create the job before calling Gemini.
-   *
-   * The database remains the source of truth for
-   * the generation lifecycle.
-   */
-  const job =
-    await db.aiMediaJob.create({
-      data: {
-        userId: user.id,
-        kind: "IMAGE",
-        provider: "INTERNAL",
-        model:
-          process.env.GEMINI_IMAGE_MODEL?.trim() ||
-          "gemini-3.1-flash-image",
-        prompt,
-        status: "PROCESSING",
-        conversationId,
-        idempotencyKey,
-      },
-    });
+  const job = await db.aiMediaJob.create({
+    data: {
+      userId: user.id,
+      kind: "IMAGE",
+      provider: "INTERNAL",
+      model:
+        process.env.GEMINI_IMAGE_MODEL?.trim() ||
+        "gemini-3.1-flash-image",
+      prompt,
+      status: "PROCESSING",
+      conversationId,
+      idempotencyKey,
+    },
+  });
 
   try {
-    const result =
-      await generateImage(
-        prompt,
-        aspectRatio,
-      );
+    const result = await generateImage(
+      prompt,
+      aspectRatio,
+    );
 
     const {
       buffer,
       mimeType,
-    } = dataUrlToBuffer(
-      result.url,
-    );
+    } = dataUrlToBuffer(result.url);
 
     const extension =
-      extensionForMimeType(
-        mimeType,
-      );
+      extensionForMimeType(mimeType);
 
-    /*
-     * Store the generated image in Vercel Blob.
-     *
-     * The Gemini API key never reaches the browser.
-     */
-    const blob =
-      await put(
-        createBlobPath(
-          user.id,
-          extension,
-        ),
-        buffer,
-        {
-          access: "public",
-          addRandomSuffix: true,
-          contentType: mimeType,
-          cacheControlMaxAge:
-            31536000,
-        },
-      );
+    let resultUrl = result.url;
+
+    if (
+      process.env.BLOB_READ_WRITE_TOKEN?.trim()
+    ) {
+      try {
+        const blob = await put(
+          createBlobPath(
+            user.id,
+            extension,
+          ),
+          buffer,
+          {
+            access: "public",
+            addRandomSuffix: true,
+            contentType: mimeType,
+            cacheControlMaxAge: 31536000,
+          },
+        );
+
+        resultUrl = blob.url;
+      } catch (blobError) {
+        console.warn(
+          "GameVortex AI Blob storage unavailable; using data URL fallback:",
+          blobError instanceof Error
+            ? blobError.message
+            : "UNKNOWN_ERROR",
+        );
+      }
+    }
 
     const completed =
       await db.aiMediaJob.update({
@@ -405,7 +368,7 @@ export async function POST(
         },
         data: {
           status: "COMPLETED",
-          resultUrl: blob.url,
+          resultUrl,
           providerTaskId:
             result.requestId,
           model: result.model,
