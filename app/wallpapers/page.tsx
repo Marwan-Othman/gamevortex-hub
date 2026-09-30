@@ -84,20 +84,15 @@ export default async function Wallpapers({ searchParams }: { searchParams: Promi
 
       <section className="grid" style={{ marginTop: 20 }}>
         {wallpapers.map((wallpaper) => {
-          const isMobile = wallpaper.type === "MOBILE";
-          return <Link key={wallpaper.id} href={`/wallpapers/${wallpaper.id}`} className="glass card game-card" style={{ overflow: "hidden", padding: 0 }}>
-            <div style={{ position: "relative", width: "100%", overflow: "hidden", background: "rgba(255,255,255,0.04)" }}>
-              {wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? <video src={wallpaper.mediaUrl} poster={wallpaper.thumbnailUrl || wallpaper.imageUrl} muted playsInline preload="metadata" style={{ display: "block", width: "100%", aspectRatio: wallpaper.width && wallpaper.height ? `${wallpaper.width} / ${wallpaper.height}` : isMobile ? "9 / 16" : "16 / 9", objectFit: "contain", background: "rgba(0,0,0,.28)" }} /> : <img src={wallpaper.thumbnailUrl || wallpaper.imageUrl} alt={wallpaper.titleEn} loading="lazy" decoding="async" style={{ display: "block", width: "100%", aspectRatio: wallpaper.width && wallpaper.height ? `${wallpaper.width} / ${wallpaper.height}` : isMobile ? "9 / 16" : "16 / 9", objectFit: "contain", background: "rgba(0,0,0,.28)" }} />}
+          const ratio = wallpaper.width && wallpaper.height ? `${wallpaper.width} / ${wallpaper.height}` : undefined;
+          const mediaStyle = { display: "block", width: "100%", height: "auto", aspectRatio: ratio, objectFit: "cover", background: "rgba(0,0,0,.28)" } as const;
+          return <Link key={wallpaper.id} href={`/wallpapers/${wallpaper.id}`} aria-label={wallpaper.titleAr || wallpaper.titleEn} className="glass card game-card" style={{ overflow: "hidden", padding: 0, alignSelf: "start" }}>
+            <div style={{ position: "relative", width: "100%", overflow: "hidden" }}>
+              {wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? <video src={wallpaper.mediaUrl} poster={wallpaper.thumbnailUrl || wallpaper.imageUrl} muted playsInline preload="metadata" style={mediaStyle} /> : <img src={wallpaper.thumbnailUrl || wallpaper.imageUrl} alt={wallpaper.titleEn} loading="lazy" decoding="async" style={mediaStyle} />}
               <div style={{ position: "absolute", inset: "12px 12px auto", display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                <span className="badge">{isMobile ? "📱 MOBILE" : "🖥️ DESKTOP"}</span>
                 {wallpaper.isVip && <span className="badge">💎 VIP</span>} {wallpaper.isAnimated && <span className="badge">🎞️ متحركة</span>} {wallpaper.mediaType === "VIDEO" && <span className="badge">🎬 VIDEO</span>}
                 {wallpaper.featured && <span className="badge">⭐ FEATURED</span>}
               </div>
-            </div>
-            <div style={{ padding: 16 }}>
-              <LocaleText as="h2" ar={wallpaper.titleAr} en={wallpaper.titleEn} />
-              <p className="muted" style={{ marginTop: 8 }}>{wallpaper.category} · 👁️ {wallpaper.viewCount} · ↓ {wallpaper.downloadCount}</p>
-              {wallpaper.tags.length > 0 && <div className="platform-list" style={{ marginTop: 8 }}><span className="badge">#{wallpaper.tags[0]}</span><span className="badge">{wallpaper.tags.length} tags</span></div>}
             </div>
           </Link>;
         })}
