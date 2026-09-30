@@ -17,6 +17,8 @@ const NAV_LINKS = [
   { href: "/apps", label: "Apps", icon: GridIcon },
   { href: "/vip", label: "VIP", icon: CrownIcon },
   { href: "/marketplace", label: "Store", icon: StoreIcon },
+  { href: "/api-access", label: "Developer API", icon: ShieldIcon },
+  { href: "/support", label: "Support", icon: ShieldIcon },
   { href: "/library", label: "Library", icon: LibraryIcon },
   { href: "/wallet", label: "Wallet", icon: WalletIcon },
   { href: "/gift-cards", label: "Gift Cards", icon: GiftCardIcon },

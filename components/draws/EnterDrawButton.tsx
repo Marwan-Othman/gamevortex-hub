@@ -23,10 +23,10 @@ export default function EnterDrawButton({ raffleId, ticketCost, userPoints, alre
     try {
       const response = await fetch(`/api/draws/${encodeURIComponent(raffleId)}/enter`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({ tickets: 1 }),
       });
-      const data = await response.json() as { entry?: { tickets: number } } & { error?: string };
+      const data = await response.json() as { entry?: { tickets: number }; replayed?: boolean } & { error?: string };
       if (!response.ok) {
         const messages: Record<string, string> = {
           UNAUTHORIZED: "سجّل الدخول أولًا للمشاركة في السحب.",
@@ -39,7 +39,7 @@ export default function EnterDrawButton({ raffleId, ticketCost, userPoints, alre
         return;
       }
       setTickets(data.entry?.tickets ?? tickets + 1);
-      setPoints((current) => current - ticketCost);
+      if (!data.replayed) setPoints((current) => current - ticketCost);
       setMessage("تم تسجيل تذكرتك بنجاح!");
     } catch {
       setMessage("تعذر الاتصال بالخادم. تحقق من اتصالك وحاول مجددًا.");

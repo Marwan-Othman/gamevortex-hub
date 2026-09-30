@@ -55,9 +55,9 @@ export default async function Marketplace() {
               </div>
               <h2>{product.title}</h2>
               <p className="muted">{product.game.titleAr || product.game.titleEn}</p>
-              <div className="product-price">{(product.priceCents / 100).toFixed(2)} {product.currency}</div>
+              <div className="product-price">{product.priceCents === 0 ? "مجاني · +10 نقاط" : `${(product.priceCents / 100).toFixed(2)} ${product.currency}`}</div>
               <p className="muted">تسليم رقمي عبر مفتاح تفعيل. تحقق من المنطقة والمنصة قبل إتمام الدفع.</p>
-              <BuyNowButton productId={product.id} productTitle={product.title} />
+              <BuyNowButton productId={product.id} productTitle={product.title} priceCents={product.priceCents} />
             </article>
           ))}
 

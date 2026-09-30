@@ -51,7 +51,7 @@
     "zod": "4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.17.30",
+    "@types/node": "^22.20.4",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "eslint": "^9.36.0",

@@ -39,6 +39,14 @@ const updateSchema = z
       .max(100000000)
       .optional(),
 
+    rewardPoints: z
+      .number()
+      .int()
+      .min(0)
+      .max(100000000)
+      .nullable()
+      .optional(),
+
     currency: z
       .string()
       .trim()
@@ -349,6 +357,7 @@ export async function PATCH(
       title?: string;
       description?: string | null;
       priceCents?: number;
+      rewardPoints?: number | null;
       currency?: string;
       kind?: ProductKind;
       deliveryType?: DeliveryType;
@@ -386,6 +395,10 @@ export async function PATCH(
     ) {
       data.priceCents =
         body.priceCents;
+    }
+
+    if (body.rewardPoints !== undefined) {
+      data.rewardPoints = body.rewardPoints;
     }
 
     if (

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getOrCreateGamerProfile, xpForLevel } from "@/lib/gamer";
+import { db } from "@/lib/prisma";
+import { getPointLedger, pointsToValueCents, USER_POINTS_PER_USD, VIP_POINTS_PER_USD } from "@/lib/points";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +109,18 @@ export default async function RewardsPage() {
       (tier) => tier.key === user.vipTier,
     ) ?? VIP_TIERS[0];
 
+  const activeVipSubscription = user.role === "SUPER_ADMIN" ? null : await db.vipSubscription.findFirst({
+    where: {
+      userId: user.id,
+      status: "ACTIVE",
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    select: { id: true },
+  });
+  const isVip = Boolean(activeVipSubscription);
+  const pointValueCents = pointsToValueCents(Math.max(0, user.points), isVip);
+  const pointLedger = await getPointLedger(user.id, 10);
+
   return (
     <main className="wrap">
       {/* الصفحة الرئيسية للمكافآت */}
@@ -168,11 +182,11 @@ export default async function RewardsPage() {
 
         <div className="stat">
           <strong>
-            {user.points}
+            {user.points.toLocaleString("ar-EG")}
           </strong>
 
           <span className="muted">
-            نقاط السحوبات
+            نقاطك المسجلة
           </span>
         </div>
 
@@ -185,6 +199,16 @@ export default async function RewardsPage() {
             درجة VIP الحالية
           </span>
         </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 20 }}>
+        <h2>رصيد النقاط وسجله</h2>
+        <p>قيمة النقاط حسب القاعدة الحالية: {isVip ? VIP_POINTS_PER_USD : USER_POINTS_PER_USD} نقطة = 1 USD. القيمة الظاهرة لا تعني وجود سحب نقدي مفعّل.</p>
+        <strong>{user.points < 0 ? `رصيد مستحق: ${Math.abs(user.points).toLocaleString("ar-EG")} نقطة` : `القيمة الحسابية: $${(pointValueCents / 100).toFixed(2)}`}</strong>
+        <div style={{ overflowX: "auto", marginTop: 14 }}><table><thead><tr><th>السبب</th><th>التغيير</th><th>الرصيد بعد العملية</th><th>التاريخ</th></tr></thead><tbody>
+          {pointLedger.map((entry) => <tr key={entry.id}><td>{entry.reason}</td><td>{entry.amount > 0 ? "+" : ""}{entry.amount}</td><td>{entry.balanceAfter}</td><td>{new Date(entry.createdAt).toLocaleString("ar")}</td></tr>)}
+          {pointLedger.length === 0 && <tr><td colSpan={4}>لا توجد حركات مسجلة بعد.</td></tr>}
+        </tbody></table></div>
       </section>
 
       {/* تقدم المستوى */}

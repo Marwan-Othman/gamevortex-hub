@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
 import AdminShell from "@/components/admin/AdminShell";
+import { calculateOwnerCashSummary } from "@/lib/owner-points";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,18 @@ export default async function OwnerControlCenter() {
     );
   }
 
-  const [users, games, publishedGames, products, orders, withdrawals, vipPlans, mobileGames, ownerWallet] = await Promise.all([
+  const [
+    users,
+    games,
+    publishedGames,
+    products,
+    orders,
+    withdrawals,
+    vipPlans,
+    mobileGames,
+    ownerWallet,
+    withdrawalTotals,
+  ] = await Promise.all([
     db.user.count(),
     db.game.count(),
     db.game.count({ where: { published: true } }),
@@ -34,8 +46,49 @@ export default async function OwnerControlCenter() {
     db.withdrawalRequest.count(),
     db.vipPlan.count({ where: { active: true } }),
     db.game.count({ where: { gamePlatforms: { some: { platform: { in: ["ANDROID", "IOS"] } } }, published: true } }),
-    db.ownerWallet.findUnique({ where: { ownerId: owner.id }, select: { availablePoints: true, pendingPoints: true } }),
+    db.ownerWallet.findUnique({
+      where: { ownerId: owner.id },
+      select: { id: true, availablePoints: true, pendingPoints: true },
+    }),
+    db.withdrawalRequest.groupBy({
+      by: ["status"],
+      _sum: { usdAmount: true },
+    }),
   ]);
+
+  const revenueGroups = ownerWallet
+    ? await db.ownerLedger.groupBy({
+        by: ["type"],
+        where: {
+          walletId: ownerWallet.id,
+          currency: "USD",
+          type: { in: ["CREDIT_REVENUE", "REFUND"] },
+        },
+        _sum: { usdAmount: true },
+      })
+    : [];
+
+  const grossUsd = Number(
+    revenueGroups.find((entry) => entry.type === "CREDIT_REVENUE")?._sum.usdAmount ?? 0,
+  );
+  const refundsUsd = Math.abs(
+    Number(revenueGroups.find((entry) => entry.type === "REFUND")?._sum.usdAmount ?? 0),
+  );
+  const paidOutUsd = withdrawalTotals
+    .filter((entry) => ["PAID", "SETTLED"].includes(entry.status))
+    .reduce((sum, entry) => sum + Number(entry._sum.usdAmount ?? 0), 0);
+  const pendingOutUsd = withdrawalTotals
+    .filter((entry) => ["REQUESTED", "PENDING", "PROCESSING"].includes(entry.status))
+    .reduce((sum, entry) => sum + Number(entry._sum.usdAmount ?? 0), 0);
+
+  const ownerCash = calculateOwnerCashSummary({
+    grossUsd,
+    refundsUsd,
+    paidOutUsd,
+    pendingOutUsd,
+    availablePoints: ownerWallet?.availablePoints ?? 0,
+    pendingPoints: ownerWallet?.pendingPoints ?? 0,
+  });
 
   const integrations = [
     ["RAWG Mobile Catalog", Boolean(process.env.RAWG_API_KEY), "/admin/games"],
@@ -49,6 +102,8 @@ export default async function OwnerControlCenter() {
     ["المتجر", "/admin/store", `${products} منتج`],
     ["VIP", "/vip", `${vipPlans} خطط نشطة`],
     ["المدفوعات والسحوبات", "/admin/errors", `${orders} طلب · ${withdrawals} سحب`],
+    ["مفاتيح API", "/admin/api-keys", "إصدار وإلغاء ومراقبة"],
+    ["الدعم الفني", "/admin/support", "تذاكر المستخدمين"],
     ["محفظة الأموال", "/wallet", "محفظة المستخدم المالية"],
     ["القرآن", "/admin/quran", "إدارة المصادر والقراء"],
     ["المراجعة والمحتوى", "/admin/moderation", "بلاغات ومراجعة المحتوى"],
@@ -84,7 +139,21 @@ export default async function OwnerControlCenter() {
         <div className={styles.indicatorRow}>
           <div className={styles.indicatorTile}><strong>{ownerWallet?.availablePoints ?? 0}</strong><span>نقاط المالك المتاحة</span></div>
           <div className={styles.indicatorTile}><strong>{ownerWallet?.pendingPoints ?? 0}</strong><span>نقاط المالك المعلقة</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.cashAvailableUsd.toFixed(2)}</strong><span>الرصيد النقدي الحقيقي المتاح</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.pointsBalanceUsd.toFixed(2)}</strong><span>قيمة نقاط المالك بالدولار</span></div>
           <Link href="/profile/gamer" className={styles.indicatorTile}><strong>→</strong><span>ملف الحساب</span></Link>
+        </div>
+      </section>
+
+      <section className={styles.panel} style={{ marginTop: 18 }}>
+        <div className={styles.panelHead}><span>سجل الإيرادات بالدولار</span></div>
+        <p className="muted">مبالغ مؤكدة عبر Webhook الدفع، قبل رسوم المزود والتسوية البنكية؛ ليست رصيدًا متاحًا للسحب.</p>
+        <div className={styles.indicatorRow}>
+          <div className={styles.indicatorTile}><strong>${ownerCash.grossUsd.toFixed(2)}</strong><span>إجمالي المبيعات المسجلة</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.refundsUsd.toFixed(2)}</strong><span>المبالغ المستردة</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.netRevenueUsd.toFixed(2)}</strong><span>الصافي المسجل قبل الرسوم</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.paidOutUsd.toFixed(2)}</strong><span>السحوبات المدفوعة</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.pendingOutUsd.toFixed(2)}</strong><span>السحوبات المعلقة</span></div>
         </div>
       </section>
 

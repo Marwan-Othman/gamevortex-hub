@@ -9,6 +9,8 @@ const areas = [
   ["VIP", "VIP", "/admin/vip", "الخطط والأسعار والاشتراكات والمكافآت.", "Plans, prices, subscriptions and rewards."],
   ["الألعاب", "Games", "/admin/games", "إدارة واستيراد ونشر الألعاب.", "Manage, import and publish games."],
   ["المتجر", "Store", "/admin/store", "المنتجات والمخزون والمفاتيح.", "Products, inventory and digital keys."],
+  ["مفاتيح API", "API keys", "/admin/api-keys", "إصدار مفاتيح خاصة ومتابعة الاستخدام وإلغاؤها.", "Issue private keys, monitor usage, and revoke access."],
+  ["الدعم الفني", "Support", "/admin/support", "متابعة طلبات المستخدمين والرد عليها.", "Review user support tickets and respond."],
   ["السحوبات", "Draws", "/admin/draws", "إدارة السحوبات والفائزين.", "Manage draws and winners."],
   ["المراجعة", "Moderation", "/admin/moderation", "البلاغات وإجراءات الإشراف.", "Reports and moderation actions."],
   ["القرآن", "Quran", "/admin/quran", "القراء ومصادر المحتوى.", "Reciters and content sources."],

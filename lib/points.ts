@@ -30,6 +30,83 @@ export type AdjustPointsInput = {
   metadata?: PointLedgerMetadata;
 };
 
+export const USER_POINTS_PER_USD = 1_000;
+export const VIP_POINTS_PER_USD = 500;
+export const STORE_PURCHASE_POINTS_PER_USD = 10;
+
+export function pointsToValueCents(points: number, isVip = false) {
+  if (!Number.isSafeInteger(points) || points < 0) throw new Error("INVALID_POINTS");
+  const rate = isVip ? VIP_POINTS_PER_USD : USER_POINTS_PER_USD;
+  return Math.floor(points * 100 / rate);
+}
+
+export function calculateStorePurchasePoints(amountCents: number, currency: string) {
+  if (!Number.isSafeInteger(amountCents) || amountCents < 0) throw new Error("INVALID_PURCHASE_AMOUNT");
+  if (currency.toUpperCase() !== "USD") return 0;
+  return Math.floor(amountCents * STORE_PURCHASE_POINTS_PER_USD / 100);
+}
+
+export function calculateProductRewardPoints(
+  items: Array<{
+    quantity: number;
+    unitPriceCents: number;
+    currency: string;
+    rewardPoints?: number | null;
+  }>,
+) {
+  return items.reduce((total, item) => {
+    if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error("INVALID_PRODUCT_QUANTITY");
+    }
+    if (!Number.isSafeInteger(item.unitPriceCents) || item.unitPriceCents < 0) {
+      throw new Error("INVALID_PURCHASE_AMOUNT");
+    }
+
+    const points = item.rewardPoints == null
+      ? calculateStorePurchasePoints(item.unitPriceCents * item.quantity, item.currency)
+      : Number.isSafeInteger(item.rewardPoints) && item.rewardPoints >= 0
+        ? item.rewardPoints * item.quantity
+        : (() => { throw new Error("INVALID_PRODUCT_REWARD_POINTS"); })();
+
+    const result = total + points;
+    if (!Number.isSafeInteger(result)) throw new Error("INVALID_PRODUCT_REWARD_POINTS");
+    return result;
+  }, 0);
+}
+
+export async function reversePointsInTransaction(
+  transaction: Prisma.TransactionClient,
+  input: { userId: string; amount: number; reason: string; idempotencyKey: string; sourceId?: string },
+) {
+  validateUserId(input.userId);
+  validatePositiveInteger(input.amount, "amount");
+  validateReason(input.reason);
+  validateIdempotencyKey(input.idempotencyKey);
+
+  const existing = await transaction.pointLedger.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+  if (existing) {
+    if (existing.userId !== input.userId || existing.amount !== -input.amount || existing.type !== "REVERSAL") {
+      throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+    }
+    return existing;
+  }
+
+  await transaction.user.update({ where: { id: input.userId }, data: { points: { decrement: input.amount } } });
+  const user = await transaction.user.findUnique({ where: { id: input.userId }, select: { points: true } });
+  if (!user) throw new Error("User not found");
+  return transaction.pointLedger.create({
+    data: {
+      userId: input.userId,
+      type: "REVERSAL",
+      amount: -input.amount,
+      balanceAfter: user.points,
+      reason: input.reason,
+      sourceId: input.sourceId,
+      idempotencyKey: input.idempotencyKey,
+    },
+  });
+}
+
 function validatePositiveInteger(
   value: number,
   fieldName: string,
@@ -98,6 +175,85 @@ async function getExistingLedgerEntry(
   return db.pointLedger.findUnique({
     where: {
       idempotencyKey,
+    },
+  });
+}
+
+async function findMatchingTransactionLedger(
+  transaction: Prisma.TransactionClient,
+  input: { userId: string; amount: number; reason: string; idempotencyKey: string },
+  type: "CREDIT" | "DEBIT",
+  ledgerAmount: number,
+) {
+  const existing = await transaction.pointLedger.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+  if (!existing) return null;
+  if (existing.userId !== input.userId || existing.amount !== ledgerAmount || existing.type !== type || existing.reason !== input.reason) {
+    throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+  }
+  return existing;
+}
+
+export async function creditPointsInTransaction(
+  transaction: Prisma.TransactionClient,
+  input: CreditPointsInput,
+) {
+  validateUserId(input.userId);
+  validatePositiveInteger(input.amount, "amount");
+  validateReason(input.reason);
+  validateIdempotencyKey(input.idempotencyKey);
+
+  const existing = await findMatchingTransactionLedger(transaction, input, "CREDIT", input.amount);
+  if (existing) return existing;
+
+  const updated = await transaction.user.updateMany({ where: { id: input.userId }, data: { points: { increment: input.amount } } });
+  if (updated.count !== 1) throw new Error("User not found");
+  const user = await transaction.user.findUnique({ where: { id: input.userId }, select: { points: true } });
+  if (!user) throw new Error("User not found");
+
+  return transaction.pointLedger.create({
+    data: {
+      userId: input.userId,
+      type: "CREDIT",
+      amount: input.amount,
+      balanceAfter: user.points,
+      reason: input.reason,
+      sourceId: input.sourceId,
+      idempotencyKey: input.idempotencyKey,
+      metadata: input.metadata,
+    },
+  });
+}
+
+export async function debitPointsInTransaction(
+  transaction: Prisma.TransactionClient,
+  input: DebitPointsInput,
+) {
+  validateUserId(input.userId);
+  validatePositiveInteger(input.amount, "amount");
+  validateReason(input.reason);
+  validateIdempotencyKey(input.idempotencyKey);
+
+  const existing = await findMatchingTransactionLedger(transaction, input, "DEBIT", -input.amount);
+  if (existing) return existing;
+
+  const updated = await transaction.user.updateMany({
+    where: { id: input.userId, points: { gte: input.amount } },
+    data: { points: { decrement: input.amount } },
+  });
+  if (updated.count !== 1) throw new Error("INSUFFICIENT_POINTS");
+  const user = await transaction.user.findUnique({ where: { id: input.userId }, select: { points: true } });
+  if (!user) throw new Error("User not found");
+
+  return transaction.pointLedger.create({
+    data: {
+      userId: input.userId,
+      type: "DEBIT",
+      amount: -input.amount,
+      balanceAfter: user.points,
+      reason: input.reason,
+      sourceId: input.sourceId,
+      idempotencyKey: input.idempotencyKey,
+      metadata: input.metadata,
     },
   });
 }

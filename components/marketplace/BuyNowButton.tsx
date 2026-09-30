@@ -5,16 +5,17 @@ import { useState } from "react";
 type BuyNowButtonProps = {
   productId: string;
   productTitle: string;
+  priceCents: number;
 };
 
 type ApiError = { error?: string };
 
 function idempotencyKey() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}-gamevortex-order`;
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-export default function BuyNowButton({ productId, productTitle }: BuyNowButtonProps) {
+export default function BuyNowButton({ productId, productTitle, priceCents }: BuyNowButtonProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
 
@@ -31,10 +32,16 @@ export default function BuyNowButton({ productId, productTitle }: BuyNowButtonPr
           idempotencyKey: idempotencyKey(),
         }),
       });
-      const orderData = await orderResponse.json() as { id?: string } & ApiError;
+      const orderData = await orderResponse.json() as { id?: string; paymentStatus?: string } & ApiError;
 
       if (!orderResponse.ok || !orderData.id) {
         setMessage(orderData.error === "UNAUTHORIZED" ? "سجّل الدخول أولًا لإتمام الشراء." : "تعذر إنشاء الطلب. حدّث الصفحة وحاول مجددًا.");
+        return;
+      }
+
+      if (orderData.paymentStatus === "NOT_REQUIRED" || priceCents === 0) {
+        setMessage("تم تسليم المنتج المجاني وإضافة نقاطه إلى حسابك.");
+        window.location.assign("/orders");
         return;
       }
 
@@ -65,7 +72,7 @@ export default function BuyNowButton({ productId, productTitle }: BuyNowButtonPr
   return (
     <div>
       <button className="btn" type="button" onClick={buyNow} disabled={busy} aria-label={`شراء ${productTitle}`}>
-        {busy ? "يجري تجهيز الدفع…" : "شراء الآن"}
+        {busy ? "يجري تجهيز الطلب…" : priceCents === 0 ? "استلام مجانًا" : "شراء الآن"}
       </button>
       {message && <p className="muted" role="status" aria-live="polite">{message}</p>}
     </div>

@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { OWNER_MIN_WITHDRAW_POINTS, OWNER_POINTS_PER_USD, pointsToUsd, validateOwnerWithdrawal } from '../lib/owner-points';
+import {
+  OWNER_MIN_WITHDRAW_POINTS,
+  OWNER_POINTS_PER_USD,
+  calculateOwnerCashSummary,
+  pointsToUsd,
+  validateOwnerWithdrawalTransition,
+  validateOwnerWithdrawal,
+} from '../lib/owner-points';
 
 const previousPerUsd = process.env.OWNER_POINTS_PER_USD;
 const previousMinWithdraw = process.env.OWNER_MIN_WITHDRAW_POINTS;
@@ -48,5 +55,34 @@ describe('validateOwnerWithdrawal', () => {
     const customMin = Number(process.env.OWNER_MIN_WITHDRAW_POINTS);
     expect(customPerUsd).toBe(10);
     expect(customMin).toBe(5);
+  });
+
+  it('keeps real cash distinct from points-based balances when summarizing owner finances', () => {
+    const summary = calculateOwnerCashSummary({
+      grossUsd: 1500,
+      refundsUsd: 150,
+      paidOutUsd: 500,
+      pendingOutUsd: 200,
+      availablePoints: 900,
+      pendingPoints: 120,
+    });
+
+    expect(summary.netRevenueUsd).toBe(1350);
+    expect(summary.cashAvailableUsd).toBe(650);
+    expect(summary.pointsBalanceUsd).toBe(30);
+    expect(summary.pendingPointsUsd).toBe(4);
+  });
+
+  it('allows only explicit payout transitions and reports whether reserved points are released', () => {
+    expect(validateOwnerWithdrawalTransition('PROCESSING', 'PAID')).toEqual({
+      releasesPoints: false,
+      settlesPayout: true,
+    });
+    expect(validateOwnerWithdrawalTransition('PENDING', 'REJECTED')).toEqual({
+      releasesPoints: true,
+      settlesPayout: false,
+    });
+    expect(() => validateOwnerWithdrawalTransition('PAID', 'REVERSED')).toThrow('WITHDRAWAL_ALREADY_FINAL');
+    expect(() => validateOwnerWithdrawalTransition('REQUESTED', 'SETTLED')).not.toThrow();
   });
 });

@@ -17,6 +17,7 @@ import {
 import {
   requireUser,
 } from "@/lib/auth";
+import { creditPointsInTransaction } from "@/lib/points";
 
 import {
   guardMutation,
@@ -114,6 +115,7 @@ export async function POST(
             });
 
           if (existing) {
+            if (existing.userId !== user.id) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
             return {
               reused: true,
               claim: existing,
@@ -175,18 +177,16 @@ export async function POST(
             }
           }
 
-          await tx.user.update({
-            where: {
-              id:
-                user.id,
-            },
-            data: {
-              points: {
-                increment:
-                  reward.points,
-              },
-            },
-          });
+          if (reward.points > 0) {
+            await creditPointsInTransaction(tx, {
+              userId: user.id,
+              amount: reward.points,
+              reason: "VIP_REWARD_CLAIM",
+              sourceId: reward.id,
+              idempotencyKey: `vip-reward:${input.idempotencyKey}`,
+              metadata: { source: "vip:rewards", claimKey: input.idempotencyKey },
+            });
+          }
 
           const claim =
             await tx.vipRewardClaim.create({

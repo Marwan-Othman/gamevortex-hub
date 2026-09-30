@@ -6,7 +6,7 @@ import {
 } from "react";
 
 type Props = {
-  target: "vip" | "orders" | "wallet";
+  target: "api" | "vip" | "orders" | "wallet";
   referenceId: string | null;
   paypalToken: string | null;
 };
@@ -28,11 +28,7 @@ export default function PaymentReturnClient({
       if (!referenceId) {
         if (!cancelled) {
           window.location.replace(
-            target === "vip"
-              ? "/vip"
-              : target === "wallet"
-                ? "/wallet"
-                : "/orders",
+            target === "api" ? "/api-access" : target === "vip" ? "/vip" : target === "wallet" ? "/wallet" : "/orders",
           );
         }
         return;
@@ -101,11 +97,7 @@ export default function PaymentReturnClient({
         window.setTimeout(
           () => {
             window.location.replace(
-              target === "vip"
-                ? "/vip?checkout=complete"
-                : target === "wallet"
-                  ? "/wallet?checkout=complete"
-                  : "/orders?checkout=complete",
+              target === "api" ? "/api-access?checkout=complete" : target === "vip" ? "/vip?checkout=complete" : target === "wallet" ? "/wallet?checkout=complete" : "/orders?checkout=complete",
             );
           },
           1200,

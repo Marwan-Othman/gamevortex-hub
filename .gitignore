@@ -21,3 +21,5 @@ coverage/
 .DS_Store
 *.log
 *.zip
+.vercel
+.env*

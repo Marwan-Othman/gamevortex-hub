@@ -17,6 +17,7 @@ const productSchema = z.object({
   description: z.string().trim().max(5000).nullable().optional(),
 
   priceCents: z.number().int().min(0).max(100000000),
+  rewardPoints: z.number().int().min(0).max(100000000).nullable().optional(),
   currency: z
     .string()
     .trim()
@@ -183,6 +184,7 @@ export async function POST(request: NextRequest) {
               ),
 
               priceCents: body.priceCents,
+              rewardPoints: body.rewardPoints ?? null,
               currency: body.currency,
 
               kind: body.kind,

@@ -66,6 +66,44 @@ function normalizePayload(value, model) {
   return { model, stream: true, messages };
 }
 
+function checkModel(request, upstream, model) {
+  return new Promise((resolve) => {
+    let upstreamReq;
+    try {
+      upstreamReq = request({
+        protocol: upstream.protocol,
+        hostname: upstream.hostname,
+        port: upstream.port || undefined,
+        method: "GET",
+        path: "/api/tags",
+      }, (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          body += chunk;
+          if (body.length > MAX_BODY_BYTES) upstreamReq.destroy();
+        });
+        response.on("end", () => {
+          if (response.statusCode !== 200) return resolve("offline");
+          try {
+            const models = JSON.parse(body).models;
+            if (!Array.isArray(models)) return resolve("offline");
+            const installed = models.some((entry) => entry?.name === model || entry?.model === model);
+            resolve(installed ? "ready" : "missing");
+          } catch {
+            resolve("offline");
+          }
+        });
+      });
+      upstreamReq.setTimeout(3_500, () => upstreamReq.destroy(new Error("UPSTREAM_TIMEOUT")));
+      upstreamReq.on("error", () => resolve("offline"));
+      upstreamReq.end();
+    } catch {
+      resolve("offline");
+    }
+  });
+}
+
 export function createAiGatewayServer({ token, model = "qwen3:1.7b", ollamaBaseUrl = "http://127.0.0.1:11434" }) {
   if (typeof token !== "string" || token.length < 64 || /^(.)\1+$/.test(token) || /replace|change.?me|example/i.test(token)) {
     throw new Error("GAMEVORTEX_AI_RUNTIME_TOKEN must be a non-placeholder secret of at least 64 characters");
@@ -75,7 +113,15 @@ export function createAiGatewayServer({ token, model = "qwen3:1.7b", ollamaBaseU
   const upstreamRequest = upstream.protocol === "https:" ? httpsRequest : httpRequest;
 
   const server = createServer(async (req, res) => {
-    if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true });
+    if (req.method === "GET" && req.url === "/health") {
+      const status = await checkModel(upstreamRequest, upstream, model);
+      const ready = status === "ready";
+      return json(res, ready ? 200 : 503, {
+        ok: ready,
+        runtimeAvailable: status !== "offline",
+        modelReady: ready,
+      });
+    }
     if (req.method !== "POST" || req.url !== "/api/chat") return json(res, 404, { error: "NOT_FOUND" });
     if (!tokenMatches(req.headers.authorization, token)) return json(res, 401, { error: "UNAUTHORIZED" });
     if (!String(req.headers["content-type"] || "").toLowerCase().includes("application/json")) return json(res, 415, { error: "JSON_REQUIRED" });

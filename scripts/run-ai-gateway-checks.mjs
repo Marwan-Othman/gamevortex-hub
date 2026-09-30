@@ -9,6 +9,7 @@ let gateway;
 let gatewayUrl;
 let forwardedPayload;
 let upstreamCalls = 0;
+let modelAvailable = true;
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -27,6 +28,11 @@ function close(server) {
 before(async () => {
   ollama = createServer(async (req, res) => {
     upstreamCalls += 1;
+    if (req.method === "GET" && req.url === "/api/tags") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ models: modelAvailable ? [{ name: "qwen3:1.7b" }] : [] }));
+      return;
+    }
     let body = "";
     for await (const chunk of req) body += chunk;
     forwardedPayload = JSON.parse(body);
@@ -51,7 +57,18 @@ after(async () => {
 test("health check responds without exposing runtime details", async () => {
   const response = await fetch(`${gatewayUrl}/health`);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true });
+  assert.deepEqual(await response.json(), { ok: true, runtimeAvailable: true, modelReady: true });
+});
+
+test("health check reports when the configured model is missing", async () => {
+  modelAvailable = false;
+  try {
+    const response = await fetch(`${gatewayUrl}/health`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { ok: false, runtimeAvailable: true, modelReady: false });
+  } finally {
+    modelAvailable = true;
+  }
 });
 
 test("rejects requests without the gateway token", async () => {

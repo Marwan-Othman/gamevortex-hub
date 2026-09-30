@@ -226,6 +226,28 @@ export async function POST(
       return NextResponse.json({ ok: true, provider: "paypal", paymentId: body.paymentId });
     }
 
+    const apiAccessPurchase = await db.apiAccessPurchase.findFirst({
+      where: { id: body.referenceId, userId: user.id },
+      select: { id: true, provider: true, providerPaymentId: true, status: true, amountCents: true },
+    });
+
+    if (apiAccessPurchase) {
+      if (apiAccessPurchase.provider !== "paypal") {
+        return NextResponse.json({ error: "PAYMENT_PROVIDER_MISMATCH" }, { status: 409 });
+      }
+      if (apiAccessPurchase.status === "SUCCEEDED") {
+        return NextResponse.json({ ok: true, reused: true, provider: "paypal", paymentId: body.paymentId });
+      }
+      if (apiAccessPurchase.providerPaymentId !== body.paymentId) {
+        return NextResponse.json({ error: "PAYMENT_NOT_FOUND" }, { status: 404 });
+      }
+      if (apiAccessPurchase.amountCents !== 1000) {
+        return NextResponse.json({ error: "PAYMENT_AMOUNT_MISMATCH" }, { status: 400 });
+      }
+      await provider.capturePayment(body.paymentId);
+      return NextResponse.json({ ok: true, provider: "paypal", paymentId: body.paymentId });
+    }
+
     const subscription =
       await db.vipSubscription.findFirst({
         where: {

@@ -84,3 +84,87 @@ export function validateOwnerPointsBalance(
     throw new Error("INSUFFICIENT_POINTS");
   }
 }
+
+export type OwnerCashSummaryInput = {
+  grossUsd: number;
+  refundsUsd?: number;
+  paidOutUsd?: number;
+  pendingOutUsd?: number;
+  availablePoints?: number;
+  pendingPoints?: number;
+};
+
+export type OwnerCashSummary = {
+  grossUsd: number;
+  refundsUsd: number;
+  netRevenueUsd: number;
+  paidOutUsd: number;
+  pendingOutUsd: number;
+  cashAvailableUsd: number;
+  pointsBalanceUsd: number;
+  pendingPointsUsd: number;
+};
+
+export function calculateOwnerCashSummary(
+  input: OwnerCashSummaryInput,
+): OwnerCashSummary {
+  const grossUsd = Number.isFinite(input.grossUsd) ? Number(input.grossUsd) : 0;
+  const refundsUsd = Number.isFinite(input.refundsUsd ?? 0) ? Number(input.refundsUsd ?? 0) : 0;
+  const paidOutUsd = Number.isFinite(input.paidOutUsd ?? 0) ? Number(input.paidOutUsd ?? 0) : 0;
+  const pendingOutUsd = Number.isFinite(input.pendingOutUsd ?? 0) ? Number(input.pendingOutUsd ?? 0) : 0;
+
+  const netRevenueUsd = Number((grossUsd - refundsUsd).toFixed(2));
+  const pointsBalance = Number.isSafeInteger(input.availablePoints ?? 0) ? Number(input.availablePoints ?? 0) : 0;
+  const pendingPoints = Number.isSafeInteger(input.pendingPoints ?? 0) ? Number(input.pendingPoints ?? 0) : 0;
+
+  const pointsBalanceUsd = pointsBalance > 0 ? Number(pointsToUsd(pointsBalance).toFixed(2)) : 0;
+  const pendingPointsUsd = pendingPoints > 0 ? Number(pointsToUsd(pendingPoints).toFixed(2)) : 0;
+
+  const cashAvailableUsd = Number(
+    Math.max(netRevenueUsd - paidOutUsd - pendingOutUsd, 0).toFixed(2),
+  );
+
+  return {
+    grossUsd: Number(grossUsd.toFixed(2)),
+    refundsUsd: Number(refundsUsd.toFixed(2)),
+    netRevenueUsd,
+    paidOutUsd: Number(paidOutUsd.toFixed(2)),
+    pendingOutUsd: Number(pendingOutUsd.toFixed(2)),
+    cashAvailableUsd,
+    pointsBalanceUsd,
+    pendingPointsUsd,
+  };
+}
+
+export type OwnerWithdrawalStatus =
+  | "REQUESTED"
+  | "PENDING"
+  | "PROCESSING"
+  | "PAID"
+  | "SETTLED"
+  | "FAILED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "REVERSED";
+
+export function validateOwnerWithdrawalTransition(
+  current: OwnerWithdrawalStatus,
+  next: OwnerWithdrawalStatus,
+): { releasesPoints: boolean; settlesPayout: boolean } {
+  if (["PAID", "SETTLED", "FAILED", "REJECTED", "CANCELLED", "REVERSED"].includes(current)) {
+    throw new Error("WITHDRAWAL_ALREADY_FINAL");
+  }
+
+  const allowed = current === "PROCESSING"
+    ? ["PAID", "SETTLED", "FAILED", "REJECTED", "CANCELLED"]
+    : ["PENDING", "PROCESSING", "PAID", "SETTLED", "FAILED", "REJECTED", "CANCELLED"];
+
+  if (!allowed.includes(next)) {
+    throw new Error("INVALID_WITHDRAWAL_TRANSITION");
+  }
+
+  return {
+    releasesPoints: ["FAILED", "REJECTED", "CANCELLED"].includes(next),
+    settlesPayout: ["PAID", "SETTLED"].includes(next),
+  };
+}

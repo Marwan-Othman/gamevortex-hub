@@ -210,3 +210,29 @@ The current limiter is process-local memory. It is suitable for development and 
 
 ## V9.4 production hardening
 See `PRODUCTION_HARDENING_V9_4.md`. External providers are implemented through server-side adapters; real credentials are intentionally never bundled.
+
+## Final project task status
+
+The project backlog has been completed and recorded in the repository. The current implementation status is:
+
+- [x] API Keys and access flow
+- [x] Payment webhook and revenue
+- [x] Owner control center
+- [x] Owner revenue tracking
+- [x] Product point rewards
+- [x] Unified point value
+- [x] Withdrawal wallet logic
+- [x] Revenue source hardening
+- [x] Privacy and security hardening
+- [x] Support system
+- [x] Point deduction on withdrawal
+- [x] Remove fake data
+- [x] Persistent point ledger
+- [x] Owner wallet separation
+- [x] AI chat UI in the site
+- [x] AI conversation history and lifecycle
+- [x] AI runtime status and health checks
+- [x] Self-hosted AI gateway security and model enforcement
+- [x] AI environment contract and runtime validation
+
+This task log is also preserved in `docs/ACTIVE_TASKS.md` for the working branch state. External production integrations (payments, AI runtime, provider credentials, and live provider verification) remain environment-dependent and are intentionally not treated as complete without real deployment credentials and end-to-end verification.

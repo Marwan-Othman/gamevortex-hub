@@ -9,6 +9,7 @@ describe("GameVortex AI runtime configuration", () => {
   it("allows direct local Ollama for development", () => {
     expect(getRuntimeConfig({ GAMEVORTEX_AI_RUNTIME_URL: "http://127.0.0.1:11434" })).toMatchObject({
       chatUrl: "http://127.0.0.1:11434/api/chat",
+      healthUrl: "http://127.0.0.1:11434/api/tags",
       model: "qwen3:1.7b",
       local: true,
     });
@@ -20,7 +21,11 @@ describe("GameVortex AI runtime configuration", () => {
       GAMEVORTEX_AI_RUNTIME_URL: "https://ai.example.test",
       GAMEVORTEX_AI_RUNTIME_TOKEN: "0123456789abcdef".repeat(4),
       GAMEVORTEX_AI_MODEL: "qwen3:1.7b",
-    })).toMatchObject({ chatUrl: "https://ai.example.test/api/chat", local: false });
+    })).toMatchObject({
+      chatUrl: "https://ai.example.test/api/chat",
+      healthUrl: "https://ai.example.test/health",
+      local: false,
+    });
   });
 
   it.each([

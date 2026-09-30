@@ -75,6 +75,7 @@ export default function StoreProductForm({
     useState("");
 
   const [price, setPrice] = useState("0");
+  const [rewardPoints, setRewardPoints] = useState("");
   const [currency, setCurrency] =
     useState("USD");
 
@@ -207,6 +208,10 @@ export default function StoreProductForm({
               numericPrice * 100,
             ),
 
+            rewardPoints: rewardPoints.trim()
+              ? Number(rewardPoints)
+              : null,
+
             currency,
 
             kind,
@@ -250,6 +255,7 @@ export default function StoreProductForm({
       setTitle("");
       setDescription("");
       setPrice("0");
+      setRewardPoints("");
       setInventory("0");
       setRegion("");
       setCountry("");
@@ -412,6 +418,22 @@ export default function StoreProductForm({
                 setPrice(event.target.value)
               }
               required
+              disabled={saving}
+            />
+          </label>
+
+          <label>
+            <span className="muted">
+              نقاط المكافأة لكل وحدة
+            </span>
+
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={rewardPoints}
+              onChange={(event) => setRewardPoints(event.target.value)}
+              placeholder="تلقائي حسب السعر"
               disabled={saving}
             />
           </label>

@@ -12,6 +12,7 @@ import { qualifyReferralOnFirstOrder } from "@/lib/referrals";
 import { rateLimitAsync, clientKey } from "@/lib/security";
 import { logSystemError } from "@/lib/observability";
 import { processVipPaymentWebhook } from "@/lib/vip-payment-webhook";
+import { calculateProductRewardPoints, creditPointsInTransaction, reversePointsInTransaction } from "@/lib/points";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ type NormalizedEvent = {
   status: "SUCCEEDED" | "FAILED" | "REFUNDED";
   amountCents: number;
   currency?: string;
+  providerOrderId?: string;
   raw: unknown;
 };
 
@@ -38,14 +40,12 @@ type WebhookOrder = Prisma.OrderGetPayload<{
 function getOwnerPurchasePoints(): number {
   const raw = process.env.OWNER_PURCHASE_POINTS;
 
-  if (!raw) {
-    return 1000;
-  }
+  if (!raw) return 0;
 
   const parsed = Number(raw);
 
   if (!Number.isInteger(parsed) || parsed < 0) {
-    return 1000;
+    return 0;
   }
 
   return parsed;
@@ -136,6 +136,9 @@ function normalizePayPal(raw: any): NormalizedEvent | null {
     amountCents,
     currency: amount?.currency_code
       ? String(amount.currency_code).toUpperCase()
+      : undefined,
+    providerOrderId: resource?.supplementary_data?.related_ids?.order_id
+      ? String(resource.supplementary_data.related_ids.order_id)
       : undefined,
     raw,
   };
@@ -333,6 +336,62 @@ async function rewardOwnerPoints(
         source: "GAMEVORTEX_STORE_PURCHASE",
       },
     },
+  });
+}
+
+async function rewardBuyerPoints(
+  transaction: Prisma.TransactionClient,
+  order: {
+    id: string;
+    userId: string;
+    currency: string;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      unitPriceCents: number;
+      product: { rewardPoints: number | null };
+    }>;
+  },
+  provider: string,
+  paymentId: string,
+) {
+  const rewardLines = order.items.map((item) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    rewardPoints: item.product.rewardPoints,
+  }));
+  const points = calculateProductRewardPoints(order.items.map((item) => ({
+    quantity: item.quantity,
+    unitPriceCents: item.unitPriceCents,
+    currency: order.currency,
+    rewardPoints: item.product.rewardPoints,
+  })));
+  if (points <= 0) return;
+  await creditPointsInTransaction(transaction, {
+    userId: order.userId,
+    amount: points,
+    reason: "STORE_PURCHASE_REWARD",
+    sourceId: order.id,
+    idempotencyKey: `purchase-points:${order.id}:${provider}:${paymentId}`,
+    metadata: { orderId: order.id, provider, paymentId, currency: order.currency, rewardLines },
+  });
+}
+
+async function refundBuyerPoints(
+  transaction: Prisma.TransactionClient,
+  order: { id: string; userId: string },
+  provider: string,
+  paymentId: string,
+) {
+  const purchaseKey = `purchase-points:${order.id}:${provider}:${paymentId}`;
+  const reward = await transaction.pointLedger.findUnique({ where: { idempotencyKey: purchaseKey } });
+  if (!reward || reward.userId !== order.userId || reward.amount <= 0) return;
+  await reversePointsInTransaction(transaction, {
+    userId: order.userId,
+    amount: reward.amount,
+    reason: "STORE_PURCHASE_REFUND",
+    sourceId: order.id,
+    idempotencyKey: `refund-points:${order.id}:${provider}:${paymentId}`,
   });
 }
 
@@ -711,6 +770,68 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
   });
 }
 
+async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
+  await db.$transaction(async (transaction) => {
+    const purchase = await transaction.apiAccessPurchase.findUnique({ where: { id: event.orderId } });
+    if (!purchase) throw new Error("API_ACCESS_PURCHASE_NOT_FOUND");
+    if (event.amountCents !== purchase.amountCents || event.currency?.toUpperCase() !== purchase.currency) {
+      throw new Error("PAYMENT_AMOUNT_MISMATCH");
+    }
+    if (purchase.provider && purchase.provider !== event.provider) throw new Error("PAYMENT_PROVIDER_MISMATCH");
+    if (purchase.providerPaymentId && purchase.providerPaymentId !== event.paymentId && purchase.providerPaymentId !== event.providerOrderId) {
+      throw new Error("PAYMENT_ID_MISMATCH");
+    }
+
+    if (event.status === "SUCCEEDED") {
+      if (purchase.status === "REFUNDED") return;
+      if (purchase.status === "SUCCEEDED") return;
+
+      await transaction.apiAccessPurchase.update({
+        where: { id: purchase.id },
+        data: { status: "SUCCEEDED", provider: event.provider, providerPaymentId: event.paymentId, completedAt: new Date() },
+      });
+
+      const owner = await transaction.user.findFirst({ where: { role: "SUPER_ADMIN" }, select: { id: true } });
+      if (!owner) throw new Error("OWNER_ACCOUNT_NOT_FOUND");
+      const wallet = await transaction.ownerWallet.upsert({
+        where: { ownerId: owner.id },
+        create: { ownerId: owner.id },
+        update: {},
+      });
+      const idempotencyKey = `api-access-revenue:${purchase.id}:${event.provider}:${event.paymentId}`;
+      const existing = await transaction.ownerLedger.findUnique({ where: { idempotencyKey }, select: { id: true } });
+      if (!existing) {
+        await transaction.ownerLedger.create({
+          data: {
+            walletId: wallet.id,
+            type: LedgerType.CREDIT_REVENUE,
+            points: 0,
+            usdAmount: new Prisma.Decimal(purchase.amountCents).div(100),
+            currency: purchase.currency,
+            provider: event.provider,
+            providerTransactionId: event.paymentId,
+            idempotencyKey,
+            metadata: { apiAccessPurchaseId: purchase.id, source: "API_ACCESS_PURCHASE" },
+          },
+        });
+      }
+      return;
+    }
+
+    if (event.status === "REFUNDED") {
+      await transaction.apiAccessPurchase.update({
+        where: { id: purchase.id },
+        data: { status: "REFUNDED", provider: event.provider, providerPaymentId: event.paymentId },
+      });
+      return;
+    }
+
+    if (purchase.status !== "SUCCEEDED" && purchase.status !== "REFUNDED") {
+      await transaction.apiAccessPurchase.update({ where: { id: purchase.id }, data: { status: "FAILED", provider: event.provider, providerPaymentId: event.paymentId } });
+    }
+  });
+}
+
 export async function POST(request: NextRequest) {
   /*
    * Payment provider webhooks are server-to-server requests.
@@ -797,6 +918,12 @@ export async function POST(request: NextRequest) {
           status: 400,
         },
       );
+    }
+
+    const apiAccessPurchase = await db.apiAccessPurchase.findUnique({ where: { id: event.orderId }, select: { id: true } });
+    if (apiAccessPurchase) {
+      await processApiAccessPaymentWebhook(event);
+      return NextResponse.json({ ok: true, type: "API_ACCESS" });
     }
 
     /*
@@ -991,6 +1118,13 @@ export async function POST(request: NextRequest) {
             event.paymentId,
           );
 
+          await rewardBuyerPoints(
+            transaction,
+            order,
+            event.provider,
+            event.paymentId,
+          );
+
           /*
            * User notification.
            */
@@ -1074,6 +1208,13 @@ export async function POST(request: NextRequest) {
            * Reverse owner purchase points.
            */
           await refundOwnerPoints(
+            transaction,
+            order,
+            event.provider,
+            event.paymentId,
+          );
+
+          await refundBuyerPoints(
             transaction,
             order,
             event.provider,

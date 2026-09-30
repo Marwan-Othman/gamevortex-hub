@@ -38,7 +38,9 @@ export default async function PaymentReturnPage({
 
   const targetValue = first(params.target);
   const target =
-    targetValue === "vip"
+    targetValue === "api"
+      ? "api"
+      : targetValue === "vip"
       ? "vip"
       : targetValue === "wallet"
         ? "wallet"

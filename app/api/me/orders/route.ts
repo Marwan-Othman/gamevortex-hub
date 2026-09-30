@@ -12,6 +12,7 @@ import {
   guardMutation,
   guardRead,
 } from "@/lib/api";
+import { calculateProductRewardPoints, creditPointsInTransaction } from "@/lib/points";
 
 export const dynamic = "force-dynamic";
 
@@ -419,7 +420,7 @@ export async function POST(
     const order =
       await db.$transaction(
         async (transaction) => {
-          return transaction.order.create(
+          const created = await transaction.order.create(
             {
               data: {
                 userId:
@@ -472,6 +473,68 @@ export async function POST(
               },
             },
           );
+
+          if (subtotalCents === 0) {
+            for (const item of created.items) {
+              const product = productsById.get(item.productId);
+              if (!product) throw new Error("PRODUCT_NOT_FOUND");
+
+              if (product.inventory !== null) {
+                const stock = await transaction.gameProduct.updateMany({
+                  where: { id: product.id, inventory: { gte: item.quantity } },
+                  data: { inventory: { decrement: item.quantity } },
+                });
+                if (stock.count !== 1) throw new Error("OUT_OF_STOCK");
+              }
+
+              const available = await transaction.digitalKey.findMany({
+                where: { productId: product.id, status: DigitalKeyStatus.AVAILABLE },
+                orderBy: { createdAt: "asc" },
+                take: item.quantity,
+                select: { id: true },
+              });
+              if (available.length !== item.quantity) throw new Error("DIGITAL_KEYS_OUT_OF_STOCK");
+              const delivered = await transaction.digitalKey.updateMany({
+                where: { id: { in: available.map((key) => key.id) }, status: DigitalKeyStatus.AVAILABLE },
+                data: { status: DigitalKeyStatus.DELIVERED, orderItemId: item.id, deliveredAt: new Date() },
+              });
+              if (delivered.count !== item.quantity) throw new Error("DIGITAL_KEYS_OUT_OF_STOCK");
+
+              await transaction.entitlement.upsert({
+                where: { userId_gameId: { userId: user.id, gameId: product.gameId } },
+                create: { userId: user.id, gameId: product.gameId, orderItemId: item.id },
+                update: { revokedAt: null, orderItemId: item.id },
+              });
+            }
+
+            const rewardPoints = calculateProductRewardPoints(created.items.map((item) => {
+              const product = productsById.get(item.productId);
+              if (!product) throw new Error("PRODUCT_NOT_FOUND");
+              return {
+                quantity: item.quantity,
+                unitPriceCents: item.unitPriceCents,
+                currency: product.currency,
+                rewardPoints: product.rewardPoints,
+              };
+            }));
+            await transaction.order.update({
+              where: { id: created.id },
+              data: { status: "COMPLETED", paymentStatus: "NOT_REQUIRED", paymentProvider: "FREE" },
+            });
+            if (rewardPoints > 0) {
+              await creditPointsInTransaction(transaction, {
+                userId: user.id,
+                amount: rewardPoints,
+                reason: "FREE_STORE_PRODUCT_REWARD",
+                sourceId: created.id,
+                idempotencyKey: `free-order-points:${created.id}`,
+                metadata: { orderId: created.id, rewardPoints },
+              });
+            }
+            return { ...created, status: "COMPLETED" as const, paymentStatus: "NOT_REQUIRED" as const, paymentProvider: "FREE" };
+          }
+
+          return created;
         },
       );
 

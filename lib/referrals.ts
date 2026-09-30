@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "./prisma";
+import { creditPointsInTransaction } from "./points";
 
 const DEFAULT_REFERRER_POINTS = 200;
 const DEFAULT_REFERRED_POINTS = 100;
@@ -205,27 +206,24 @@ export async function qualifyReferralOnFirstOrder(
     return null;
   }
 
-  await tx.user.update({
-    where: {
-      id: referral.referrerId,
-    },
-    data: {
-      points: {
-        increment: REFERRAL_REFERRER_POINTS,
-      },
-    },
-  });
-
-  await tx.user.update({
-    where: {
-      id: referral.referredId,
-    },
-    data: {
-      points: {
-        increment: REFERRAL_REFERRED_POINTS,
-      },
-    },
-  });
+  if (REFERRAL_REFERRER_POINTS > 0) {
+    await creditPointsInTransaction(tx, {
+      userId: referral.referrerId,
+      amount: REFERRAL_REFERRER_POINTS,
+      reason: "REFERRAL_REWARD",
+      sourceId: referral.id,
+      idempotencyKey: `referral:${referral.id}:referrer`,
+    });
+  }
+  if (REFERRAL_REFERRED_POINTS > 0) {
+    await creditPointsInTransaction(tx, {
+      userId: referral.referredId,
+      amount: REFERRAL_REFERRED_POINTS,
+      reason: "REFERRAL_WELCOME_REWARD",
+      sourceId: referral.id,
+      idempotencyKey: `referral:${referral.id}:referred`,
+    });
+  }
 
   const rewards = [
     {
