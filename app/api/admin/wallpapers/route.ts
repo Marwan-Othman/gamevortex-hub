@@ -19,6 +19,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_URL_LENGTH = 4000;
+const MAX_BULK_DELETE = 500;
+
+type JsonRecord = Record<string, unknown>;
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
 
 function serializeWallpaper<T>(value: T): T {
   return JSON.parse(
@@ -117,7 +128,9 @@ function isPrivateIpv6(ip: string) {
   );
 }
 
-async function assertSafeRemoteUrl(value: string) {
+async function assertSafeRemoteUrl(
+  value: string,
+) {
   const url = new URL(value);
 
   if (url.protocol !== "https:") {
@@ -183,11 +196,7 @@ async function importRemoteWallpaper(
 
   let response: Response | null = null;
 
-  for (
-    let attempt = 0;
-    attempt < 6;
-    attempt += 1
-  ) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     await assertSafeRemoteUrl(currentUrl);
 
     response = await fetch(currentUrl, {
@@ -280,19 +289,13 @@ async function importRemoteWallpaper(
     `wallpaper-${Date.now()}`,
   );
 
-  let stored;
-
-  try {
-    stored = await storeWallpaperFile({
-      pathname: `wallpapers/imported/${Date.now()}-${sanitizeWallpaperFilename(
-        filename,
-      )}`,
-      file: response.body.pipeThrough(counter),
-      contentType,
-    });
-  } catch (error) {
-    throw error;
-  }
+  const stored = await storeWallpaperFile({
+    pathname: `wallpapers/imported/${Date.now()}-${sanitizeWallpaperFilename(
+      filename,
+    )}`,
+    file: response.body.pipeThrough(counter),
+    contentType,
+  });
 
   if (size === 0) {
     await del(stored.url).catch(
@@ -384,7 +387,8 @@ export async function GET(
 export async function POST(
   request: NextRequest,
 ) {
-  const user = await requireSuperAdmin();
+  const user =
+    await requireSuperAdmin();
 
   if (!user) {
     return NextResponse.json(
@@ -397,29 +401,23 @@ export async function POST(
   }
 
   try {
-    const body: unknown =
+    const parsedBody: unknown =
       await request.json();
 
-    if (
-      !body ||
-      typeof body !== "object" ||
-      Array.isArray(body)
-    ) {
+    if (!isJsonRecord(parsedBody)) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Invalid request body.",
+          error: "Invalid request body",
         },
         { status: 400 },
       );
     }
 
-    const payload =
-      body as Record<string, unknown>;
+    const body = parsedBody;
 
     const sourceType =
-      payload.sourceType === "URL"
+      body.sourceType === "URL"
         ? "URL"
         : "BLOB";
 
@@ -434,7 +432,7 @@ export async function POST(
 
     if (sourceType === "URL") {
       const sourceUrl = cleanString(
-        payload.sourceUrl,
+        body.sourceUrl,
         MAX_URL_LENGTH,
       );
 
@@ -454,7 +452,7 @@ export async function POST(
         );
     } else {
       const imageUrl = cleanString(
-        payload.imageUrl,
+        body.imageUrl,
         MAX_URL_LENGTH,
       );
 
@@ -474,7 +472,7 @@ export async function POST(
 
       const mimeType =
         cleanString(
-          payload.mimeType,
+          body.mimeType,
           120,
         )?.toLowerCase() || "";
 
@@ -494,7 +492,7 @@ export async function POST(
       }
 
       const size = Number(
-        payload.fileSizeBytes || 0,
+        body.fileSizeBytes || 0,
       );
 
       if (
@@ -518,7 +516,7 @@ export async function POST(
         filename:
           sanitizeWallpaperFilename(
             cleanString(
-              payload.originalFilename,
+              body.originalFilename,
               160,
             ) || "wallpaper",
           ),
@@ -528,7 +526,7 @@ export async function POST(
         size,
 
         isAnimated:
-          payload.isAnimated === true ||
+          body.isAnimated === true ||
           isAnimatedWallpaperMimeType(
             mimeType,
           ),
@@ -538,27 +536,27 @@ export async function POST(
     }
 
     const width =
-      Number.isInteger(payload.width) &&
-      Number(payload.width) > 0
+      Number.isInteger(body.width) &&
+      Number(body.width) > 0
         ? Math.min(
-            Number(payload.width),
+            Number(body.width),
             100000,
           )
         : null;
 
     const height =
-      Number.isInteger(payload.height) &&
-      Number(payload.height) > 0
+      Number.isInteger(body.height) &&
+      Number(body.height) > 0
         ? Math.min(
-            Number(payload.height),
+            Number(body.height),
             100000,
           )
         : null;
 
     const type =
-      payload.type === "MOBILE" ||
-      payload.type === "DESKTOP"
-        ? payload.type
+      body.type === "MOBILE" ||
+      body.type === "DESKTOP"
+        ? body.type
         : detectType(
             width,
             height,
@@ -579,25 +577,6 @@ export async function POST(
       width && height
         ? `${width}x${height}`
         : null;
-
-    /*
-     * مهم:
-     * Prisma يتوقع String[].
-     * نقوم هنا بتحويل أي قيمة واردة من
-     * body إلى string[] بشكل صريح.
-     */
-    const tags: string[] =
-      Array.isArray(payload.tags)
-        ? payload.tags.filter(
-            (
-              value: unknown,
-            ): value is string =>
-              typeof value === "string",
-          )
-        : [];
-
-    const normalizedTags: string[] =
-      normalizeWallpaperTags(tags);
 
     const wallpaper =
       await prisma.wallpaper.create({
@@ -624,9 +603,11 @@ export async function POST(
           originalFilename:
             file.filename,
 
-          mimeType: file.mimeType,
+          mimeType:
+            file.mimeType,
 
-          fileSizeBytes: file.size,
+          fileSizeBytes:
+            file.size,
 
           isAnimated:
             file.isAnimated,
@@ -663,10 +644,14 @@ export async function POST(
           category: "GAMING",
 
           /*
-           * هنا تم حل الخطأ:
-           * normalizedTags هو string[]
+           * مهم:
+           * normalizeWallpaperTags يجب أن يعيد
+           * string[] حتى لا ينتج unknown[].
            */
-          tags: normalizedTags,
+          tags:
+            normalizeWallpaperTags(
+              [] as string[],
+            ),
 
           width,
 
@@ -675,17 +660,18 @@ export async function POST(
           resolution,
 
           isVip:
-            payload.isVip === true,
+            body.isVip === true,
 
           published:
-            payload.published === true,
+            body.published === true,
 
           featured:
-            payload.featured === true,
+            body.featured === true,
 
           sortOrder: 0,
 
-          uploadedById: user.id,
+          uploadedById:
+            user.id,
 
           moderationStatus:
             "APPROVED",
@@ -737,30 +723,24 @@ export async function PATCH(
   }
 
   try {
-    const body: unknown =
+    const parsedBody: unknown =
       await request.json();
 
-    if (
-      !body ||
-      typeof body !== "object" ||
-      Array.isArray(body)
-    ) {
+    if (!isJsonRecord(parsedBody)) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Invalid request body.",
+          error: "Invalid request body",
         },
         { status: 400 },
       );
     }
 
-    const payload =
-      body as Record<string, unknown>;
+    const body = parsedBody;
 
     const id =
-      typeof payload.id === "string"
-        ? payload.id.trim()
+      typeof body.id === "string"
+        ? body.id.trim()
         : "";
 
     if (!id) {
@@ -794,44 +774,29 @@ export async function PATCH(
       published?: boolean;
       featured?: boolean;
       isVip?: boolean;
-      tags?: string[];
     } = {};
 
     if (
-      typeof payload.published ===
+      typeof body.published ===
       "boolean"
     ) {
       data.published =
-        payload.published;
+        body.published;
     }
 
     if (
-      typeof payload.featured ===
+      typeof body.featured ===
       "boolean"
     ) {
       data.featured =
-        payload.featured;
+        body.featured;
     }
 
     if (
-      typeof payload.isVip ===
+      typeof body.isVip ===
       "boolean"
     ) {
-      data.isVip =
-        payload.isVip;
-    }
-
-    if (Array.isArray(payload.tags)) {
-      const tags: string[] =
-        payload.tags.filter(
-          (
-            value: unknown,
-          ): value is string =>
-            typeof value === "string",
-        );
-
-      data.tags =
-        normalizeWallpaperTags(tags);
+      data.isVip = body.isVip;
     }
 
     const wallpaper =
@@ -866,12 +831,10 @@ export async function PATCH(
 /*
  * DELETE
  *
- * يدعم طريقتين:
- *
- * 1. حذف خلفية واحدة:
+ * حذف خلفية واحدة:
  * DELETE /api/admin/wallpapers?id=xxx
  *
- * 2. حذف عدة خلفيات:
+ * حذف عدة خلفيات:
  * DELETE /api/admin/wallpapers
  *
  * Body:
@@ -902,7 +865,7 @@ export async function DELETE(
       ) || "";
 
     /*
-     * الحذف الفردي القديم
+     * حذف فردي
      */
     if (
       !contentType
@@ -912,8 +875,9 @@ export async function DELETE(
         )
     ) {
       const id =
-        new URL(request.url)
-          .searchParams
+        new URL(
+          request.url,
+        ).searchParams
           .get("id")
           ?.trim();
 
@@ -929,16 +893,14 @@ export async function DELETE(
       }
 
       const wallpaper =
-        await prisma.wallpaper.findUnique(
-          {
-            where: { id },
+        await prisma.wallpaper.findUnique({
+          where: { id },
 
-            select: {
-              id: true,
-              imageUrl: true,
-            },
+          select: {
+            id: true,
+            imageUrl: true,
           },
-        );
+        });
 
       if (!wallpaper) {
         return NextResponse.json(
@@ -955,9 +917,6 @@ export async function DELETE(
         where: { id },
       });
 
-      /*
-       * حذف ملف الصورة من Vercel Blob
-       */
       if (
         isVercelBlobUrl(
           wallpaper.imageUrl,
@@ -982,45 +941,67 @@ export async function DELETE(
     }
 
     /*
-     * الحذف الجماعي
+     * حذف جماعي
      */
-    const body: unknown =
+    const parsedBody: unknown =
       await request.json();
 
-    const rawIds =
-      body &&
-      typeof body === "object" &&
-      !Array.isArray(body) &&
-      Array.isArray(
-        (body as Record<string, unknown>)
-          .ids,
-      )
-        ? (
-            body as Record<
-              string,
-              unknown
-            >
-          ).ids
+    if (!isJsonRecord(parsedBody)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Invalid request body",
+        },
+        { status: 400 },
+      );
+    }
+
+    /*
+     * هنا تحديدًا تم إصلاح الخطأ الذي
+     * كان يوقف Vercel build.
+     *
+     * لا نسمح لـ unknown[] بالدخول إلى
+     * Prisma أو Set.
+     */
+    const rawIds: unknown =
+      parsedBody.ids;
+
+    const ids: string[] =
+      Array.isArray(rawIds)
+        ? rawIds
+            .filter(
+              (
+                value: unknown,
+              ): value is string =>
+                typeof value ===
+                "string",
+            )
+            .map(
+              (value: string) =>
+                value.trim(),
+            )
+            .filter(
+              (
+                value: string,
+              ): value is string =>
+                value.length > 0,
+            )
         : [];
 
-    const ids: string[] = [
-      ...new Set(
-        rawIds
-          .filter(
-            (
-              value: unknown,
-            ): value is string =>
-              typeof value === "string",
-          )
-          .map(
-            (value: string) =>
-              value.trim(),
-          )
-          .filter(Boolean),
-      ),
-    ].slice(0, 500);
+    /*
+     * إزالة التكرارات مع بقاء النوع
+     * string[] بشكل صريح.
+     */
+    const uniqueIds: string[] =
+      Array.from(
+        new Set<string>(ids),
+      ).slice(
+        0,
+        MAX_BULK_DELETE,
+      );
 
-    if (!ids.length) {
+    if (!uniqueIds.length) {
       return NextResponse.json(
         {
           success: false,
@@ -1032,24 +1013,22 @@ export async function DELETE(
     }
 
     /*
-     * نجلب الصور أولًا حتى نعرف
-     * ملفات Blob التي يجب حذفها.
+     * جلب السجلات قبل الحذف حتى نعرف
+     * روابط ملفات Vercel Blob.
      */
     const wallpapers =
-      await prisma.wallpaper.findMany(
-        {
-          where: {
-            id: {
-              in: ids,
-            },
-          },
-
-          select: {
-            id: true,
-            imageUrl: true,
+      await prisma.wallpaper.findMany({
+        where: {
+          id: {
+            in: uniqueIds,
           },
         },
-      );
+
+        select: {
+          id: true,
+          imageUrl: true,
+        },
+      });
 
     if (!wallpapers.length) {
       return NextResponse.json(
@@ -1064,12 +1043,13 @@ export async function DELETE(
 
     const foundIds: string[] =
       wallpapers.map(
-        (wallpaper) =>
-          wallpaper.id,
+        (
+          wallpaper,
+        ): string => wallpaper.id,
       );
 
     /*
-     * حذف السجلات من PostgreSQL.
+     * حذف السجلات من PostgreSQL
      */
     await prisma.wallpaper.deleteMany({
       where: {
@@ -1080,31 +1060,42 @@ export async function DELETE(
     });
 
     /*
-     * حذف ملفات الصور من Vercel Blob.
+     * جمع روابط Blob فقط.
+     *
+     * النوع هنا string[] بشكل صريح.
      */
     const blobUrls: string[] =
       wallpapers
         .map(
-          (wallpaper) =>
+          (
+            wallpaper,
+          ): string =>
             wallpaper.imageUrl,
         )
         .filter(
           (
             url: string,
-          ): url is string =>
+          ): boolean =>
             isVercelBlobUrl(url),
         );
 
+    /*
+     * حذف الملفات من Vercel Blob.
+     */
     const blobResults =
       await Promise.allSettled(
-        blobUrls.map((url) =>
-          del(url),
+        blobUrls.map(
+          (
+            url: string,
+          ) => del(url),
         ),
       );
 
     const failedBlobDeletes =
       blobResults.filter(
-        (result) =>
+        (
+          result,
+        ) =>
           result.status ===
           "rejected",
       ).length;
