@@ -1,17 +1,12 @@
 /**
  * GameVortex AI Media Provider
  *
- * Image generation is powered server-side by the Gemini API.
+ * Server-side Gemini image generation adapter.
  *
  * IMPORTANT:
  * - GEMINI_API_KEY is server-only.
  * - Never expose it through NEXT_PUBLIC_* variables.
- * - Video generation remains disabled for now.
- *
- * The Prisma provider enum remains INTERNAL because GameVortex
- * intentionally exposes a single internal media adapter to the
- * rest of the application. Gemini is an implementation detail
- * of that adapter.
+ * - Video generation remains disabled until the image system is finished.
  */
 
 export type ImageResult = {
@@ -34,17 +29,21 @@ export type VideoStatusResult = {
 };
 
 const GEMINI_API_BASE =
-  "https://generativelanguage.googleapis.com/v1";
+  "https://generativelanguage.googleapis.com/v1beta/models";
 
-const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
+const DEFAULT_IMAGE_MODEL =
+  "gemini-3.1-flash-image";
 
 const IMAGE_TIMEOUT_MS = 180_000;
 
 function getGeminiApiKey() {
-  const value = process.env.GEMINI_API_KEY?.trim();
+  const value =
+    process.env.GEMINI_API_KEY?.trim();
 
   if (!value) {
-    throw new Error("GEMINI_API_KEY_NOT_CONFIGURED");
+    throw new Error(
+      "GEMINI_API_KEY_NOT_CONFIGURED",
+    );
   }
 
   return value;
@@ -77,11 +76,9 @@ function normalizeAspectRatio(
     "21:9",
   ]);
 
-  if (value && allowed.has(value)) {
-    return value;
-  }
-
-  return "9:16";
+  return value && allowed.has(value)
+    ? value
+    : "1:1";
 }
 
 function createRequestId() {
@@ -92,10 +89,7 @@ function createRequestId() {
 
 function extractImageFromResponse(
   body: unknown,
-): {
-  base64: string;
-  mimeType: string;
-} | null {
+) {
   if (
     !body ||
     typeof body !== "object" ||
@@ -104,11 +98,10 @@ function extractImageFromResponse(
     return null;
   }
 
-  const candidates = (
-    body as {
+  const candidates =
+    (body as {
       candidates?: unknown;
-    }
-  ).candidates;
+    }).candidates;
 
   if (!Array.isArray(candidates)) {
     return null;
@@ -117,31 +110,27 @@ function extractImageFromResponse(
   for (const candidate of candidates) {
     if (
       !candidate ||
-      typeof candidate !== "object" ||
-      !("content" in candidate)
+      typeof candidate !== "object"
     ) {
       continue;
     }
 
-    const content = (
-      candidate as {
+    const content =
+      (candidate as {
         content?: unknown;
-      }
-    ).content;
+      }).content;
 
     if (
       !content ||
-      typeof content !== "object" ||
-      !("parts" in content)
+      typeof content !== "object"
     ) {
       continue;
     }
 
-    const parts = (
-      content as {
+    const parts =
+      (content as {
         parts?: unknown;
-      }
-    ).parts;
+      }).parts;
 
     if (!Array.isArray(parts)) {
       continue;
@@ -150,17 +139,15 @@ function extractImageFromResponse(
     for (const part of parts) {
       if (
         !part ||
-        typeof part !== "object" ||
-        !("inlineData" in part)
+        typeof part !== "object"
       ) {
         continue;
       }
 
-      const inlineData = (
-        part as {
+      const inlineData =
+        (part as {
           inlineData?: unknown;
-        }
-      ).inlineData;
+        }).inlineData;
 
       if (
         !inlineData ||
@@ -169,19 +156,15 @@ function extractImageFromResponse(
         continue;
       }
 
-      const data = (
-        inlineData as {
+      const data =
+        (inlineData as {
           data?: unknown;
-          mimeType?: unknown;
-        }
-      ).data;
+        }).data;
 
-      const mimeType = (
-        inlineData as {
-          data?: unknown;
+      const mimeType =
+        (inlineData as {
           mimeType?: unknown;
-        }
-      ).mimeType;
+        }).mimeType;
 
       if (
         typeof data === "string" &&
@@ -190,8 +173,11 @@ function extractImageFromResponse(
         return {
           base64: data,
           mimeType:
-            typeof mimeType === "string" &&
-            mimeType.startsWith("image/")
+            typeof mimeType ===
+              "string" &&
+            mimeType.startsWith(
+              "image/",
+            )
               ? mimeType
               : "image/png",
         };
@@ -204,20 +190,18 @@ function extractImageFromResponse(
 
 function extractGeminiError(
   body: unknown,
-): string | null {
+) {
   if (
     !body ||
-    typeof body !== "object" ||
-    !("error" in body)
+    typeof body !== "object"
   ) {
     return null;
   }
 
-  const error = (
-    body as {
+  const error =
+    (body as {
       error?: unknown;
-    }
-  ).error;
+    }).error;
 
   if (
     !error ||
@@ -226,79 +210,145 @@ function extractGeminiError(
     return null;
   }
 
-  const message = (
-    error as {
+  const message =
+    (error as {
       message?: unknown;
-    }
-  ).message;
+    }).message;
 
   return typeof message === "string"
     ? message
     : null;
 }
 
-export async function generateImage(
-  prompt: string,
-  aspectRatio = "9:16",
-): Promise<ImageResult> {
-  const cleanPrompt = prompt.trim();
+function classifyProviderFailure(
+  status: number,
+  message: string | null,
+) {
+  const normalized =
+    (message || "").toLowerCase();
 
-  if (!cleanPrompt) {
-    throw new Error("AI_IMAGE_PROMPT_REQUIRED");
+  if (
+    status === 401 ||
+    status === 403 ||
+    normalized.includes("billing") ||
+    normalized.includes("paid tier") ||
+    normalized.includes("payment") ||
+    normalized.includes("quota")
+  ) {
+    return "GEMINI_IMAGE_BILLING_REQUIRED";
   }
 
-  const apiKey = getGeminiApiKey();
-  const model = getImageModel();
-  const requestId = createRequestId();
-  const ratio = normalizeAspectRatio(aspectRatio);
+  if (status === 429) {
+    return "GEMINI_RATE_LIMITED";
+  }
 
-  const controller = new AbortController();
+  if (
+    status === 408 ||
+    status === 504
+  ) {
+    return "GEMINI_IMAGE_TIMEOUT";
+  }
 
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, IMAGE_TIMEOUT_MS);
+  return "GEMINI_IMAGE_GENERATION_FAILED";
+}
 
-  try {
-    const response = await fetch(
-      `${GEMINI_API_BASE}/models/${encodeURIComponent(
-        model,
-      )}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: cleanPrompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseModalities: ["IMAGE"],
-            responseFormat: {
-              image: {
-                aspectRatio: ratio,
-              },
-            },
-          },
-        }),
-        signal: controller.signal,
-        cache: "no-store",
-      },
+export async function generateImage(
+  prompt: string,
+  aspectRatio = "1:1",
+): Promise<ImageResult> {
+  const cleanPrompt =
+    prompt.trim();
+
+  if (!cleanPrompt) {
+    throw new Error(
+      "AI_IMAGE_PROMPT_REQUIRED",
+    );
+  }
+
+  const apiKey =
+    getGeminiApiKey();
+
+  const model =
+    getImageModel();
+
+  const requestId =
+    createRequestId();
+
+  const ratio =
+    normalizeAspectRatio(
+      aspectRatio,
     );
 
-    const rawBody = await response.text();
+  const controller =
+    new AbortController();
+
+  const timeout = setTimeout(
+    () =>
+      controller.abort(),
+    IMAGE_TIMEOUT_MS,
+  );
+
+  try {
+    const response =
+      await fetch(
+        `${GEMINI_API_BASE}/${encodeURIComponent(
+          model,
+        )}:generateContent`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+            Accept:
+              "application/json",
+            "x-goog-api-key":
+              apiKey,
+          },
+
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text:
+                      cleanPrompt,
+                  },
+                ],
+              },
+            ],
+
+            generationConfig: {
+              responseModalities: [
+                "IMAGE",
+              ],
+
+              responseFormat: {
+                image: {
+                  aspectRatio:
+                    ratio,
+                  imageSize: "1K",
+                },
+              },
+            },
+          }),
+
+          signal:
+            controller.signal,
+
+          cache: "no-store",
+        },
+      );
+
+    const rawBody =
+      await response.text();
 
     let body: unknown = {};
 
     try {
-      body = rawBody ? JSON.parse(rawBody) : {};
+      body = rawBody
+        ? JSON.parse(rawBody)
+        : {};
     } catch {
       throw new Error(
         "GEMINI_INVALID_RESPONSE",
@@ -307,46 +357,56 @@ export async function generateImage(
 
     if (!response.ok) {
       const providerMessage =
-        extractGeminiError(body);
+        extractGeminiError(
+          body,
+        );
+
+      const code =
+        classifyProviderFailure(
+          response.status,
+          providerMessage,
+        );
 
       console.error(
-        "Gemini image generation failed:",
+        "Gemini image generation failed",
         {
           requestId,
-          status: response.status,
-          message: providerMessage,
+          status:
+            response.status,
+          code,
+          message:
+            providerMessage?.slice(
+              0,
+              500,
+            ),
         },
       );
 
-      if (
-        response.status === 401 ||
-        response.status === 403
-      ) {
-        throw new Error(
-          "GEMINI_AUTH_FAILED",
-        );
-      }
-
-      if (response.status === 429) {
-        throw new Error(
-          "GEMINI_RATE_LIMITED",
-        );
-      }
-
-      throw new Error(
-        "GEMINI_IMAGE_GENERATION_FAILED",
-      );
+      throw new Error(code);
     }
 
     const image =
-      extractImageFromResponse(body);
+      extractImageFromResponse(
+        body,
+      );
 
     if (!image) {
       console.error(
-        "Gemini returned no image:",
+        "Gemini returned no image",
         {
           requestId,
           model,
+          responseKeys:
+            body &&
+            typeof body ===
+              "object"
+              ? Object.keys(
+                  body as Record<
+                    string,
+                    unknown
+                  >,
+                )
+              : [],
         },
       );
 
@@ -355,17 +415,9 @@ export async function generateImage(
       );
     }
 
-    /*
-     * The provider adapter returns a data URL.
-     *
-     * The API route is responsible for storing this image
-     * in Vercel Blob and returning the permanent public URL.
-     */
-    const dataUrl = `data:${image.mimeType};base64,${image.base64}`;
-
     return {
       requestId,
-      url: dataUrl,
+      url: `data:${image.mimeType};base64,${image.base64}`,
       model,
     };
   } catch (error) {
