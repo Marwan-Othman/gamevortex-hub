@@ -1,64 +1,38 @@
-/**
- * GameVortex AI Runtime
- *
- * Provider:
- * Google Gemini API
- *
- * Environment:
- * GEMINI_API_KEY
- * GEMINI_MODEL (optional)
- *
- * This runtime replaces the old Ollama runtime while keeping
- * the existing GameVortex AI chat streaming contract compatible.
- */
+import { getRuntimeConfig } from "@/lib/gamevortex-ai/config";
 
-export type GameVortexAIMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
+export type CreateChatStreamResult = {
+  response: Response;
+  replaceMessageId?: string;
 };
 
-export type GameVortexAIRuntimeOptions = {
-  model?: string;
-  temperature?: number;
-  maxOutputTokens?: number;
-  signal?: AbortSignal;
+type GeminiMessage = {
+  role: "user" | "model";
+  parts: Array<{
+    text: string;
+  }>;
 };
 
-export type GameVortexAIResult = {
-  text: string;
-  model: string;
+type GeminiCandidate = {
+  content?: {
+    parts?: Array<{
+      text?: unknown;
+    }>;
+  };
 };
 
-const GEMINI_API_URL =
+type GeminiStreamChunk = {
+  candidates?: GeminiCandidate[];
+  error?: {
+    message?: string;
+  };
+};
+
+const MAX_HISTORY_MESSAGES = 100;
+const MAX_MESSAGE_LENGTH = 12000;
+const GEMINI_API_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
-const DEFAULT_MODEL =
-  process.env.GEMINI_MODEL?.trim() ||
-  "gemini-3.8-flash";
-
-const DEFAULT_TEMPERATURE = 0.7;
-const DEFAULT_MAX_OUTPUT_TOKENS = 2000;
-
-const MAX_MESSAGE_LENGTH = 4000;
-const MAX_MESSAGES = 50;
-
-function getGeminiApiKey(): string {
-  const apiKey =
-    process.env.GEMINI_API_KEY?.trim();
-
-  if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY is not configured.",
-    );
-  }
-
-  return apiKey;
-}
-
-function cleanText(
-  value: unknown,
-  maxLength = MAX_MESSAGE_LENGTH,
-): string {
+function cleanText(value: unknown, maxLength = MAX_MESSAGE_LENGTH) {
   if (typeof value !== "string") {
     return "";
   }
@@ -72,177 +46,42 @@ function cleanText(
     .slice(0, maxLength);
 }
 
-function normalizeMessages(
-  messages: GameVortexAIMessage[],
-): GameVortexAIMessage[] {
-  return messages
-    .filter(
-      (message) =>
-        message &&
-        (
-          message.role === "system" ||
-          message.role === "user" ||
-          message.role === "assistant"
-        ),
-    )
-    .map((message) => ({
-      role: message.role,
-      content: cleanText(
-        message.content,
-        MAX_MESSAGE_LENGTH,
-      ),
-    }))
-    .filter(
-      (message) =>
-        message.content.length > 0,
-    )
-    .slice(-MAX_MESSAGES);
-}
-
-function convertRole(
-  role: GameVortexAIMessage["role"],
-): "user" | "model" {
-  return role === "assistant"
-    ? "model"
-    : "user";
-}
-
-function buildGeminiRequest(
-  messages: GameVortexAIMessage[],
-  options: GameVortexAIRuntimeOptions,
-) {
-  const normalized =
-    normalizeMessages(messages);
-
-  if (normalized.length === 0) {
-    throw new Error(
-      "AI_EMPTY_INPUT",
-    );
+function mapGeminiError(status: number): Error {
+  if (status === 401 || status === 403) {
+    return new Error("RUNTIME_AUTH_FAILED");
   }
 
-  const systemMessages =
-    normalized.filter(
-      (message) =>
-        message.role === "system",
-    );
+  if (status === 408 || status === 504) {
+    return new Error("RUNTIME_TIMEOUT");
+  }
 
-  const conversationMessages =
-    normalized.filter(
-      (message) =>
-        message.role !== "system",
-    );
+  if (status === 429) {
+    return new Error("RUNTIME_HTTP_ERROR");
+  }
 
-  const systemText =
-    systemMessages
-      .map(
-        (message) =>
-          message.content,
-      )
-      .join("\n\n")
-      .trim();
+  if (status >= 500) {
+    return new Error("RUNTIME_HTTP_ERROR");
+  }
 
-  const contents =
-    conversationMessages.map(
-      (message) => ({
-        role: convertRole(
-          message.role,
-        ),
-        parts: [
-          {
-            text: message.content,
-          },
-        ],
-      }),
-    );
-
-  return {
-    ...(systemText
-      ? {
-          systemInstruction: {
-            parts: [
-              {
-                text: systemText,
-              },
-            ],
-          },
-        }
-      : {}),
-
-    contents,
-
-    generationConfig: {
-      temperature:
-        typeof options.temperature ===
-        "number"
-          ? Math.max(
-              0,
-              Math.min(
-                options.temperature,
-                2,
-              ),
-            )
-          : DEFAULT_TEMPERATURE,
-
-      maxOutputTokens:
-        typeof options.maxOutputTokens ===
-        "number"
-          ? Math.max(
-              1,
-              Math.min(
-                Math.floor(
-                  options.maxOutputTokens,
-                ),
-                8192,
-              ),
-            )
-          : DEFAULT_MAX_OUTPUT_TOKENS,
-    },
-  };
+  return new Error("RUNTIME_HTTP_ERROR");
 }
 
-function extractText(
-  data: unknown,
-): string {
-  if (
-    !data ||
-    typeof data !== "object"
-  ) {
+function extractChunkText(data: GeminiStreamChunk): string {
+  if (!Array.isArray(data.candidates)) {
     return "";
   }
 
-  const response =
-    data as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{
-            text?: unknown;
-          }>;
-        };
-      }>;
-    };
-
-  const candidates =
-    Array.isArray(
-      response.candidates,
-    )
-      ? response.candidates
-      : [];
-
   let text = "";
 
-  for (const candidate of candidates) {
-    const parts =
-      candidate.content?.parts;
+  for (const candidate of data.candidates) {
+    const parts = candidate.content?.parts;
 
     if (!Array.isArray(parts)) {
       continue;
     }
 
     for (const part of parts) {
-      if (
-        typeof part.text ===
-        "string"
-      ) {
+      if (typeof part.text === "string") {
         text += part.text;
       }
     }
@@ -251,368 +90,420 @@ function extractText(
   return text;
 }
 
-async function parseGeminiError(
-  response: Response,
-): Promise<string> {
-  let body: unknown = null;
-
-  try {
-    body = await response.json();
-  } catch {
-    try {
-      body = await response.text();
-    } catch {
-      body = null;
-    }
+function createNdjsonStream(
+  geminiResponse: Response,
+): ReadableStream<Uint8Array> {
+  if (!geminiResponse.body) {
+    throw new Error("RUNTIME_INVALID_RESPONSE");
   }
 
-  if (
-    body &&
-    typeof body === "object" &&
-    "error" in body
-  ) {
-    const error =
-      (
-        body as {
-          error?: {
-            message?: unknown;
-          };
-        }
-      ).error;
-
-    if (
-      error &&
-      typeof error.message ===
-        "string"
-    ) {
-      return error.message;
-    }
-  }
-
-  if (
-    typeof body === "string" &&
-    body.trim()
-  ) {
-    return body.trim().slice(0, 1000);
-  }
-
-  return `Gemini API request failed with status ${response.status}.`;
-}
-
-/**
- * Non-streaming Gemini response.
- */
-export async function runGameVortexAI(
-  messages: GameVortexAIMessage[],
-  options: GameVortexAIRuntimeOptions = {},
-): Promise<GameVortexAIResult> {
-  const apiKey =
-    getGeminiApiKey();
-
-  const model =
-    options.model?.trim() ||
-    DEFAULT_MODEL;
-
-  const requestBody =
-    buildGeminiRequest(
-      messages,
-      options,
-    );
-
-  const response =
-    await fetch(
-      `${GEMINI_API_URL}/${encodeURIComponent(
-        model,
-      )}:generateContent`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-          "x-goog-api-key":
-            apiKey,
-        },
-
-        body: JSON.stringify(
-          requestBody,
-        ),
-
-        signal:
-          options.signal,
-
-        cache: "no-store",
-      },
-    );
-
-  if (!response.ok) {
-    const error =
-      await parseGeminiError(
-        response,
-      );
-
-    throw new Error(
-      `Gemini API error: ${error}`,
-    );
-  }
-
-  const data: unknown =
-    await response.json();
-
-  const text =
-    extractText(data)
-      .trim();
-
-  if (!text) {
-    throw new Error(
-      "Gemini returned an empty response.",
-    );
-  }
-
-  return {
-    text,
-    model,
-  };
-}
-
-/**
- * Streaming Gemini response.
- *
- * Gemini returns Server-Sent Events.
- * This function converts those events into
- * plain text chunks so the existing GameVortex
- * chat layer can continue streaming normally.
- */
-export async function* streamGameVortexAI(
-  messages: GameVortexAIMessage[],
-  options: GameVortexAIRuntimeOptions = {},
-): AsyncGenerator<
-  string,
-  void,
-  unknown
-> {
-  const apiKey =
-    getGeminiApiKey();
-
-  const model =
-    options.model?.trim() ||
-    DEFAULT_MODEL;
-
-  const requestBody =
-    buildGeminiRequest(
-      messages,
-      options,
-    );
-
-  const response =
-    await fetch(
-      `${GEMINI_API_URL}/${encodeURIComponent(
-        model,
-      )}:streamGenerateContent?alt=sse`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-          "x-goog-api-key":
-            apiKey,
-          Accept:
-            "text/event-stream",
-        },
-
-        body: JSON.stringify(
-          requestBody,
-        ),
-
-        signal:
-          options.signal,
-
-        cache: "no-store",
-      },
-    );
-
-  if (!response.ok) {
-    const error =
-      await parseGeminiError(
-        response,
-      );
-
-    throw new Error(
-      `Gemini API error: ${error}`,
-    );
-  }
-
-  if (!response.body) {
-    throw new Error(
-      "Gemini returned no streaming body.",
-    );
-  }
-
-  const reader =
-    response.body.getReader();
-
-  const decoder =
-    new TextDecoder();
+  const reader = geminiResponse.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
 
   let buffer = "";
 
-  try {
-    while (true) {
-      const {
-        done,
-        value,
-      } =
-        await reader.read();
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
 
-      if (done) {
-        break;
-      }
+          if (done) {
+            break;
+          }
 
-      buffer +=
-        decoder.decode(
-          value,
-          {
+          buffer += decoder.decode(value, {
             stream: true,
-          },
-        );
+          });
 
-      const events =
-        buffer.split(
-          "\n\n",
-        );
+          const events = buffer.split("\n\n");
+          buffer = events.pop() ?? "";
 
-      buffer =
-        events.pop() ?? "";
+          for (const event of events) {
+            const lines = event.split("\n");
 
-      for (
-        const eventBlock of events
-      ) {
-        const lines =
-          eventBlock.split(
-            "\n",
-          );
+            for (const line of lines) {
+              const trimmed = line.trim();
 
-        for (
-          const line of lines
-        ) {
-          const trimmed =
-            line.trim();
+              if (!trimmed.startsWith("data:")) {
+                continue;
+              }
 
-          if (
-            !trimmed.startsWith(
-              "data:",
-            )
-          ) {
-            continue;
-          }
+              const payload = trimmed.slice(5).trim();
 
-          const payload =
-            trimmed
-              .slice(5)
-              .trim();
+              if (!payload || payload === "[DONE]") {
+                continue;
+              }
 
-          if (!payload) {
-            continue;
-          }
+              let data: GeminiStreamChunk;
 
-          let event: unknown;
+              try {
+                data = JSON.parse(payload) as GeminiStreamChunk;
+              } catch {
+                continue;
+              }
 
-          try {
-            event =
-              JSON.parse(
-                payload,
+              if (data.error) {
+                controller.error(
+                  new Error("RUNTIME_STREAM_FAILED"),
+                );
+                return;
+              }
+
+              const text = extractChunkText(data);
+
+              if (!text) {
+                continue;
+              }
+
+              /*
+               * route.ts expects NDJSON in this format:
+               *
+               * {
+               *   "message": {
+               *     "content": "..."
+               *   }
+               * }
+               */
+              controller.enqueue(
+                encoder.encode(
+                  JSON.stringify({
+                    message: {
+                      content: text,
+                    },
+                  }) + "\n",
+                ),
               );
-          } catch {
-            continue;
-          }
-
-          const chunk =
-            extractText(
-              event,
-            );
-
-          if (chunk) {
-            yield chunk;
+            }
           }
         }
-      }
-    }
 
-    /*
-     * Flush any final decoder data.
-     */
-    buffer +=
-      decoder.decode();
+        buffer += decoder.decode();
 
-    if (buffer.trim()) {
-      const lines =
-        buffer.split(
-          "\n",
+        if (buffer.trim()) {
+          const lines = buffer.split("\n");
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+
+            if (!trimmed.startsWith("data:")) {
+              continue;
+            }
+
+            const payload = trimmed.slice(5).trim();
+
+            if (!payload || payload === "[DONE]") {
+              continue;
+            }
+
+            try {
+              const data =
+                JSON.parse(payload) as GeminiStreamChunk;
+
+              const text = extractChunkText(data);
+
+              if (text) {
+                controller.enqueue(
+                  encoder.encode(
+                    JSON.stringify({
+                      message: {
+                        content: text,
+                      },
+                    }) + "\n",
+                  ),
+                );
+              }
+            } catch {
+              // Ignore incomplete trailing SSE data.
+            }
+          }
+        }
+
+        controller.close();
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: "gamevortex_gemini_stream_error",
+            error:
+              error instanceof Error
+                ? error.message
+                : "UNKNOWN_ERROR",
+          }),
         );
 
-      for (
-        const line of lines
-      ) {
-        const trimmed =
-          line.trim();
-
-        if (
-          !trimmed.startsWith(
-            "data:",
-          )
-        ) {
-          continue;
-        }
-
-        const payload =
-          trimmed
-            .slice(5)
-            .trim();
-
-        if (!payload) {
-          continue;
-        }
-
-        try {
-          const event =
-            JSON.parse(
-              payload,
-            );
-
-          const chunk =
-            extractText(
-              event,
-            );
-
-          if (chunk) {
-            yield chunk;
-          }
-        } catch {
-          // Ignore incomplete final SSE data.
-        }
+        controller.error(
+          error instanceof Error
+            ? error
+            : new Error("RUNTIME_STREAM_FAILED"),
+        );
+      } finally {
+        reader.releaseLock();
       }
-    }
-  } finally {
-    reader.releaseLock();
-  }
+    },
+
+    async cancel() {
+      try {
+        await reader.cancel();
+      } catch {
+        // Client disconnected.
+      }
+    },
+  });
 }
 
-/**
- * Compatibility aliases.
- *
- * These allow existing GameVortex AI callers
- * to use the new Gemini runtime without
- * changing their naming conventions.
- */
-export const gameVortexAI =
-  runGameVortexAI;
+export async function createChatStream(
+  userId: string,
+  conversationId: string,
+  prompt: string,
+  signal?: AbortSignal,
+  regenerate = false,
+): Promise<CreateChatStreamResult> {
+  if (!userId) {
+    throw new Error("UNAUTHORIZED");
+  }
 
-export const gameVortexAIStream =
-  streamGameVortexAI;
+  if (!conversationId) {
+    throw new Error("CONVERSATION_NOT_FOUND");
+  }
 
-export const aiRuntime =
-  runGameVortexAI;
+  const cleanedPrompt = cleanText(prompt);
 
-export const aiRuntimeStream =
-  streamGameVortexAI;
+  if (!cleanedPrompt) {
+    throw new Error("INVALID_REQUEST");
+  }
+
+  /*
+   * Import Prisma lazily so this module remains server-only.
+   */
+  const { db } = await import("@/lib/prisma");
+
+  const conversation =
+    await db.gameVortexAiConversation.findFirst({
+      where: {
+        id: conversationId,
+        userId,
+      },
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: "asc",
+          },
+          take: MAX_HISTORY_MESSAGES,
+        },
+      },
+    });
+
+  if (!conversation) {
+    throw new Error("CONVERSATION_NOT_FOUND");
+  }
+
+  let replaceMessageId: string | undefined;
+
+  /*
+   * Regeneration:
+   * reuse the most recent assistant message slot.
+   */
+  if (regenerate) {
+    const lastAssistant =
+      [...conversation.messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === "assistant",
+        );
+
+    if (!lastAssistant) {
+      throw new Error("REGENERATION_NOT_AVAILABLE");
+    }
+
+    replaceMessageId = lastAssistant.id;
+  }
+
+  const history: GeminiMessage[] = [];
+
+  const systemInstructions =
+    cleanText(
+      conversation.systemInstructions,
+      2000,
+    );
+
+  if (systemInstructions) {
+    history.push({
+      role: "user",
+      parts: [
+        {
+          text: systemInstructions,
+        },
+      ],
+    });
+  }
+
+  for (const message of conversation.messages) {
+    if (
+      message.role !== "user" &&
+      message.role !== "assistant"
+    ) {
+      continue;
+    }
+
+    const content = cleanText(message.content);
+
+    if (!content) {
+      continue;
+    }
+
+    history.push({
+      role:
+        message.role === "assistant"
+          ? "model"
+          : "user",
+      parts: [
+        {
+          text: content,
+        },
+      ],
+    });
+  }
+
+  /*
+   * For a normal request the new user prompt is added.
+   *
+   * During regeneration, the client sends the same prompt,
+   * but we don't duplicate it when it is already the last
+   * user message in the stored conversation.
+   */
+  const lastStoredMessage =
+    conversation.messages[
+      conversation.messages.length - 1
+    ];
+
+  const alreadyStored =
+    lastStoredMessage?.role === "user" &&
+    cleanText(lastStoredMessage.content) ===
+      cleanedPrompt;
+
+  if (!alreadyStored || regenerate) {
+    history.push({
+      role: "user",
+      parts: [
+        {
+          text: cleanedPrompt,
+        },
+      ],
+    });
+  }
+
+  const config = getRuntimeConfig();
+
+  const endpoint =
+    `${GEMINI_API_BASE}/` +
+    `${encodeURIComponent(config.model)}` +
+    `:streamGenerateContent?alt=sse`;
+
+  let geminiResponse: Response;
+
+  try {
+    geminiResponse = await fetch(endpoint, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+
+        /*
+         * API key remains server-side.
+         */
+        "x-goog-api-key":
+          process.env.GEMINI_API_KEY!,
+      },
+
+      body: JSON.stringify({
+        contents: history,
+
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096,
+        },
+      }),
+
+      signal,
+
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "AbortError"
+    ) {
+      throw new Error(
+        "RUNTIME_REQUEST_CANCELLED",
+      );
+    }
+
+    console.error(
+      JSON.stringify({
+        event: "gamevortex_gemini_unreachable",
+        error:
+          error instanceof Error
+            ? error.message
+            : "UNKNOWN_ERROR",
+      }),
+    );
+
+    throw new Error(
+      "RUNTIME_UNREACHABLE",
+    );
+  }
+
+  if (!geminiResponse.ok) {
+    let providerMessage = "";
+
+    try {
+      const data = (await geminiResponse.json()) as {
+        error?: {
+          message?: string;
+        };
+      };
+
+      providerMessage =
+        typeof data?.error?.message === "string"
+          ? data.error.message
+          : "";
+    } catch {
+      // Ignore provider response parsing failure.
+    }
+
+    console.error(
+      JSON.stringify({
+        event: "gamevortex_gemini_http_error",
+        status: geminiResponse.status,
+        message: providerMessage.slice(0, 500),
+      }),
+    );
+
+    throw mapGeminiError(
+      geminiResponse.status,
+    );
+  }
+
+  const stream =
+    createNdjsonStream(geminiResponse);
+
+  const response = new Response(stream, {
+    status: 200,
+
+    headers: {
+      "Content-Type":
+        "application/x-ndjson; charset=utf-8",
+      "Cache-Control":
+        "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+
+  return {
+    response,
+    replaceMessageId,
+  };
+}
