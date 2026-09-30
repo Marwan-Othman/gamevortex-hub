@@ -1895,7 +1895,7 @@ model GameVortexApiKey {
   revokedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  requestLogs GameVortexApiRequestLog[]
+  requests GameVortexApiRequestLog[]
 
   @@index([userId, revokedAt, createdAt])
 }
