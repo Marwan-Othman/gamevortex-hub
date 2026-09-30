@@ -7,7 +7,7 @@ Date: 2026-09-29
 - Wallpaper schema includes FREE/VIP, media type, moderation, license metadata, indexes, favorites and reports.
 - AI media schema includes image/video jobs, provider, status, idempotency, credits balance and credit ledger.
 - AI media idempotency is user-scoped to prevent cross-user key collisions.
-- External AI media generation is disabled in this release; the wallpaper system does not depend on FAL.ai or MiniMax.
+- External AI media generation is disabled in this release; the wallpaper system does not depend on external media provider or external video provider.
 - Wallpaper moderation defaults existing records to APPROVED and new user submissions are controlled by moderation flow.
 - Existing project audit script passes its source-level checks.
 - Final content audit passes.
@@ -46,4 +46,4 @@ Do not put production secrets in GitHub. Configure them in the deployment enviro
 
 ## Provider decision
 
-FAL.ai and MiniMax credentials are intentionally not part of this release. External AI media generation is disabled and does not block the wallpaper system or the main GameVortex AI chat.
+external media provider and external video provider credentials are intentionally not part of this release. External AI media generation is disabled and does not block the wallpaper system or the main GameVortex AI chat.

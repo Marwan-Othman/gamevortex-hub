@@ -17,7 +17,7 @@ function classifyError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (/^P\d{4}$/.test(String((error as { code?: unknown })?.code || ""))) return "DATABASE_UNAVAILABLE";
   const known = new Set([
-    "CONVERSATION_NOT_FOUND", "REGENERATION_NOT_AVAILABLE", "RUNTIME_NOT_CONFIGURED",
+    "CONVERSATION_NOT_FOUND", "REGENERATION_NOT_AVAILABLE", "SENSITIVE_SITE_REQUEST_BLOCKED", "RUNTIME_NOT_CONFIGURED",
     "RUNTIME_TOKEN_NOT_CONFIGURED", "RUNTIME_CONFIGURATION_INVALID", "RUNTIME_AUTH_FAILED",
     "RUNTIME_ENDPOINT_INVALID", "RUNTIME_UNREACHABLE", "RUNTIME_TIMEOUT",
     "RUNTIME_REQUEST_CANCELLED", "RUNTIME_HTTP_ERROR", "RUNTIME_INVALID_RESPONSE",
@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
     const safeCode = classifyError(error);
     if (safeCode !== "RUNTIME_REQUEST_CANCELLED") console.error(JSON.stringify({ event: "gamevortex_ai_request_failed", code: safeCode, requestId }));
     const statusByCode: Record<string, number> = {
+      SENSITIVE_SITE_REQUEST_BLOCKED: 403,
       CONVERSATION_NOT_FOUND: 404,
       REGENERATION_NOT_AVAILABLE: 409,
       RUNTIME_NOT_CONFIGURED: 503,

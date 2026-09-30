@@ -1,2 +1,2 @@
-console.log('AI media provider check: external FAL/MiniMax providers are intentionally disabled in this build.');
+console.log("GameVortex AI media check: no external media providers are configured or required by the independent chat runtime.");
 process.exit(0);

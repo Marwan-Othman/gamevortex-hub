@@ -5,10 +5,10 @@ export default function AIWallpapersPage() {
         <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">GameVortex AI</p>
         <h1 className="text-3xl font-black md:text-5xl">AI Wallpapers & Video</h1>
         <p className="mt-3 max-w-2xl text-white/60">
-          AI image and video generation is currently disabled. The main GameVortex AI chat remains independent from external media providers.
+          GameVortex AI chat runs on the independent self-hosted AI runtime. No external media provider is required by the chat system.
         </p>
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 text-white/70">
-          No FAL_KEY or MINIMAX_API_KEY is required for the current build.
+          Image and video generation are intentionally disabled until an independent media runtime is implemented. Existing media storage and deletion support remain available.
         </div>
       </div>
     </main>

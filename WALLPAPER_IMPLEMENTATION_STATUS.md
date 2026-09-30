@@ -49,12 +49,12 @@ Do not commit real API keys or production database credentials.
 ## Still provider-dependent / requires production verification
 
 - Real AI image generation and AI credit accounting require a configured image provider and a deliberate credit ledger integration.
-- Real video generation requires the configured MiniMax provider and durable storage.
+- Real video generation requires the configured external video provider provider and durable storage.
 - Binary object storage/CDN upload requires a production storage provider.
 - Full typecheck/build could not be executed in this offline build workspace because dependency installation timed out.
 
 ## Batch continuation
-- Added a server-side AI media gateway for image generation through fal and asynchronous video generation through MiniMax.
+- Added a server-side AI media gateway for image generation through external media provider and asynchronous video generation through external video provider.
 - Added idempotent AI media jobs and credit ledger/balance schema with a dedicated migration.
 - Added AI media status endpoint and a first-party `/ai/wallpapers` UI.
 - Added server-only provider configuration examples.

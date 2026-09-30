@@ -1,0 +1,14 @@
+{
+  "external_media_provider_runtime_refs": [
+    "prisma/migrations/20260923143000_add_ai_media_jobs/migration.sql",
+    "prisma/migrations/20260929195500_add_ai_media_credits/migration.sql"
+  ],
+  "active_external_media_env_refs": [],
+  "independent_runtime_files": [
+    "lib/gamevortex-ai/config.ts",
+    "lib/gamevortex-ai/runtime.ts",
+    "self-hosted-ai/gateway.mjs",
+    "self-hosted-ai/.env.example"
+  ],
+  "migration_added": "prisma/migrations/20260930120000_remove_external_ai_media_providers/migration.sql"
+}
