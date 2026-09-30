@@ -12,38 +12,84 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+/**
+ * GameVortex Wallpaper Blob Client Upload
+ *
+ * يدعم طريقتين للمصادقة مع Vercel Blob:
+ *
+ * 1. BLOB_READ_WRITE_TOKEN
+ *    للتخزين التقليدي باستخدام Read/Write Token.
+ *
+ * 2. Vercel OIDC
+ *    عند ربط Blob بالمشروع واستخدام OIDC في Vercel،
+ *    يمكن لـ Vercel Function المصادقة تلقائيًا بدون
+ *    الحاجة إلى BLOB_READ_WRITE_TOKEN.
+ *
+ * مهم:
+ * BLOB_READ_WRITE_TOKEN لا يتم إرساله إلى المتصفح أبدًا.
+ */
+
+function getBlobToken() {
+  const value =
+    process.env.BLOB_READ_WRITE_TOKEN?.trim();
+
+  return value || undefined;
+}
+
+function isValidWallpaperPath(
+  pathname: unknown,
+): pathname is string {
+  if (typeof pathname !== "string") {
+    return false;
+  }
+
+  const value = pathname.trim();
+
+  if (!value) {
+    return false;
+  }
+
+  if (!value.startsWith("wallpapers/")) {
+    return false;
+  }
+
+  /*
+   * منع path traversal.
+   */
+  if (
+    value.includes("..") ||
+    value.includes("\\") ||
+    value.includes("\0")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAllowedWallpaperMimeType(
+  value: unknown,
+): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return (
+    WALLPAPER_IMAGE_MIME_TYPES as readonly string[]
+  ).includes(value.toLowerCase());
+}
+
+export async function POST(
+  request: NextRequest,
+) {
   try {
     /*
      * ------------------------------------------------------------
-     * 1. Verify Blob configuration before doing anything else.
+     * 1. قراءة body القادم من @vercel/blob/client
      * ------------------------------------------------------------
      *
-     * The token must exist on the server.
-     * It must NEVER be exposed to the browser.
-     */
-    const blobToken =
-      process.env.BLOB_READ_WRITE_TOKEN?.trim();
-
-    if (!blobToken) {
-      console.error(
-        "Wallpaper upload configuration error: BLOB_READ_WRITE_TOKEN is missing.",
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Vercel Blob غير مهيأ بشكل صحيح. BLOB_READ_WRITE_TOKEN غير موجود في بيئة Production.",
-        },
-        { status: 500 },
-      );
-    }
-
-    /*
-     * ------------------------------------------------------------
-     * 2. Parse the request body.
-     * ------------------------------------------------------------
+     * upload() في المتصفح يرسل JSON إلى هذا endpoint
+     * حتى يحصل على clientToken.
      */
     let body: HandleUploadBody;
 
@@ -52,7 +98,7 @@ export async function POST(request: NextRequest) {
         (await request.json()) as HandleUploadBody;
     } catch (error) {
       console.error(
-        "Wallpaper upload request body parsing failed:",
+        "GameVortex Blob upload body parsing failed:",
         error,
       );
 
@@ -60,27 +106,54 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "بيانات رفع الصورة غير صالحة.",
+            "بيانات طلب رفع الخلفية غير صالحة.",
         },
-        { status: 400 },
+        {
+          status: 400,
+        },
       );
     }
 
     /*
      * ------------------------------------------------------------
-     * 3. Generate the Vercel Blob client token.
+     * 2. تجهيز Blob authentication
      * ------------------------------------------------------------
+     *
+     * لا نفرض وجود BLOB_READ_WRITE_TOKEN هنا.
+     *
+     * إذا كان موجودًا سيتم تمريره إلى handleUpload.
+     *
+     * وإذا لم يكن موجودًا، يستطيع Vercel استخدام OIDC
+     * عند تفعيل OIDC على Blob Store المرتبط بالمشروع.
+     */
+    const blobToken = getBlobToken();
+
+    /*
+     * ------------------------------------------------------------
+     * 3. إنشاء client token
+     * ------------------------------------------------------------
+     *
+     * handleUpload مسؤول عن إنشاء token قصير العمر
+     * خاص بالمتصفح.
+     *
+     * لا نرسل BLOB_READ_WRITE_TOKEN للعميل.
      */
     const response = await handleUpload({
-      token: blobToken,
+      ...(blobToken
+        ? {
+            token: blobToken,
+          }
+        : {}),
 
       request,
 
       body,
 
       /*
-       * This callback is executed when the browser requests
-       * permission to upload a file.
+       * ----------------------------------------------------------
+       * يتم استدعاء هذا الجزء عند طلب المتصفح إنشاء
+       * client upload token.
+       * ----------------------------------------------------------
        */
       onBeforeGenerateToken:
         async (pathname) => {
@@ -89,7 +162,11 @@ export async function POST(request: NextRequest) {
            * Authentication
            * ------------------------------------------------------
            *
-           * Only SUPER_ADMIN may generate wallpaper upload tokens.
+           * المستخدم يجب أن يكون SUPER_ADMIN.
+           *
+           * هذا التحقق يتم هنا وليس قبل handleUpload،
+           * لأن Vercel Blob قد يرسل callback منفصلًا
+           * بعد اكتمال الرفع ولا يحمل session cookie.
            */
           const user =
             await getOptionalUser();
@@ -99,7 +176,7 @@ export async function POST(request: NextRequest) {
             user.role !== "SUPER_ADMIN"
           ) {
             console.warn(
-              "Unauthorized wallpaper upload token request.",
+              "GameVortex wallpaper upload rejected: unauthorized user.",
             );
 
             throw new Error(
@@ -109,21 +186,16 @@ export async function POST(request: NextRequest) {
 
           /*
            * ------------------------------------------------------
-           * Validate upload path
+           * Validate pathname
            * ------------------------------------------------------
            */
           if (
-            typeof pathname !==
-              "string" ||
-            !pathname.startsWith(
-              "wallpapers/",
-            ) ||
-            pathname.includes(
-              "..",
+            !isValidWallpaperPath(
+              pathname,
             )
           ) {
             console.warn(
-              "Invalid wallpaper upload pathname:",
+              "GameVortex wallpaper upload rejected: invalid pathname.",
               pathname,
             );
 
@@ -134,8 +206,11 @@ export async function POST(request: NextRequest) {
 
           /*
            * ------------------------------------------------------
-           * Return upload restrictions
+           * Upload restrictions
            * ------------------------------------------------------
+           *
+           * نسمح فقط بصيغ الصور التي يدعمها
+           * نظام GameVortex Wallpaper.
            */
           return {
             allowedContentTypes: [
@@ -151,51 +226,63 @@ export async function POST(request: NextRequest) {
 
       /*
        * ----------------------------------------------------------
-       * Upload completed callback
+       * Upload completed
        * ----------------------------------------------------------
        *
-       * Database creation intentionally remains in:
+       * لا نقوم بإنشاء سجل Prisma هنا.
+       *
+       * بعد أن يحصل المتصفح على blob.url،
+       * يقوم WallpaperAdminClient بإرسال بيانات
+       * الخلفية إلى:
        *
        * /api/admin/wallpapers
        *
-       * The upload endpoint is responsible only for authorizing
-       * and completing the Blob upload handshake.
+       * وهذا endpoint يقوم بإنشاء سجل قاعدة البيانات.
+       *
+       * وجود callback هنا اختياري، لذلك نحتفظ به
+       * فقط للتسجيل في سجلات Vercel.
        */
       onUploadCompleted:
-        async () => {
+        async ({ blob }) => {
           console.log(
-            "Wallpaper Blob upload completed.",
+            "GameVortex wallpaper Blob upload completed:",
+            {
+              url: blob.url,
+              pathname: blob.pathname,
+            },
           );
         },
     });
 
     /*
      * ------------------------------------------------------------
-     * 4. Return the response generated by Vercel Blob.
+     * 4. إرجاع client token للمتصفح
      * ------------------------------------------------------------
+     *
+     * handleUpload يعيد الاستجابة التي يحتاجها
+     * @vercel/blob/client.
      */
     return NextResponse.json(
       response,
-      { status: 200 },
+      {
+        status: 200,
+      },
     );
   } catch (error) {
-    /*
-     * ------------------------------------------------------------
-     * 5. Detailed server-side error logging
-     * ------------------------------------------------------------
-     */
     console.error(
-      "Wallpaper Blob upload handshake failed:",
+      "GameVortex wallpaper Blob upload handshake failed:",
       error,
     );
 
     const message =
       error instanceof Error
         ? error.message
-        : "Unknown upload authorization error";
+        : "UNKNOWN_BLOB_UPLOAD_ERROR";
 
     /*
-     * Authentication failure
+     * ------------------------------------------------------------
+     * Authentication error
+     * ------------------------------------------------------------
      */
     if (
       message ===
@@ -205,14 +292,18 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "غير مصرح لك برفع الخلفيات.",
+            "غير مصرح لك برفع الخلفيات. يجب أن تكون SUPER_ADMIN.",
         },
-        { status: 401 },
+        {
+          status: 401,
+        },
       );
     }
 
     /*
-     * Invalid pathname
+     * ------------------------------------------------------------
+     * Invalid path
+     * ------------------------------------------------------------
      */
     if (
       message ===
@@ -224,20 +315,62 @@ export async function POST(request: NextRequest) {
           error:
             "مسار رفع الخلفية غير صالح.",
         },
-        { status: 400 },
+        {
+          status: 400,
+        },
       );
     }
 
     /*
-     * Generic Blob/configuration error
+     * ------------------------------------------------------------
+     * Blob configuration/authentication errors
+     * ------------------------------------------------------------
+     *
+     * لا نعرض أي secret أو token للمستخدم.
+     */
+    const safeMessage =
+      message.toLowerCase();
+
+    if (
+      safeMessage.includes(
+        "token",
+      ) ||
+      safeMessage.includes(
+        "authentication",
+      ) ||
+      safeMessage.includes(
+        "unauthorized",
+      ) ||
+      safeMessage.includes(
+        "access denied",
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "تعذر المصادقة مع Vercel Blob. تأكد من ربط Blob بالمشروع وتفعيل OIDC أو إضافة BLOB_READ_WRITE_TOKEN في Production.",
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Generic error
+     * ------------------------------------------------------------
      */
     return NextResponse.json(
       {
         success: false,
         error:
-          "فشل إنشاء تصريح رفع الصورة إلى Vercel Blob.",
+          "فشل إنشاء تصريح رفع الخلفية إلى Vercel Blob.",
       },
-      { status: 500 },
+      {
+        status: 500,
+      },
     );
   }
 }
