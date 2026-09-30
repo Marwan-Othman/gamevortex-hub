@@ -22,12 +22,8 @@ const MAX_URL_LENGTH = 4000;
 
 function serializeWallpaper<T>(value: T): T {
   return JSON.parse(
-    JSON.stringify(
-      value,
-      (_key, item) =>
-        typeof item === "bigint"
-          ? item.toString()
-          : item,
+    JSON.stringify(value, (_key, item) =>
+      typeof item === "bigint" ? item.toString() : item,
     ),
   ) as T;
 }
@@ -35,24 +31,17 @@ function serializeWallpaper<T>(value: T): T {
 async function requireSuperAdmin() {
   const user = await getOptionalUser();
 
-  return user?.role === "SUPER_ADMIN"
-    ? user
-    : null;
+  return user?.role === "SUPER_ADMIN" ? user : null;
 }
 
-function cleanString(
-  value: unknown,
-  max = 5000,
-) {
+function cleanString(value: unknown, max = 5000): string | null {
   if (typeof value !== "string") {
     return null;
   }
 
   const cleaned = value.trim();
 
-  return cleaned
-    ? cleaned.slice(0, max)
-    : null;
+  return cleaned ? cleaned.slice(0, max) : null;
 }
 
 function createWallpaperSlug() {
@@ -65,11 +54,7 @@ function detectType(
   width: number | null,
   height: number | null,
 ): "MOBILE" | "DESKTOP" {
-  if (
-    width &&
-    height &&
-    height > width
-  ) {
+  if (width && height && height > width) {
     return "MOBILE";
   }
 
@@ -77,9 +62,7 @@ function detectType(
 }
 
 function isPrivateIpv4(ip: string) {
-  const parts = ip
-    .split(".")
-    .map(Number);
+  const parts = ip.split(".").map(Number);
 
   if (
     parts.length !== 4 ||
@@ -99,16 +82,10 @@ function isPrivateIpv4(ip: string) {
     a === 10 ||
     a === 127 ||
     (a === 169 && b === 254) ||
-    (a === 172 &&
-      b >= 16 &&
-      b <= 31) ||
+    (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
-    (a === 100 &&
-      b >= 64 &&
-      b <= 127) ||
-    (a === 198 &&
-      (b === 18 ||
-        b === 19)) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 198 && (b === 18 || b === 19)) ||
     a >= 224 ||
     a === 0
   );
@@ -122,9 +99,7 @@ function isPrivateIpv6(ip: string) {
   );
 
   if (mapped) {
-    return isPrivateIpv4(
-      mapped[1],
-    );
+    return isPrivateIpv4(mapped[1]);
   }
 
   return (
@@ -139,25 +114,18 @@ function isPrivateIpv6(ip: string) {
   );
 }
 
-async function assertSafeRemoteUrl(
-  value: string,
-) {
+async function assertSafeRemoteUrl(value: string) {
   const url = new URL(value);
 
   if (url.protocol !== "https:") {
-    throw new Error(
-      "IMAGE_URL_MUST_BE_HTTPS",
-    );
+    throw new Error("IMAGE_URL_MUST_BE_HTTPS");
   }
 
   if (url.username || url.password) {
-    throw new Error(
-      "IMAGE_URL_CANNOT_CONTAIN_CREDENTIALS",
-    );
+    throw new Error("IMAGE_URL_CANNOT_CONTAIN_CREDENTIALS");
   }
 
-  const hostname =
-    url.hostname.toLowerCase();
+  const hostname = url.hostname.toLowerCase();
 
   if (
     [
@@ -167,9 +135,7 @@ async function assertSafeRemoteUrl(
     ].includes(hostname) ||
     hostname.endsWith(".local")
   ) {
-    throw new Error(
-      "IMAGE_URL_HOST_NOT_ALLOWED",
-    );
+    throw new Error("IMAGE_URL_HOST_NOT_ALLOWED");
   }
 
   if (net.isIP(hostname)) {
@@ -179,87 +145,60 @@ async function assertSafeRemoteUrl(
       (net.isIP(hostname) === 6 &&
         isPrivateIpv6(hostname))
     ) {
-      throw new Error(
-        "IMAGE_URL_HOST_NOT_ALLOWED",
-      );
+      throw new Error("IMAGE_URL_HOST_NOT_ALLOWED");
     }
 
     return;
   }
 
-  const records =
-    await dns.lookup(hostname, {
-      all: true,
-    });
+  const records = await dns.lookup(hostname, {
+    all: true,
+  });
 
   if (!records.length) {
-    throw new Error(
-      "IMAGE_URL_HOST_NOT_RESOLVED",
-    );
+    throw new Error("IMAGE_URL_HOST_NOT_RESOLVED");
   }
 
   for (const record of records) {
     if (
       (record.family === 4 &&
-        isPrivateIpv4(
-          record.address,
-        )) ||
+        isPrivateIpv4(record.address)) ||
       (record.family === 6 &&
-        isPrivateIpv6(
-          record.address,
-        ))
+        isPrivateIpv6(record.address))
     ) {
-      throw new Error(
-        "IMAGE_URL_HOST_NOT_ALLOWED",
-      );
+      throw new Error("IMAGE_URL_HOST_NOT_ALLOWED");
     }
   }
 }
 
-async function importRemoteWallpaper(
-  sourceUrl: string,
-) {
+async function importRemoteWallpaper(sourceUrl: string) {
   let currentUrl = sourceUrl;
 
-  let response: Response | null =
-    null;
+  let response: Response | null = null;
 
-  for (
-    let attempt = 0;
-    attempt < 6;
-    attempt += 1
-  ) {
-    await assertSafeRemoteUrl(
-      currentUrl,
-    );
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await assertSafeRemoteUrl(currentUrl);
 
-    response = await fetch(
-      currentUrl,
-      {
-        method: "GET",
-        redirect: "manual",
-        cache: "no-store",
-        signal:
-          AbortSignal.timeout(
-            300_000,
-          ),
-        headers: {
-          accept:
-            "image/jpeg,image/png,image/webp,image/gif,image/apng,image/avif;q=0.9,*/*;q=0.1",
-          "user-agent":
-            "GameVortex-Wallpaper-Importer/1.0",
-        },
+    response = await fetch(currentUrl, {
+      method: "GET",
+      redirect: "manual",
+      cache: "no-store",
+      signal: AbortSignal.timeout(300_000),
+      headers: {
+        accept:
+          "image/jpeg,image/png,image/webp,image/gif,image/apng,image/avif;q=0.9,*/*;q=0.1",
+        "user-agent":
+          "GameVortex-Wallpaper-Importer/1.0",
       },
-    );
+    });
 
     if (
       response.status >= 300 &&
       response.status < 400
     ) {
-      const location =
-        response.headers.get(
-          "location",
-        );
+      const location = response.headers.get(
+        "location",
+      );
 
       if (!location) {
         throw new Error(
@@ -278,30 +217,21 @@ async function importRemoteWallpaper(
     break;
   }
 
-  if (
-    !response ||
-    !response.ok
-  ) {
+  if (!response || !response.ok) {
     throw new Error(
-      `IMAGE_SOURCE_FETCH_FAILED_${
-        response?.status || 0
-      }`,
+      `IMAGE_SOURCE_FETCH_FAILED_${response?.status || 0}`,
     );
   }
 
   const contentType = (
-    response.headers.get(
-      "content-type",
-    ) || ""
+    response.headers.get("content-type") || ""
   )
     .split(";", 1)[0]
     .trim()
     .toLowerCase();
 
   if (
-    !isSupportedWallpaperMimeType(
-      contentType,
-    )
+    !isSupportedWallpaperMimeType(contentType)
   ) {
     throw new Error(
       "IMAGE_SOURCE_TYPE_NOT_SUPPORTED",
@@ -309,57 +239,47 @@ async function importRemoteWallpaper(
   }
 
   if (!response.body) {
-    throw new Error(
-      "IMAGE_FILE_EMPTY",
-    );
+    throw new Error("IMAGE_FILE_EMPTY");
   }
 
   let size = 0;
 
-  const counter =
-    new TransformStream<
-      Uint8Array,
-      Uint8Array
-    >({
-      transform(
-        chunk,
-        controller,
-      ) {
-        size += chunk.byteLength;
+  const counter = new TransformStream<
+    Uint8Array,
+    Uint8Array
+  >({
+    transform(chunk, controller) {
+      size += chunk.byteLength;
 
-        controller.enqueue(
-          chunk,
+      if (size > WALLPAPER_MAX_FILE_SIZE) {
+        throw new Error(
+          "IMAGE_FILE_TOO_LARGE",
         );
-      },
-    });
+      }
 
-  const filename =
-    filenameFromUrl(
-      sourceUrl,
-      `wallpaper-${Date.now()}`,
-    );
+      controller.enqueue(chunk);
+    },
+  });
 
-  const stored =
-    await storeWallpaperFile({
-      pathname: `wallpapers/imported/${Date.now()}-${sanitizeWallpaperFilename(
-        filename,
-      )}`,
-      file: response.body.pipeThrough(
-        counter,
-      ),
-      contentType,
-    });
+  const filename = filenameFromUrl(
+    sourceUrl,
+    `wallpaper-${Date.now()}`,
+  );
+
+  const stored = await storeWallpaperFile({
+    pathname: `wallpapers/imported/${Date.now()}-${sanitizeWallpaperFilename(
+      filename,
+    )}`,
+    file: response.body.pipeThrough(counter),
+    contentType,
+  });
 
   if (size === 0) {
-    await del(
-      stored.url,
-    ).catch(
+    await del(stored.url).catch(
       () => undefined,
     );
 
-    throw new Error(
-      "IMAGE_FILE_EMPTY",
-    );
+    throw new Error("IMAGE_FILE_EMPTY");
   }
 
   return {
@@ -375,11 +295,8 @@ async function importRemoteWallpaper(
   };
 }
 
-export async function GET(
-  request: NextRequest,
-) {
-  const user =
-    await requireSuperAdmin();
+export async function GET(request: NextRequest) {
+  const user = await requireSuperAdmin();
 
   if (!user) {
     return NextResponse.json(
@@ -391,11 +308,11 @@ export async function GET(
     );
   }
 
-  const { searchParams } =
-    new URL(request.url);
+  const { searchParams } = new URL(
+    request.url,
+  );
 
-  const typeValue =
-    searchParams.get("type");
+  const typeValue = searchParams.get("type");
 
   const type =
     typeValue === "MOBILE" ||
@@ -403,8 +320,7 @@ export async function GET(
       ? typeValue
       : undefined;
 
-  const vipValue =
-    searchParams.get("vip");
+  const vipValue = searchParams.get("vip");
 
   const isVip =
     vipValue === "true"
@@ -414,29 +330,25 @@ export async function GET(
         : undefined;
 
   const wallpapers =
-    await prisma.wallpaper.findMany(
-      {
-        where: {
-          ...(type
-            ? { type }
-            : {}),
-          ...(isVip !== undefined
-            ? { isVip }
-            : {}),
-        },
-
-        orderBy: [
-          {
-            sortOrder: "asc",
-          },
-          {
-            createdAt: "desc",
-          },
-        ],
-
-        take: 500,
+    await prisma.wallpaper.findMany({
+      where: {
+        ...(type ? { type } : {}),
+        ...(isVip !== undefined
+          ? { isVip }
+          : {}),
       },
-    );
+
+      orderBy: [
+        {
+          sortOrder: "asc",
+        },
+        {
+          createdAt: "desc",
+        },
+      ],
+
+      take: 500,
+    });
 
   return NextResponse.json({
     success: true,
@@ -446,11 +358,8 @@ export async function GET(
   });
 }
 
-export async function POST(
-  request: NextRequest,
-) {
-  const user =
-    await requireSuperAdmin();
+export async function POST(request: NextRequest) {
+  const user = await requireSuperAdmin();
 
   if (!user) {
     return NextResponse.json(
@@ -463,8 +372,7 @@ export async function POST(
   }
 
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
     const sourceType =
       body.sourceType === "URL"
@@ -477,25 +385,20 @@ export async function POST(
       mimeType: "image/jpeg",
       size: 0,
       isAnimated: false,
-      sourceUrl:
-        null as string | null,
+      sourceUrl: null as string | null,
     };
 
-    if (
-      sourceType === "URL"
-    ) {
-      const sourceUrl =
-        cleanString(
-          body.sourceUrl,
-          MAX_URL_LENGTH,
-        );
+    if (sourceType === "URL") {
+      const sourceUrl = cleanString(
+        body.sourceUrl,
+        MAX_URL_LENGTH,
+      );
 
       if (!sourceUrl) {
         return NextResponse.json(
           {
             success: false,
-            error:
-              "رابط الصورة مطلوب",
+            error: "رابط الصورة مطلوب",
           },
           { status: 400 },
         );
@@ -506,17 +409,14 @@ export async function POST(
           sourceUrl,
         );
     } else {
-      const imageUrl =
-        cleanString(
-          body.imageUrl,
-          MAX_URL_LENGTH,
-        );
+      const imageUrl = cleanString(
+        body.imageUrl,
+        MAX_URL_LENGTH,
+      );
 
       if (
         !imageUrl ||
-        !isVercelBlobUrl(
-          imageUrl,
-        )
+        !isVercelBlobUrl(imageUrl)
       ) {
         return NextResponse.json(
           {
@@ -532,8 +432,7 @@ export async function POST(
         cleanString(
           body.mimeType,
           120,
-        )?.toLowerCase() ||
-        "";
+        )?.toLowerCase() || "";
 
       if (
         !isSupportedWallpaperMimeType(
@@ -551,15 +450,13 @@ export async function POST(
       }
 
       const size = Number(
-        body.fileSizeBytes ||
-          0,
+        body.fileSizeBytes || 0,
       );
 
       if (
         !Number.isFinite(size) ||
         size <= 0 ||
-        size >
-          WALLPAPER_MAX_FILE_SIZE
+        size > WALLPAPER_MAX_FILE_SIZE
       ) {
         return NextResponse.json(
           {
@@ -579,8 +476,7 @@ export async function POST(
             cleanString(
               body.originalFilename,
               160,
-            ) ||
-              "wallpaper",
+            ) || "wallpaper",
           ),
 
         mimeType,
@@ -588,8 +484,7 @@ export async function POST(
         size,
 
         isAnimated:
-          body.isAnimated ===
-            true ||
+          body.isAnimated === true ||
           isAnimatedWallpaperMimeType(
             mimeType,
           ),
@@ -599,9 +494,7 @@ export async function POST(
     }
 
     const width =
-      Number.isInteger(
-        body.width,
-      ) &&
+      Number.isInteger(body.width) &&
       body.width > 0
         ? Math.min(
             body.width,
@@ -610,9 +503,7 @@ export async function POST(
         : null;
 
     const height =
-      Number.isInteger(
-        body.height,
-      ) &&
+      Number.isInteger(body.height) &&
       body.height > 0
         ? Math.min(
             body.height,
@@ -621,10 +512,8 @@ export async function POST(
         : null;
 
     const type =
-      body.type ===
-        "MOBILE" ||
-      body.type ===
-        "DESKTOP"
+      body.type === "MOBILE" ||
+      body.type === "DESKTOP"
         ? body.type
         : detectType(
             width,
@@ -647,118 +536,123 @@ export async function POST(
         ? `${width}x${height}`
         : null;
 
+    /*
+     * مهم جدًا:
+     *
+     * normalizeWallpaperTags() قد يرجع unknown[]
+     * حسب تعريف الدالة.
+     *
+     * Prisma يريد String[].
+     *
+     * لذلك نثبت النوع هنا صراحةً.
+     */
+    const tags: string[] =
+      normalizeWallpaperTags(
+        [],
+      ) as string[];
+
     const wallpaper =
-      await prisma.wallpaper.create(
-        {
-          data: {
-            titleAr:
-              "خلفية GameVortex",
+      await prisma.wallpaper.create({
+        data: {
+          titleAr:
+            "خلفية GameVortex",
 
-            titleEn:
-              "GameVortex Wallpaper",
+          titleEn:
+            "GameVortex Wallpaper",
 
-            slug:
-              createWallpaperSlug(),
+          slug:
+            createWallpaperSlug(),
 
-            descriptionAr:
-              null,
+          descriptionAr: null,
 
-            descriptionEn:
-              null,
+          descriptionEn: null,
 
-            imageUrl:
-              file.url,
+          imageUrl:
+            file.url,
 
-            thumbnailUrl:
-              null,
+          thumbnailUrl:
+            null,
 
-            downloadUrl:
-              null,
+          downloadUrl:
+            null,
 
-            originalFilename:
-              file.filename,
+          originalFilename:
+            file.filename,
 
-            mimeType:
-              file.mimeType,
+          mimeType:
+            file.mimeType,
 
-            fileSizeBytes:
-              file.size,
+          fileSizeBytes:
+            file.size,
 
-            isAnimated:
-              file.isAnimated,
+          isAnimated:
+            file.isAnimated,
 
-            mediaUrl:
-              null,
+          mediaUrl:
+            null,
 
-            mediaType:
-              "IMAGE",
+          mediaType:
+            "IMAGE",
 
-            durationSeconds:
-              null,
+          durationSeconds:
+            null,
 
-            sourceUrl:
-              file.sourceUrl,
+          sourceUrl:
+            file.sourceUrl,
 
-            sourceProvider:
-              sourceType === "URL"
-                ? "IMPORTED_TO_GAMEVORTEX"
-                : "GAMEVORTEX_BLOB",
+          sourceProvider:
+            sourceType === "URL"
+              ? "IMPORTED_TO_GAMEVORTEX"
+              : "GAMEVORTEX_BLOB",
 
-            licenseUrl:
-              null,
+          licenseUrl:
+            null,
 
-            licenseStatus:
-              null,
+          licenseStatus:
+            null,
 
-            attribution:
-              null,
+          attribution:
+            null,
 
-            sourceStatus:
-              "OFFICIAL_SOURCE",
+          sourceStatus:
+            "OFFICIAL_SOURCE",
 
+          type,
+
+          orientation,
+
+          deviceType:
             type,
 
-            orientation,
+          category:
+            "GAMING",
 
-            deviceType:
-              type,
+          tags,
 
-            category:
-              "GAMING",
+          width,
 
-            tags:
-              normalizeWallpaperTags(
-                [],
-              ),
+          height,
 
-            width,
+          resolution,
 
-            height,
+          isVip:
+            body.isVip === true,
 
-            resolution,
+          published:
+            body.published === true,
 
-            isVip:
-              body.isVip ===
-              true,
+          featured:
+            body.featured === true,
 
-            published:
-              body.published ===
-              true,
+          sortOrder: 0,
 
-            featured:
-              body.featured ===
-              true,
+          uploadedById:
+            user.id,
 
-            sortOrder: 0,
-
-            uploadedById:
-              user.id,
-
-            moderationStatus:
-              "APPROVED",
-          },
+          moderationStatus:
+            "APPROVED",
         },
-      );
+      });
 
     return NextResponse.json(
       {
@@ -788,11 +682,8 @@ export async function POST(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-) {
-  const user =
-    await requireSuperAdmin();
+export async function PATCH(request: NextRequest) {
+  const user = await requireSuperAdmin();
 
   if (!user) {
     return NextResponse.json(
@@ -805,12 +696,10 @@ export async function PATCH(
   }
 
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
     const id =
-      typeof body.id ===
-      "string"
+      typeof body.id === "string"
         ? body.id.trim()
         : "";
 
@@ -826,11 +715,9 @@ export async function PATCH(
     }
 
     const current =
-      await prisma.wallpaper.findUnique(
-        {
-          where: { id },
-        },
-      );
+      await prisma.wallpaper.findUnique({
+        where: { id },
+      });
 
     if (!current) {
       return NextResponse.json(
@@ -843,10 +730,11 @@ export async function PATCH(
       );
     }
 
-    const data: Record<
-      string,
-      unknown
-    > = {};
+    const data: {
+      published?: boolean;
+      featured?: boolean;
+      isVip?: boolean;
+    } = {};
 
     if (
       typeof body.published ===
@@ -873,12 +761,10 @@ export async function PATCH(
     }
 
     const wallpaper =
-      await prisma.wallpaper.update(
-        {
-          where: { id },
-          data,
-        },
-      );
+      await prisma.wallpaper.update({
+        where: { id },
+        data,
+      });
 
     return NextResponse.json({
       success: true,
@@ -903,27 +789,8 @@ export async function PATCH(
   }
 }
 
-/*
- * DELETE
- *
- * يدعم طريقتين:
- *
- * 1. حذف خلفية واحدة:
- * DELETE /api/admin/wallpapers?id=xxx
- *
- * 2. حذف عدة خلفيات:
- * DELETE /api/admin/wallpapers
- *
- * Body:
- * {
- *   "ids": ["id1", "id2", "id3"]
- * }
- */
-export async function DELETE(
-  request: NextRequest,
-) {
-  const user =
-    await requireSuperAdmin();
+export async function DELETE(request: NextRequest) {
+  const user = await requireSuperAdmin();
 
   if (!user) {
     return NextResponse.json(
@@ -942,22 +809,16 @@ export async function DELETE(
       ) || "";
 
     /*
-     * الحذف الفردي القديم
-     *
-     * يبقى يعمل حتى لا نخرب زر "حذف"
-     * الموجود داخل كل بطاقة.
+     * حذف خلفية واحدة.
      */
     if (
       !contentType
         .toLowerCase()
-        .includes(
-          "application/json",
-        )
+        .includes("application/json")
     ) {
       const id =
-        new URL(
-          request.url,
-        ).searchParams
+        new URL(request.url)
+          .searchParams
           .get("id")
           ?.trim();
 
@@ -973,16 +834,14 @@ export async function DELETE(
       }
 
       const wallpaper =
-        await prisma.wallpaper.findUnique(
-          {
-            where: { id },
+        await prisma.wallpaper.findUnique({
+          where: { id },
 
-            select: {
-              id: true,
-              imageUrl: true,
-            },
+          select: {
+            id: true,
+            imageUrl: true,
           },
-        );
+        });
 
       if (!wallpaper) {
         return NextResponse.json(
@@ -995,15 +854,10 @@ export async function DELETE(
         );
       }
 
-      await prisma.wallpaper.delete(
-        {
-          where: { id },
-        },
-      );
+      await prisma.wallpaper.delete({
+        where: { id },
+      });
 
-      /*
-       * حذف ملف الصورة من Vercel Blob
-       */
       if (
         isVercelBlobUrl(
           wallpaper.imageUrl,
@@ -1028,12 +882,7 @@ export async function DELETE(
     }
 
     /*
-     * الحذف الجماعي
-     *
-     * Body:
-     * {
-     *   ids: [...]
-     * }
+     * حذف جماعي.
      */
     const body =
       await request.json();
@@ -1043,13 +892,7 @@ export async function DELETE(
         ? body.ids
         : [];
 
-    /*
-     * إزالة IDs المكررة
-     * والتحقق من أنها strings
-     *
-     * الحد الأقصى 500 في العملية الواحدة.
-     */
-    const ids = [
+    const ids: string[] = [
       ...new Set(
         rawIds
           .filter(
@@ -1078,25 +921,19 @@ export async function DELETE(
       );
     }
 
-    /*
-     * نجلب الصور أولًا حتى نعرف ملفات Blob
-     * التي يجب حذفها بعد حذف السجلات.
-     */
     const wallpapers =
-      await prisma.wallpaper.findMany(
-        {
-          where: {
-            id: {
-              in: ids,
-            },
-          },
-
-          select: {
-            id: true,
-            imageUrl: true,
+      await prisma.wallpaper.findMany({
+        where: {
+          id: {
+            in: ids,
           },
         },
-      );
+
+        select: {
+          id: true,
+          imageUrl: true,
+        },
+      });
 
     if (!wallpapers.length) {
       return NextResponse.json(
@@ -1109,45 +946,31 @@ export async function DELETE(
       );
     }
 
-    const foundIds =
+    const foundIds: string[] =
       wallpapers.map(
         (wallpaper) =>
           wallpaper.id,
       );
 
-    /*
-     * حذف السجلات من PostgreSQL دفعة واحدة.
-     *
-     * WallpaperFavorite و WallpaperReport
-     * مرتبطان بـ onDelete: Cascade في Prisma
-     * الموجودة في مشروعك، لذلك العلاقات التابعة
-     * يتم حذفها تلقائيًا من قاعدة البيانات.
-     */
-    await prisma.wallpaper.deleteMany(
-      {
-        where: {
-          id: {
-            in: foundIds,
-          },
+    await prisma.wallpaper.deleteMany({
+      where: {
+        id: {
+          in: foundIds,
         },
       },
-    );
+    });
 
-    /*
-     * حذف ملفات الصور من Vercel Blob.
-     *
-     * إذا فشل حذف ملف Blob لا نعيد عملية
-     * قاعدة البيانات للخلف، لأن السجل تم حذفه
-     * بالفعل.
-     */
-    const blobUrls =
+    const blobUrls: string[] =
       wallpapers
         .map(
           (wallpaper) =>
             wallpaper.imageUrl,
         )
-        .filter((url) =>
-          isVercelBlobUrl(url),
+        .filter(
+          (
+            url,
+          ): url is string =>
+            isVercelBlobUrl(url),
         );
 
     const blobResults =
