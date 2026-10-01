@@ -31,7 +31,7 @@ function assertApprovalOwner(ownerId: string) {
 }
 
 async function auditApproval(
-  tx: typeof db,
+  tx: Prisma.TransactionClient,
   input: {
     ownerId: string;
     action: string;
@@ -171,7 +171,7 @@ export async function consumeOwnerApproval(input: {
         AND "ownerId" = ${input.ownerId}
         AND "opportunityId" = ${input.opportunityId.trim()}
       FOR UPDATE
-    `);
+    `;
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_NOT_FOUND");
@@ -281,7 +281,7 @@ export async function revokeOwnerApproval(input: {
         AND "status" = 'PENDING'
         AND "consumedAt" IS NULL
         AND "expiresAt" > CURRENT_TIMESTAMP
-    `);
+    `;
 
     if (result !== 1) throw new Error("APPROVAL_NOT_REVOKABLE");
 
