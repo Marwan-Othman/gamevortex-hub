@@ -14,6 +14,7 @@ function position(overrides: Record<string, unknown> = {}) {
     stopLossPrice: 95,
     takeProfitPrice: 110,
     openedAt: "2026-10-01T20:00:00Z",
+    shariahPolicyVersion: "strict-v1",
     ...overrides,
   });
 }
@@ -28,6 +29,7 @@ describe("paper position lifecycle", () => {
     expect(result.amountUsd).toBe(10);
     expect(result.stopLossPrice).toBe(95);
     expect(result.takeProfitPrice).toBe(110);
+    expect(result.shariahPolicyVersion).toBe("strict-v1");
   });
 
   it("rejects positions below the $1 minimum", () => {
@@ -46,7 +48,13 @@ describe("paper position lifecycle", () => {
     );
   });
 
-  it("detects stop-loss before take-profit when both could be touched", () => {
+  it("requires a Shariah policy version", () => {
+    expect(() => position({ shariahPolicyVersion: "" })).toThrow(
+      "INVALID_POSITION_SHARIAH_POLICY_VERSION",
+    );
+  });
+
+  it("detects take-profit and stop-loss exits", () => {
     const result = evaluatePaperPositionExit(position(), 120);
     expect(result).toEqual({ reason: "TAKE_PROFIT", price: 110 });
 
@@ -66,6 +74,7 @@ describe("paper position lifecycle", () => {
     expect(result.exitReason).toBe("TAKE_PROFIT");
     expect(result.pnlUsd).toBeCloseTo(1);
     expect(result.returnPercent).toBeCloseTo(10);
+    expect(result.shariahPolicyVersion).toBe("strict-v1");
   });
 
   it("rejects closing an already closed position", () => {
