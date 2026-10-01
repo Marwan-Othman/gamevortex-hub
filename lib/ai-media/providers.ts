@@ -28,11 +28,26 @@ export type VideoStatusResult = {
   };
 };
 
+/**
+ * Gemini legacy generateContent REST endpoint.
+ *
+ * IMPORTANT:
+ * gemini-3.1-flash-image supports generateContent.
+ * The current Google documentation uses /v1/models/...:generateContent.
+ */
 const GEMINI_API_BASE =
-  "https://generativelanguage.googleapis.com/v1beta/models";
+  "https://generativelanguage.googleapis.com/v1/models";
 
 const DEFAULT_IMAGE_MODEL =
   "gemini-3.1-flash-image";
+
+/**
+ * Start with 1K while verifying the integration.
+ *
+ * After successful production testing, this can be changed
+ * to 2K or 4K for higher-resolution output.
+ */
+const DEFAULT_IMAGE_SIZE = "1K";
 
 const IMAGE_TIMEOUT_MS = 180_000;
 
@@ -54,6 +69,22 @@ function getImageModel() {
     process.env.GEMINI_IMAGE_MODEL?.trim() ||
     DEFAULT_IMAGE_MODEL
   );
+}
+
+function getImageSize() {
+  const configured =
+    process.env.GEMINI_IMAGE_SIZE?.trim();
+
+  if (
+    configured === "512" ||
+    configured === "1K" ||
+    configured === "2K" ||
+    configured === "4K"
+  ) {
+    return configured;
+  }
+
+  return DEFAULT_IMAGE_SIZE;
 }
 
 function normalizeAspectRatio(
@@ -234,13 +265,15 @@ function classifyProviderFailure(
   if (
     normalized.includes("billing") ||
     normalized.includes("paid tier") ||
-    normalized.includes("payment")
+    normalized.includes("payment") ||
+    normalized.includes("pay-as-you-go")
   ) {
     return "GEMINI_IMAGE_BILLING_REQUIRED";
   }
 
   if (
     normalized.includes("quota") ||
+    normalized.includes("resource exhausted") ||
     status === 429
   ) {
     return "GEMINI_RATE_LIMITED";
@@ -279,6 +312,9 @@ export async function generateImage(
   const model =
     getImageModel();
 
+  const imageSize =
+    getImageSize();
+
   const requestId =
     createRequestId();
 
@@ -296,63 +332,74 @@ export async function generateImage(
   );
 
   try {
+    const endpoint =
+      `${GEMINI_API_BASE}/${encodeURIComponent(
+        model,
+      )}:generateContent`;
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            ...(inputImage
+              ? [
+                  {
+                    inlineData: {
+                      mimeType:
+                        inputImage.mimeType,
+                      data:
+                        inputImage.base64,
+                    },
+                  },
+                ]
+              : []),
+
+            {
+              text: inputImage
+                ? `Edit the provided image according to this instruction. Preserve identity and unchanged elements unless the user explicitly requests a change. ${cleanPrompt}`
+                : cleanPrompt,
+            },
+          ],
+        },
+      ],
+
+      generationConfig: {
+        responseModalities: [
+          "IMAGE",
+        ],
+
+        responseFormat: {
+          image: {
+            aspectRatio:
+              ratio,
+
+            imageSize,
+          },
+        },
+      },
+    };
+
     const response =
       await fetch(
-        `${GEMINI_API_BASE}/${encodeURIComponent(
-          model,
-        )}:generateContent`,
+        endpoint,
         {
           method: "POST",
 
           headers: {
             "Content-Type":
               "application/json",
+
             Accept:
               "application/json",
+
             "x-goog-api-key":
               apiKey,
           },
 
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  ...(inputImage
-                    ? [
-                        {
-                          inlineData: {
-                            mimeType:
-                              inputImage.mimeType,
-                            data:
-                              inputImage.base64,
-                          },
-                        },
-                      ]
-                    : []),
-
-                  {
-                    text: inputImage
-                      ? `Edit the provided image according to this instruction. Preserve identity and unchanged elements unless the user explicitly requests a change. ${cleanPrompt}`
-                      : cleanPrompt,
-                  },
-                ],
-              },
-            ],
-
-            generationConfig: {
-              responseModalities: [
-                "IMAGE",
-              ],
-
-              responseFormat: {
-                image: {
-                  aspectRatio:
-                    ratio,
-                  imageSize: "1K",
-                },
-              },
-            },
-          }),
+          body:
+            JSON.stringify(
+              requestBody,
+            ),
 
           signal:
             controller.signal,
@@ -371,6 +418,17 @@ export async function generateImage(
         ? JSON.parse(rawBody)
         : {};
     } catch {
+      console.error(
+        "Gemini returned non-JSON response",
+        {
+          requestId,
+          status:
+            response.status,
+          bodyPreview:
+            rawBody.slice(0, 500),
+        },
+      );
+
       throw new Error(
         "GEMINI_INVALID_RESPONSE",
       );
@@ -390,9 +448,14 @@ export async function generateImage(
         "Gemini image generation failed",
         {
           requestId,
+
           status:
             response.status,
+
           code,
+
+          model,
+
           message:
             providerMessage?.slice(
               0,
@@ -405,14 +468,18 @@ export async function generateImage(
     }
 
     const image =
-      extractImageFromResponse(body);
+      extractImageFromResponse(
+        body,
+      );
 
     if (!image) {
       console.error(
         "Gemini returned no image",
         {
           requestId,
+
           model,
+
           responseKeys:
             body &&
             typeof body === "object"
@@ -434,7 +501,8 @@ export async function generateImage(
     return {
       requestId,
 
-      url: `data:${image.mimeType};base64,${image.base64}`,
+      url:
+        `data:${image.mimeType};base64,${image.base64}`,
 
       model,
     };
