@@ -26,6 +26,38 @@ type ApprovalRow = {
 
 export type PersistedOwnerApproval = ApprovalRow;
 
+function assertApprovalOwner(ownerId: string) {
+  if (!ownerId.trim()) throw new Error("INVALID_APPROVAL_OWNER");
+}
+
+async function auditApproval(
+  tx: typeof db,
+  input: {
+    ownerId: string;
+    action: string;
+    approvalId: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "AuditLog" (
+      "id",
+      "actorUserId",
+      "action",
+      "entityType",
+      "entityId",
+      "metadata"
+    ) VALUES (
+      ${randomUUID()},
+      ${input.ownerId},
+      ${input.action},
+      'TradingApproval',
+      ${input.approvalId},
+      ${input.metadata === undefined ? null : JSON.stringify(input.metadata)}::jsonb
+    )
+  `);
+}
+
 export async function createOwnerApproval(input: {
   ownerId: string;
   opportunityId: string;
@@ -35,9 +67,15 @@ export async function createOwnerApproval(input: {
   riskSnapshot?: Prisma.JsonValue;
   ttlSeconds?: number;
 }): Promise<{ approval: PersistedOwnerApproval; token: ApprovalToken }> {
+  assertApprovalOwner(input.ownerId);
+
   const amountUsd = new Prisma.Decimal(input.amountUsd);
   if (!amountUsd.isFinite() || amountUsd.lt(MIN_APPROVAL_AMOUNT_USD)) {
     throw new Error("INVALID_APPROVAL_AMOUNT");
+  }
+
+  if (input.shariahStatus !== "APPROVED") {
+    throw new Error("SHARIAH_APPROVAL_REQUIRED");
   }
 
   const token = createApprovalToken(input.opportunityId, input.ttlSeconds);
@@ -59,16 +97,16 @@ export async function createOwnerApproval(input: {
         "riskSnapshot"
       ) VALUES (
         ${id},
-        ${input.opportunityId},
+        ${input.opportunityId.trim()},
         ${input.ownerId},
-        ${amountUsd},
+        ${amountUsd.toDecimalPlaces(2).toString()}::numeric,
         ${token.tokenHash},
         ${new Date(token.issuedAt)},
         ${new Date(token.expiresAt)},
         'PENDING',
         ${input.strategyVersion ?? null},
-        ${input.shariahStatus},
-        ${input.riskSnapshot ?? Prisma.JsonNull}
+        'APPROVED',
+        ${input.riskSnapshot === undefined ? null : JSON.stringify(input.riskSnapshot)}::jsonb
       )
       RETURNING
         "id",
@@ -88,19 +126,16 @@ export async function createOwnerApproval(input: {
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_PERSISTENCE_FAILED");
 
-    await tx.auditLog.create({
-      data: {
-        actorUserId: input.ownerId,
-        action: "TRADING_APPROVAL_ISSUED",
-        entityType: "TradingApproval",
-        entityId: approval.id,
-        metadata: {
-          opportunityId: approval.opportunityId,
-          amountUsd: approval.amountUsd.toString(),
-          expiresAt: approval.expiresAt.toISOString(),
-          strategyVersion: approval.strategyVersion,
-          shariahStatus: approval.shariahStatus,
-        },
+    await auditApproval(tx, {
+      ownerId: input.ownerId,
+      action: "TRADING_APPROVAL_ISSUED",
+      approvalId: approval.id,
+      metadata: {
+        opportunityId: approval.opportunityId,
+        amountUsd: approval.amountUsd.toString(),
+        expiresAt: approval.expiresAt.toISOString(),
+        strategyVersion: approval.strategyVersion,
+        shariahStatus: approval.shariahStatus,
       },
     });
 
@@ -114,6 +149,8 @@ export async function consumeOwnerApproval(input: {
   opportunityId: string;
   token: string;
 }): Promise<PersistedOwnerApproval> {
+  assertApprovalOwner(input.ownerId);
+
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
       SELECT
@@ -132,9 +169,9 @@ export async function consumeOwnerApproval(input: {
       FROM "TradingApproval"
       WHERE "id" = ${input.approvalId}
         AND "ownerId" = ${input.ownerId}
-        AND "opportunityId" = ${input.opportunityId}
+        AND "opportunityId" = ${input.opportunityId.trim()}
       FOR UPDATE
-    `;
+    `);
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_NOT_FOUND");
@@ -145,6 +182,14 @@ export async function consumeOwnerApproval(input: {
 
     if (approval.status === "REVOKED") {
       throw new Error("APPROVAL_REVOKED");
+    }
+
+    if (approval.status === "EXPIRED") {
+      throw new Error("APPROVAL_EXPIRED");
+    }
+
+    if (approval.status !== "PENDING") {
+      throw new Error("APPROVAL_NOT_CONSUMABLE");
     }
 
     const verification = verifyApprovalToken({
@@ -163,17 +208,17 @@ export async function consumeOwnerApproval(input: {
             AND "status" = 'PENDING'
             AND "consumedAt" IS NULL
         `);
-        await tx.auditLog.create({
-          data: {
-            actorUserId: input.ownerId,
-            action: "TRADING_APPROVAL_EXPIRED",
-            entityType: "TradingApproval",
-            entityId: approval.id,
-            metadata: { opportunityId: approval.opportunityId },
-          },
+
+        await auditApproval(tx, {
+          ownerId: input.ownerId,
+          action: "TRADING_APPROVAL_EXPIRED",
+          approvalId: approval.id,
+          metadata: { opportunityId: approval.opportunityId },
         });
+
         throw new Error("APPROVAL_EXPIRED");
       }
+
       throw new Error("INVALID_APPROVAL_TOKEN");
     }
 
@@ -206,17 +251,14 @@ export async function consumeOwnerApproval(input: {
     const result = updated[0];
     if (!result) throw new Error("APPROVAL_NOT_CONSUMABLE");
 
-    await tx.auditLog.create({
-      data: {
-        actorUserId: input.ownerId,
-        action: "TRADING_APPROVAL_CONSUMED",
-        entityType: "TradingApproval",
-        entityId: result.id,
-        metadata: {
-          opportunityId: result.opportunityId,
-          amountUsd: result.amountUsd.toString(),
-          consumedAt: result.consumedAt?.toISOString() ?? null,
-        },
+    await auditApproval(tx, {
+      ownerId: input.ownerId,
+      action: "TRADING_APPROVAL_CONSUMED",
+      approvalId: result.id,
+      metadata: {
+        opportunityId: result.opportunityId,
+        amountUsd: result.amountUsd.toString(),
+        consumedAt: result.consumedAt?.toISOString() ?? null,
       },
     });
 
@@ -228,6 +270,8 @@ export async function revokeOwnerApproval(input: {
   ownerId: string;
   approvalId: string;
 }): Promise<void> {
+  assertApprovalOwner(input.ownerId);
+
   return db.$transaction(async (tx) => {
     const result = await tx.$executeRaw(Prisma.sql`
       UPDATE "TradingApproval"
@@ -236,17 +280,15 @@ export async function revokeOwnerApproval(input: {
         AND "ownerId" = ${input.ownerId}
         AND "status" = 'PENDING'
         AND "consumedAt" IS NULL
+        AND "expiresAt" > CURRENT_TIMESTAMP
     `);
 
     if (result !== 1) throw new Error("APPROVAL_NOT_REVOKABLE");
 
-    await tx.auditLog.create({
-      data: {
-        actorUserId: input.ownerId,
-        action: "TRADING_APPROVAL_REVOKED",
-        entityType: "TradingApproval",
-        entityId: input.approvalId,
-      },
+    await auditApproval(tx, {
+      ownerId: input.ownerId,
+      action: "TRADING_APPROVAL_REVOKED",
+      approvalId: input.approvalId,
     });
   });
 }
