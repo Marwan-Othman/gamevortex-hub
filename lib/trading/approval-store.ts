@@ -33,15 +33,21 @@ function assertApprovalOwner(ownerId: string) {
 export async function createOwnerApproval(input: {
   ownerId: string;
   opportunityId: string;
-  amountUsd: Prisma.Decimal | number | string;
+  amountUsd: string | number;
   shariahStatus: "APPROVED";
   strategyVersion?: string;
-  riskSnapshot?: Prisma.JsonValue;
-  ttlSeconds?: number;
+  riskSnapshot?: Prisma.JsonObject;
+  ttlSeconds: number;
 }): Promise<{ approval: PersistedOwnerApproval; token: ApprovalToken }> {
   assertApprovalOwner(input.ownerId);
 
-  const amountUsd = new Prisma.Decimal(input.amountUsd);
+  let amountUsd: Prisma.Decimal;
+  try {
+    amountUsd = new Prisma.Decimal(input.amountUsd);
+  } catch {
+    throw new Error("INVALID_APPROVAL_AMOUNT");
+  }
+
   if (!amountUsd.isFinite() || amountUsd.lt(MIN_APPROVAL_AMOUNT_USD)) {
     throw new Error("INVALID_APPROVAL_AMOUNT");
   }
@@ -56,17 +62,8 @@ export async function createOwnerApproval(input: {
   return db.$transaction(async (tx: any) => {
     const rows = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
       INSERT INTO "TradingApproval" (
-        "id",
-        "opportunityId",
-        "ownerId",
-        "amountUsd",
-        "tokenHash",
-        "issuedAt",
-        "expiresAt",
-        "status",
-        "strategyVersion",
-        "shariahStatus",
-        "riskSnapshot"
+        "id", "opportunityId", "ownerId", "amountUsd", "tokenHash",
+        "issuedAt", "expiresAt", "status", "strategyVersion", "shariahStatus", "riskSnapshot"
       ) VALUES (
         ${id},
         ${input.opportunityId.trim()},
@@ -81,18 +78,8 @@ export async function createOwnerApproval(input: {
         ${input.riskSnapshot === undefined ? null : JSON.stringify(input.riskSnapshot)}::jsonb
       )
       RETURNING
-        "id",
-        "opportunityId",
-        "ownerId",
-        "amountUsd",
-        "tokenHash",
-        "issuedAt",
-        "expiresAt",
-        "consumedAt",
-        "status",
-        "strategyVersion",
-        "shariahStatus",
-        "riskSnapshot"
+        "id", "opportunityId", "ownerId", "amountUsd", "tokenHash", "issuedAt", "expiresAt",
+        "consumedAt", "status", "strategyVersion", "shariahStatus", "riskSnapshot"
     `);
 
     const approval = rows[0];
@@ -143,9 +130,7 @@ export async function consumeOwnerApproval(input: {
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_NOT_FOUND");
-    if (approval.consumedAt || approval.status === "CONSUMED") {
-      throw new Error("APPROVAL_ALREADY_CONSUMED");
-    }
+    if (approval.consumedAt || approval.status === "CONSUMED") throw new Error("APPROVAL_ALREADY_CONSUMED");
     if (approval.status === "REVOKED") throw new Error("APPROVAL_REVOKED");
     if (approval.status === "EXPIRED") throw new Error("APPROVAL_EXPIRED");
     if (approval.status !== "PENDING") throw new Error("APPROVAL_NOT_CONSUMABLE");
