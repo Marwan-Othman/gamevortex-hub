@@ -1,0 +1,1244 @@
+/* ============================================================
+   GameVortex Hub — Gamer Profile
+   Desktop + Mobile Responsive Redesign
+   Purple / Cyan / Gold Gaming UI
+   ============================================================ */
+
+.page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 22px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: #f7f4ff;
+  background:
+    radial-gradient(
+      700px 420px at 90% 0%,
+      rgba(139, 61, 255, 0.13),
+      transparent 65%
+    ),
+    radial-gradient(
+      600px 420px at 0% 45%,
+      rgba(39, 215, 255, 0.07),
+      transparent 65%
+    ),
+    transparent;
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+
+  border: 1px solid rgba(139, 61, 255, 0.35);
+  border-radius: 24px;
+  padding: 22px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(5, 7, 18, 0.96) 0%,
+      rgba(5, 7, 18, 0.86) 38%,
+      rgba(5, 7, 18, 0.55) 72%,
+      rgba(5, 7, 18, 0.35) 100%
+    ),
+    url("/images/profile/gamer-profile.png");
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.45),
+    inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(39, 215, 255, 0.025),
+      transparent
+    );
+}
+
+.heroTop {
+  position: relative;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  min-height: 78px;
+}
+
+.avatarWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+
+  border-radius: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8b3dff 0%,
+      #27d7ff 62%,
+      #7f6cff 100%
+    );
+
+  border: 2px solid rgba(255, 212, 90, 0.45);
+
+  color: #fff;
+  font-size: 25px;
+  font-weight: 900;
+
+  box-shadow:
+    0 0 28px rgba(139, 61, 255, 0.28),
+    inset 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.levelBadge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+
+  min-width: 23px;
+  height: 23px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 6px;
+  border-radius: 8px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffe58b,
+      #ffd45a,
+      #dda522
+    );
+
+  border: 2px solid #080913;
+
+  color: #171004;
+  font-size: 10px;
+  font-weight: 900;
+
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+
+.vipBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  margin-top: 7px;
+  padding: 4px 10px;
+
+  border-radius: 999px;
+
+  background: rgba(139, 61, 255, 0.13);
+  border: 1px solid rgba(139, 61, 255, 0.4);
+
+  color: #ffe28a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.progressRow {
+  position: relative;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-top: 20px;
+}
+
+.progressBar {
+  flex: 1;
+  height: 8px;
+
+  overflow: hidden;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #8b3dff,
+      #27d7ff,
+      #8b3dff
+    );
+
+  box-shadow:
+    0 0 15px rgba(39, 215, 255, 0.3);
+}
+
+.progressLabel {
+  min-width: 35px;
+
+  color: #d7c8ff;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.actionRow {
+  position: relative;
+  z-index: 1;
+
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+
+  margin-top: 17px;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 38px;
+  padding: 8px 10px;
+
+  border: 1px solid rgba(139, 61, 255, 0.2);
+  border-radius: 11px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(139, 61, 255, 0.075),
+      rgba(10, 11, 24, 0.6)
+    );
+
+  color: #f5f1ff;
+  font-size: 11.5px;
+  font-weight: 750;
+  text-decoration: none;
+
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.actionBtn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(39, 215, 255, 0.38);
+  background: rgba(39, 215, 255, 0.06);
+}
+
+/* ============================================================
+   SECTION HEAD
+   ============================================================ */
+
+.panelHead {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  min-height: 24px;
+  margin-bottom: 10px;
+
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.panelHead::after {
+  content: "";
+
+  width: 3px;
+  height: 14px;
+
+  margin-inline-start: 8px;
+
+  border-radius: 99px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #27d7ff,
+      #8b3dff
+    );
+
+  box-shadow:
+    0 0 10px rgba(39, 215, 255, 0.5);
+}
+
+.panelHead a {
+  color: #27d7ff;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* ============================================================
+   STATS
+   ============================================================ */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.statTile {
+  min-height: 112px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 12px;
+
+  border: 1px solid rgba(139, 61, 255, 0.2);
+  border-radius: 16px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.94),
+      rgba(5, 7, 18, 0.96)
+    );
+
+  color: inherit;
+  text-decoration: none;
+
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.025);
+
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.statTile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(39, 215, 255, 0.28);
+}
+
+.statIcon {
+  width: 36px;
+  height: 36px;
+
+  margin-bottom: 7px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 11px;
+
+  background: rgba(139, 61, 255, 0.11);
+  color: #27d7ff;
+
+  box-shadow:
+    0 0 18px rgba(139, 61, 255, 0.12);
+}
+
+.statTile strong {
+  display: block;
+
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.statTile span {
+  margin-top: 5px;
+
+  color: #a99fbd;
+  font-size: 10px;
+}
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+
+.panel {
+  position: relative;
+
+  padding: 16px;
+
+  border: 1px solid rgba(139, 61, 255, 0.22);
+  border-radius: 19px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 18, 42, 0.94),
+      rgba(5, 7, 18, 0.97)
+    );
+
+  box-shadow:
+    0 18px 55px rgba(0, 0, 0, 0.32),
+    inset 0 1px rgba(255, 255, 255, 0.025);
+}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 14px;
+}
+
+/* ============================================================
+   LEGENDS
+   ============================================================ */
+
+.legendRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #bdb5ce;
+  font-size: 11px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+}
+
+.legendItem strong {
+  margin-inline-start: auto;
+  color: #fff;
+}
+
+/* ============================================================
+   PURCHASE LIST
+   ============================================================ */
+
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 11px 0;
+
+  border-bottom: 1px solid rgba(139, 61, 255, 0.09);
+
+  font-size: 12px;
+}
+
+.listItem:last-child {
+  border-bottom: none;
+}
+
+.listIcon {
+  width: 35px;
+  height: 35px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: rgba(139, 61, 255, 0.11);
+  color: #27d7ff;
+}
+
+.listMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.listMain strong {
+  display: block;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 12px;
+}
+
+.listMain span {
+  display: block;
+  margin-top: 3px;
+
+  color: #938aa3;
+  font-size: 10px;
+}
+
+.listPrice {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.statusBadge {
+  padding: 3px 7px;
+
+  border-radius: 999px;
+
+  background: rgba(39, 215, 255, 0.07);
+  border: 1px solid rgba(39, 215, 255, 0.18);
+
+  color: #65e3ff;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+/* ============================================================
+   GAME LIBRARY
+   ============================================================ */
+
+.hscroll {
+  display: flex;
+  gap: 10px;
+
+  overflow-x: auto;
+
+  padding-bottom: 4px;
+
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.hscroll::-webkit-scrollbar {
+  display: none;
+}
+
+.gameCard {
+  flex: 0 0 132px;
+
+  overflow: hidden;
+
+  border: 1px solid rgba(139, 61, 255, 0.18);
+  border-radius: 13px;
+
+  background: rgba(8, 10, 23, 0.8);
+
+  color: inherit;
+  text-decoration: none;
+}
+
+.gameCoverWrap {
+  aspect-ratio: 3 / 4;
+  background: #101225;
+}
+
+.gameCoverWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gameInfo {
+  padding: 8px;
+}
+
+.gameInfo strong {
+  display: block;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 11px;
+}
+
+.gameInfo span {
+  display: block;
+  margin-top: 4px;
+
+  color: #ffd96d;
+  font-size: 10px;
+}
+
+/* ============================================================
+   REWARD BANNER
+   ============================================================ */
+
+.banner {
+  position: relative;
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+
+  padding: 19px;
+
+  border: 1px solid rgba(139, 61, 255, 0.34);
+  border-radius: 20px;
+
+  background:
+    radial-gradient(
+      420px 180px at 20% 100%,
+      rgba(139, 61, 255, 0.2),
+      transparent 70%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(39, 16, 72, 0.9),
+      rgba(11, 10, 25, 0.97)
+    );
+
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.bannerText {
+  min-width: 0;
+}
+
+.bannerText h2 {
+  margin: 0 0 5px;
+
+  color: #f0d7ff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.bannerText p {
+  margin: 0 0 12px;
+
+  color: #b9aec9;
+  font-size: 11px;
+}
+
+.bannerBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 35px;
+
+  padding: 8px 16px;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffe58b,
+      #ffd45a,
+      #e5ad2f
+    );
+
+  color: #171004;
+  font-size: 11px;
+  font-weight: 900;
+
+  text-decoration: none;
+
+  box-shadow:
+    0 7px 20px rgba(255, 212, 90, 0.16);
+}
+
+.bannerIcon {
+  width: 58px;
+  height: 58px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 16px;
+
+  background: rgba(139, 61, 255, 0.13);
+  border: 1px solid rgba(139, 61, 255, 0.32);
+
+  color: #d7aaff;
+}
+
+/* ============================================================
+   ACHIEVEMENTS
+   ============================================================ */
+
+.achievementsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.achievementCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  min-width: 0;
+
+  padding: 11px;
+
+  border: 1px solid rgba(139, 61, 255, 0.17);
+  border-radius: 13px;
+
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.achievementIcon {
+  width: 38px;
+  height: 38px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 11px;
+
+  background: rgba(139, 61, 255, 0.11);
+
+  font-size: 17px;
+}
+
+.achievementMeta {
+  min-width: 0;
+}
+
+.achievementMeta strong {
+  display: block;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 12px;
+}
+
+.achievementMeta p {
+  margin: 3px 0;
+
+  color: #9990a9;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.achievementMeta span {
+  color: #b98cff;
+  font-size: 9.5px;
+}
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+
+.loginPrompt {
+  padding: 80px 20px;
+
+  text-align: center;
+}
+
+.loginPrompt a {
+  display: inline-block;
+
+  margin-top: 14px;
+
+  padding: 10px 22px;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8b3dff,
+      #27d7ff
+    );
+
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 859px) {
+  .page {
+    padding: 18px 16px 92px;
+  }
+
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 599px) {
+  .page {
+    max-width: 100%;
+
+    padding:
+      12px
+      10px
+      82px;
+
+    gap: 12px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE HERO
+     ---------------------------------------------------------- */
+
+  .hero {
+    padding: 14px;
+    border-radius: 18px;
+
+    background-position: center center;
+  }
+
+  .heroTop {
+    gap: 11px;
+    min-height: 62px;
+  }
+
+  .avatar {
+    width: 58px;
+    height: 58px;
+
+    border-radius: 17px;
+
+    font-size: 20px;
+  }
+
+  .levelBadge {
+    right: -5px;
+    bottom: -5px;
+
+    min-width: 20px;
+    height: 20px;
+
+    padding: 0 5px;
+
+    border-radius: 7px;
+
+    font-size: 9px;
+  }
+
+  .name {
+    font-size: 16px;
+  }
+
+  .vipBadge {
+    margin-top: 5px;
+    padding: 3px 8px;
+
+    font-size: 9px;
+  }
+
+  .progressRow {
+    gap: 7px;
+    margin-top: 14px;
+  }
+
+  .progressBar {
+    height: 6px;
+  }
+
+  .progressLabel {
+    min-width: 28px;
+    font-size: 8px;
+  }
+
+  /*
+     الهاتف لا يحتاج أربعة أزرار طويلة في صف واحد.
+     نجعلها شبكة 2 × 2.
+  */
+
+  .actionRow {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+
+    margin-top: 12px;
+  }
+
+  .actionBtn {
+    min-height: 34px;
+    padding: 7px 6px;
+
+    border-radius: 9px;
+
+    font-size: 10px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE SECTION HEADERS
+     ---------------------------------------------------------- */
+
+  .panelHead {
+    min-height: 21px;
+    margin-bottom: 8px;
+
+    font-size: 11px;
+  }
+
+  .panelHead::after {
+    width: 2px;
+    height: 11px;
+  }
+
+  .panelHead a {
+    font-size: 9px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE STATS
+     ---------------------------------------------------------- */
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+  }
+
+  .statTile {
+    min-height: 91px;
+
+    padding: 9px;
+
+    border-radius: 12px;
+  }
+
+  .statIcon {
+    width: 29px;
+    height: 29px;
+
+    margin-bottom: 5px;
+
+    border-radius: 9px;
+  }
+
+  .statIcon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .statTile strong {
+    font-size: 13px;
+  }
+
+  .statTile span {
+    margin-top: 4px;
+    font-size: 8.5px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE PANELS
+     ---------------------------------------------------------- */
+
+  .panel {
+    padding: 11px;
+
+    border-radius: 15px;
+
+    box-shadow:
+      0 12px 35px rgba(0, 0, 0, 0.28);
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE CHARTS
+     ---------------------------------------------------------- */
+
+  .chartsGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE PURCHASES
+     ---------------------------------------------------------- */
+
+  .listItem {
+    gap: 7px;
+    padding: 9px 0;
+
+    font-size: 10px;
+  }
+
+  .listIcon {
+    width: 29px;
+    height: 29px;
+    border-radius: 8px;
+  }
+
+  .listIcon svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .listMain strong {
+    font-size: 10px;
+  }
+
+  .listMain span {
+    font-size: 8px;
+  }
+
+  .listPrice {
+    font-size: 10px;
+  }
+
+  .statusBadge {
+    display: none;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE GAME CARDS
+     ---------------------------------------------------------- */
+
+  .hscroll {
+    gap: 8px;
+  }
+
+  .gameCard {
+    flex-basis: 106px;
+    border-radius: 10px;
+  }
+
+  .gameInfo {
+    padding: 6px;
+  }
+
+  .gameInfo strong {
+    font-size: 9px;
+  }
+
+  .gameInfo span {
+    font-size: 8px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE REWARD BANNER
+     ---------------------------------------------------------- */
+
+  .banner {
+    min-height: 105px;
+
+    padding: 13px;
+
+    border-radius: 16px;
+
+    gap: 10px;
+  }
+
+  .bannerText h2 {
+    font-size: 12px;
+  }
+
+  .bannerText p {
+    max-width: 210px;
+
+    margin-bottom: 8px;
+
+    font-size: 9px;
+    line-height: 1.5;
+  }
+
+  .bannerBtn {
+    min-height: 30px;
+
+    padding: 6px 12px;
+
+    font-size: 9px;
+  }
+
+  .bannerIcon {
+    width: 45px;
+    height: 45px;
+
+    border-radius: 12px;
+  }
+
+  .bannerIcon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  /* ----------------------------------------------------------
+     MOBILE ACHIEVEMENTS
+     ---------------------------------------------------------- */
+
+  .achievementsGrid {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .achievementCard {
+    gap: 8px;
+
+    padding: 8px;
+
+    border-radius: 10px;
+  }
+
+  .achievementIcon {
+    width: 31px;
+    height: 31px;
+
+    border-radius: 8px;
+
+    font-size: 14px;
+  }
+
+  .achievementMeta strong {
+    font-size: 10px;
+  }
+
+  .achievementMeta p {
+    margin: 2px 0;
+
+    font-size: 8.5px;
+  }
+
+  .achievementMeta span {
+    font-size: 8px;
+  }
+}
+
+/* ============================================================
+   VERY SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 380px) {
+  .page {
+    padding-inline: 8px;
+  }
+
+  .hero {
+    padding: 11px;
+
+    background-position: center center;
+  }
+
+  .avatar {
+    width: 52px;
+    height: 52px;
+  }
+
+  .name {
+    font-size: 14px;
+  }
+
+  .actionBtn {
+    font-size: 9px;
+  }
+
+  .statTile {
+    min-height: 84px;
+  }
+
+  .statTile strong {
+    font-size: 12px;
+  }
+
+  .statTile span {
+    font-size: 8px;
+  }
+
+  .gameCard {
+    flex-basis: 98px;
+  }
+}
+
+/* ============================================================
+   SAFE RTL SUPPORT
+   ============================================================ */
+
+.page {
+  direction: rtl;
+}
+
+.progressRow {
+  direction: ltr;
+}
+
+.progressLabel {
+  direction: ltr;
+}
+
+.listPrice {
+  direction: ltr;
+}
+
+.banner {
+  direction: rtl;
+}
+
+/* ============================================================
+   DISABLED / FUTURE
+   ============================================================ */
+
+.soonBtn {
+  opacity: 0.5;
+  cursor: default;
+}

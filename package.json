@@ -1,0 +1,62 @@
+{
+  "name": "gamevortex-hub",
+  "version": "10.4.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "npm run db:generate && next build",
+    "build:production": "npm run production:validate",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run && npm run test:ai-gateway",
+    "test:ai-gateway": "node --test scripts/run-ai-gateway-checks.mjs",
+    "test:smoke": "node scripts/smoke-check.mjs",
+    "test:source": "node scripts/source-integrity-check.mjs",
+    "test:owner-policy": "node scripts/test-owner-role-policy.mjs",
+    "test:env-contract": "node scripts/test-env-contract.mjs",
+    "audit:tasks": "node scripts/audit-master-tasks.mjs",
+    "audit:content": "node scripts/final-content-audit.mjs",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:validate": "prisma validate",
+    "db:format": "prisma format",
+    "db:status": "prisma migrate status",
+    "db:seed": "npx --yes tsx prisma/seed-gamer-achievements.ts",
+    "wallpapers:seed": "node scripts/seed-wallpaper-library.mjs",
+    "db:backup": "sh scripts/backup-postgres.sh",
+    "validate:env": "node scripts/validate-env.mjs",
+    "production:validate": "npm run validate:env && npm run test:source && npm run db:validate && npm run db:generate && npm run db:deploy && npm run typecheck && next build && npm run test:smoke",
+    "production:start": "node scripts/start-production.mjs",
+    "production:seed": "node scripts/seed-production.mjs",
+    "production:bootstrap": "node scripts/bootstrap-production.mjs",
+    "payouts:process": "node scripts/process-withdrawals.mjs",
+    "fix:owner": "node scripts/fix-owner-conflict.mjs",
+    "import:mobile-games": "node scripts/import-mobile-games.mjs",
+    "postinstall": "prisma generate",
+    "ai-media-check": "node scripts/ai-media-config-check.mjs",
+    "audit:points": "node scripts/audit-point-integrity.mjs"
+  },
+  "engines": {
+    "node": ">=20.9 <23",
+    "npm": ">=10"
+  },
+  "dependencies": {
+    "@prisma/client": "6.12.0",
+    "@vercel/blob": "2.4.0",
+    "next": "16.3.6",
+    "react": "19.1.8",
+    "react-dom": "19.1.8",
+    "zod": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.12.0",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "prisma": "6.12.0",
+    "typescript": "5.8.3",
+    "vitest": "^5.0.2"
+  }
+}

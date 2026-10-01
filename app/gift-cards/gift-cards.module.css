@@ -1,0 +1,218 @@
+.header {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: clamp(28px, 6vw, 44px);
+  line-height: 1.1;
+}
+
+.search {
+  margin: 6px 0 18px;
+}
+
+.brandGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .brandGrid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+}
+
+.brandTile {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 178px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(18, 14, 26, 0.92), rgba(11, 9, 17, 0.9));
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.brandTile::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: -40px;
+  top: -40px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--from), transparent 68%);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.brandTile:hover {
+  transform: translateY(-4px);
+  border-color: rgba(183, 128, 245, 0.35);
+}
+
+.monogram {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  font-size: 24px;
+  font-weight: 900;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, var(--from), var(--to));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.monogramLarge {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  font-size: 32px;
+}
+
+.brandName {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.25;
+  direction: ltr;
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+
+.brandMeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fromPrice {
+  margin-top: auto;
+  color: var(--a);
+  font-weight: 900;
+  font-size: 15px;
+}
+
+.empty {
+  padding: 28px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 22px;
+  color: var(--muted);
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.brandHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.brandHead h1 {
+  margin: 0;
+  font-size: clamp(24px, 5vw, 38px);
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
+.notice {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.regionNav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+  scrollbar-width: thin;
+}
+
+.regionChip {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.regionBox {
+  scroll-margin-top: 90px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(18, 14, 26, 0.9), rgba(11, 9, 17, 0.88));
+}
+
+.regionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.regionHead h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.denomGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .denomGrid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+.denomTile {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.denomLabel {
+  font-size: 18px;
+  font-weight: 900;
+  direction: ltr;
+  text-align: start;
+}
+
+.denomPrice {
+  color: var(--a);
+  font-weight: 900;
+}
+
+.soldOut {
+  opacity: 0.5;
+}
