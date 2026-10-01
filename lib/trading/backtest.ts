@@ -41,6 +41,11 @@ export type BacktestResult = {
   finalCapitalUsd: number;
   pnlUsd: number;
   returnPercent: number;
+  maxDrawdownUsd: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRatePercent: number;
   trades: BacktestTrade[];
 };
 
@@ -95,6 +100,8 @@ export function runBacktest(
   candles.forEach(validateCandle);
 
   let capital = config.initialCapitalUsd;
+  let peakCapital = capital;
+  let maxDrawdownUsd = 0;
   let entry:
     | { timestamp: string; price: number; amountUsd: number; stopLoss: number; takeProfit: number }
     | undefined;
@@ -130,6 +137,8 @@ export function runBacktest(
         });
         entry = undefined;
       }
+      peakCapital = Math.max(peakCapital, capital);
+      maxDrawdownUsd = Math.max(maxDrawdownUsd, peakCapital - capital);
       continue;
     }
 
@@ -154,6 +163,9 @@ export function runBacktest(
         takeProfit: strategy.takeProfitPrice!,
       };
     }
+
+    peakCapital = Math.max(peakCapital, capital);
+    maxDrawdownUsd = Math.max(maxDrawdownUsd, peakCapital - capital);
   }
 
   if (entry) {
@@ -169,14 +181,24 @@ export function runBacktest(
       pnlUsd,
       exitReason: "END_OF_DATA",
     });
+    peakCapital = Math.max(peakCapital, capital);
+    maxDrawdownUsd = Math.max(maxDrawdownUsd, peakCapital - capital);
   }
 
   const pnlUsd = capital - config.initialCapitalUsd;
+  const winningTrades = trades.filter((trade) => trade.pnlUsd > 0).length;
+  const totalTrades = trades.length;
+
   return {
     initialCapitalUsd: config.initialCapitalUsd,
     finalCapitalUsd: capital,
     pnlUsd,
     returnPercent: (pnlUsd / config.initialCapitalUsd) * 100,
+    maxDrawdownUsd,
+    totalTrades,
+    winningTrades,
+    losingTrades: totalTrades - winningTrades,
+    winRatePercent: totalTrades === 0 ? 0 : (winningTrades / totalTrades) * 100,
     trades,
   };
 }
