@@ -1,15 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { db } from "@/lib/prisma";
-import { createApprovalToken, verifyApprovalToken, type ApprovalToken } from "./approval";
+import { db } from "../prisma";
+import {
+  createApprovalToken,
+  verifyApprovalToken,
+  type ApprovalToken,
+} from "./approval";
 
 const MIN_APPROVAL_AMOUNT_USD = new Prisma.Decimal(1);
 
-export type OwnerApproval = {
+type ApprovalRow = {
   id: string;
   opportunityId: string;
   ownerId: string;
   amountUsd: Prisma.Decimal;
+  tokenHash: string;
   issuedAt: Date;
   expiresAt: Date;
   consumedAt: Date | null;
@@ -19,41 +24,17 @@ export type OwnerApproval = {
   riskSnapshot: Prisma.JsonValue | null;
 };
 
-type ApprovalRow = OwnerApproval & {
-  tokenHash: string;
-};
+export type PersistedOwnerApproval = ApprovalRow;
 
-export type OwnerApprovalToken = ApprovalToken;
-
-export type CreateOwnerApprovalInput = {
+export async function createOwnerApproval(input: {
   ownerId: string;
   opportunityId: string;
-  amountUsd: string | number;
+  amountUsd: Prisma.Decimal | number | string;
   shariahStatus: "APPROVED";
   strategyVersion?: string;
-  riskSnapshot?: Prisma.JsonObject;
-  ttlSeconds: number;
-};
-
-function normalizeAmount(value: string | number) {
-  let amount: Prisma.Decimal;
-  try {
-    amount = new Prisma.Decimal(value);
-  } catch {
-    throw new Error("INVALID_APPROVAL_AMOUNT");
-  }
-
-  if (!amount.isFinite() || amount.lessThan(MIN_APPROVAL_AMOUNT_USD)) {
-    throw new Error("INVALID_APPROVAL_AMOUNT");
-  }
-
-  return amount.toDecimalPlaces(2);
-}
-
-export async function createOwnerApproval(input: CreateOwnerApprovalInput): Promise<{
-  approval: OwnerApproval;
-  token: OwnerApprovalToken;
-}> {
+  riskSnapshot?: Prisma.JsonValue;
+  ttlSeconds?: number;
+}): Promise<{ approval: PersistedOwnerApproval; token: ApprovalToken }> {
   if (!input.ownerId || !input.opportunityId.trim()) {
     throw new Error("INVALID_APPROVAL_INPUT");
   }
@@ -62,14 +43,19 @@ export async function createOwnerApproval(input: CreateOwnerApprovalInput): Prom
     throw new Error("SHARIAH_APPROVAL_REQUIRED");
   }
 
-  if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 30 || input.ttlSeconds > 15 * 60) {
-    throw new Error("INVALID_APPROVAL_TTL");
+  let amountUsd: Prisma.Decimal;
+  try {
+    amountUsd = new Prisma.Decimal(input.amountUsd);
+  } catch {
+    throw new Error("INVALID_APPROVAL_AMOUNT");
   }
 
-  const amountUsd = normalizeAmount(input.amountUsd);
+  if (!amountUsd.isFinite() || amountUsd.lt(MIN_APPROVAL_AMOUNT_USD)) {
+    throw new Error("INVALID_APPROVAL_AMOUNT");
+  }
+
   const token = createApprovalToken(input.opportunityId, input.ttlSeconds);
   const id = randomUUID();
-  const riskSnapshot = input.riskSnapshot === undefined ? null : JSON.stringify(input.riskSnapshot);
 
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
@@ -78,46 +64,43 @@ export async function createOwnerApproval(input: CreateOwnerApprovalInput): Prom
         "opportunityId",
         "ownerId",
         "amountUsd",
+        "tokenHash",
         "issuedAt",
         "expiresAt",
         "status",
         "strategyVersion",
         "shariahStatus",
-        "riskSnapshot",
-        "tokenHash"
-      )
-      VALUES (
+        "riskSnapshot"
+      ) VALUES (
         ${id},
         ${token.opportunityId},
         ${input.ownerId},
-        ${amountUsd.toString()}::numeric,
+        ${amountUsd.toDecimalPlaces(2).toString()}::numeric,
+        ${token.tokenHash},
         ${new Date(token.issuedAt)},
         ${new Date(token.expiresAt)},
         'PENDING',
         ${input.strategyVersion ?? null},
         'APPROVED',
-        ${riskSnapshot}::jsonb,
-        ${token.tokenHash}
+        ${input.riskSnapshot === undefined ? null : JSON.stringify(input.riskSnapshot)}::jsonb
       )
       RETURNING
         "id",
         "opportunityId",
         "ownerId",
         "amountUsd",
+        "tokenHash",
         "issuedAt",
         "expiresAt",
         "consumedAt",
         "status",
         "strategyVersion",
         "shariahStatus",
-        "riskSnapshot",
-        "tokenHash"
+        "riskSnapshot"
     `;
 
     const approval = rows[0];
-    if (!approval) {
-      throw new Error("APPROVAL_CREATION_FAILED");
-    }
+    if (!approval) throw new Error("APPROVAL_PERSISTENCE_FAILED");
 
     await tx.auditLog.create({
       data: {
@@ -135,7 +118,7 @@ export async function createOwnerApproval(input: CreateOwnerApprovalInput): Prom
       },
     });
 
-    return { approval, token: { ...token } };
+    return { approval, token };
   });
 }
 
@@ -144,7 +127,7 @@ export async function consumeOwnerApproval(input: {
   approvalId: string;
   opportunityId: string;
   token: string;
-}): Promise<OwnerApproval> {
+}): Promise<PersistedOwnerApproval> {
   if (!input.ownerId || !input.approvalId || !input.opportunityId.trim() || !input.token) {
     throw new Error("INVALID_APPROVAL_INPUT");
   }
@@ -156,20 +139,20 @@ export async function consumeOwnerApproval(input: {
         "opportunityId",
         "ownerId",
         "amountUsd",
+        "tokenHash",
         "issuedAt",
         "expiresAt",
         "consumedAt",
         "status",
         "strategyVersion",
         "shariahStatus",
-        "riskSnapshot",
-        "tokenHash"
+        "riskSnapshot"
       FROM "TradingApproval"
       WHERE "id" = ${input.approvalId}
         AND "ownerId" = ${input.ownerId}
         AND "opportunityId" = ${input.opportunityId.trim()}
       FOR UPDATE
-    `);
+    `;
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_NOT_FOUND");
@@ -239,14 +222,14 @@ export async function consumeOwnerApproval(input: {
         "opportunityId",
         "ownerId",
         "amountUsd",
+        "tokenHash",
         "issuedAt",
         "expiresAt",
         "consumedAt",
         "status",
         "strategyVersion",
         "shariahStatus",
-        "riskSnapshot",
-        "tokenHash"
+        "riskSnapshot"
     `;
 
     const result = updated[0];
