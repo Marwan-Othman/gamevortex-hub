@@ -6,6 +6,7 @@ import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import AdminShell from "@/components/admin/AdminShell";
 import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
 import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
+import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,8 @@ export default async function TradingPage() {
       />
 
       <TradingRiskConfigPanel initial={riskConfigForClient} />
+
+      <TradingBacktestPanel />
     </AdminShell>
   );
 }
