@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { getOwnerOrAccessScreen } from "@/lib/admin-access";
+import { forbidden } from "next/navigation";
+import { Role } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
 import { getTradingSummary } from "@/lib/trading/allocation";
 import { tradingMaxAllocationUsd, TRADING_MIN_ALLOCATION_USD } from "@/lib/trading/money";
 import AdminShell from "@/components/admin/AdminShell";
@@ -15,13 +17,24 @@ export const metadata: Metadata = {
 };
 
 export default async function TradingPage() {
-  const result = await getOwnerOrAccessScreen();
-  if ("screen" in result) return result.screen;
+  let owner;
 
-  const summary = await getTradingSummary(result.owner.id);
+  try {
+    owner = await requireUser();
+  } catch {
+    // Trading is OWNER ONLY. Unauthenticated access is deliberately fail-closed
+    // with the same 403 response as every other unauthorized role.
+    forbidden();
+  }
+
+  if (owner.role !== Role.SUPER_ADMIN) {
+    forbidden();
+  }
+
+  const summary = await getTradingSummary(owner.id);
 
   return (
-    <AdminShell ownerLabel={result.owner.username || result.owner.email}>
+    <AdminShell ownerLabel={owner.username || owner.email}>
       <section className={styles.ownerCard}>
         <div className={styles.ownerCardName}>GameVortex AI Trading — Owner Edition</div>
         <p className="muted">
