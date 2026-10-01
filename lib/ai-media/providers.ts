@@ -173,11 +173,8 @@ function extractImageFromResponse(
         return {
           base64: data,
           mimeType:
-            typeof mimeType ===
-              "string" &&
-            mimeType.startsWith(
-              "image/",
-            )
+            typeof mimeType === "string" &&
+            mimeType.startsWith("image/")
               ? mimeType
               : "image/png",
         };
@@ -229,16 +226,23 @@ function classifyProviderFailure(
 
   if (
     status === 401 ||
-    status === 403 ||
+    status === 403
+  ) {
+    return "GEMINI_AUTH_FAILED";
+  }
+
+  if (
     normalized.includes("billing") ||
     normalized.includes("paid tier") ||
-    normalized.includes("payment") ||
-    normalized.includes("quota")
+    normalized.includes("payment")
   ) {
     return "GEMINI_IMAGE_BILLING_REQUIRED";
   }
 
-  if (status === 429) {
+  if (
+    normalized.includes("quota") ||
+    status === 429
+  ) {
     return "GEMINI_RATE_LIMITED";
   }
 
@@ -287,8 +291,7 @@ export async function generateImage(
     new AbortController();
 
   const timeout = setTimeout(
-    () =>
-      controller.abort(),
+    () => controller.abort(),
     IMAGE_TIMEOUT_MS,
   );
 
@@ -318,12 +321,15 @@ export async function generateImage(
                     ? [
                         {
                           inlineData: {
-                            mimeType: inputImage.mimeType,
-                            data: inputImage.base64,
+                            mimeType:
+                              inputImage.mimeType,
+                            data:
+                              inputImage.base64,
                           },
                         },
                       ]
                     : []),
+
                   {
                     text: inputImage
                       ? `Edit the provided image according to this instruction. Preserve identity and unchanged elements unless the user explicitly requests a change. ${cleanPrompt}`
@@ -372,9 +378,7 @@ export async function generateImage(
 
     if (!response.ok) {
       const providerMessage =
-        extractGeminiError(
-          body,
-        );
+        extractGeminiError(body);
 
       const code =
         classifyProviderFailure(
@@ -401,9 +405,7 @@ export async function generateImage(
     }
 
     const image =
-      extractImageFromResponse(
-        body,
-      );
+      extractImageFromResponse(body);
 
     if (!image) {
       console.error(
@@ -413,8 +415,7 @@ export async function generateImage(
           model,
           responseKeys:
             body &&
-            typeof body ===
-              "object"
+            typeof body === "object"
               ? Object.keys(
                   body as Record<
                     string,
@@ -432,7 +433,9 @@ export async function generateImage(
 
     return {
       requestId,
+
       url: `data:${image.mimeType};base64,${image.base64}`,
+
       model,
     };
   } catch (error) {
