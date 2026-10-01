@@ -215,6 +215,13 @@ export async function POST(req: NextRequest) {
       ? input.aspectRatio
       : "9:16";
 
+  const operation =
+    input.operation === "EDIT" ||
+    input.operation === "ENHANCE" ||
+    input.operation === "TRANSFORM"
+      ? input.operation
+      : "EDIT";
+
   if (kind !== "IMAGE") {
     return NextResponse.json(
       {
@@ -306,7 +313,7 @@ export async function POST(req: NextRequest) {
       model:
         process.env.GEMINI_IMAGE_MODEL?.trim() ||
         "gemini-3.1-flash-image",
-      prompt,
+      prompt: `[${operation}] ${prompt}`,
       status: "PROCESSING",
       conversationId,
       idempotencyKey,
@@ -314,8 +321,17 @@ export async function POST(req: NextRequest) {
   });
 
   try {
+    const operationInstruction =
+      operation === "ENHANCE"
+        ? "Enhance the uploaded image quality while preserving its identity, composition, and subject. "
+        : operation === "TRANSFORM"
+          ? "Transform the uploaded image according to the user's requested style or visual direction while preserving the important subject. "
+          : "Edit the uploaded image according to the user's requested changes. ";
+
     const result = await generateImage(
-      prompt,
+      uploadedImage
+        ? `${operationInstruction}${prompt}`
+        : prompt,
       aspectRatio,
       uploadedImage,
     );

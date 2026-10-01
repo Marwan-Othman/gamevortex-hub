@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent, SyntheticEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { upload } from "@vercel/blob/client";
+import {
+  WALLPAPER_BULK_UPLOAD_MAX,
+  WALLPAPER_MAX_FILE_SIZE,
+  isSupportedWallpaperMimeType,
+} from "@/lib/wallpaper-constants";
 
 type Wallpaper = {
   id: string;
   titleAr: string;
   titleEn: string;
-  imageUrl: string;
   thumbnailUrl: string | null;
   type: "MOBILE" | "DESKTOP";
   category: string;
@@ -27,35 +31,52 @@ type Wallpaper = {
   sourceStatus: string;
 };
 
-type SourceMode = "IMAGE" | "ANIMATED";
-type InputMode = "FILE" | "URL";
+type QueueStatus =
+  | "queued"
+  | "uploading"
+  | "saving"
+  | "done"
+  | "failed"
+  | "cancelled";
 
-type FormState = {
-  sourceMode: SourceMode;
-  inputMode: InputMode;
-  imageUrl: string;
-  isVip: boolean;
-  published: boolean;
-  featured: boolean;
+type QueueItem = {
+  id: string;
+  file: File;
+  previewUrl: string;
+  status: QueueStatus;
+  progress: number;
+  error?: string;
+  controller?: AbortController;
+  resultId?: string;
 };
 
-const emptyForm: FormState = {
-  sourceMode: "IMAGE",
-  inputMode: "FILE",
-  imageUrl: "",
+const CATEGORY_OPTIONS = [
+  ["GAMING", "ألعاب"],
+  ["ANIME", "أنمي"],
+  ["CYBERPUNK", "سايبر"],
+  ["CARS", "سيارات"],
+  ["NATURE", "طبيعة"],
+  ["SPACE", "فضاء"],
+  ["FANTASY", "فانتازيا"],
+  ["ARABIC", "عربي"],
+  ["ISLAMIC", "إسلامي"],
+  ["ABSTRACT", "مجرد"],
+  ["MINIMAL", "بسيط"],
+  ["TECHNOLOGY", "تقنية"],
+  ["AI", "ذكاء اصطناعي"],
+  ["NEON", "نيون"],
+  ["GAMEVORTEX", "GameVortex"],
+  ["SPORTS", "رياضة"],
+  ["OTHER", "أخرى"],
+] as const;
+
+const EMPTY_FORM = {
   isVip: false,
   published: false,
   featured: false,
+  category: "GAMING",
+  type: "AUTO" as "AUTO" | "MOBILE" | "DESKTOP",
 };
-
-function isAnimatedMimeType(type: string) {
-  return [
-    "image/gif",
-    "image/webp",
-    "image/apng",
-    "image/avif",
-  ].includes(type.toLowerCase());
-}
 
 function detectType(
   width: number,
@@ -64,25 +85,23 @@ function detectType(
   return height > width ? "MOBILE" : "DESKTOP";
 }
 
-function safeFileName(name: string) {
+function safeFilename(name: string) {
   return (
     name
+      .normalize("NFKC")
       .replace(/[^a-zA-Z0-9._-]+/g, "-")
       .replace(/-+/g, "-")
-      .slice(-120) || "wallpaper"
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 140) || "wallpaper"
   );
 }
 
-function imageRatio(
-  width?: number | null,
-  height?: number | null,
-  type?: "MOBILE" | "DESKTOP",
-) {
-  if (width && height && width > 0 && height > 0) {
-    return `${width} / ${height}`;
-  }
+function fileKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
 
-  return type === "MOBILE" ? "9 / 16" : "16 / 9";
+function isSupportedClientFile(file: File) {
+  return isSupportedWallpaperMimeType(file.type);
 }
 
 export default function WallpaperAdminClient({
@@ -90,489 +109,527 @@ export default function WallpaperAdminClient({
 }: {
   initialWallpapers: Wallpaper[];
 }) {
-  const [wallpapers, setWallpapers] = useState(initialWallpapers);
+  const [wallpapers, setWallpapers] =
+    useState<Wallpaper[]>(initialWallpapers);
 
-  const [form, setForm] = useState<FormState>(emptyForm);
-
-  const [file, setFile] = useState<File | null>(null);
-
-  const [previewUrl, setPreviewUrl] = useState("");
-
-  const [dimensions, setDimensions] = useState({
-    width: 0,
-    height: 0,
-  });
-
-  const [busy, setBusy] = useState(false);
-
-  const [progress, setProgress] = useState(0);
-
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [running, setRunning] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  /*
-   * IDs الخاصة بالخلفيات المحددة
-   */
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const queueRef = useRef<QueueItem[]>([]);
+  const runningRef = useRef(false);
 
-  /*
-   * يمنع الضغط المتكرر أثناء الحذف الجماعي
-   */
-  const [bulkBusy, setBulkBusy] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const accept = useMemo(
-    () =>
-      form.sourceMode === "ANIMATED"
-        ? ".gif,.webp,.apng,.avif,image/gif,image/webp,image/apng,image/avif"
-        : ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp",
-    [form.sourceMode],
-  );
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(previewUrl);
+      for (const item of queueRef.current) {
+        if (item.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
       }
     };
-  }, [previewUrl]);
+  }, []);
 
-  function update<K extends keyof FormState>(
-    key: K,
-    value: FormState[K],
+  const accept = useMemo(
+    () =>
+      ".jpg,.jpeg,.png,.webp,.gif,.apng,.avif,image/jpeg,image/png,image/webp,image/gif,image/apng,image/avif",
+    [],
+  );
+
+  const addFiles = useCallback(
+    (files: FileList | File[]) => {
+      setMessage("");
+
+      const incoming = Array.from(files);
+
+      if (incoming.length === 0) {
+        return;
+      }
+
+      const existing = new Set(
+        queueRef.current.map((item) => fileKey(item.file)),
+      );
+
+      const available = Math.max(
+        0,
+        WALLPAPER_BULK_UPLOAD_MAX - queueRef.current.length,
+      );
+
+      const added: QueueItem[] = [];
+
+      for (const file of incoming.slice(0, available)) {
+        if (existing.has(fileKey(file))) {
+          continue;
+        }
+
+        if (!isSupportedClientFile(file)) {
+          setMessage(
+            `الصورة ${file.name} ليست بصيغة مدعومة.`,
+          );
+          continue;
+        }
+
+        if (file.size <= 0) {
+          setMessage(
+            `الصورة ${file.name} فارغة أو تالفة.`,
+          );
+          continue;
+        }
+
+        if (file.size > WALLPAPER_MAX_FILE_SIZE) {
+          setMessage(
+            `الصورة ${file.name} تتجاوز الحد 50MB.`,
+          );
+          continue;
+        }
+
+        existing.add(fileKey(file));
+
+        added.push({
+          id: crypto.randomUUID(),
+          file,
+          previewUrl: URL.createObjectURL(file),
+          status: "queued",
+          progress: 0,
+        });
+      }
+
+      setQueue((current) => [
+        ...current,
+        ...added,
+      ]);
+
+      if (incoming.length > available) {
+        setMessage(
+          `الحد الأقصى لطابور الرفع هو ${WALLPAPER_BULK_UPLOAD_MAX} صورة.`,
+        );
+      }
+    },
+    [],
+  );
+
+  function onPick(
+    event: ChangeEvent<HTMLInputElement>,
   ) {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    if (event.target.files) {
+      addFiles(event.target.files);
+    }
+
+    event.target.value = "";
   }
 
-  function resetForm() {
-    if (previewUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    setForm(emptyForm);
-
-    setFile(null);
-
-    setPreviewUrl("");
-
-    setDimensions({
-      width: 0,
-      height: 0,
-    });
-
-    setProgress(0);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  function handleFileChange(nextFile: File | null) {
-    setMessage("");
-
-    setFile(nextFile);
-
-    setDimensions({
-      width: 0,
-      height: 0,
-    });
-
-    if (previewUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    if (!nextFile) {
-      setPreviewUrl("");
-      return;
-    }
-
-    if (!nextFile.type.startsWith("image/")) {
-      setFile(null);
-      setPreviewUrl("");
-      setMessage("الملف المختار ليس صورة مدعومة.");
-      return;
-    }
-
-    if (nextFile.size <= 0) {
-      setFile(null);
-      setPreviewUrl("");
-      setMessage("الملف فاضي أو تالف.");
-      return;
-    }
-
-    const detectedAnimated = isAnimatedMimeType(nextFile.type);
+  function removeQueued(id: string) {
+    const item = queueRef.current.find(
+      (x) => x.id === id,
+    );
 
     if (
-      detectedAnimated &&
-      form.sourceMode !== "ANIMATED"
+      !item ||
+      item.status === "uploading" ||
+      item.status === "saving"
     ) {
-      update("sourceMode", "ANIMATED");
+      return;
     }
 
-    setPreviewUrl(
-      URL.createObjectURL(nextFile),
+    if (item.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+
+    setQueue((current) =>
+      current.filter((x) => x.id !== id),
     );
   }
 
-  function handlePreviewLoad(
-    event: SyntheticEvent<HTMLImageElement>,
-  ) {
-    const width = event.currentTarget.naturalWidth;
+  async function uploadItem(item: QueueItem) {
+    const controller = new AbortController();
 
-    const height = event.currentTarget.naturalHeight;
-
-    if (width && height) {
-      setDimensions({
-        width,
-        height,
-      });
-    }
-  }
-
-  async function createWallpaper(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    setBusy(true);
-
-    setProgress(0);
-
-    setMessage("");
+    setQueue((current) =>
+      current.map((x) =>
+        x.id === item.id
+          ? {
+              ...x,
+              status: "uploading",
+              progress: 0,
+              controller,
+            }
+          : x,
+      ),
+    );
 
     try {
-      let payload: Record<string, unknown>;
+      const blob = await upload(
+        `wallpapers/${Date.now()}-${crypto.randomUUID()}-${safeFilename(
+          item.file.name,
+        )}`,
+        item.file,
+        {
+          access: "public",
+          handleUploadUrl:
+            "/api/admin/wallpapers/upload",
+          multipart: true,
 
-      if (form.inputMode === "FILE") {
-        if (!file) {
-          throw new Error(
-            "اختر صورة من الهاتف أولًا.",
-          );
-        }
-
-        if (!file.type.startsWith("image/")) {
-          throw new Error(
-            "صيغة الصورة غير مدعومة.",
-          );
-        }
-
-        const blob = await upload(
-          `wallpapers/${Date.now()}-${crypto.randomUUID()}-${safeFileName(
-            file.name,
-          )}`,
-          file,
-          {
-            access: "public",
-            handleUploadUrl:
-              "/api/admin/wallpapers/upload",
-            multipart: true,
-
-            onUploadProgress(event) {
-              setProgress(
-                Math.round(event.percentage),
-              );
-            },
+          onUploadProgress(event) {
+            setQueue((current) =>
+              current.map((x) =>
+                x.id === item.id
+                  ? {
+                      ...x,
+                      progress: Math.round(
+                        event.percentage,
+                      ),
+                    }
+                  : x,
+              ),
+            );
           },
+        },
+      );
+
+      if (controller.signal.aborted) {
+        throw new DOMException(
+          "Upload cancelled",
+          "AbortError",
         );
-
-        payload = {
-          sourceType: "BLOB",
-
-          imageUrl: blob.url,
-
-          originalFilename: file.name,
-
-          mimeType: file.type,
-
-          fileSizeBytes: file.size,
-
-          isAnimated:
-            isAnimatedMimeType(file.type),
-
-          width:
-            dimensions.width || undefined,
-
-          height:
-            dimensions.height || undefined,
-
-          type:
-            dimensions.width &&
-            dimensions.height
-              ? detectType(
-                  dimensions.width,
-                  dimensions.height,
-                )
-              : undefined,
-
-          isVip: form.isVip,
-
-          published: form.published,
-
-          featured: form.featured,
-        };
-      } else {
-        const imageUrl =
-          form.imageUrl.trim();
-
-        if (!imageUrl) {
-          throw new Error(
-            "ضع رابط الصورة أولًا.",
-          );
-        }
-
-        if (!/^https:\/\//i.test(imageUrl)) {
-          throw new Error(
-            "الرابط يجب أن يبدأ بـ HTTPS.",
-          );
-        }
-
-        payload = {
-          sourceType: "URL",
-
-          sourceUrl: imageUrl,
-
-          width:
-            dimensions.width || undefined,
-
-          height:
-            dimensions.height || undefined,
-
-          type:
-            dimensions.width &&
-            dimensions.height
-              ? detectType(
-                  dimensions.width,
-                  dimensions.height,
-                )
-              : undefined,
-
-          isVip: form.isVip,
-
-          published: form.published,
-
-          featured: form.featured,
-        };
       }
 
-      const response = await fetch(
+      setQueue((current) =>
+        current.map((x) =>
+          x.id === item.id
+            ? {
+                ...x,
+                status: "saving",
+                progress: 100,
+                controller: undefined,
+              }
+            : x,
+        ),
+      );
+
+      const preview = URL.createObjectURL(
+        item.file,
+      );
+
+      const dimensions =
+        await new Promise<{
+          width: number;
+          height: number;
+        }>((resolve) => {
+          const img = new Image();
+
+          img.onload = () =>
+            resolve({
+              width: img.naturalWidth || 0,
+              height: img.naturalHeight || 0,
+            });
+
+          img.onerror = () =>
+            resolve({
+              width: 0,
+              height: 0,
+            });
+
+          img.src = preview;
+        });
+
+      URL.revokeObjectURL(preview);
+
+      const type =
+        form.type === "AUTO"
+          ? detectType(
+              dimensions.width,
+              dimensions.height,
+            )
+          : form.type;
+
+      const res = await fetch(
         "/api/admin/wallpapers",
         {
           method: "POST",
-
           headers: {
-            "content-type":
-              "application/json",
+            "content-type": "application/json",
           },
-
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            sourceType: "BLOB",
+            imageUrl: blob.url,
+            originalFilename: item.file.name,
+            mimeType: item.file.type,
+            fileSizeBytes: item.file.size,
+            isAnimated: [
+              "image/gif",
+              "image/apng",
+            ].includes(item.file.type),
+            width:
+              dimensions.width || undefined,
+            height:
+              dimensions.height || undefined,
+            type,
+            category: form.category,
+            isVip: form.isVip,
+            published: form.published,
+            featured: form.featured,
+          }),
+          signal: controller.signal,
         },
       );
 
-      const result =
-        await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
+      if (!res.ok) {
         throw new Error(
-          result.error ||
-            "فشل إنشاء الخلفية",
+          data.error || "فشل حفظ الخلفية",
         );
       }
 
+      const savedWallpaper =
+        data.data as Wallpaper;
+
       setWallpapers((current) => [
-        result.data,
+        savedWallpaper,
         ...current,
       ]);
 
-      resetForm();
+      setQueue((current) =>
+        current.map((x) =>
+          x.id === item.id
+            ? {
+                ...x,
+                status: "done",
+                resultId:
+                  savedWallpaper.id,
+                controller: undefined,
+              }
+            : x,
+        ),
+      );
 
-      setMessage(
-        "تمت إضافة الخلفية بنجاح بدون ضغط أو تحويل للصورة الأصلية.",
-      );
+      return true;
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "حدث خطأ غير متوقع",
+      const cancelled =
+        error instanceof DOMException &&
+        error.name === "AbortError";
+
+      setQueue((current) =>
+        current.map((x) =>
+          x.id === item.id
+            ? {
+                ...x,
+                status: cancelled
+                  ? "cancelled"
+                  : "failed",
+                error: cancelled
+                  ? "تم الإلغاء"
+                  : error instanceof Error
+                    ? error.message
+                    : "فشل الرفع",
+                controller: undefined,
+              }
+            : x,
+        ),
       );
-    } finally {
-      setBusy(false);
+
+      return false;
     }
   }
 
-  async function patch(
-    id: string,
+  async function startQueue() {
+    if (runningRef.current) {
+      return;
+    }
+
+    const queuedIds = queueRef.current
+      .filter(
+        (x) =>
+          x.status === "queued" ||
+          x.status === "failed",
+      )
+      .map((x) => x.id);
+
+    if (!queuedIds.length) {
+      return;
+    }
+
+    runningRef.current = true;
+    setRunning(true);
+    setMessage("");
+
+    let cursor = 0;
+
+    const worker = async () => {
+      while (cursor < queuedIds.length) {
+        const id = queuedIds[cursor++];
+
+        const item = queueRef.current.find(
+          (x) => x.id === id,
+        );
+
+        if (
+          !item ||
+          !(
+            item.status === "queued" ||
+            item.status === "failed"
+          )
+        ) {
+          continue;
+        }
+
+        await uploadItem(item);
+      }
+    };
+
+    await Promise.all([
+      worker(),
+      worker(),
+    ]);
+
+    runningRef.current = false;
+    setRunning(false);
+
+    setMessage(
+      "انتهى طابور الرفع. الصور الناجحة محفوظة، والفاشلة يمكن إعادة محاولتها منفردة.",
+    );
+  }
+
+  function cancelItem(id: string) {
+    const item = queueRef.current.find(
+      (x) => x.id === id,
+    );
+
+    item?.controller?.abort();
+  }
+
+  function retryItem(id: string) {
+    setQueue((current) =>
+      current.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              status: "queued",
+              progress: 0,
+              error: undefined,
+            }
+          : x,
+      ),
+    );
+  }
+
+  function clearCompleted() {
+    setQueue((current) =>
+      current.filter((item) => {
+        if (
+          item.status === "done" ||
+          item.status === "cancelled"
+        ) {
+          if (
+            item.previewUrl.startsWith("blob:")
+          ) {
+            URL.revokeObjectURL(
+              item.previewUrl,
+            );
+          }
+
+          return false;
+        }
+
+        return true;
+      }),
+    );
+  }
+
+  async function patchIds(
+    ids: string[],
     data: Record<string, unknown>,
   ) {
-    const response = await fetch(
+    const res = await fetch(
       "/api/admin/wallpapers",
       {
         method: "PATCH",
-
         headers: {
-          "content-type":
-            "application/json",
+          "content-type": "application/json",
         },
-
         body: JSON.stringify({
-          id,
+          ids,
           ...data,
         }),
       },
     );
 
     const result =
-      await response.json();
+      (await res.json()) as {
+        data?: unknown;
+        error?: string;
+      };
 
-    if (!response.ok) {
+    if (!res.ok) {
       throw new Error(
         result.error ||
-          "فشل التحديث",
+          "فشل التحديث الجماعي",
       );
     }
+
+    const updates: Wallpaper[] =
+      Array.isArray(result.data)
+        ? (result.data as Wallpaper[])
+        : result.data
+          ? [result.data as Wallpaper]
+          : [];
+
+    const byId = new Map<
+      string,
+      Wallpaper
+    >(
+      updates.map((item) => [
+        item.id,
+        item,
+      ]),
+    );
 
     setWallpapers((current) =>
-      current.map((item) =>
-        item.id === id
-          ? result.data
-          : item,
+      current.map(
+        (item) =>
+          byId.get(item.id) ?? item,
       ),
     );
   }
 
-  async function toggle(
-    id: string,
-    field:
-      | "published"
-      | "featured"
-      | "isVip",
-  ) {
-    const item =
-      wallpapers.find(
-        (wallpaper) =>
-          wallpaper.id === id,
-      );
-
-    if (!item) return;
-
-    try {
-      await patch(id, {
-        [field]: !item[field],
-      });
-
-      setMessage(
-        "تم تحديث الخلفية.",
-      );
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "فشل التحديث",
-      );
-    }
-  }
-
-  /*
-   * هل الخلفية محددة؟
-   */
-  function isSelected(id: string) {
-    return selectedIds.includes(id);
-  }
-
-  /*
-   * تحديد / إلغاء تحديد خلفية واحدة
-   */
-  function toggleSelected(id: string) {
-    setSelectedIds((current) =>
-      current.includes(id)
-        ? current.filter(
-            (item) => item !== id,
-          )
-        : [...current, id],
-    );
-  }
-
-  /*
-   * تحديد جميع الخلفيات الموجودة حاليًا
-   */
-  function selectAll() {
-    setSelectedIds(
-      wallpapers.map(
-        (item) => item.id,
-      ),
-    );
-  }
-
-  /*
-   * إلغاء كل التحديد
-   */
-  function clearSelection() {
-    setSelectedIds([]);
-  }
-
-  /*
-   * حذف خلفية واحدة
-   */
-  async function deleteWallpaper(
-    id: string,
+  async function bulkAction(
+    data: Record<string, unknown>,
   ) {
     if (
-      !window.confirm(
-        "هل تريد حذف هذه الخلفية نهائيًا؟",
-      )
+      !selectedIds.length ||
+      bulkBusy
     ) {
       return;
     }
 
+    setBulkBusy(true);
+
     try {
-      const response = await fetch(
-        `/api/admin/wallpapers?id=${encodeURIComponent(
-          id,
-        )}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      const result =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            "فشل الحذف",
-        );
-      }
-
-      setWallpapers((current) =>
-        current.filter(
-          (item) => item.id !== id,
-        ),
-      );
-
-      setSelectedIds((current) =>
-        current.filter(
-          (item) => item !== id,
-        ),
+      await patchIds(
+        selectedIds,
+        data,
       );
 
       setMessage(
-        "تم حذف الخلفية.",
+        `تم تحديث ${selectedIds.length} خلفية.`,
       );
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "فشل الحذف",
+          : "فشل العملية",
       );
+    } finally {
+      setBulkBusy(false);
     }
   }
 
-  /*
-   * حذف الخلفيات المحددة دفعة واحدة
-   */
   async function deleteSelected() {
     if (
       !selectedIds.length ||
@@ -581,33 +638,25 @@ export default function WallpaperAdminClient({
       return;
     }
 
-    const count =
-      selectedIds.length;
-
-    const confirmed =
-      window.confirm(
-        `هل تريد حذف ${count} خلفية محددة نهائيًا؟\n\nسيتم حذف السجلات وملفات التخزين المرتبطة بها.`,
-      );
-
-    if (!confirmed) {
+    if (
+      !window.confirm(
+        `حذف ${selectedIds.length} خلفية نهائيًا؟`,
+      )
+    ) {
       return;
     }
 
     setBulkBusy(true);
 
-    setMessage("");
-
     try {
-      const response = await fetch(
+      const res = await fetch(
         "/api/admin/wallpapers",
         {
           method: "DELETE",
-
           headers: {
             "content-type":
               "application/json",
           },
-
           body: JSON.stringify({
             ids: selectedIds,
           }),
@@ -615,786 +664,1004 @@ export default function WallpaperAdminClient({
       );
 
       const result =
-        await response.json();
+        (await res.json()) as {
+          deletedIds?: unknown;
+          error?: string;
+        };
 
-      if (!response.ok) {
+      if (!res.ok) {
         throw new Error(
           result.error ||
-            "فشل حذف الخلفيات المحددة",
+            "فشل الحذف",
         );
       }
 
-      const deletedIds =
-        Array.isArray(
-          result.deletedIds,
-        )
-          ? result.deletedIds
-          : selectedIds;
+      const ids = Array.isArray(
+        result.deletedIds,
+      )
+        ? result.deletedIds.filter(
+            (value): value is string =>
+              typeof value === "string",
+          )
+        : selectedIds;
 
       setWallpapers((current) =>
         current.filter(
           (item) =>
-            !deletedIds.includes(
-              item.id,
-            ),
+            !ids.includes(item.id),
         ),
       );
 
       setSelectedIds([]);
 
       setMessage(
-        `تم حذف ${deletedIds.length} خلفية بنجاح.`,
+        `تم حذف ${ids.length} خلفية.`,
       );
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "فشل حذف الخلفيات المحددة",
+          : "فشل الحذف",
       );
     } finally {
       setBulkBusy(false);
     }
   }
 
-  return (
-    <>
-      <section
-        className="glass card"
-        style={{
-          marginTop: 20,
-        }}
-      >
-        <h2>إضافة خلفية</h2>
+  async function downloadZip() {
+    if (
+      !selectedIds.length ||
+      bulkBusy
+    ) {
+      return;
+    }
 
-        <p
-          className="muted"
-          style={{
-            marginTop: 8,
-          }}
-        >
-          ارفع الصورة من الهاتف أو ضع
-          رابطها. الملف الأصلي يُحفظ كما
-          هو، والصور المتحركة تبقى متحركة.
-        </p>
+    setBulkBusy(true);
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin/wallpapers/download-zip",
+          {
+            method: "POST",
+            headers: {
+              "content-type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              ids: selectedIds,
+            }),
+          },
+        );
+
+      if (!response.ok) {
+        const result =
+          await response
+            .json()
+            .catch(
+              () => ({}),
+            );
+
+        throw new Error(
+          result.error ||
+            "فشل تنزيل ZIP",
+        );
+      }
+
+      const blob =
+        await response.blob();
+
+      const url =
+        URL.createObjectURL(
+          blob,
+        );
+
+      const a =
+        document.createElement(
+          "a",
+        );
+
+      a.href = url;
+      a.download =
+        "gamevortex-wallpapers.zip";
+      a.click();
+
+      URL.revokeObjectURL(
+        url,
+      );
+
+      setMessage(
+        `تم تجهيز ZIP لـ ${selectedIds.length} خلفية.`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "فشل تنزيل ZIP",
+      );
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function toggleSelected(
+    id: string,
+  ) {
+    setSelectedIds(
+      (current) =>
+        current.includes(id)
+          ? current.filter(
+              (x) => x !== id,
+            )
+          : [...current, id],
+    );
+  }
+
+  function selectAll() {
+    setSelectedIds(
+      wallpapers.map(
+        (x) => x.id,
+      ),
+    );
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
+  async function deleteOne(
+    id: string,
+  ) {
+    if (
+      !window.confirm(
+        "حذف الخلفية نهائيًا؟",
+      )
+    ) {
+      return;
+    }
+
+    const response =
+      await fetch(
+        `/api/admin/wallpapers?id=${encodeURIComponent(
+          id,
+        )}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+    if (!response.ok) {
+      const result =
+        await response
+          .json()
+          .catch(
+            () => ({}),
+          );
+
+      setMessage(
+        result.error ||
+          "فشل حذف الخلفية",
+      );
+
+      return;
+    }
+
+    setWallpapers((current) =>
+      current.filter(
+        (x) => x.id !== id,
+      ),
+    );
+
+    setSelectedIds((current) =>
+      current.filter(
+        (x) => x !== id,
+      ),
+    );
+  }
+
+  async function submitSingle(
+    event: FormEvent,
+  ) {
+    event.preventDefault();
+    await startQueue();
+  }
+
+  const selectedCount =
+    selectedIds.length;
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: 20,
+        marginTop: 20,
+      }}
+    >
+      <section className="glass card">
+        <div className="card-top">
+          <div>
+            <h2>
+              رفع خلفيات
+            </h2>
+
+            <p className="muted">
+              يمكنك تحديد 1 إلى 100 صورة من Android أو الكمبيوتر. كل صورة لها حالة وتقدم وإعادة محاولة مستقلة.
+            </p>
+          </div>
+
+          <strong className="badge">
+            {queue.length}/
+            {
+              WALLPAPER_BULK_UPLOAD_MAX
+            }
+          </strong>
+        </div>
 
         <form
-          onSubmit={createWallpaper}
+          onSubmit={
+            submitSingle
+          }
           style={{
             display: "grid",
-            gap: 16,
-            marginTop: 20,
+            gap: 14,
+            marginTop: 16,
           }}
         >
           <div
-            className="tabs"
             style={{
               display: "grid",
               gridTemplateColumns:
-                "1fr 1fr",
+                "repeat(auto-fit,minmax(160px,1fr))",
               gap: 10,
             }}
           >
-            <button
-              className={`btn ${
-                form.sourceMode ===
-                "IMAGE"
-                  ? ""
-                  : "secondary"
-              }`}
-              type="button"
-              onClick={() =>
-                update(
-                  "sourceMode",
-                  "IMAGE",
-                )
-              }
-            >
-              🖼️ صورة عادية
-            </button>
-
-            <button
-              className={`btn ${
-                form.sourceMode ===
-                "ANIMATED"
-                  ? ""
-                  : "secondary"
-              }`}
-              type="button"
-              onClick={() =>
-                update(
-                  "sourceMode",
-                  "ANIMATED",
-                )
-              }
-            >
-              🎞️ صورة متحركة
-            </button>
-          </div>
-
-          <div
-            className="tabs"
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "1fr 1fr",
-              gap: 10,
-            }}
-          >
-            <button
-              className={`btn ${
-                form.inputMode ===
-                "FILE"
-                  ? ""
-                  : "secondary"
-              }`}
-              type="button"
-              onClick={() =>
-                update(
-                  "inputMode",
-                  "FILE",
-                )
-              }
-            >
-              📱 رفع من الهاتف
-            </button>
-
-            <button
-              className={`btn ${
-                form.inputMode ===
-                "URL"
-                  ? ""
-                  : "secondary"
-              }`}
-              type="button"
-              onClick={() =>
-                update(
-                  "inputMode",
-                  "URL",
-                )
-              }
-            >
-              🔗 استخدام رابط
-            </button>
-          </div>
-
-          {form.inputMode ===
-          "FILE" ? (
-            <div
+            <label
+              className="glass card"
               style={{
-                display: "grid",
-                gap: 10,
+                padding: 12,
+                cursor: "pointer",
               }}
             >
-              <label
-                className="btn"
-                style={{
-                  cursor: busy
-                    ? "not-allowed"
-                    : "pointer",
-                  textAlign: "center",
-                }}
-              >
-                {file
-                  ? `📁 ${file.name}`
-                  : "📱 اختر صورة من الهاتف"}
+              <strong>
+                الصور
+              </strong>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={accept}
-                  onChange={(event) =>
-                    handleFileChange(
-                      event.target.files?.[0] ||
-                        null,
-                    )
-                  }
-                  disabled={busy}
-                  style={{
-                    display: "none",
-                  }}
-                />
-              </label>
-
-              <p
-                className="muted"
+              <input
+                ref={inputRef}
+                type="file"
+                accept={accept}
+                multiple
+                onChange={onPick}
+                disabled={running}
                 style={{
-                  fontSize: 13,
-                }}
-              >
-                بدون حد أقصى للحجم. JPG /
-                PNG / WebP / GIF / APNG /
-                AVIF حسب نوع الصورة.
-              </p>
-            </div>
-          ) : (
-            <input
-              className="input"
-              type="url"
-              value={form.imageUrl}
-              onChange={(event) =>
-                update(
-                  "imageUrl",
-                  event.target.value,
-                )
-              }
-              onBlur={() =>
-                setPreviewUrl(
-                  form.imageUrl.trim(),
-                )
-              }
-              placeholder={
-                form.sourceMode ===
-                "ANIMATED"
-                  ? "رابط GIF / WebP / APNG / AVIF HTTPS"
-                  : "رابط الصورة HTTPS"
-              }
-              required
-            />
-          )}
-
-          {previewUrl && (
-            <div
-              style={{
-                overflow: "hidden",
-                borderRadius: 18,
-                border:
-                  "1px solid rgba(255,255,255,0.10)",
-                background:
-                  "rgba(0,0,0,0.30)",
-                padding: 8,
-              }}
-            >
-              <img
-                src={previewUrl}
-                alt="معاينة الخلفية"
-                onLoad={handlePreviewLoad}
-                style={{
-                  display: "block",
                   width: "100%",
-                  maxHeight: 520,
-                  objectFit: "contain",
-                  borderRadius: 14,
+                  marginTop: 8,
                 }}
               />
+            </label>
 
-              {dimensions.width >
-                0 &&
-                dimensions.height >
-                  0 && (
-                  <p
-                    className="muted"
-                    style={{
-                      margin:
-                        "8px 4px 0",
-                      textAlign:
-                        "center",
-                    }}
-                  >
-                    {dimensions.width} ×{" "}
-                    {dimensions.height} ·{" "}
-                    {detectType(
-                      dimensions.width,
-                      dimensions.height,
-                    )}
-                  </p>
+            <label
+              className="glass card"
+              style={{
+                padding: 12,
+              }}
+            >
+              <strong>
+                النوع
+              </strong>
+
+              <select
+                className="input"
+                value={form.type}
+                onChange={(e) =>
+                  setForm(
+                    (x) => ({
+                      ...x,
+                      type:
+                        e.target
+                          .value as typeof form.type,
+                    }),
+                  )
+                }
+              >
+                <option value="AUTO">
+                  تلقائي
+                </option>
+
+                <option value="MOBILE">
+                  Mobile
+                </option>
+
+                <option value="DESKTOP">
+                  Desktop
+                </option>
+              </select>
+            </label>
+
+            <label
+              className="glass card"
+              style={{
+                padding: 12,
+              }}
+            >
+              <strong>
+                التصنيف
+              </strong>
+
+              <select
+                className="input"
+                value={form.category}
+                onChange={(e) =>
+                  setForm(
+                    (x) => ({
+                      ...x,
+                      category:
+                        e.target.value,
+                    }),
+                  )
+                }
+              >
+                {CATEGORY_OPTIONS.map(
+                  ([value, label]) => (
+                    <option
+                      key={value}
+                      value={value}
+                    >
+                      {label}
+                    </option>
+                  ),
                 )}
-            </div>
-          )}
+              </select>
+            </label>
+
+            <label
+              className="glass card"
+              style={{
+                padding: 12,
+              }}
+            >
+              <strong>
+                الوصول
+              </strong>
+
+              <span
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  marginTop: 8,
+                }}
+              >
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={
+                      form.isVip
+                    }
+                    onChange={(e) =>
+                      setForm(
+                        (x) => ({
+                          ...x,
+                          isVip:
+                            e.target
+                              .checked,
+                        }),
+                      )
+                    }
+                  />{" "}
+                  VIP
+                </label>
+
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={
+                      form.published
+                    }
+                    onChange={(e) =>
+                      setForm(
+                        (x) => ({
+                          ...x,
+                          published:
+                            e.target
+                              .checked,
+                        }),
+                      )
+                    }
+                  />{" "}
+                  نشر
+                </label>
+              </span>
+            </label>
+          </div>
 
           <div
-            className="tabs"
             style={{
               display: "flex",
               gap: 10,
               flexWrap: "wrap",
             }}
           >
-            <label className="badge">
-              <input
-                type="checkbox"
-                checked={form.isVip}
-                onChange={(event) =>
-                  update(
-                    "isVip",
-                    event.target
-                      .checked,
-                  )
-                }
-              />{" "}
-              💎 VIP
-            </label>
+            <button
+              className="btn"
+              type="submit"
+              disabled={
+                running ||
+                queue.every(
+                  (x) =>
+                    x.status !==
+                      "queued" &&
+                    x.status !==
+                      "failed",
+                )
+              }
+            >
+              ⬆️ بدء الرفع
+            </button>
 
-            <label className="badge">
-              <input
-                type="checkbox"
-                checked={form.published}
-                onChange={(event) =>
-                  update(
-                    "published",
-                    event.target
-                      .checked,
-                  )
-                }
-              />{" "}
-              📢 منشورة
-            </label>
+            <button
+              className="btn secondary"
+              type="button"
+              onClick={
+                clearCompleted
+              }
+            >
+              مسح المكتمل
+            </button>
 
-            <label className="badge">
-              <input
-                type="checkbox"
-                checked={form.featured}
-                onChange={(event) =>
-                  update(
-                    "featured",
-                    event.target
-                      .checked,
-                  )
-                }
-              />{" "}
-              ⭐ مميزة
-            </label>
-          </div>
-
-          {busy &&
-            form.inputMode ===
-              "FILE" && (
-              <div
-                className="glass"
-                style={{
-                  padding: 12,
-                }}
+            {message && (
+              <span
+                className="muted"
+                role="status"
               >
-                <div
-                  style={{
-                    height: 8,
-                    borderRadius: 999,
-                    background:
-                      "rgba(255,255,255,.10)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${progress}%`,
-                      height: "100%",
-                      background:
-                        "linear-gradient(90deg,#b84cff,#6b3df5)",
-                      transition:
-                        "width .2s ease",
-                    }}
-                  />
-                </div>
+                {message}
+              </span>
+            )}
+          </div>
+        </form>
 
-                <p
-                  className="muted"
+        {queue.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              marginTop: 16,
+            }}
+          >
+            {queue.map(
+              (item) => (
+                <div
+                  className="glass card"
+                  key={item.id}
                   style={{
-                    marginTop: 8,
-                    textAlign:
+                    padding: 10,
+                    display: "grid",
+                    gridTemplateColumns:
+                      "88px 1fr auto",
+                    gap: 12,
+                    alignItems:
                       "center",
                   }}
                 >
-                  رفع الملف{" "}
-                  {progress}%
-                </p>
-              </div>
+                  <img
+                    src={
+                      item.previewUrl
+                    }
+                    alt={
+                      item.file.name
+                    }
+                    style={{
+                      width: 88,
+                      height: 70,
+                      objectFit:
+                        "cover",
+                      borderRadius: 12,
+                    }}
+                  />
+
+                  <div>
+                    <strong
+                      style={{
+                        display:
+                          "block",
+                        overflow:
+                          "hidden",
+                        textOverflow:
+                          "ellipsis",
+                        whiteSpace:
+                          "nowrap",
+                      }}
+                    >
+                      {
+                        item.file
+                          .name
+                      }
+                    </strong>
+
+                    <span className="muted">
+                      {(
+                        item.file
+                          .size /
+                        1024 /
+                        1024
+                      ).toFixed(
+                        2,
+                      )}{" "}
+                      MB ·{" "}
+                      {
+                        item.status
+                      }
+                    </span>
+
+                    <div
+                      style={{
+                        height: 8,
+                        background:
+                          "rgba(255,255,255,.08)",
+                        borderRadius:
+                          99,
+                        marginTop: 8,
+                        overflow:
+                          "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${item.progress}%`,
+                          height:
+                            "100%",
+                          background:
+                            "linear-gradient(90deg,#7c3aed,#38bdf8)",
+                        }}
+                      />
+                    </div>
+
+                    {item.error && (
+                      <small
+                        style={{
+                          color:
+                            "#ff9b9b",
+                        }}
+                      >
+                        {
+                          item.error
+                        }
+                      </small>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      gap: 6,
+                      flexWrap:
+                        "wrap",
+                      justifyContent:
+                        "flex-end",
+                    }}
+                  >
+                    {(
+                      item.status ===
+                        "uploading" ||
+                      item.status ===
+                        "saving"
+                    ) && (
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() =>
+                          cancelItem(
+                            item.id,
+                          )
+                        }
+                      >
+                        إلغاء
+                      </button>
+                    )}
+
+                    {item.status ===
+                      "failed" && (
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() =>
+                          retryItem(
+                            item.id,
+                          )
+                        }
+                      >
+                        إعادة
+                      </button>
+                    )}
+
+                    {(
+                      item.status ===
+                        "queued" ||
+                      item.status ===
+                        "failed" ||
+                      item.status ===
+                        "cancelled"
+                    ) && (
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() =>
+                          removeQueued(
+                            item.id,
+                          )
+                        }
+                      >
+                        حذف من الطابور
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ),
             )}
-
-          <button
-            className="btn"
-            type="submit"
-            disabled={busy}
-          >
-            {busy
-              ? "جارٍ رفع وإضافة الخلفية…"
-              : "إضافة الخلفية"}
-          </button>
-
-          {message && (
-            <p
-              className="muted"
-              role="status"
-            >
-              {message}
-            </p>
-          )}
-        </form>
+          </div>
+        )}
       </section>
 
-      <section
-        style={{
-          marginTop: 24,
-        }}
-      >
+      <section className="glass card">
         <div
-          className="section-head"
+          className="card-top"
           style={{
-            alignItems: "center",
-            gap: 12,
             flexWrap: "wrap",
+            gap: 10,
           }}
         >
-          <div>
-            <h2>
-              الخلفيات الحالية (
-              {wallpapers.length})
-            </h2>
-
-            <p
-              className="muted"
-              style={{
-                marginTop: 6,
-              }}
-            >
-              {selectedIds.length
-                ? `تم تحديد ${selectedIds.length} خلفية`
-                : "يمكنك تحديد خلفية واحدة أو عدة خلفيات وحذفها دفعة واحدة."}
-            </p>
-          </div>
+          <h2>
+            مكتبة الخلفيات (
+            {
+              wallpapers.length
+            }
+            )
+          </h2>
 
           <div
             style={{
               display: "flex",
               gap: 8,
               flexWrap: "wrap",
-              marginInlineStart:
-                "auto",
             }}
           >
             <button
               className="btn secondary"
               type="button"
               onClick={selectAll}
-              disabled={
-                bulkBusy ||
-                !wallpapers.length ||
-                selectedIds.length ===
-                  wallpapers.length
-              }
             >
-              ☑️ تحديد الكل
+              تحديد الكل
             </button>
 
             <button
               className="btn secondary"
               type="button"
-              onClick={clearSelection}
-              disabled={
-                bulkBusy ||
-                !selectedIds.length
+              onClick={
+                clearSelection
               }
             >
               إلغاء التحديد
             </button>
 
             <button
-              className="btn"
+              className="btn secondary"
               type="button"
+              disabled={
+                !selectedCount ||
+                bulkBusy
+              }
+              onClick={() =>
+                bulkAction({
+                  isVip: true,
+                })
+              }
+            >
+              VIP
+            </button>
+
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                !selectedCount ||
+                bulkBusy
+              }
+              onClick={() =>
+                bulkAction({
+                  isVip: false,
+                })
+              }
+            >
+              FREE
+            </button>
+
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                !selectedCount ||
+                bulkBusy
+              }
+              onClick={() =>
+                bulkAction({
+                  published: true,
+                })
+              }
+            >
+              نشر
+            </button>
+
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                !selectedCount ||
+                bulkBusy
+              }
+              onClick={() =>
+                bulkAction({
+                  published: false,
+                })
+              }
+            >
+              إخفاء
+            </button>
+
+            <label className="glass card" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 10px", margin: 0 }}>
+              <span className="muted">التصنيف</span>
+              <select
+                className="input"
+                disabled={!selectedCount || bulkBusy}
+                defaultValue=""
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) void bulkAction({ category: value });
+                  e.currentTarget.value = "";
+                }}
+                aria-label="تغيير تصنيف الصور المحددة"
+              >
+                <option value="">تغيير…</option>
+                {CATEGORY_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="glass card" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 10px", margin: 0 }}>
+              <span className="muted">النوع</span>
+              <select
+                className="input"
+                disabled={!selectedCount || bulkBusy}
+                defaultValue=""
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "MOBILE" || value === "DESKTOP") void bulkAction({ type: value });
+                  e.currentTarget.value = "";
+                }}
+                aria-label="تغيير نوع الصور المحددة"
+              >
+                <option value="">تغيير…</option>
+                <option value="MOBILE">Mobile</option>
+                <option value="DESKTOP">Desktop</option>
+              </select>
+            </label>
+
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                !selectedCount ||
+                bulkBusy
+              }
+              onClick={
+                downloadZip
+              }
+            >
+              ZIP
+            </button>
+
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                !selectedCount ||
+                bulkBusy
+              }
               onClick={
                 deleteSelected
               }
-              disabled={
-                bulkBusy ||
-                !selectedIds.length
-              }
-              style={{
-                opacity:
-                  selectedIds.length
-                    ? 1
-                    : 0.55,
-              }}
             >
-              {bulkBusy
-                ? "جارٍ الحذف…"
-                : `🗑️ حذف المحدد${
-                    selectedIds.length
-                      ? ` (${selectedIds.length})`
-                      : ""
-                  }`}
+              حذف
             </button>
           </div>
         </div>
 
-        <div className="grid">
-          {wallpapers.map(
-            (wallpaper) => (
-              <article
-                className="glass card"
-                key={wallpaper.id}
-                style={{
-                  overflow:
-                    "hidden",
-                  position:
-                    "relative",
-                  border:
-                    isSelected(
-                      wallpaper.id,
-                    )
-                      ? "2px solid #b84cff"
-                      : undefined,
-                  boxShadow:
-                    isSelected(
-                      wallpaper.id,
-                    )
-                      ? "0 0 0 2px rgba(184,76,255,.16), 0 0 28px rgba(184,76,255,.18)"
-                      : undefined,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    toggleSelected(
-                      wallpaper.id,
-                    )
-                  }
-                  disabled={
-                    bulkBusy
-                  }
-                  aria-label={
-                    isSelected(
-                      wallpaper.id,
-                    )
-                      ? "إلغاء تحديد الخلفية"
-                      : "تحديد الخلفية"
-                  }
-                  aria-pressed={isSelected(
-                    wallpaper.id,
-                  )}
-                  style={{
-                    position:
-                      "absolute",
-                    top: 10,
-                    insetInlineStart: 10,
-                    zIndex: 3,
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    border:
-                      isSelected(
-                        wallpaper.id,
-                      )
-                        ? "1px solid #d78cff"
-                        : "1px solid rgba(255,255,255,.20)",
-                    background:
-                      isSelected(
-                        wallpaper.id,
-                      )
-                        ? "linear-gradient(135deg,#c24cff,#6b3df5)"
-                        : "rgba(8,8,24,.82)",
-                    color: "white",
-                    cursor:
-                      bulkBusy
-                        ? "not-allowed"
-                        : "pointer",
-                    fontSize: 20,
-                    display:
-                      "grid",
-                    placeItems:
-                      "center",
-                  }}
-                >
-                  {isSelected(
-                    wallpaper.id,
-                  )
-                    ? "✓"
-                    : "□"}
-                </button>
+        <p className="muted">
+          {selectedCount} محددة. يمكنك
+          تغيير الوصول والتصنيف والنوع
+          من أدوات الإدارة.
+        </p>
 
-                <div
+        <div
+          className="grid"
+          style={{
+            marginTop: 16,
+          }}
+        >
+          {wallpapers.map(
+            (item) => {
+              const selected =
+                selectedIds.includes(
+                  item.id,
+                );
+
+              return (
+                <article
+                  key={item.id}
+                  className="glass card game-card"
                   style={{
-                    width: "100%",
-                    background:
-                      "rgba(0,0,0,.28)",
-                    borderRadius: 14,
                     overflow:
                       "hidden",
+                    padding: 0,
                   }}
                 >
-                  {wallpaper.isAnimated ? (
-                    <img
-                      src={
-                        wallpaper.imageUrl
-                      }
-                      alt="GameVortex Wallpaper"
-                      loading="lazy"
-                      style={{
-                        width: "100%",
-                        aspectRatio:
-                          imageRatio(
-                            wallpaper.width,
-                            wallpaper.height,
-                            wallpaper.type,
-                          ),
-                        objectFit:
-                          "contain",
-                        display:
-                          "block",
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={
-                        wallpaper.thumbnailUrl ||
-                        wallpaper.imageUrl
-                      }
-                      alt="GameVortex Wallpaper"
-                      loading="lazy"
-                      style={{
-                        width: "100%",
-                        aspectRatio:
-                          imageRatio(
-                            wallpaper.width,
-                            wallpaper.height,
-                            wallpaper.type,
-                          ),
-                        objectFit:
-                          "contain",
-                        display:
-                          "block",
-                      }}
-                    />
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    display:
-                      "grid",
-                    gap: 10,
-                    marginTop: 14,
-                  }}
-                >
-                  <div className="card-top">
-                    <strong>
-                      GameVortex Wallpaper
-                    </strong>
-
-                    <span className="badge">
-                      {wallpaper.isVip
-                        ? "💎 VIP"
-                        : "🆓 FREE"}
-                    </span>
-                  </div>
-
-                  <p className="muted">
-                    {wallpaper.published
-                      ? "📢 منشورة"
-                      : "🔒 غير منشورة"}{" "}
-                    ·{" "}
-                    {wallpaper.featured
-                      ? "⭐ مميزة"
-                      : "عادية"}
-                    {wallpaper.isAnimated
-                      ? " · 🎞️ متحركة"
-                      : ""}
-                  </p>
-
-                  <p className="muted">
-                    {wallpaper.width &&
-                    wallpaper.height
-                      ? `${wallpaper.width}×${wallpaper.height} · `
-                      : ""}
-                    👁️{" "}
-                    {
-                      wallpaper.viewCount
-                    }{" "}
-                    · ↓{" "}
-                    {
-                      wallpaper.downloadCount
-                    }
-                  </p>
-
                   <div
-                    className="tabs"
                     style={{
-                      display:
-                        "flex",
-                      gap: 8,
-                      flexWrap:
-                        "wrap",
+                      position:
+                        "relative",
                     }}
                   >
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() =>
-                        toggle(
-                          wallpaper.id,
-                          "published",
-                        )
+                    <img
+                      src={`/api/wallpapers/${item.id}/media`}
+                      alt={
+                        item.titleEn
                       }
-                      disabled={
-                        bulkBusy
-                      }
-                    >
-                      {wallpaper.published
-                        ? "إلغاء النشر"
-                        : "نشر"}
-                    </button>
+                      loading="lazy"
+                      style={{
+                        width:
+                          "100%",
+                        aspectRatio:
+                          item.width &&
+                          item.height
+                            ? `${item.width}/${item.height}`
+                            : "16/9",
+                        objectFit:
+                          "cover",
+                      }}
+                    />
 
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() =>
-                        toggle(
-                          wallpaper.id,
-                          "isVip",
-                        )
-                      }
-                      disabled={
-                        bulkBusy
-                      }
+                    <label
+                      style={{
+                        position:
+                          "absolute",
+                        top: 10,
+                        left: 10,
+                        background:
+                          "rgba(0,0,0,.55)",
+                        padding:
+                          "6px 9px",
+                        borderRadius:
+                          10,
+                      }}
                     >
-                      {wallpaper.isVip
-                        ? "جعله FREE"
-                        : "جعله VIP"}
-                    </button>
-
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() =>
-                        toggle(
-                          wallpaper.id,
-                          "featured",
-                        )
-                      }
-                      disabled={
-                        bulkBusy
-                      }
-                    >
-                      {wallpaper.featured
-                        ? "إلغاء التمييز"
-                        : "تمييز"}
-                    </button>
-
-                    <button
-                      className="btn secondary"
-                      type="button"
-                      onClick={() =>
-                        deleteWallpaper(
-                          wallpaper.id,
-                        )
-                      }
-                      disabled={
-                        bulkBusy
-                      }
-                    >
-                      حذف
-                    </button>
+                      <input
+                        type="checkbox"
+                        checked={
+                          selected
+                        }
+                        onChange={() =>
+                          toggleSelected(
+                            item.id,
+                          )
+                        }
+                        aria-label={`تحديد ${item.titleEn}`}
+                      />
+                    </label>
                   </div>
-                </div>
-              </article>
-            ),
+
+                  <div
+                    style={{
+                      padding: 12,
+                      display:
+                        "grid",
+                      gap: 8,
+                    }}
+                  >
+                    <strong>
+                      {item.titleAr ||
+                        item.titleEn}
+                    </strong>
+
+                    <div className="muted">
+                      {item.type} ·{" "}
+                      {
+                        item.category
+                      }{" "}
+                      ·{" "}
+                      {item.isVip
+                        ? "VIP"
+                        : "FREE"}{" "}
+                      {item.published
+                        ? "· منشور"
+                        : "· مخفي"}
+                    </div>
+
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        gap: 8,
+                        flexWrap:
+                          "wrap",
+                      }}
+                    >
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() =>
+                          patchIds(
+                            [item.id],
+                            { isVip: !item.isVip },
+                          ).catch((error) =>
+                            setMessage(
+                              error instanceof Error
+                                ? error.message
+                                : "فشل تحديث الوصول",
+                            ),
+                          )
+                        }
+                      >
+                        تبديل VIP
+                      </button>
+
+                      <select
+                        className="input"
+                        value={item.category}
+                        onChange={(e) =>
+                          patchIds([item.id], { category: e.target.value }).catch((error) =>
+                            setMessage(error instanceof Error ? error.message : "فشل تحديث التصنيف"),
+                          )
+                        }
+                        aria-label={`تغيير تصنيف ${item.titleEn}`}
+                      >
+                        {CATEGORY_OPTIONS.map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+
+                      <select
+                        className="input"
+                        value={item.type}
+                        onChange={(e) =>
+                          patchIds([item.id], { type: e.target.value }).catch((error) =>
+                            setMessage(error instanceof Error ? error.message : "فشل تحديث النوع"),
+                          )
+                        }
+                        aria-label={`تغيير نوع ${item.titleEn}`}
+                      >
+                        <option value="MOBILE">Mobile</option>
+                        <option value="DESKTOP">Desktop</option>
+                      </select>
+
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() =>
+                          deleteOne(
+                            item.id,
+                          )
+                        }
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            },
           )}
         </div>
-
-        {!wallpapers.length && (
-          <p className="muted">
-            لا توجد خلفيات في قاعدة
-            البيانات حاليًا.
-          </p>
-        )}
       </section>
-    </>
+    </div>
   );
-}
+              }

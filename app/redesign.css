@@ -2112,3 +2112,79 @@ pre, code { max-width: 100%; overflow-x: auto; }
     transition-duration: .001ms !important;
   }
 }
+
+/* GameVortex 2026 responsive polish */
+html { overflow-x: hidden; }
+body { overflow-x: hidden; }
+img, video, canvas { max-width: 100%; }
+button, input, select, textarea { max-width: 100%; }
+
+@media (max-width: 640px) {
+  .gv-header-inner { min-height: 60px !important; gap: 8px !important; }
+  .gv-brand-name { font-size: 18px !important; }
+  .gv-brand-mark, .gv-brand-mark svg { width: 32px !important; height: 32px !important; }
+  .gv-header-actions { gap: 5px !important; }
+  .gv-icon-button, .gv-menu-button, .gv-profile-button { width: 36px !important; height: 36px !important; }
+  .gv-mobile-tabs { width: calc(100% - 12px) !important; }
+  .gv-mobile-tabs a { padding: 9px 10px !important; font-size: 12px !important; }
+
+  .wrap, .page, .content, .contentWrap, .adminPage, .adminShell, .dashboard, .dashboardPage {
+    width: calc(100% - 16px) !important;
+    max-width: none !important;
+    padding-inline: 0 !important;
+  }
+
+  .hero, .card, .glass, .panel, .section {
+    border-radius: 16px !important;
+  }
+
+  .card-top {
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .btn {
+    min-height: 42px;
+    padding-inline: 14px !important;
+    touch-action: manipulation;
+  }
+
+  .input, input, select, textarea {
+    min-height: 42px;
+    font-size: 16px !important;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .game-card h2, .game-card h3, .card h2, .card h3 {
+    overflow-wrap: anywhere;
+  }
+
+  /* Admin wallpaper queue and bulk controls */
+  .game-card img { min-height: 0; }
+  .wallpaper-admin-grid { grid-template-columns: 1fr !important; }
+  .wallpaper-upload-toolbar {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+  .wallpaper-upload-toolbar > * {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .grid { grid-template-columns: 1fr !important; }
+  .gv-search { display: none !important; }
+  .language-switcher button { padding: 5px 7px !important; }
+}
+
+/* Prefer a calmer surface when the device asks for reduced transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  .hero, .card, .glass, .panel, .section, .gv-header {
+    backdrop-filter: none !important;
+  }
+}

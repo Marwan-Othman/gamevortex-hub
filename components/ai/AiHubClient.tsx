@@ -353,6 +353,12 @@ export default function AiHubClient() {
   const [imageFile, setImageFile] =
     useState<File | null>(null);
 
+  const [imagePreviewUrl, setImagePreviewUrl] =
+    useState("");
+
+  const [imageOperation, setImageOperation] =
+    useState<"EDIT" | "ENHANCE" | "TRANSFORM">("EDIT");
+
   const aborter =
     useRef<AbortController | null>(
       null,
@@ -373,6 +379,18 @@ export default function AiHubClient() {
     en: string,
   ) =>
     english ? en : ar;
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl("");
+      return;
+    }
+
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
 
   const speechLang =
     useMemo(() => {
@@ -1201,6 +1219,7 @@ export default function AiHubClient() {
 
       const form = new FormData();
       form.set("kind", "IMAGE");
+      form.set("operation", imageOperation);
       form.set("prompt", text);
       form.set("aspectRatio", aspectRatio);
       form.set("conversationId", conversationId);
@@ -1835,6 +1854,34 @@ export default function AiHubClient() {
                 <label>
                   <span>
                     {t(
+                      "نوع العملية",
+                      "Operation",
+                    )}
+                  </span>
+
+                  <select
+                    value={imageOperation}
+                    onChange={(event) =>
+                      setImageOperation(
+                        event.target.value as "EDIT" | "ENHANCE" | "TRANSFORM",
+                      )
+                    }
+                  >
+                    <option value="EDIT">
+                      {t("تعديل", "Edit")}
+                    </option>
+                    <option value="ENHANCE">
+                      {t("تحسين الجودة", "Enhance")}
+                    </option>
+                    <option value="TRANSFORM">
+                      {t("تحويل الأسلوب", "Transform")}
+                    </option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>
+                    {t(
                       "نسبة الصورة",
                       "Aspect ratio",
                     )}
@@ -1897,7 +1944,22 @@ export default function AiHubClient() {
                   onChange={(event) => setImageFile(event.target.files?.[0] || null)}
                 />
                 {imageFile ? (
-                  <span className="muted">{imageFile.name} · {(imageFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                  <span className="muted">
+                    {imageFile.name} · {(imageFile.size / 1024 / 1024).toFixed(2)} MB
+                  </span>
+                ) : null}
+                {imageFile ? (
+                  <img
+                    src={imagePreviewUrl}
+                    alt={t("معاينة الصورة المرفوعة", "Uploaded image preview")}
+                    style={{
+                      width: "100%",
+                      maxHeight: 280,
+                      objectFit: "contain",
+                      borderRadius: 16,
+                      marginTop: 8,
+                    }}
+                  />
                 ) : null}
               </label>
 
