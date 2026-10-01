@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import { getTradingSummary } from "@/lib/trading/allocation";
 import { tradingMaxAllocationUsd, TRADING_MIN_ALLOCATION_USD } from "@/lib/trading/money";
+import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import AdminShell from "@/components/admin/AdminShell";
 import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
+import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,10 @@ export default async function TradingPage() {
   const result = await getOwnerOrAccessScreen();
   if ("screen" in result) return result.screen;
 
-  const summary = await getTradingSummary(result.owner.id);
+  const [summary, riskConfig] = await Promise.all([
+    getTradingSummary(result.owner.id),
+    getRiskConfig(result.owner.id),
+  ]);
 
   return (
     <AdminShell ownerLabel={result.owner.username || result.owner.email}>
@@ -46,6 +51,8 @@ export default async function TradingPage() {
         minUsd={TRADING_MIN_ALLOCATION_USD}
         maxUsd={tradingMaxAllocationUsd()}
       />
+
+      <TradingRiskConfigPanel initial={riskConfig} />
     </AdminShell>
   );
 }
