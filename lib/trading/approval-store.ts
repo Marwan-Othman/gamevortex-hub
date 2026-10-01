@@ -53,7 +53,7 @@ export async function createOwnerApproval(input: {
   const token = createApprovalToken(input.opportunityId, input.ttlSeconds);
   const id = randomUUID();
 
-  return db.$transaction(async (tx) => {
+  return db.$transaction(async (tx: any) => {
     const rows = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
       INSERT INTO "TradingApproval" (
         "id",
@@ -93,19 +93,14 @@ export async function createOwnerApproval(input: {
         "strategyVersion",
         "shariahStatus",
         "riskSnapshot"
-    `;
+    `);
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_PERSISTENCE_FAILED");
 
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO "AuditLog" (
-        "id",
-        "actorUserId",
-        "action",
-        "entityType",
-        "entityId",
-        "metadata"
+        "id", "actorUserId", "action", "entityType", "entityId", "metadata"
       ) VALUES (
         ${randomUUID()},
         ${input.ownerId},
@@ -134,21 +129,11 @@ export async function consumeOwnerApproval(input: {
 }): Promise<PersistedOwnerApproval> {
   assertApprovalOwner(input.ownerId);
 
-  return db.$transaction(async (tx) => {
+  return db.$transaction(async (tx: any) => {
     const rows = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
-      SELECT
-        "id",
-        "opportunityId",
-        "ownerId",
-        "amountUsd",
-        "tokenHash",
-        "issuedAt",
-        "expiresAt",
-        "consumedAt",
-        "status",
-        "strategyVersion",
-        "shariahStatus",
-        "riskSnapshot"
+      SELECT "id", "opportunityId", "ownerId", "amountUsd", "tokenHash",
+             "issuedAt", "expiresAt", "consumedAt", "status", "strategyVersion",
+             "shariahStatus", "riskSnapshot"
       FROM "TradingApproval"
       WHERE "id" = ${input.approvalId}
         AND "ownerId" = ${input.ownerId}
@@ -158,22 +143,12 @@ export async function consumeOwnerApproval(input: {
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_NOT_FOUND");
-
     if (approval.consumedAt || approval.status === "CONSUMED") {
       throw new Error("APPROVAL_ALREADY_CONSUMED");
     }
-
-    if (approval.status === "REVOKED") {
-      throw new Error("APPROVAL_REVOKED");
-    }
-
-    if (approval.status === "EXPIRED") {
-      throw new Error("APPROVAL_EXPIRED");
-    }
-
-    if (approval.status !== "PENDING") {
-      throw new Error("APPROVAL_NOT_CONSUMABLE");
-    }
+    if (approval.status === "REVOKED") throw new Error("APPROVAL_REVOKED");
+    if (approval.status === "EXPIRED") throw new Error("APPROVAL_EXPIRED");
+    if (approval.status !== "PENDING") throw new Error("APPROVAL_NOT_CONSUMABLE");
 
     const verification = verifyApprovalToken({
       opportunityId: approval.opportunityId,
@@ -187,78 +162,43 @@ export async function consumeOwnerApproval(input: {
         await tx.$executeRaw(Prisma.sql`
           UPDATE "TradingApproval"
           SET "status" = 'EXPIRED'
-          WHERE "id" = ${approval.id}
-            AND "status" = 'PENDING'
-            AND "consumedAt" IS NULL
+          WHERE "id" = ${approval.id} AND "status" = 'PENDING' AND "consumedAt" IS NULL
         `);
-
         await tx.$executeRaw(Prisma.sql`
-          INSERT INTO "AuditLog" (
-            "id",
-            "actorUserId",
-            "action",
-            "entityType",
-            "entityId",
-            "metadata"
-          ) VALUES (
-            ${randomUUID()},
-            ${input.ownerId},
-            'TRADING_APPROVAL_EXPIRED',
-            'TradingApproval',
-            ${approval.id},
+          INSERT INTO "AuditLog" ("id", "actorUserId", "action", "entityType", "entityId", "metadata")
+          VALUES (
+            ${randomUUID()}, ${input.ownerId}, 'TRADING_APPROVAL_EXPIRED',
+            'TradingApproval', ${approval.id},
             ${JSON.stringify({ opportunityId: approval.opportunityId })}::jsonb
           )
         `);
-
         throw new Error("APPROVAL_EXPIRED");
       }
-
       throw new Error("INVALID_APPROVAL_TOKEN");
     }
 
     const consumedAt = new Date();
     const updated = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
       UPDATE "TradingApproval"
-      SET
-        "status" = 'CONSUMED',
-        "consumedAt" = ${consumedAt}
+      SET "status" = 'CONSUMED', "consumedAt" = ${consumedAt}
       WHERE "id" = ${approval.id}
         AND "ownerId" = ${input.ownerId}
         AND "status" = 'PENDING'
         AND "consumedAt" IS NULL
         AND "expiresAt" > CURRENT_TIMESTAMP
-      RETURNING
-        "id",
-        "opportunityId",
-        "ownerId",
-        "amountUsd",
-        "tokenHash",
-        "issuedAt",
-        "expiresAt",
-        "consumedAt",
-        "status",
-        "strategyVersion",
-        "shariahStatus",
-        "riskSnapshot"
-    `;
+      RETURNING "id", "opportunityId", "ownerId", "amountUsd", "tokenHash",
+                "issuedAt", "expiresAt", "consumedAt", "status", "strategyVersion",
+                "shariahStatus", "riskSnapshot"
+    `);
 
     const result = updated[0];
     if (!result) throw new Error("APPROVAL_NOT_CONSUMABLE");
 
     await tx.$executeRaw(Prisma.sql`
-      INSERT INTO "AuditLog" (
-        "id",
-        "actorUserId",
-        "action",
-        "entityType",
-        "entityId",
-        "metadata"
-      ) VALUES (
-        ${randomUUID()},
-        ${input.ownerId},
-        'TRADING_APPROVAL_CONSUMED',
-        'TradingApproval',
-        ${result.id},
+      INSERT INTO "AuditLog" ("id", "actorUserId", "action", "entityType", "entityId", "metadata")
+      VALUES (
+        ${randomUUID()}, ${input.ownerId}, 'TRADING_APPROVAL_CONSUMED',
+        'TradingApproval', ${result.id},
         ${JSON.stringify({
           opportunityId: result.opportunityId,
           amountUsd: result.amountUsd.toString(),
@@ -277,7 +217,7 @@ export async function revokeOwnerApproval(input: {
 }): Promise<void> {
   assertApprovalOwner(input.ownerId);
 
-  return db.$transaction(async (tx) => {
+  return db.$transaction(async (tx: any) => {
     const result = await tx.$executeRaw(Prisma.sql`
       UPDATE "TradingApproval"
       SET "status" = 'REVOKED'
@@ -291,19 +231,8 @@ export async function revokeOwnerApproval(input: {
     if (result !== 1) throw new Error("APPROVAL_NOT_REVOKABLE");
 
     await tx.$executeRaw(Prisma.sql`
-      INSERT INTO "AuditLog" (
-        "id",
-        "actorUserId",
-        "action",
-        "entityType",
-        "entityId"
-      ) VALUES (
-        ${randomUUID()},
-        ${input.ownerId},
-        'TRADING_APPROVAL_REVOKED',
-        'TradingApproval',
-        ${input.approvalId}
-      )
+      INSERT INTO "AuditLog" ("id", "actorUserId", "action", "entityType", "entityId")
+      VALUES (${randomUUID()}, ${input.ownerId}, 'TRADING_APPROVAL_REVOKED', 'TradingApproval', ${input.approvalId})
     `);
   });
 }
