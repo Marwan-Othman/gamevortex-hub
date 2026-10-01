@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardMutation } from "@/lib/api";
 import { requireTradingOwner, tradingForbidden } from "@/lib/trading/access";
-import { consumeOwnerApproval } from "@/lib/trading/approval-store";
+import { consumeOwnerApproval } from "@/lib/trading/approval-lifecycle";
 import { logSystemError } from "@/lib/observability";
 
 export const runtime = "nodejs";
