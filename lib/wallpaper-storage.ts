@@ -3,15 +3,21 @@ import {
   WALLPAPER_ANIMATED_MIME_TYPES,
   WALLPAPER_IMAGE_MIME_TYPES,
   WALLPAPER_MAX_FILE_SIZE,
-} from "./wallpaper-constants";
-
-export { WALLPAPER_ANIMATED_MIME_TYPES, WALLPAPER_IMAGE_MIME_TYPES, WALLPAPER_MAX_FILE_SIZE };
-export {
   isAnimatedWallpaperMimeType,
   isSupportedWallpaperMimeType,
   isVercelBlobUrl,
   sanitizeWallpaperFilename,
 } from "./wallpaper-constants";
+
+export {
+  WALLPAPER_ANIMATED_MIME_TYPES,
+  WALLPAPER_IMAGE_MIME_TYPES,
+  WALLPAPER_MAX_FILE_SIZE,
+  isAnimatedWallpaperMimeType,
+  isSupportedWallpaperMimeType,
+  isVercelBlobUrl,
+  sanitizeWallpaperFilename,
+};
 
 export async function storeWallpaperFile({
   pathname,
@@ -53,7 +59,7 @@ export async function validateRemoteBlobImage(url: string, expectedMime?: string
   if (!isVercelBlobUrl(url)) throw new Error("INVALID_BLOB_URL");
   const res = await fetch(url, { method: "GET", redirect: "follow" });
   if (!res.ok) throw new Error("BLOB_VALIDATION_FAILED");
-  const mime = (res.headers.get("content-type") || "").split(";",1)[0].trim().toLowerCase();
+  const mime = (res.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
   if (!isSupportedWallpaperMimeType(mime)) throw new Error("IMAGE_SOURCE_TYPE_NOT_SUPPORTED");
   if (expectedMime && mime !== expectedMime.toLowerCase()) throw new Error("IMAGE_MIME_MISMATCH");
   const lengthHeader = Number(res.headers.get("content-length") || 0);
