@@ -16,6 +16,8 @@ type MediaJob = {
   createdAt?: string;
 };
 type AiRequestError = Error & { requestId?: string };
+type AiMode = "CHAT" | "IMAGE" | "VIDEO" | "VOICE";
+type VoiceStyle = "ANGRY";
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -73,6 +75,8 @@ export default function AiHubClient() {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [mediaBusy, setMediaBusy] = useState<"IMAGE" | "VIDEO" | null>(null);
+  const [mode, setMode] = useState<AiMode>("CHAT");
+  const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>("ANGRY");
   const [error, setError] = useState("");
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [listening, setListening] = useState(false);
@@ -296,11 +300,31 @@ export default function AiHubClient() {
   function speakLatest() {
     const text = [...messages].reverse().find((message) => message.role === "assistant")?.content;
     if (!text || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = speechLang;
+
+    // The browser controls the actual voice engine. We provide one clearly
+    // defined GameVortex style: an angry, firm delivery. If an Arabic voice
+    // exists on the device, prefer it when the interface is Arabic.
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find((voice) =>
+      english
+        ? voice.lang.toLowerCase().startsWith("en")
+        : voice.lang.toLowerCase().startsWith("ar"),
+    );
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    if (voiceStyle === "ANGRY") {
+      utterance.rate = 1.12;
+      utterance.pitch = 0.68;
+      utterance.volume = 1;
+    }
+
     utterance.onstart = () => setSpeaking(true);
     utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
     window.speechSynthesis.speak(utterance);
   }
 
@@ -312,19 +336,54 @@ export default function AiHubClient() {
         <div>
           <span className={styles.kicker}>GAMEVORTEX AI</span>
           <h1>{t("مركز الذكاء الاصطناعي", "AI Hub")}</h1>
-          <p>{t("محادثة، صوت، صور وفيديو في مساحة واحدة.", "Chat, voice, images and video in one workspace.")}</p>
+          <p>{t("اختر الوضع الذي تريده من الأعلى: الدردشة، الصور، الفيديو أو الصوت.", "Choose a mode above: chat, images, video, or voice.")}</p>
         </div>
         <button className={styles.primaryButton} onClick={() => void create()}>{t("محادثة جديدة", "New chat")}</button>
       </header>
 
+      <nav className={styles.modeTabs} aria-label={t("أوضاع GameVortex AI", "GameVortex AI modes")}>
+        <button className={mode === "CHAT" ? styles.modeActive : ""} onClick={() => setMode("CHAT")} type="button">✦ {t("الدردشة", "Chat")}</button>
+        <button className={mode === "IMAGE" ? styles.modeActive : ""} onClick={() => setMode("IMAGE")} type="button">▧ {t("الصور", "Images")}</button>
+        <button className={mode === "VIDEO" ? styles.modeActive : ""} onClick={() => setMode("VIDEO")} type="button">▶ {t("الفيديو", "Video")}</button>
+        <button className={mode === "VOICE" ? styles.modeActive : ""} onClick={() => { setMode("VOICE"); setVoiceOpen(true); }} type="button">◉ {t("الصوت", "Voice")}</button>
+      </nav>
+
       {error && <div className={styles.notice}>{error}</div>}
+
+      {mode === "IMAGE" && (
+        <section className={styles.modeCard}>
+          <div>
+            <span className={styles.kicker}>AI IMAGE</span>
+            <h2>{t("توليد الصور", "AI Image Generation")}</h2>
+            <p>{t("اكتب وصف الصورة ثم اضغط إنشاء الصورة. هذه الخانة الآن قابلة للضغط بشكل مستقل عن الدردشة.", "Write an image prompt and generate it. This mode is independent from chat.")}</p>
+          </div>
+          <textarea className={styles.modePrompt} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("مثال: مدينة ألعاب مستقبلية بإضاءة نيون بنفسجية", "Example: a futuristic gaming city with purple neon lights")} />
+          <button className={styles.modeAction} type="button" disabled={!prompt.trim() || !!mediaBusy} onClick={() => void generateMedia("IMAGE")}>
+            {mediaBusy === "IMAGE" ? t("جاري إنشاء الصورة…", "Generating image…") : t("إنشاء الصورة", "Generate image")}
+          </button>
+        </section>
+      )}
+
+      {mode === "VIDEO" && (
+        <section className={styles.modeCard}>
+          <div>
+            <span className={styles.kicker}>AI VIDEO</span>
+            <h2>{t("الفيديو", "AI Video")}</h2>
+            <p>{t("تم فتح خانة الفيديو بشكل مستقل. مولد الفيديو في الـAPI الحالي ما زال غير مفعّل، لذلك لن أوهمك بزر يعمل شكليًا ثم يفشل.", "The video mode is now independently clickable. The current API still has video generation disabled, so this mode will not pretend that generation works.")}</p>
+          </div>
+          <textarea className={styles.modePrompt} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("اكتب فكرة الفيديو هنا…", "Describe your video idea here…")} />
+          <button className={styles.modeAction} type="button" disabled title={t("مزود الفيديو غير مفعّل حاليًا", "Video provider is not enabled yet")}>
+            {t("توليد الفيديو غير مفعّل حاليًا", "Video generation is not enabled yet")}
+          </button>
+        </section>
+      )}
 
       <section className={styles.workArea}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHead}><h3>{t("المحادثات", "Conversations")}</h3><button onClick={() => void create()}>＋</button></div>
           {items.map((item) => (
             <div className={`${styles.historyRow} ${active === item.id ? styles.activeRow : ""}`} key={item.id}>
-              <button onClick={() => void open(item.id)}>{item.title}</button>
+              <button onClick={() => { setMode("CHAT"); void open(item.id); }}>{item.title}</button>
               <button onClick={() => void rename(item)} aria-label={t("تعديل", "Rename")}>✎</button>
               <button onClick={() => void remove(item.id)} aria-label={t("حذف", "Delete")}>×</button>
             </div>
@@ -333,7 +392,7 @@ export default function AiHubClient() {
 
         <div className={styles.chatPanel}>
           <div className={styles.messages}>
-            {!messages.length && !media.length && <div className={styles.welcome}><div className={styles.orbSmall}>✦</div><h2>{t("مرحبًا بك في GameVortex AI", "Welcome to GameVortex AI")}</h2><p>{t("اكتب طلبك أو استخدم الصوت أو أنشئ صورة وفيديو.", "Write a prompt, use voice, or create an image or video.")}</p></div>}
+            {!messages.length && !media.length && <div className={styles.welcome}><div className={styles.orbSmall}>✦</div><h2>{t("مرحبًا بك في GameVortex AI", "Welcome to GameVortex AI")}</h2><p>{t("اكتب طلبك أو اختر الصور أو الفيديو أو الصوت من الأعلى.", "Write a prompt or choose images, video, or voice above.")}</p></div>}
             {messages.map((message, index) => (
               <article key={message.id || `${message.role}-${index}`} className={`${styles.message} ${message.role === "user" ? styles.userMessage : styles.aiMessage}`}>
                 <strong>{message.role === "user" ? t("أنت", "You") : "GameVortex AI"}</strong>
@@ -353,25 +412,31 @@ export default function AiHubClient() {
           </div>
 
           <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); void send(); }}>
-            <button type="button" className={styles.voiceButton} onClick={startVoice} title={t("محادثة صوتية", "Voice chat")}>🎙️</button>
+            <button type="button" className={styles.voiceButton} onClick={() => { setMode("VOICE"); startVoice(); }} title={t("محادثة صوتية", "Voice chat")}>🎙️</button>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("اسأل GameVortex AI...", "Ask GameVortex AI...")} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
-            <button type="button" onClick={() => void generateMedia("IMAGE")} disabled={!prompt.trim() || !!mediaBusy || busy}>🖼️</button>
-            <button type="button" onClick={() => void generateMedia("VIDEO")} disabled={!prompt.trim() || !!mediaBusy || busy}>🎬</button>
+            <button type="button" onClick={() => { setMode("IMAGE"); void generateMedia("IMAGE"); }} disabled={!prompt.trim() || !!mediaBusy || busy}>🖼️</button>
+            <button type="button" onClick={() => setMode("VIDEO")} disabled={busy}>🎬</button>
             <button type="submit" disabled={busy || !prompt.trim()}>{busy ? "…" : "↑"}</button>
             {busy && <button type="button" onClick={() => aborter.current?.abort()}>{t("إيقاف", "Stop")}</button>}
           </form>
-          <div className={styles.status}>{t("زر الصوت متاح دائمًا. وضع الصوت يستخدم قدرات المتصفح المدعومة.", "Voice is always available. Voice mode uses the browser's supported speech capabilities.")}</div>
+          <div className={styles.status}>{t("الصوت العصبي متاح من إعدادات المحادثة الصوتية. يمكنك فتحه من زر الصوت.", "The angry voice style is available in voice chat settings.")}</div>
         </div>
       </section>
 
       {voiceOpen && <div className={styles.voiceOverlay} role="dialog" aria-modal="true">
-        <div className={styles.voiceTop}><span>GAMEVORTEX AI</span><button onClick={() => { stopVoice(); setVoiceOpen(false); }}>×</button></div>
+        <div className={styles.voiceTop}><span>GAMEVORTEX AI</span><button onClick={() => { stopVoice(); window.speechSynthesis?.cancel(); setSpeaking(false); setVoiceOpen(false); }}>×</button></div>
         <div className={`${styles.voiceOrb} ${listening ? styles.listening : speaking ? styles.speaking : ""}`}><span>✦</span></div>
         <h2>{listening ? t("أستمع إليك…", "Listening…") : speaking ? t("GameVortex AI يتحدث…", "GameVortex AI is speaking…") : t("المحادثة الصوتية", "Voice chat")}</h2>
-        <p>{t("تحدث بشكل طبيعي، ثم أرسل النص المحوّل إلى المحادثة.", "Speak naturally, then send the transcribed text to the conversation.")}</p>
+        <p>{t("اختر النبرة العصبية ثم تحدث. سيتم استخدام صوت عربي متاح على جهازك إن كان موجودًا.", "Choose the angry style and speak. An Arabic voice available on your device will be preferred when possible.")}</p>
+        <label className={styles.voiceStyleLabel}>
+          <span>{t("نبرة الصوت", "Voice style")}</span>
+          <select value={voiceStyle} onChange={(e) => setVoiceStyle(e.target.value as VoiceStyle)}>
+            <option value="ANGRY">{t("عصبي", "Angry")}</option>
+          </select>
+        </label>
         <div className={styles.voiceControls}>
           <button onClick={listening ? stopVoice : startVoice}>{listening ? "🔇" : "🎙️"}</button>
-          <button onClick={() => { stopVoice(); setVoiceOpen(false); }}>✕</button>
+          <button onClick={() => { stopVoice(); window.speechSynthesis?.cancel(); setSpeaking(false); setVoiceOpen(false); }}>✕</button>
           <button onClick={speakLatest}>🔊</button>
         </div>
         {prompt && <div className={styles.voiceTranscript}>{prompt}</div>}
