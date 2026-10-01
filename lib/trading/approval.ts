@@ -1,10 +1,9 @@
 /**
  * GameVortex AI Trading — owner approval token primitives.
  *
- * Approval tokens are opaque, short-lived, and cryptographically bound to one
- * trading opportunity. Persistence stores only the hash; the plaintext token
- * is returned only when the approval is issued. This module never executes an
- * order or moves funds.
+ * Tokens are short-lived, opaque, and bound to one opportunity. Persistence
+ * must store only the hash and must atomically mark the approval as consumed
+ * when an executor accepts it. This module never executes an order.
  */
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -24,20 +23,18 @@ export type ApprovalVerification =
   | { valid: true }
   | { valid: false; reason: "INVALID_TOKEN" | "EXPIRED" };
 
-function normalizeOpportunityId(opportunityId: string): string {
-  const normalized = opportunityId.trim();
-  if (!normalized) throw new Error("INVALID_APPROVAL_OPPORTUNITY");
-  return normalized;
-}
-
 function hashToken(opportunityId: string, token: string): Buffer {
   return createHash("sha256")
-    .update(`${normalizeOpportunityId(opportunityId)}:${token}`, "utf8")
+    .update(`${opportunityId}:${token}`, "utf8")
     .digest();
 }
 
+function validateOpportunityId(opportunityId: string): void {
+  if (!opportunityId.trim()) throw new Error("INVALID_APPROVAL_OPPORTUNITY");
+}
+
 export function createApprovalToken(opportunityId: string, ttlSeconds = 5 * 60): ApprovalToken {
-  const normalizedOpportunityId = normalizeOpportunityId(opportunityId);
+  validateOpportunityId(opportunityId);
   if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < MIN_TTL_SECONDS || ttlSeconds > MAX_TTL_SECONDS) {
     throw new Error("INVALID_APPROVAL_TTL");
   }
@@ -48,8 +45,8 @@ export function createApprovalToken(opportunityId: string, ttlSeconds = 5 * 60):
 
   return {
     token,
-    tokenHash: hashToken(normalizedOpportunityId, token).toString("hex"),
-    opportunityId: normalizedOpportunityId,
+    tokenHash: hashToken(opportunityId, token).toString("hex"),
+    opportunityId: opportunityId.trim(),
     issuedAt: issuedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };
@@ -63,7 +60,7 @@ export function verifyApprovalToken(input: {
   now?: Date;
 }): ApprovalVerification {
   try {
-    const opportunityId = normalizeOpportunityId(input.opportunityId);
+    validateOpportunityId(input.opportunityId);
     if (!input.token || !/^[a-f0-9]{64}$/i.test(input.expectedTokenHash)) {
       return { valid: false, reason: "INVALID_TOKEN" };
     }
@@ -74,7 +71,7 @@ export function verifyApprovalToken(input: {
       return { valid: false, reason: "EXPIRED" };
     }
 
-    const actual = hashToken(opportunityId, input.token);
+    const actual = hashToken(input.opportunityId.trim(), input.token);
     const expected = Buffer.from(input.expectedTokenHash, "hex");
     if (expected.length !== actual.length || !timingSafeEqual(actual, expected)) {
       return { valid: false, reason: "INVALID_TOKEN" };
