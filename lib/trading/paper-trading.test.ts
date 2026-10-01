@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runPaperTrading } from "./paper-trading";
 import type { RiskConfig } from "./risk";
-import type { ShariahAssetInput } from "./shariah";
+import type { ShariahAssetInput, ShariahPolicy } from "./shariah";
 
 const riskConfig: RiskConfig = {
   maxTradeAmountUsd: 10,
@@ -12,6 +12,15 @@ const riskConfig: RiskConfig = {
   maxConsecutiveLosses: 3,
   requireStopLoss: true,
   requireTakeProfit: true,
+};
+
+const shariahPolicy: ShariahPolicy = {
+  version: "test-v1",
+  prohibitedBusinessKeywords: ["alcohol", "casino", "gambling"],
+  prohibitedMethods: ["MARGIN", "LEVERAGED", "SHORT", "FUTURES", "OPTIONS", "UNKNOWN"],
+  maxInterestBearingDebtRatio: 0.05,
+  maxInterestIncomeRatio: 0.05,
+  maxImpermissibleIncomeRatio: 0.05,
 };
 
 const shariah: ShariahAssetInput = {
@@ -49,6 +58,7 @@ describe("runPaperTrading", () => {
         stopLossPercent: 2,
         takeProfitPercent: 4,
         riskConfig,
+        shariahPolicy,
       },
       [
         tick(),
@@ -75,6 +85,7 @@ describe("runPaperTrading", () => {
         stopLossPercent: 2,
         takeProfitPercent: 4,
         riskConfig,
+        shariahPolicy,
       },
       [
         tick({
@@ -96,10 +107,14 @@ describe("runPaperTrading", () => {
       {
         symbol: "TEST",
         startingCapitalUsd: 100,
-        tradeAmountUsd: 11,
+        tradeAmountUsd: 10,
         stopLossPercent: 2,
         takeProfitPercent: 4,
-        riskConfig,
+        riskConfig: {
+          ...riskConfig,
+          maxTradeAmountUsd: 9,
+        },
+        shariahPolicy,
       },
       [tick()],
     );
@@ -117,6 +132,7 @@ describe("runPaperTrading", () => {
         stopLossPercent: 2,
         takeProfitPercent: 4,
         riskConfig,
+        shariahPolicy,
       },
       [
         tick({
@@ -142,6 +158,7 @@ describe("runPaperTrading", () => {
           stopLossPercent: 2,
           takeProfitPercent: 4,
           riskConfig,
+          shariahPolicy,
         },
         [],
       ),
