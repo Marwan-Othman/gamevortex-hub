@@ -30,6 +30,7 @@ export type PaperPosition = {
   exitReason?: PaperPositionExitReason;
   pnlUsd?: number;
   returnPercent?: number;
+  shariahPolicyVersion: string;
 };
 
 export type PaperPositionExitReason =
@@ -67,6 +68,12 @@ function normalizeTimestamp(value: string, code: string): string {
   return normalized;
 }
 
+function normalizePolicyVersion(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 100) throw new Error("INVALID_POSITION_SHARIAH_POLICY_VERSION");
+  return normalized;
+}
+
 export function openPaperPosition(input: {
   positionId: string;
   symbol: string;
@@ -75,10 +82,12 @@ export function openPaperPosition(input: {
   stopLossPrice: number;
   takeProfitPrice?: number;
   openedAt: string;
+  shariahPolicyVersion: string;
 }): PaperPosition {
   const positionId = normalizeId(input.positionId, "INVALID_POSITION_ID");
   const symbol = normalizeSymbol(input.symbol);
   const openedAt = normalizeTimestamp(input.openedAt, "INVALID_POSITION_OPEN_TIME");
+  const shariahPolicyVersion = normalizePolicyVersion(input.shariahPolicyVersion);
 
   if (!positiveFinite(input.amountUsd) || input.amountUsd < 1) {
     throw new Error("INVALID_POSITION_AMOUNT");
@@ -105,6 +114,7 @@ export function openPaperPosition(input: {
     takeProfitPrice: input.takeProfitPrice,
     openedAt,
     status: "OPEN",
+    shariahPolicyVersion,
   };
 }
 
