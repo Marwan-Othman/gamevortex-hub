@@ -23,7 +23,7 @@ async function lockedAccount(tx: Tx, ownerId: string) {
 
 /**
  * Lock the owner's real USD wallet before changing its balance.
- * Trading capital is cash and must never be represented by owner points.
+ * Trading capital must never be represented by owner points.
  */
 async function lockedOwnerWallet(tx: Tx, ownerId: string) {
   const wallet = await tx.wallet.upsert({
@@ -40,14 +40,9 @@ async function lockedOwnerWallet(tx: Tx, ownerId: string) {
 /**
  * Owner USD Wallet -> Trading Balance (USD).
  *
- * IMPORTANT:
- * - Owner points are NOT used as trading capital.
- * - The Wallet.balance is the financial source of truth.
- * - TradingAllocation.sourceWalletId is retained for schema compatibility with
- *   the existing OwnerWallet relation; it is not used as the funding balance.
- * - WalletTransaction is the financial movement record.
- * - TradingLedger is the trading-account movement record.
- * - The operation is idempotent on idempotencyKey.
+ * The existing TradingAllocation schema still stores sourceWalletId as an
+ * OwnerWallet relation and amountUsd as an integer. Those legacy fields are
+ * retained for compatibility while the actual financial source is Wallet.
  */
 export async function createAllocation(input: {
   ownerId: string;
@@ -55,18 +50,22 @@ export async function createAllocation(input: {
   idempotencyKey: string;
 }) {
   const amountUsd = validateAllocationUsd(input.amountUsd);
+  const amountDecimal = new Prisma.Decimal(amountUsd);
   const key = input.idempotencyKey;
 
   return db.$transaction(async (tx) => {
     const wallet = await lockedOwnerWallet(tx, input.ownerId);
 
+    // Compatibility relation only. Points are never debited or used as capital.
     const ownerWallet = await tx.ownerWallet.upsert({
       where: { ownerId: input.ownerId },
       update: {},
       create: { ownerId: input.ownerId },
     });
 
-    const existing = await tx.tradingAllocation.findUnique({ where: { idempotencyKey: key } });
+    const existing = await tx.tradingAllocation.findUnique({
+      where: { idempotencyKey: key },
+    });
     if (existing) {
       if (existing.sourceWalletId !== ownerWallet.id || existing.amountUsd !== amountUsd) {
         throw new Error("IDEMPOTENCY_KEY_CONFLICT");
@@ -76,24 +75,24 @@ export async function createAllocation(input: {
 
     const account = await lockedAccount(tx, input.ownerId);
 
-    // Atomic guard: the wallet row is locked and the update still checks the
-    // balance so insufficient funds can never produce a negative balance.
-    const debited = await tx.wallet.updateMany({
-      where: { id: wallet.id, balance: { gte: new Prisma.Decimal(amountUsd) } },
-      data: { balance: { decrement: new Prisma.Decimal(amountUsd) } },
-    });
-    if (debited.count !== 1) throw new Error("INSUFFICIENT_WALLET_BALANCE");
-
     const balanceBefore = wallet.balance;
-    const balanceAfter = balanceBefore.sub(new Prisma.Decimal(amountUsd));
+    const balanceAfter = balanceBefore.sub(amountDecimal);
+
+    // Atomic guard: wallet is locked and the update also requires sufficient funds.
+    const debited = await tx.wallet.updateMany({
+      where: { id: wallet.id, balance: { gte: amountDecimal } },
+      data: { balance: { decrement: amountDecimal } },
+    });
+    if (debited.count !== 1) {
+      throw new Error("INSUFFICIENT_WALLET_BALANCE");
+    }
 
     const allocation = await tx.tradingAllocation.create({
       data: {
         accountId: account.id,
+        // Legacy relation compatibility; the actual funding wallet is wallet.id.
         sourceWalletId: ownerWallet.id,
         amountUsd,
-        // Legacy compatibility fields. New allocations are funded by USD,
-        // not by points. They remain until the schema cleanup migration.
         points: 0,
         conversionRate: OWNER_POINTS_PER_USD,
         idempotencyKey: key,
@@ -101,7 +100,7 @@ export async function createAllocation(input: {
     });
 
     const tradingBefore = account.balanceUsd;
-    const tradingAfter = tradingBefore.add(new Prisma.Decimal(amountUsd));
+    const tradingAfter = tradingBefore.add(amountDecimal);
 
     await tx.tradingAccount.update({
       where: { id: account.id },
@@ -113,7 +112,7 @@ export async function createAllocation(input: {
         userId: input.ownerId,
         walletId: wallet.id,
         type: "ADJUSTMENT",
-        amount: new Prisma.Decimal(amountUsd).neg(),
+        amount: amountDecimal.neg(),
         balanceBefore,
         balanceAfter,
         currency: "USD",
@@ -166,7 +165,10 @@ export async function createAllocation(input: {
  * Trading Balance (USD) -> Owner USD Wallet.
  * Returns unused capital without touching owner points.
  */
-export async function releaseAllocation(input: { ownerId: string; allocationId: string }) {
+export async function releaseAllocation(input: {
+  ownerId: string;
+  allocationId: string;
+}) {
   return db.$transaction(async (tx) => {
     const wallet = await lockedOwnerWallet(tx, input.ownerId);
     const account = await lockedAccount(tx, input.ownerId);
@@ -176,10 +178,15 @@ export async function releaseAllocation(input: { ownerId: string; allocationId: 
     });
     if (!allocation) throw new Error("ALLOCATION_NOT_FOUND");
 
-    if (allocation.status === "RELEASED") throw new Error("ALLOCATION_ALREADY_RELEASED");
-    if (allocation.relatedTradeId) throw new Error("ALLOCATION_IN_USE");
+    if (allocation.status === "RELEASED") {
+      throw new Error("ALLOCATION_ALREADY_RELEASED");
+    }
+    if (allocation.relatedTradeId) {
+      throw new Error("ALLOCATION_IN_USE");
+    }
 
-    if (account.balanceUsd.lt(new Prisma.Decimal(allocation.amountUsd))) {
+    const allocationDecimal = new Prisma.Decimal(allocation.amountUsd);
+    if (account.balanceUsd.lt(allocationDecimal)) {
       throw new Error("INSUFFICIENT_TRADING_BALANCE");
     }
 
@@ -187,10 +194,12 @@ export async function releaseAllocation(input: { ownerId: string; allocationId: 
       where: { id: allocation.id, status: "ACTIVE", relatedTradeId: null },
       data: { status: "RELEASED", releasedAt: new Date() },
     });
-    if (flipped.count !== 1) throw new Error("ALLOCATION_ALREADY_RELEASED");
+    if (flipped.count !== 1) {
+      throw new Error("ALLOCATION_ALREADY_RELEASED");
+    }
 
     const tradingBefore = account.balanceUsd;
-    const tradingAfter = tradingBefore.sub(new Prisma.Decimal(allocation.amountUsd));
+    const tradingAfter = tradingBefore.sub(allocationDecimal);
 
     await tx.tradingAccount.update({
       where: { id: account.id },
@@ -198,7 +207,7 @@ export async function releaseAllocation(input: { ownerId: string; allocationId: 
     });
 
     const walletBefore = wallet.balance;
-    const walletAfter = walletBefore.add(new Prisma.Decimal(allocation.amountUsd));
+    const walletAfter = walletBefore.add(allocationDecimal);
 
     await tx.wallet.update({
       where: { id: wallet.id },
@@ -210,7 +219,7 @@ export async function releaseAllocation(input: { ownerId: string; allocationId: 
         userId: input.ownerId,
         walletId: wallet.id,
         type: "ADJUSTMENT",
-        amount: new Prisma.Decimal(allocation.amountUsd),
+        amount: allocationDecimal,
         balanceBefore: walletBefore,
         balanceAfter: walletAfter,
         currency: "USD",
@@ -276,8 +285,6 @@ export async function getTradingSummary(ownerId: string) {
     : [];
 
   return {
-    // Kept for compatibility with the existing admin UI; points are no longer
-    // used to fund trading.
     walletAvailablePoints: ownerWallet?.availablePoints ?? 0,
     pointsPerUsd: OWNER_POINTS_PER_USD,
     walletAvailableUsd: wallet?.balance.toString() ?? "0",
