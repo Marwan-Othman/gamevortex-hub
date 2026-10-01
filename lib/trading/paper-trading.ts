@@ -3,10 +3,11 @@
  *
  * Paper trading is simulation only. This module never touches wallets,
  * exchange credentials, or real orders. It reuses the same strategy, Shariah,
- * and risk gates that a future executor must respect.
+ * risk, and position-lifecycle gates that a future executor must respect.
  */
 
 import { evaluatePreTrade, type PreTradeDecision } from "@/lib/trading/pre-trade-guard";
+import { closePaperPosition, evaluatePaperPositionExit, openPaperPosition, type PaperPosition } from "@/lib/trading/position";
 import { evaluateStrategy, type StrategyDecision } from "@/lib/trading/strategy";
 import type { RiskConfig } from "@/lib/trading/risk";
 import type { ShariahAssetInput, ShariahPolicy } from "@/lib/trading/shariah";
@@ -54,15 +55,6 @@ export type PaperTradingResult = {
   lastPreTradeDecision?: PreTradeDecision;
 };
 
-type OpenPosition = {
-  entryTime: string;
-  entryPrice: number;
-  amountUsd: number;
-  stopLoss: number;
-  takeProfit: number;
-  shariahPolicyVersion: string;
-};
-
 function positiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
@@ -76,6 +68,7 @@ function validateConfig(config: PaperTradingConfig): void {
     !positiveFinite(config.takeProfitPercent) ||
     config.stopLossPercent >= 100 ||
     config.takeProfitPercent >= 100 ||
+    config.tradeAmountUsd < 1 ||
     config.tradeAmountUsd > config.startingCapitalUsd
   ) {
     throw new Error("INVALID_PAPER_TRADING_CONFIG");
@@ -85,23 +78,47 @@ function validateConfig(config: PaperTradingConfig): void {
 function validateTick(tick: PaperTradingTick): void {
   if (
     !tick.timestamp ||
-    ![
+    [
       tick.price,
       tick.previousPrice,
       tick.fastAverage,
       tick.slowAverage,
       tick.volume,
       tick.averageVolume,
-    ].every(positiveFinite)
+    ].some((value) => !positiveFinite(value))
   ) {
     throw new Error("INVALID_PAPER_TRADING_TICK");
   }
 }
 
+function closePositionToTrade(position: PaperPosition): PaperTrade {
+  if (position.status !== "CLOSED" || !position.closedAt || position.exitPrice === undefined) {
+    throw new Error("INVALID_CLOSED_PAPER_POSITION");
+  }
+
+  if (
+    position.exitReason !== "STOP_LOSS" &&
+    position.exitReason !== "TAKE_PROFIT" &&
+    position.exitReason !== "END_OF_DATA"
+  ) {
+    throw new Error("INVALID_PAPER_TRADE_EXIT_REASON");
+  }
+
+  return {
+    entryTime: position.openedAt,
+    exitTime: position.closedAt,
+    entryPrice: position.entryPrice,
+    exitPrice: position.exitPrice,
+    amountUsd: position.amountUsd,
+    pnlUsd: position.pnlUsd ?? 0,
+    exitReason: position.exitReason,
+    shariahPolicyVersion: position.status === "CLOSED" ? position.shariahPolicyVersion : "",
+  };
+}
+
 /**
  * Runs a deterministic paper-trading session over supplied market ticks.
- * One spot position is allowed at a time. If stop-loss and take-profit are
- * both touched in one tick, stop-loss wins because intratick order is unknown.
+ * One spot BUY position is allowed at a time.
  */
 export function runPaperTrading(
   config: PaperTradingConfig,
@@ -114,44 +131,35 @@ export function runPaperTrading(
   let capital = config.startingCapitalUsd;
   let dailyLossUsd = 0;
   let consecutiveLosses = 0;
-  let position: OpenPosition | undefined;
+  let position: PaperPosition | undefined;
   const trades: PaperTrade[] = [];
   const blockedSignals: PaperTradingResult["blockedSignals"] = [];
   let lastPreTradeDecision: PreTradeDecision | undefined;
 
-  for (const tick of ticks) {
+  for (let index = 0; index < ticks.length; index += 1) {
+    const tick = ticks[index];
+
     if (position) {
-      let exitPrice: number | undefined;
-      let exitReason: PaperTrade["exitReason"] | undefined;
+      const exit = evaluatePaperPositionExit(position, tick.price);
 
-      if (tick.price <= position.stopLoss) {
-        exitPrice = position.stopLoss;
-        exitReason = "STOP_LOSS";
-      } else if (tick.price >= position.takeProfit) {
-        exitPrice = position.takeProfit;
-        exitReason = "TAKE_PROFIT";
-      }
+      if (exit) {
+        position = closePaperPosition(position, {
+          exitPrice: exit.price,
+          reason: exit.reason,
+          closedAt: tick.timestamp,
+        });
 
-      if (exitPrice !== undefined && exitReason) {
-        const pnlUsd = position.amountUsd * ((exitPrice - position.entryPrice) / position.entryPrice);
-        capital += pnlUsd;
-        if (pnlUsd < 0) {
-          dailyLossUsd += Math.abs(pnlUsd);
+        const trade = closePositionToTrade(position);
+        trades.push(trade);
+        capital += trade.pnlUsd;
+
+        if (trade.pnlUsd < 0) {
+          dailyLossUsd += Math.abs(trade.pnlUsd);
           consecutiveLosses += 1;
         } else {
           consecutiveLosses = 0;
         }
 
-        trades.push({
-          entryTime: position.entryTime,
-          exitTime: tick.timestamp,
-          entryPrice: position.entryPrice,
-          exitPrice,
-          amountUsd: position.amountUsd,
-          pnlUsd,
-          exitReason,
-          shariahPolicyVersion: position.shariahPolicyVersion,
-        });
         position = undefined;
       }
 
@@ -197,31 +205,36 @@ export function runPaperTrading(
       continue;
     }
 
-    position = {
-      entryTime: tick.timestamp,
-      entryPrice: strategy.entryPrice,
+    if (strategy.stopLossPrice === undefined) {
+      blockedSignals.push({
+        timestamp: tick.timestamp,
+        reasons: ["STOP_LOSS_REQUIRED"],
+      });
+      continue;
+    }
+
+    position = openPaperPosition({
+      positionId: `paper-${config.symbol.trim().toUpperCase()}-${index}`,
+      symbol: config.symbol,
       amountUsd: config.tradeAmountUsd,
-      stopLoss: strategy.stopLossPrice!,
-      takeProfit: strategy.takeProfitPrice!,
-      shariahPolicyVersion: decision.shariah.policyVersion,
-    };
+      entryPrice: strategy.entryPrice,
+      stopLossPrice: strategy.stopLossPrice,
+      takeProfitPrice: strategy.takeProfitPrice,
+      openedAt: tick.timestamp,
+    });
   }
 
   if (position) {
     const finalTick = ticks[ticks.length - 1];
-    const pnlUsd = position.amountUsd * ((finalTick.price - position.entryPrice) / position.entryPrice);
-    capital += pnlUsd;
-    if (pnlUsd < 0) dailyLossUsd += Math.abs(pnlUsd);
-    trades.push({
-      entryTime: position.entryTime,
-      exitTime: finalTick.timestamp,
-      entryPrice: position.entryPrice,
+    position = closePaperPosition(position, {
       exitPrice: finalTick.price,
-      amountUsd: position.amountUsd,
-      pnlUsd,
-      exitReason: "END_OF_DATA",
-      shariahPolicyVersion: position.shariahPolicyVersion,
+      reason: "END_OF_DATA",
+      closedAt: finalTick.timestamp,
     });
+
+    const trade = closePositionToTrade(position);
+    trades.push(trade);
+    capital += trade.pnlUsd;
   }
 
   const pnlUsd = capital - config.startingCapitalUsd;
