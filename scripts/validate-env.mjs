@@ -9,6 +9,18 @@ const numericPositive = (key) => {
 };
 numericPositive('OWNER_POINTS_PER_USD');
 numericPositive('OWNER_MIN_WITHDRAW_POINTS');
+
+const tradingExchangeMode = (process.env.TRADING_EXCHANGE_MODE ?? 'PAPER').trim().toUpperCase();
+if (!['PAPER', 'LIVE'].includes(tradingExchangeMode)) {
+  errors.push('TRADING_EXCHANGE_MODE must be PAPER or LIVE.');
+}
+if (process.env.TRADING_LIVE_ENABLED === 'true' || tradingExchangeMode === 'LIVE') {
+  errors.push('Live trading is intentionally disabled until the live exchange adapter and security gates are implemented.');
+}
+if (process.env.TRADING_EXCHANGE && !/^[A-Z0-9._-]{2,32}$/i.test(process.env.TRADING_EXCHANGE.trim())) {
+  errors.push('TRADING_EXCHANGE must be a short provider identifier.');
+}
+
 // OWNER_EMAIL is only required when automatic owner bootstrap is explicitly enabled.
 if (production && process.env.REQUIRE_OWNER_BOOTSTRAP === '1') {
   if (!process.env.OWNER_EMAIL || !process.env.OWNER_INITIAL_PASSWORD) errors.push('OWNER_EMAIL and OWNER_INITIAL_PASSWORD are required when REQUIRE_OWNER_BOOTSTRAP=1.');
