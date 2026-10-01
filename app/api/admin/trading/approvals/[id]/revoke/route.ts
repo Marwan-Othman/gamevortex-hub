@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardMutation } from "@/lib/api";
 import { requireTradingOwner, tradingForbidden } from "@/lib/trading/access";
-import { revokeOwnerApproval } from "@/lib/trading/approval-store";
+import { revokeOwnerApproval } from "@/lib/trading/approval-lifecycle";
 import { logSystemError } from "@/lib/observability";
 
 export const runtime = "nodejs";
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (message === "FORBIDDEN") return tradingForbidden();
 
     const status: Record<string, number> = {
-      INVALID_APPROVAL_INPUT: 400,
+      INVALID_APPROVAL_OWNER: 400,
       APPROVAL_NOT_REVOKABLE: 409,
     };
 
