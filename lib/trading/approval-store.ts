@@ -30,34 +30,6 @@ function assertApprovalOwner(ownerId: string) {
   if (!ownerId.trim()) throw new Error("INVALID_APPROVAL_OWNER");
 }
 
-async function auditApproval(
-  tx: Prisma.TransactionClient,
-  input: {
-    ownerId: string;
-    action: string;
-    approvalId: string;
-    metadata?: Record<string, unknown>;
-  },
-) {
-  await tx.$executeRaw(Prisma.sql`
-    INSERT INTO "AuditLog" (
-      "id",
-      "actorUserId",
-      "action",
-      "entityType",
-      "entityId",
-      "metadata"
-    ) VALUES (
-      ${randomUUID()},
-      ${input.ownerId},
-      ${input.action},
-      'TradingApproval',
-      ${input.approvalId},
-      ${input.metadata === undefined ? null : JSON.stringify(input.metadata)}::jsonb
-    )
-  `);
-}
-
 export async function createOwnerApproval(input: {
   ownerId: string;
   opportunityId: string;
@@ -126,18 +98,29 @@ export async function createOwnerApproval(input: {
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_PERSISTENCE_FAILED");
 
-    await auditApproval(tx, {
-      ownerId: input.ownerId,
-      action: "TRADING_APPROVAL_ISSUED",
-      approvalId: approval.id,
-      metadata: {
-        opportunityId: approval.opportunityId,
-        amountUsd: approval.amountUsd.toString(),
-        expiresAt: approval.expiresAt.toISOString(),
-        strategyVersion: approval.strategyVersion,
-        shariahStatus: approval.shariahStatus,
-      },
-    });
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "AuditLog" (
+        "id",
+        "actorUserId",
+        "action",
+        "entityType",
+        "entityId",
+        "metadata"
+      ) VALUES (
+        ${randomUUID()},
+        ${input.ownerId},
+        'TRADING_APPROVAL_ISSUED',
+        'TradingApproval',
+        ${approval.id},
+        ${JSON.stringify({
+          opportunityId: approval.opportunityId,
+          amountUsd: approval.amountUsd.toString(),
+          expiresAt: approval.expiresAt.toISOString(),
+          strategyVersion: approval.strategyVersion,
+          shariahStatus: approval.shariahStatus,
+        })}::jsonb
+      )
+    `);
 
     return { approval, token };
   });
@@ -171,7 +154,7 @@ export async function consumeOwnerApproval(input: {
         AND "ownerId" = ${input.ownerId}
         AND "opportunityId" = ${input.opportunityId.trim()}
       FOR UPDATE
-    `;
+    `);
 
     const approval = rows[0];
     if (!approval) throw new Error("APPROVAL_NOT_FOUND");
@@ -209,12 +192,23 @@ export async function consumeOwnerApproval(input: {
             AND "consumedAt" IS NULL
         `);
 
-        await auditApproval(tx, {
-          ownerId: input.ownerId,
-          action: "TRADING_APPROVAL_EXPIRED",
-          approvalId: approval.id,
-          metadata: { opportunityId: approval.opportunityId },
-        });
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO "AuditLog" (
+            "id",
+            "actorUserId",
+            "action",
+            "entityType",
+            "entityId",
+            "metadata"
+          ) VALUES (
+            ${randomUUID()},
+            ${input.ownerId},
+            'TRADING_APPROVAL_EXPIRED',
+            'TradingApproval',
+            ${approval.id},
+            ${JSON.stringify({ opportunityId: approval.opportunityId })}::jsonb
+          )
+        `);
 
         throw new Error("APPROVAL_EXPIRED");
       }
@@ -251,16 +245,27 @@ export async function consumeOwnerApproval(input: {
     const result = updated[0];
     if (!result) throw new Error("APPROVAL_NOT_CONSUMABLE");
 
-    await auditApproval(tx, {
-      ownerId: input.ownerId,
-      action: "TRADING_APPROVAL_CONSUMED",
-      approvalId: result.id,
-      metadata: {
-        opportunityId: result.opportunityId,
-        amountUsd: result.amountUsd.toString(),
-        consumedAt: result.consumedAt?.toISOString() ?? null,
-      },
-    });
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "AuditLog" (
+        "id",
+        "actorUserId",
+        "action",
+        "entityType",
+        "entityId",
+        "metadata"
+      ) VALUES (
+        ${randomUUID()},
+        ${input.ownerId},
+        'TRADING_APPROVAL_CONSUMED',
+        'TradingApproval',
+        ${result.id},
+        ${JSON.stringify({
+          opportunityId: result.opportunityId,
+          amountUsd: result.amountUsd.toString(),
+          consumedAt: result.consumedAt?.toISOString() ?? null,
+        })}::jsonb
+      )
+    `);
 
     return result;
   });
@@ -281,14 +286,24 @@ export async function revokeOwnerApproval(input: {
         AND "status" = 'PENDING'
         AND "consumedAt" IS NULL
         AND "expiresAt" > CURRENT_TIMESTAMP
-    `;
+    `);
 
     if (result !== 1) throw new Error("APPROVAL_NOT_REVOKABLE");
 
-    await auditApproval(tx, {
-      ownerId: input.ownerId,
-      action: "TRADING_APPROVAL_REVOKED",
-      approvalId: input.approvalId,
-    });
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "AuditLog" (
+        "id",
+        "actorUserId",
+        "action",
+        "entityType",
+        "entityId"
+      ) VALUES (
+        ${randomUUID()},
+        ${input.ownerId},
+        'TRADING_APPROVAL_REVOKED',
+        'TradingApproval',
+        ${input.approvalId}
+      )
+    `);
   });
 }
