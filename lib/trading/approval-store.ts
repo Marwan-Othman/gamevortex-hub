@@ -43,51 +43,69 @@ export async function createOwnerApproval(input: {
   const token = createApprovalToken(input.opportunityId, input.ttlSeconds);
   const id = randomUUID();
 
-  const rows = await db.$queryRaw<ApprovalRow[]>(Prisma.sql`
-    INSERT INTO "TradingApproval" (
-      "id",
-      "opportunityId",
-      "ownerId",
-      "amountUsd",
-      "tokenHash",
-      "issuedAt",
-      "expiresAt",
-      "status",
-      "strategyVersion",
-      "shariahStatus",
-      "riskSnapshot"
-    ) VALUES (
-      ${id},
-      ${token.opportunityId},
-      ${input.ownerId},
-      ${amountUsd},
-      ${token.tokenHash},
-      ${new Date(token.issuedAt)},
-      ${new Date(token.expiresAt)},
-      'PENDING',
-      ${input.strategyVersion ?? null},
-      ${input.shariahStatus},
-      ${input.riskSnapshot ?? Prisma.JsonNull}
-    )
-    RETURNING
-      "id",
-      "opportunityId",
-      "ownerId",
-      "amountUsd",
-      "tokenHash",
-      "issuedAt",
-      "expiresAt",
-      "consumedAt",
-      "status",
-      "strategyVersion",
-      "shariahStatus",
-      "riskSnapshot"
-  `);
+  return db.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<ApprovalRow[]>(Prisma.sql`
+      INSERT INTO "TradingApproval" (
+        "id",
+        "opportunityId",
+        "ownerId",
+        "amountUsd",
+        "tokenHash",
+        "issuedAt",
+        "expiresAt",
+        "status",
+        "strategyVersion",
+        "shariahStatus",
+        "riskSnapshot"
+      ) VALUES (
+        ${id},
+        ${token.opportunityId},
+        ${input.ownerId},
+        ${amountUsd},
+        ${token.tokenHash},
+        ${new Date(token.issuedAt)},
+        ${new Date(token.expiresAt)},
+        'PENDING',
+        ${input.strategyVersion ?? null},
+        ${input.shariahStatus},
+        ${input.riskSnapshot ?? Prisma.JsonNull}
+      )
+      RETURNING
+        "id",
+        "opportunityId",
+        "ownerId",
+        "amountUsd",
+        "tokenHash",
+        "issuedAt",
+        "expiresAt",
+        "consumedAt",
+        "status",
+        "strategyVersion",
+        "shariahStatus",
+        "riskSnapshot"
+    `);
 
-  const approval = rows[0];
-  if (!approval) throw new Error("APPROVAL_PERSISTENCE_FAILED");
+    const approval = rows[0];
+    if (!approval) throw new Error("APPROVAL_PERSISTENCE_FAILED");
 
-  return { approval, token };
+    await tx.auditLog.create({
+      data: {
+        actorUserId: input.ownerId,
+        action: "TRADING_APPROVAL_ISSUED",
+        entityType: "TradingApproval",
+        entityId: approval.id,
+        metadata: {
+          opportunityId: approval.opportunityId,
+          amountUsd: approval.amountUsd.toString(),
+          expiresAt: approval.expiresAt.toISOString(),
+          strategyVersion: approval.strategyVersion,
+          shariahStatus: approval.shariahStatus,
+        },
+      },
+    });
+
+    return { approval, token };
+  });
 }
 
 export async function consumeOwnerApproval(input: {
@@ -141,6 +159,15 @@ export async function consumeOwnerApproval(input: {
             AND "status" = 'PENDING'
             AND "consumedAt" IS NULL
         `);
+        await tx.auditLog.create({
+          data: {
+            actorUserId: input.ownerId,
+            action: "TRADING_APPROVAL_EXPIRED",
+            entityType: "TradingApproval",
+            entityId: approval.id,
+            metadata: { opportunityId: approval.opportunityId },
+          },
+        });
         throw new Error("APPROVAL_EXPIRED");
       }
       throw new Error("INVALID_APPROVAL_TOKEN");
@@ -175,6 +202,20 @@ export async function consumeOwnerApproval(input: {
     const result = updated[0];
     if (!result) throw new Error("APPROVAL_NOT_CONSUMABLE");
 
+    await tx.auditLog.create({
+      data: {
+        actorUserId: input.ownerId,
+        action: "TRADING_APPROVAL_CONSUMED",
+        entityType: "TradingApproval",
+        entityId: result.id,
+        metadata: {
+          opportunityId: result.opportunityId,
+          amountUsd: result.amountUsd.toString(),
+          consumedAt: result.consumedAt?.toISOString() ?? null,
+        },
+      },
+    });
+
     return result;
   });
 }
@@ -183,14 +224,25 @@ export async function revokeOwnerApproval(input: {
   ownerId: string;
   approvalId: string;
 }): Promise<void> {
-  const result = await db.$executeRaw(Prisma.sql`
-    UPDATE "TradingApproval"
-    SET "status" = 'REVOKED'
-    WHERE "id" = ${input.approvalId}
-      AND "ownerId" = ${input.ownerId}
-      AND "status" = 'PENDING'
-      AND "consumedAt" IS NULL
-  `);
+  return db.$transaction(async (tx) => {
+    const result = await tx.$executeRaw(Prisma.sql`
+      UPDATE "TradingApproval"
+      SET "status" = 'REVOKED'
+      WHERE "id" = ${input.approvalId}
+        AND "ownerId" = ${input.ownerId}
+        AND "status" = 'PENDING'
+        AND "consumedAt" IS NULL
+    `);
 
-  if (result !== 1) throw new Error("APPROVAL_NOT_REVOKABLE");
+    if (result !== 1) throw new Error("APPROVAL_NOT_REVOKABLE");
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: input.ownerId,
+        action: "TRADING_APPROVAL_REVOKED",
+        entityType: "TradingApproval",
+        entityId: input.approvalId,
+      },
+    });
+  });
 }
