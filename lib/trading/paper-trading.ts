@@ -7,7 +7,12 @@
  */
 
 import { evaluatePreTrade, type PreTradeDecision } from "@/lib/trading/pre-trade-guard";
-import { closePaperPosition, evaluatePaperPositionExit, openPaperPosition, type PaperPosition } from "@/lib/trading/position";
+import {
+  closePaperPosition,
+  evaluatePaperPositionExit,
+  openPaperPosition,
+  type PaperPosition,
+} from "@/lib/trading/position";
 import { evaluateStrategy, type StrategyDecision } from "@/lib/trading/strategy";
 import type { RiskConfig } from "@/lib/trading/risk";
 import type { ShariahAssetInput, ShariahPolicy } from "@/lib/trading/shariah";
@@ -112,7 +117,7 @@ function closePositionToTrade(position: PaperPosition): PaperTrade {
     amountUsd: position.amountUsd,
     pnlUsd: position.pnlUsd ?? 0,
     exitReason: position.exitReason,
-    shariahPolicyVersion: position.status === "CLOSED" ? position.shariahPolicyVersion : "",
+    shariahPolicyVersion: position.shariahPolicyVersion,
   };
 }
 
@@ -221,6 +226,7 @@ export function runPaperTrading(
       stopLossPrice: strategy.stopLossPrice,
       takeProfitPrice: strategy.takeProfitPrice,
       openedAt: tick.timestamp,
+      shariahPolicyVersion: decision.shariah.policyVersion,
     });
   }
 
