@@ -68,7 +68,31 @@ describe("runPaperTrading", () => {
     expect(result.trades).toHaveLength(1);
     expect(result.trades[0].exitReason).toBe("TAKE_PROFIT");
     expect(result.trades[0].pnlUsd).toBeCloseTo(0.4, 8);
+    expect(result.trades[0].shariahPolicyVersion).toBe("paper-v1");
     expect(result.lastPreTradeDecision?.allowed).toBe(true);
+  });
+
+  it("preserves the Shariah policy version when a position closes at end of data", () => {
+    const result = runPaperTrading(
+      {
+        symbol: "TEST",
+        startingCapitalUsd: 100,
+        tradeAmountUsd: 10,
+        stopLossPercent: 2,
+        takeProfitPercent: 50,
+        riskConfig,
+        shariahPolicy,
+      },
+      [
+        tick({ timestamp: "2026-01-01T00:00:00Z", price: 110 }),
+        tick({ timestamp: "2026-01-01T00:05:00Z", price: 111, previousPrice: 110, fastAverage: 110.5 }),
+      ],
+    );
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].exitReason).toBe("END_OF_DATA");
+    expect(result.trades[0].shariahPolicyVersion).toBe(shariahPolicy.version);
+    expect(result.finalCapitalUsd).toBeGreaterThan(result.startingCapitalUsd);
   });
 
   it("records a blocked signal when Shariah screening rejects the method", () => {
