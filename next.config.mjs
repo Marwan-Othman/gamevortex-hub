@@ -15,6 +15,11 @@ const contentSecurityPolicy = [
 
 const nextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Enables Next.js forbidden() so protected Server Components can return
+    // an actual HTTP 403 instead of rendering a normal 200 response.
+    authInterrupts: true,
+  },
   async headers() {
     const securityHeaders = [
       { key: "Content-Security-Policy", value: contentSecurityPolicy },
