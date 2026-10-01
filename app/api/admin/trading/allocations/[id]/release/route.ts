@@ -18,7 +18,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
 
     const result = await releaseAllocation({ ownerId: owner.id, allocationId: id });
-    return NextResponse.json({ ok: true, allocationId: result.allocationId, amountUsd: result.amountUsd, points: result.points });
+    return NextResponse.json({
+      ok: true,
+      allocationId: result.allocationId,
+      amountUsd: result.amountUsd,
+      returnedToWallet: result.returnedToWallet,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
     if (message === "FORBIDDEN") return tradingForbidden();
