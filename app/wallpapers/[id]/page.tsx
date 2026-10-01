@@ -11,12 +11,12 @@ import FavoriteButton from "../FavoriteButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const wallpaper = await db.wallpaper.findUnique({ where: { id }, select: { titleAr: true, titleEn: true, descriptionAr: true, descriptionEn: true, imageUrl: true } });
+  const wallpaper = await db.wallpaper.findUnique({ where: { id }, select: { titleAr: true, titleEn: true, descriptionAr: true, descriptionEn: true } });
   if (!wallpaper) return { title: "Wallpaper | GameVortex" };
   return {
     title: `${wallpaper.titleEn} | GameVortex Wallpapers`,
     description: wallpaper.descriptionEn || wallpaper.descriptionAr || "GameVortex wallpaper",
-    openGraph: { title: wallpaper.titleEn, description: wallpaper.descriptionEn || wallpaper.descriptionAr || "GameVortex wallpaper", images: [wallpaper.imageUrl] },
+    openGraph: { title: wallpaper.titleEn, description: wallpaper.descriptionEn || wallpaper.descriptionAr || "GameVortex wallpaper" },
   };
 }
 
@@ -28,6 +28,7 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
   const user = await getOptionalUser();
   const vip = user ? await getVipAccess(user.id) : null;
   const canDownload = !wallpaper.isVip || Boolean(vip?.isVip);
+  const canViewMedia = !wallpaper.isVip || Boolean(vip?.isVip);
   const favorite = user ? await db.wallpaperFavorite.findUnique({ where: { userId_wallpaperId: { userId: user.id, wallpaperId: wallpaper.id } }, select: { id: true } }) : null;
   const related = await db.wallpaper.findMany({
     where: { published: true, id: { not: wallpaper.id }, category: wallpaper.category },
@@ -45,36 +46,28 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
       <section className="glass card">
         <div style={{ display: "grid", gap: 18 }}>
           <div className="wallpaper-detail-media" style={{ width: "100%" }}>
-            {wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? (
-              <video
-                src={wallpaper.mediaUrl}
-                poster={wallpaper.imageUrl}
-                controls
-                playsInline
-                preload="metadata"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  maxHeight: "82vh",
-                  objectFit: "contain",
-                  borderRadius: 16,
-                  background: "rgba(0,0,0,.25)",
-                }}
-              />
+            {canViewMedia ? (
+              wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? (
+                <video
+                  src={`/api/wallpapers/${wallpaper.id}/media`}
+                  poster={wallpaper.thumbnailUrl || undefined}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  style={{ display: "block", width: "100%", maxHeight: "82vh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
+                />
+              ) : (
+                <img
+                  src={`/api/wallpapers/${wallpaper.id}/media`}
+                  alt={wallpaper.titleEn}
+                  fetchPriority="high"
+                  style={{ display: "block", width: "100%", maxHeight: "82vh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
+                />
+              )
             ) : (
-              <img
-                src={wallpaper.imageUrl}
-                alt={wallpaper.titleEn}
-                fetchPriority="high"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  maxHeight: "82vh",
-                  objectFit: "contain",
-                  borderRadius: 16,
-                  background: "rgba(0,0,0,.25)",
-                }}
-              />
+              <div className="glass card" style={{ minHeight: 280, display: "grid", placeItems: "center", textAlign: "center" }}>
+                <div><div style={{ fontSize: 48 }}>💎</div><strong>خلفية VIP</strong><p className="muted" style={{ marginTop: 8 }}>افتح VIP لمشاهدة الخلفية وتحميلها.</p></div>
+              </div>
             )}
           </div>
 
@@ -114,7 +107,7 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
         </div>
       </section>
 
-      {related.length > 0 && <section style={{ marginTop: 28 }}><div className="section-head"><h2>خلفيات مشابهة</h2></div><div className="grid">{related.map(item => <Link key={item.id} href={`/wallpapers/${item.id}`} className="glass card game-card" style={{ overflow: "hidden", padding: 0 }}><img src={item.thumbnailUrl || item.imageUrl} alt={item.titleEn} loading="lazy" style={{ width: "100%", aspectRatio: item.width && item.height ? `${item.width} / ${item.height}` : item.type === "MOBILE" ? "9/16" : "16/9", objectFit: "contain", background: "rgba(0,0,0,.28)" }} /><div style={{ padding: 12 }}><strong>{item.titleAr}</strong>{item.isVip && <span className="badge" style={{ marginInlineStart: 8 }}>💎 VIP</span>}</div></Link>)}</div></section>}
+      {related.length > 0 && <section style={{ marginTop: 28 }}><div className="section-head"><h2>خلفيات مشابهة</h2></div><div className="grid">{related.map(item => <Link key={item.id} href={`/wallpapers/${item.id}`} className="glass card game-card" style={{ overflow: "hidden", padding: 0 }}><img src={item.isVip && !vip?.isVip ? "/icon.svg" : `/api/wallpapers/${item.id}/media`} alt={item.titleEn} loading="lazy" style={{ width: "100%", aspectRatio: item.width && item.height ? `${item.width} / ${item.height}` : item.type === "MOBILE" ? "9/16" : "16/9", objectFit: "contain", background: "rgba(0,0,0,.28)" }} /><div style={{ padding: 12 }}><strong>{item.titleAr}</strong>{item.isVip && <span className="badge" style={{ marginInlineStart: 8 }}>💎 VIP</span>}</div></Link>)}</div></section>}
     </main>
   );
 }

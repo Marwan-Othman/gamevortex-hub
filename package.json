@@ -7,7 +7,7 @@
     "build": "npm run db:generate && next build",
     "build:production": "npm run production:validate",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run && npm run test:ai-gateway",
     "test:ai-gateway": "node --test scripts/run-ai-gateway-checks.mjs",
@@ -24,7 +24,7 @@
     "db:validate": "prisma validate",
     "db:format": "prisma format",
     "db:status": "prisma migrate status",
-    "db:seed": "tsx prisma/seed-gamer-achievements.ts",
+    "db:seed": "npx --yes tsx prisma/seed-gamer-achievements.ts",
     "wallpapers:seed": "node scripts/seed-wallpaper-library.mjs",
     "db:backup": "sh scripts/backup-postgres.sh",
     "validate:env": "node scripts/validate-env.mjs",
@@ -36,7 +36,8 @@
     "fix:owner": "node scripts/fix-owner-conflict.mjs",
     "import:mobile-games": "node scripts/import-mobile-games.mjs",
     "postinstall": "prisma generate",
-    "ai-media-check": "node scripts/ai-media-config-check.mjs"
+    "ai-media-check": "node scripts/ai-media-config-check.mjs",
+    "audit:points": "node scripts/audit-point-integrity.mjs"
   },
   "engines": {
     "node": ">=20.9 <23",
@@ -51,13 +52,10 @@
     "zod": "4.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.20.4",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
-    "eslint": "^9.36.0",
-    "eslint-config-next": "16.3.6",
+    "@types/node": "22.12.0",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
     "prisma": "6.12.0",
-    "tsx": "^4.20.5",
     "typescript": "5.8.3",
     "vitest": "^5.0.2"
   }

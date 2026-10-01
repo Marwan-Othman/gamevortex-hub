@@ -4,6 +4,7 @@ import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { isHttpsUrl, normalizeWallpaperTags, normalizeWallpaperSlug } from "@/lib/wallpapers";
 import { validateWallpaperMedia } from "@/lib/wallpaper-moderation";
+import { guardMutation } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,11 @@ const TYPES = new Set(["MOBILE", "DESKTOP"]);
 const MAX_BODY = 20_000;
 
 export async function POST(request: NextRequest) {
+  const guard = await guardMutation(request, "wallpapers-upload");
+  if (guard) return guard;
   const user = await getOptionalUser();
-  if (user?.role !== "SUPER_ADMIN") return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  if (user.role !== "SUPER_ADMIN") return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   if (request.headers.get("content-length") && Number(request.headers.get("content-length")) > MAX_BODY) {
     return NextResponse.json({ success: false, error: "Payload too large" }, { status: 413 });
   }

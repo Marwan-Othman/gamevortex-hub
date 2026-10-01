@@ -24,13 +24,13 @@ export default async function WallpaperModerationPage() {
     </section>
     <section className="grid" style={{ marginTop: 20 }}>
       {pending.map((item) => <article className="glass card" key={item.id}>
-        {item.mediaType === "VIDEO" && item.mediaUrl ? <video controls preload="metadata" poster={item.imageUrl} style={{ width: "100%", borderRadius: 14 }} src={item.mediaUrl} /> : <img src={item.imageUrl} alt={item.titleEn} loading="lazy" style={{ width: "100%", borderRadius: 14 }} />}
+        {item.mediaType === "VIDEO" && item.mediaUrl ? <video controls preload="metadata" poster={item.imageUrl} style={{ width: "100%", borderRadius: 14 }} src={`/api/wallpapers/${item.id}/media`} /> : <img src={`/api/wallpapers/${item.id}/media`} alt={item.titleEn} loading="lazy" style={{ width: "100%", borderRadius: 14 }} />}
         <h2 style={{ marginTop: 12 }}>{item.titleAr}</h2>
         <p className="muted">{item.titleEn}</p>
         <p className="muted">Source: {item.sourceUrl || "—"}<br />License: {item.licenseUrl || "—"}<br />Attribution: {item.attribution || "—"}</p>
         <div className="tabs" style={{ marginTop: 12 }}>
           <form action="/api/admin/wallpapers/moderation" method="post"><input type="hidden" name="id" value={item.id} /></form>
-          <button className="btn" data-moderate={item.id} data-decision="APPROVED">قبول +25 نقطة</button>
+          <button className="btn" data-moderate={item.id} data-decision="APPROVED">قبول ومكافأة المساهم بالنقاط</button>
           <button className="btn secondary" data-moderate={item.id} data-decision="REJECTED">رفض</button>
         </div>
       </article>)}

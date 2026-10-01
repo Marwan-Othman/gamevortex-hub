@@ -432,6 +432,7 @@ model Game {
   libraryItems GameLibraryItem[]
   activities Activity[]
   products GameProduct[]
+  mods Mod[]
 
   gamePlatforms GamePlatform[]
 
@@ -1739,6 +1740,34 @@ enum WallpaperModerationStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model Mod {
+  id String @id @default(cuid())
+  slug String @unique
+  titleAr String
+  titleEn String
+  descriptionAr String?
+  descriptionEn String?
+  imageUrl String?
+  modUrl String?
+  downloadUrl String?
+  sourceUrl String?
+  sourceProvider String?
+  sourceStatus SourceStatus @default(NEEDS_SOURCE)
+  platform PlatformType?
+  gameId String?
+  published Boolean @default(false)
+  featured Boolean @default(false)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  game Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([published, featured, sortOrder])
+  @@index([gameId])
+  @@index([platform, published])
 }
 
 model Wallpaper {

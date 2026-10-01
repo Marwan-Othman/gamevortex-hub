@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/ai", label: "GameVortex AI", icon: GameIcon },
   { href: "/games", label: "Games", icon: GameIcon },
   { href: "/apps", label: "Apps", icon: GridIcon },
+  { href: "/mods", label: "Mods", icon: GridIcon },
   { href: "/vip", label: "VIP", icon: CrownIcon },
   { href: "/marketplace", label: "Store", icon: StoreIcon },
   { href: "/api-access", label: "Developer API", icon: ShieldIcon },

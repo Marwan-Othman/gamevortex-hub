@@ -46,6 +46,11 @@ const NAV_SECTIONS: NavSection[] = [
         icon: <IconWallpaper />,
       },
       {
+        label: "Mods",
+        href: "/admin/mods",
+        icon: <IconGames />,
+      },
+      {
         label: "مراجعة الخلفيات",
         href: "/admin/wallpapers/moderation",
         icon: <IconSupport />,

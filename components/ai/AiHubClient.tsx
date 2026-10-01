@@ -1,447 +1,2677 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import styles from "./ai.module.css";
-import { useLocale } from "@/components/ui/useLocale";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-type Conversation = { id: string; title: string; updatedAt?: string };
-type Message = { id?: string; role: string; content: string };
+import styles from "./ai.module.css";
+
+import {
+  useLocale,
+} from "@/components/ui/useLocale";
+
+type Conversation = {
+  id: string;
+  title: string;
+  updatedAt?: string;
+};
+
+type Message = {
+  id?: string;
+  role: string;
+  content: string;
+};
+
 type MediaJob = {
   id: string;
   kind: "IMAGE" | "VIDEO";
-  status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
+  status:
+    | "QUEUED"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "FAILED";
   prompt: string;
   resultUrl?: string | null;
   errorMessage?: string | null;
   createdAt?: string;
 };
-type AiRequestError = Error & { requestId?: string };
-type AiMode = "CHAT" | "IMAGE" | "VIDEO" | "VOICE";
-type VoiceStyle = "ANGRY";
+
+type AiRequestError =
+  Error & {
+    requestId?: string;
+  };
+
+type Mode =
+  | "CHAT"
+  | "IMAGE"
+  | "VIDEO"
+  | "VOICE";
 
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
+
+  onresult:
+    | ((
+        event: {
+          results: ArrayLike<{
+            0: {
+              transcript: string;
+            };
+          }>;
+        },
+      ) => void)
+    | null;
+
+  onerror:
+    | (() => void)
+    | null;
+
+  onend:
+    | (() => void)
+    | null;
+
   start: () => void;
   stop: () => void;
 };
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
-function inlineMarkdown(text: string) {
-  return text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
-    if (part.startsWith("`") && part.endsWith("`")) return <code key={index}>{part.slice(1, -1)}</code>;
-    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith("*") && part.endsWith("*")) return <em key={index}>{part.slice(1, -1)}</em>;
-    return part;
-  });
+type SpeechRecognitionCtor =
+  new () => SpeechRecognitionLike;
+
+const VOICE_TONES = {
+  natural: {
+    pitch: 1,
+    rate: 1,
+  },
+
+  calm: {
+    pitch: 0.92,
+    rate: 0.9,
+  },
+
+  friendly: {
+    pitch: 1.08,
+    rate: 1.02,
+  },
+
+  professional: {
+    pitch: 0.98,
+    rate: 0.96,
+  },
+
+  energetic: {
+    pitch: 1.16,
+    rate: 1.1,
+  },
+} as const;
+
+type Tone =
+  keyof typeof VOICE_TONES;
+
+function inlineMarkdown(
+  text: string,
+) {
+  return text
+    .split(
+      /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g,
+    )
+    .map(
+      (part, index) => {
+        if (
+          part.startsWith("`") &&
+          part.endsWith("`")
+        ) {
+          return (
+            <code key={index}>
+              {part.slice(
+                1,
+                -1,
+              )}
+            </code>
+          );
+        }
+
+        if (
+          part.startsWith("**") &&
+          part.endsWith("**")
+        ) {
+          return (
+            <strong key={index}>
+              {part.slice(
+                2,
+                -2,
+              )}
+            </strong>
+          );
+        }
+
+        if (
+          part.startsWith("*") &&
+          part.endsWith("*")
+        ) {
+          return (
+            <em key={index}>
+              {part.slice(
+                1,
+                -1,
+              )}
+            </em>
+          );
+        }
+
+        return part;
+      },
+    );
 }
 
-function errorMessage(code: string, english: boolean) {
-  const messages: Record<string, [string, string]> = {
-    RUNTIME_NOT_CONFIGURED: ["محرك GameVortex AI غير مربوط بعد. أضف عنوان HTTPS لخادم Ollama الذي تملكه إلى GAMEVORTEX_AI_RUNTIME_URL في Vercel.", "GameVortex AI is not connected yet. Set GAMEVORTEX_AI_RUNTIME_URL in Vercel to the HTTPS address of your self-hosted Ollama gateway."],
-    RUNTIME_TOKEN_NOT_CONFIGURED: ["أضف GAMEVORTEX_AI_RUNTIME_TOKEN في Vercel واجعله مطابقًا للرمز الموجود في خادم GameVortex AI.", "Set GAMEVORTEX_AI_RUNTIME_TOKEN in Vercel to the same secret configured on your GameVortex AI gateway."],
-    RUNTIME_CONFIGURATION_INVALID: ["إعدادات محرك AI غير صالحة. راجع العنوان واسم النموذج والرمز.", "The AI runtime settings are invalid. Check the URL, model name, and token."],
-    RUNTIME_UNREACHABLE: ["تعذر الوصول إلى خادم Ollama. تأكد أن الخادم يعمل وأن عنوان HTTPS يمكن الوصول إليه من Vercel.", "The Ollama server could not be reached. Check that it is running and that Vercel can reach its HTTPS address."],
-    RUNTIME_TIMEOUT: ["انتهت مهلة انتظار النموذج. تحقق من أن النموذج محمّل وأن الخادم يستجيب.", "The model timed out. Check that the model is loaded and the runtime is responding."],
-    RUNTIME_AUTH_FAILED: ["رفض خادم AI الرمز. يجب أن تتطابق قيمة GAMEVORTEX_AI_RUNTIME_TOKEN في Vercel والخادم.", "The AI gateway rejected its token. GAMEVORTEX_AI_RUNTIME_TOKEN must match in Vercel and on the gateway."],
-    RUNTIME_ENDPOINT_INVALID: ["عنوان AI لا يشير إلى بوابة GameVortex الصحيحة.", "The AI URL does not point to a compatible GameVortex gateway."],
-    RUNTIME_HTTP_ERROR: ["أعاد خادم AI خطأ. افحص سجلات بوابة GameVortex AI وOllama.", "The AI runtime returned an error. Check the GameVortex AI gateway and Ollama logs."],
-    RUNTIME_INVALID_RESPONSE: ["أرسل خادم AI استجابة غير مفهومة.", "The AI runtime returned an invalid response."],
-    RUNTIME_STREAM_FAILED: ["انقطع التوليد قبل اكتماله. أعد المحاولة.", "Generation stopped before it finished. Try again."],
-    RUNTIME_EMPTY_RESPONSE: ["لم يُرجع النموذج أي نص.", "The model returned no text."],
-    REGENERATION_NOT_AVAILABLE: ["لا توجد إجابة أخيرة صالحة لإعادة توليدها.", "There is no latest answer available to regenerate."],
-    CONVERSATION_NOT_FOUND: ["لم يتم العثور على المحادثة.", "Conversation not found."],
-    SENSITIVE_SITE_REQUEST_BLOCKED: ["لا أستطيع تزويدك بروابط أو معلومات داخلية/حساسة للموقع. يمكنني مساعدتك بالمعلومات العامة المتاحة للمستخدمين.", "I cannot provide protected or internal GameVortex links or information. I can help with public, user-facing information instead."],
-    UNAUTHORIZED: ["انتهت جلسة الدخول. سجّل الدخول مجددًا.", "Your session has expired. Sign in again."],
-    AI_MEDIA_INTERNAL_RUNTIME_NOT_CONFIGURED: ["محرك الوسائط المستقل غير مهيأ بعد. محادثة GameVortex AI تعمل بشكل مستقل عن مزودي الوسائط الخارجيين.", "The independent media runtime is not configured yet. GameVortex AI chat runs independently from external media providers."],
-    AI_MEDIA_GENERATION_UNAVAILABLE: ["توليد الصور والفيديو غير متاح في محرك AI المستقل الحالي. لم تتم إضافة أي مزود خارجي.", "Image and video generation is unavailable in the current independent AI runtime. No external provider has been added."],
-    AI_CREDITS_EXHAUSTED: ["انتهى رصيد هذه الميزة.", "Your credits for this feature are exhausted."],
-    AI_SERVICE_UNAVAILABLE: ["تعذر إكمال الطلب. تحقق من إعدادات GameVortex AI.", "The request could not be completed. Check GameVortex AI settings."],
+function errorMessage(
+  code: string,
+  english: boolean,
+) {
+  const messages: Record<
+    string,
+    [string, string]
+  > = {
+    UNAUTHORIZED: [
+      "انتهت جلسة الدخول. سجّل الدخول مجددًا.",
+      "Your session has expired. Sign in again.",
+    ],
+
+    CONVERSATION_NOT_FOUND: [
+      "لم يتم العثور على المحادثة.",
+      "Conversation not found.",
+    ],
+
+    RUNTIME_EMPTY_RESPONSE: [
+      "لم يُرجع النموذج أي نص.",
+      "The model returned no text.",
+    ],
+
+    RUNTIME_INVALID_RESPONSE: [
+      "أرسل خادم AI استجابة غير مفهومة.",
+      "The AI runtime returned an invalid response.",
+    ],
+
+    RUNTIME_STREAM_FAILED: [
+      "انقطع التوليد قبل اكتماله. أعد المحاولة.",
+      "Generation stopped before it finished. Try again.",
+    ],
+
+    RUNTIME_HTTP_ERROR: [
+      "أعاد خادم AI خطأ. أعد المحاولة.",
+      "The AI runtime returned an error. Try again.",
+    ],
+
+    RUNTIME_AUTH_FAILED: [
+      "مفتاح Gemini غير مقبول من الخدمة.",
+      "Gemini rejected the API key.",
+    ],
+
+    RUNTIME_UNREACHABLE: [
+      "تعذر الوصول إلى Gemini حاليًا.",
+      "Gemini could not be reached right now.",
+    ],
+
+    GEMINI_IMAGE_BILLING_REQUIRED: [
+      "توليد الصور في Gemini API يحتاج تفعيل الفوترة. الدردشة النصية قد تعمل بدون ذلك، لكن صور Gemini ليست ضمن الخطة المجانية الحالية.",
+      "Gemini API image generation requires billing. Text chat may work on the free tier, but Gemini image generation is not included in the current API free tier.",
+    ],
+
+    GEMINI_RATE_LIMITED: [
+      "تم الوصول إلى حد الطلبات. انتظر قليلًا ثم أعد المحاولة.",
+      "The image API rate limit was reached. Wait a little and try again.",
+    ],
+
+    GEMINI_IMAGE_TIMEOUT: [
+      "استغرق توليد الصورة وقتًا أطول من المسموح.",
+      "Image generation timed out.",
+    ],
+
+    GEMINI_IMAGE_NOT_RETURNED: [
+      "Gemini لم يُرجع ملف صورة في الاستجابة.",
+      "Gemini did not return an image in its response.",
+    ],
+
+    GEMINI_IMAGE_GENERATION_FAILED: [
+      "فشل توليد الصورة من Gemini.",
+      "Gemini image generation failed.",
+    ],
+
+    GEMINI_INVALID_RESPONSE: [
+      "استجابة Gemini للصور غير صالحة.",
+      "Gemini returned an invalid image response.",
+    ],
+
+    AI_IMAGE_PROMPT_REQUIRED: [
+      "اكتب وصف الصورة أولًا.",
+      "Enter an image prompt first.",
+    ],
+
+    AI_IMAGE_TYPE_NOT_SUPPORTED: [
+      "نوع الصورة غير مدعوم. استخدم PNG أو JPG أو WEBP أو GIF.",
+      "Unsupported image type. Use PNG, JPG, WEBP or GIF.",
+    ],
+
+    AI_IMAGE_TOO_LARGE: [
+      "حجم الصورة كبير جدًا. الحد الأقصى 10MB.",
+      "The image is too large. The maximum size is 10MB.",
+    ],
+
+    AI_VIDEO_GENERATION_NOT_ENABLED: [
+      "الفيديو مؤجل حاليًا. سنفعّله بعد إنهاء نظام الصور.",
+      "Video generation is intentionally paused until the image system is finished.",
+    ],
+
+    AI_SERVICE_UNAVAILABLE: [
+      "تعذر إكمال الطلب حاليًا.",
+      "The request could not be completed right now.",
+    ],
   };
-  return messages[code]?.[english ? 1 : 0] || messages.AI_SERVICE_UNAVAILABLE[english ? 1 : 0];
+
+  return (
+    messages[code]?.[
+      english ? 1 : 0
+    ] ||
+    messages
+      .AI_SERVICE_UNAVAILABLE[
+        english ? 1 : 0
+      ]
+  );
 }
 
 export default function AiHubClient() {
-  const locale = useLocale();
-  const english = locale === "en";
-  const [items, setItems] = useState<Conversation[]>([]);
-  const [active, setActive] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [media, setMedia] = useState<MediaJob[]>([]);
-  const [prompt, setPrompt] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [mediaBusy, setMediaBusy] = useState<"IMAGE" | "VIDEO" | null>(null);
-  const [mode, setMode] = useState<AiMode>("CHAT");
-  const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>("ANGRY");
-  const [error, setError] = useState("");
-  const [voiceOpen, setVoiceOpen] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const aborter = useRef<AbortController | null>(null);
-  const recognition = useRef<SpeechRecognitionLike | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
-  const t = (ar: string, en: string) => english ? en : ar;
+  const locale =
+    useLocale();
 
-  const speechLang = useMemo(() => {
-    if (typeof navigator === "undefined") return english ? "en-US" : "ar-SA";
-    const language = navigator.language || (english ? "en-US" : "ar-SA");
-    return english ? language : language.startsWith("ar") ? language : "ar-SA";
-  }, [english]);
+  const english =
+    locale === "en";
+
+  const [mode, setMode] =
+    useState<Mode>("CHAT");
+
+  const [items, setItems] =
+    useState<Conversation[]>(
+      [],
+    );
+
+  const [active, setActive] =
+    useState("");
+
+  const [messages, setMessages] =
+    useState<Message[]>([]);
+
+  const [media, setMedia] =
+    useState<MediaJob[]>([]);
+
+  const [prompt, setPrompt] =
+    useState("");
+
+  const [busy, setBusy] =
+    useState(false);
+
+  const [mediaBusy, setMediaBusy] =
+    useState<
+      "IMAGE" | null
+    >(null);
+
+  const [error, setError] =
+    useState("");
+
+  const [listening, setListening] =
+    useState(false);
+
+  const [speaking, setSpeaking] =
+    useState(false);
+
+  const [voiceAutoSpeak, setVoiceAutoSpeak] =
+    useState(true);
+
+  const [handsFree, setHandsFree] =
+    useState(false);
+
+  const [tone, setTone] =
+    useState<Tone>("natural");
+
+  const [speechSpeed, setSpeechSpeed] =
+    useState("1");
+
+  const [selectedVoice, setSelectedVoice] =
+    useState("");
+
+  const [voices, setVoices] =
+    useState<
+      SpeechSynthesisVoice[]
+    >([]);
+
+  const [aspectRatio, setAspectRatio] =
+    useState("1:1");
+
+  const [imageFile, setImageFile] =
+    useState<File | null>(null);
+
+  const aborter =
+    useRef<AbortController | null>(
+      null,
+    );
+
+  const recognition =
+    useRef<SpeechRecognitionLike | null>(
+      null,
+    );
+
+  const bottom =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const t = (
+    ar: string,
+    en: string,
+  ) =>
+    english ? en : ar;
+
+  const speechLang =
+    useMemo(() => {
+      if (
+        typeof navigator ===
+        "undefined"
+      ) {
+        return english
+          ? "en-US"
+          : "ar-SA";
+      }
+
+      const language =
+        navigator.language ||
+        (english
+          ? "en-US"
+          : "ar-SA");
+
+      return english
+        ? language
+        : language.startsWith(
+            "ar",
+          )
+          ? language
+          : "ar-SA";
+    }, [english]);
+
+  useEffect(() => {
+    if (
+      typeof window ===
+        "undefined" ||
+      !(
+        "speechSynthesis" in
+        window
+      )
+    ) {
+      return;
+    }
+
+    const loadVoices =
+      () => {
+        const available =
+          window.speechSynthesis.getVoices();
+
+        setVoices(
+          available,
+        );
+
+        if (
+          !selectedVoice &&
+          available.length
+        ) {
+          const preferred =
+            available.find(
+              (voice) =>
+                voice.lang
+                  .toLowerCase()
+                  .startsWith(
+                    english
+                      ? "en"
+                      : "ar",
+                  ),
+            );
+
+          setSelectedVoice(
+            (
+              preferred ||
+              available[0]
+            ).name,
+          );
+        }
+      };
+
+    loadVoices();
+
+    window.speechSynthesis.addEventListener(
+      "voiceschanged",
+      loadVoices,
+    );
+
+    return () =>
+      window.speechSynthesis.removeEventListener(
+        "voiceschanged",
+        loadVoices,
+      );
+  }, [
+    english,
+    selectedVoice,
+  ]);
 
   async function refresh() {
     try {
-      const response = await fetch("/api/gamevortex-ai/conversations", { cache: "no-store" });
-      if (!response.ok) throw new Error("AI_SERVICE_UNAVAILABLE");
-      const result = await response.json();
-      setItems(Array.isArray(result.data) ? result.data : []);
+      const response =
+        await fetch(
+          "/api/gamevortex-ai/conversations",
+          {
+            cache:
+              "no-store",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          "AI_SERVICE_UNAVAILABLE",
+        );
+      }
+
+      const result =
+        await response.json();
+
+      const next =
+        Array.isArray(
+          result.data,
+        )
+          ? result.data
+          : [];
+
+      setItems(next);
+
+      if (
+        !active &&
+        next[0]?.id
+      ) {
+        await open(
+          next[0].id,
+        );
+      }
     } catch {
-      setError(errorMessage("AI_SERVICE_UNAVAILABLE", english));
+      setError(
+        errorMessage(
+          "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
     }
   }
 
-  async function refreshMedia(conversationId = active) {
-    if (!conversationId) return;
-    try {
-      const response = await fetch(`/api/ai/media?conversationId=${encodeURIComponent(conversationId)}`, { cache: "no-store" });
-      if (!response.ok) return;
-      const result = await response.json();
-      setMedia(Array.isArray(result.jobs) ? result.jobs : []);
-    } catch { /* media history is non-blocking */ }
-  }
+  async function refreshMedia(
+    conversationId = active,
+  ) {
+    if (!conversationId) {
+      return;
+    }
 
-  async function open(id: string) {
     try {
-      const response = await fetch(`/api/gamevortex-ai/conversations/${id}`);
+      const response =
+        await fetch(
+          `/api/ai/media?conversationId=${encodeURIComponent(
+            conversationId,
+          )}`,
+          {
+            cache:
+              "no-store",
+          },
+        );
+
       if (!response.ok) {
-        setError(errorMessage(response.status === 401 ? "UNAUTHORIZED" : "AI_SERVICE_UNAVAILABLE", english));
         return;
       }
-      const { data } = await response.json();
-      setActive(id);
-      setMessages(data.messages);
-      setError("");
-      await refreshMedia(id);
+
+      const result =
+        await response.json();
+
+      setMedia(
+        Array.isArray(
+          result.jobs,
+        )
+          ? result.jobs
+          : [],
+      );
     } catch {
-      setError(errorMessage("AI_SERVICE_UNAVAILABLE", english));
+      // Media history is intentionally non-blocking.
+    }
+  }
+
+  async function open(
+    id: string,
+  ) {
+    try {
+      const response =
+        await fetch(
+          `/api/gamevortex-ai/conversations/${id}`,
+        );
+
+      if (!response.ok) {
+        setError(
+          errorMessage(
+            response.status ===
+              401
+              ? "UNAUTHORIZED"
+              : "AI_SERVICE_UNAVAILABLE",
+            english,
+          ),
+        );
+
+        return;
+      }
+
+      const { data } =
+        await response.json();
+
+      setActive(id);
+
+      setMessages(
+        Array.isArray(
+          data.messages,
+        )
+          ? data.messages
+          : [],
+      );
+
+      setError("");
+
+      await refreshMedia(
+        id,
+      );
+    } catch {
+      setError(
+        errorMessage(
+          "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
     }
   }
 
   async function create() {
     try {
-      const response = await fetch("/api/gamevortex-ai/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      if (!response.ok) throw new Error(response.status === 401 ? "UNAUTHORIZED" : "AI_SERVICE_UNAVAILABLE");
-      const { data } = await response.json();
+      const response =
+        await fetch(
+          "/api/gamevortex-ai/conversations",
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              "{}",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status ===
+            401
+            ? "UNAUTHORIZED"
+            : "AI_SERVICE_UNAVAILABLE",
+        );
+      }
+
+      const { data } =
+        await response.json();
+
+      setMessages([]);
+
+      setMedia([]);
+
+      setActive(
+        data.id,
+      );
+
+      setError("");
+
       await refresh();
-      await open(data.id);
     } catch (e) {
-      setError(errorMessage(e instanceof Error ? e.message : "AI_SERVICE_UNAVAILABLE", english));
+      setError(
+        errorMessage(
+          e instanceof Error
+            ? e.message
+            : "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
     }
   }
 
-  async function remove(id: string) {
+  async function remove(
+    id: string,
+  ) {
     try {
-      const response = await fetch(`/api/gamevortex-ai/conversations/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error(response.status === 401 ? "UNAUTHORIZED" : "AI_SERVICE_UNAVAILABLE");
-      setItems((current) => current.filter((item) => item.id !== id));
-      if (active === id) { setActive(""); setMessages([]); setMedia([]); }
+      const response =
+        await fetch(
+          `/api/gamevortex-ai/conversations/${id}`,
+          {
+            method:
+              "DELETE",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status ===
+            401
+            ? "UNAUTHORIZED"
+            : "AI_SERVICE_UNAVAILABLE",
+        );
+      }
+
+      const next =
+        items.filter(
+          (item) =>
+            item.id !== id,
+        );
+
+      setItems(next);
+
+      if (
+        active === id
+      ) {
+        setActive("");
+
+        setMessages([]);
+
+        setMedia([]);
+
+        if (next[0]) {
+          await open(
+            next[0].id,
+          );
+        }
+      }
     } catch (e) {
-      setError(errorMessage(e instanceof Error ? e.message : "AI_SERVICE_UNAVAILABLE", english));
+      setError(
+        errorMessage(
+          e instanceof Error
+            ? e.message
+            : "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
     }
   }
 
-  async function rename(item: Conversation) {
-    const title = window.prompt(t("اسم المحادثة", "Conversation title"), item.title);
-    if (!title?.trim()) return;
-    const response = await fetch(`/api/gamevortex-ai/conversations/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
-    if (!response.ok) setError(errorMessage("AI_SERVICE_UNAVAILABLE", english));
-    else await refresh();
+  async function rename(
+    item: Conversation,
+  ) {
+    const title =
+      window.prompt(
+        t(
+          "اسم المحادثة",
+          "Conversation title",
+        ),
+        item.title,
+      );
+
+    if (!title?.trim()) {
+      return;
+    }
+
+    const response =
+      await fetch(
+        `/api/gamevortex-ai/conversations/${item.id}`,
+        {
+          method:
+            "PATCH",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify({
+              title,
+            }),
+        },
+      );
+
+    if (!response.ok) {
+      setError(
+        errorMessage(
+          "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
+    } else {
+      await refresh();
+    }
   }
 
-  useEffect(() => { void refresh(); }, []);
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, media]);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
-  async function send(text = prompt, regenerate = false) {
-    if (!text.trim() || busy) return;
+  useEffect(() => {
+    bottom.current?.scrollIntoView(
+      {
+        behavior:
+          "smooth",
+      },
+    );
+  }, [
+    messages,
+    media,
+  ]);
+
+  function speakText(
+    text: string,
+    after?: () => void,
+  ) {
+    if (
+      !text.trim() ||
+      typeof window ===
+        "undefined" ||
+      !(
+        "speechSynthesis" in
+        window
+      )
+    ) {
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance =
+      new SpeechSynthesisUtterance(
+        text,
+      );
+
+    utterance.lang =
+      speechLang;
+
+    utterance.pitch =
+      VOICE_TONES[tone]
+        .pitch;
+
+    utterance.rate =
+      Number(
+        speechSpeed,
+      ) *
+      VOICE_TONES[tone]
+        .rate;
+
+    const voice =
+      voices.find(
+        (item) =>
+          item.name ===
+          selectedVoice,
+      );
+
+    if (voice) {
+      utterance.voice =
+        voice;
+    }
+
+    utterance.onstart =
+      () =>
+        setSpeaking(
+          true,
+        );
+
+    utterance.onend =
+      () => {
+        setSpeaking(
+          false,
+        );
+
+        after?.();
+      };
+
+    utterance.onerror =
+      () => {
+        setSpeaking(
+          false,
+        );
+
+        after?.();
+      };
+
+    window.speechSynthesis.speak(
+      utterance,
+    );
+  }
+
+  async function send(
+    text = prompt,
+    regenerate = false,
+  ) {
+    const cleanPrompt =
+      text.trim();
+
+    if (
+      !cleanPrompt ||
+      busy
+    ) {
+      return;
+    }
+
     setError("");
-    let conversationId = active;
+
+    let conversationId =
+      active;
+
     if (!conversationId) {
       try {
-        const response = await fetch("/api/gamevortex-ai/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        if (!response.ok) throw new Error(response.status === 401 ? "UNAUTHORIZED" : "AI_SERVICE_UNAVAILABLE");
-        const { data } = await response.json();
-        conversationId = data.id;
-        setActive(conversationId);
+        const response =
+          await fetch(
+            "/api/gamevortex-ai/conversations",
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                "{}",
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            response.status ===
+              401
+              ? "UNAUTHORIZED"
+              : "AI_SERVICE_UNAVAILABLE",
+          );
+        }
+
+        const { data } =
+          await response.json();
+
+        conversationId =
+          data.id;
+
+        setActive(
+          conversationId,
+        );
+
         void refresh();
       } catch (e) {
-        setError(errorMessage(e instanceof Error ? e.message : "AI_SERVICE_UNAVAILABLE", english));
+        setError(
+          errorMessage(
+            e instanceof Error
+              ? e.message
+              : "AI_SERVICE_UNAVAILABLE",
+            english,
+          ),
+        );
+
         return;
       }
     }
 
-    const assistant: Message = { role: "assistant", content: "" };
-    if (regenerate) setMessages((current) => [...current.slice(0, -1), assistant]);
-    else setMessages((current) => [...current, { role: "user", content: text.trim() }, assistant]);
+    const assistant: Message =
+      {
+        role:
+          "assistant",
+        content:
+          "",
+      };
+
+    if (regenerate) {
+      setMessages(
+        (current) => [
+          ...current.slice(
+            0,
+            -1,
+          ),
+          assistant,
+        ],
+      );
+    } else {
+      setMessages(
+        (current) => [
+          ...current,
+
+          {
+            role:
+              "user",
+            content:
+              cleanPrompt,
+          },
+
+          assistant,
+        ],
+      );
+    }
+
     setPrompt("");
+
     setBusy(true);
-    const controller = new AbortController();
-    aborter.current = controller;
+
+    const controller =
+      new AbortController();
+
+    aborter.current =
+      controller;
 
     try {
-      const response = await fetch("/api/gamevortex-ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, prompt: text.trim(), regenerate }), signal: controller.signal });
+      const response =
+        await fetch(
+          "/api/gamevortex-ai/chat",
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                conversationId,
+                prompt:
+                  cleanPrompt,
+                regenerate,
+              }),
+
+            signal:
+              controller.signal,
+          },
+        );
+
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        const requestError = new Error(body.error || `HTTP_${response.status}`) as AiRequestError;
-        requestError.requestId = body.requestId || response.headers.get("x-request-id") || undefined;
+        const body =
+          await response
+            .json()
+            .catch(
+              () => ({}),
+            );
+
+        const requestError =
+          new Error(
+            body.error ||
+              `HTTP_${response.status}`,
+          ) as AiRequestError;
+
+        requestError.requestId =
+          body.requestId ||
+          response.headers.get(
+            "x-request-id",
+          ) ||
+          undefined;
+
         throw requestError;
       }
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("RUNTIME_INVALID_RESPONSE");
-      const decoder = new TextDecoder();
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        assistant.content += decoder.decode(value, { stream: true });
-        setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
+
+      const reader =
+        response.body?.getReader();
+
+      if (!reader) {
+        throw new Error(
+          "RUNTIME_INVALID_RESPONSE",
+        );
       }
-      assistant.content += decoder.decode();
-      setMessages((current) => [...current.slice(0, -1), { ...assistant }]);
-      await refreshMedia(conversationId);
+
+      const decoder =
+        new TextDecoder();
+
+      while (true) {
+        const {
+          value,
+          done,
+        } =
+          await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        assistant.content +=
+          decoder.decode(
+            value,
+            {
+              stream: true,
+            },
+          );
+
+        setMessages(
+          (current) => [
+            ...current.slice(
+              0,
+              -1,
+            ),
+
+            {
+              ...assistant,
+            },
+          ],
+        );
+      }
+
+      assistant.content +=
+        decoder.decode();
+
+      setMessages(
+        (current) => [
+          ...current.slice(
+            0,
+            -1,
+          ),
+
+          {
+            ...assistant,
+          },
+        ],
+      );
+
+      await refreshMedia(
+        conversationId,
+      );
+
       await refresh();
+
+      if (
+        mode === "VOICE" &&
+        voiceAutoSpeak &&
+        assistant.content
+      ) {
+        speakText(
+          assistant.content,
+          handsFree
+            ? () =>
+                window.setTimeout(
+                  startVoice,
+                  250,
+                )
+            : undefined,
+        );
+      }
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setMessages((current) => current.filter((m) => m !== assistant));
-      setError(errorMessage(e instanceof Error ? e.message : "AI_SERVICE_UNAVAILABLE", english));
+      if (
+        e instanceof DOMException &&
+        e.name ===
+          "AbortError"
+      ) {
+        return;
+      }
+
+      setMessages(
+        (current) =>
+          current.filter(
+            (message) =>
+              message !==
+              assistant,
+          ),
+      );
+
+      setError(
+        errorMessage(
+          e instanceof Error
+            ? e.message
+            : "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
     } finally {
       setBusy(false);
-      aborter.current = null;
+
+      aborter.current =
+        null;
     }
   }
 
   async function ensureConversation() {
-    if (active) return active;
-    const response = await fetch("/api/gamevortex-ai/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    if (!response.ok) throw new Error(response.status === 401 ? "UNAUTHORIZED" : "AI_SERVICE_UNAVAILABLE");
-    const { data } = await response.json();
-    setActive(data.id);
+    if (active) {
+      return active;
+    }
+
+    const response =
+      await fetch(
+        "/api/gamevortex-ai/conversations",
+        {
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            "{}",
+        },
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        response.status ===
+          401
+          ? "UNAUTHORIZED"
+          : "AI_SERVICE_UNAVAILABLE",
+      );
+    }
+
+    const { data } =
+      await response.json();
+
+    setActive(
+      data.id,
+    );
+
     void refresh();
+
     return data.id as string;
   }
 
-  async function generateMedia(kind: "IMAGE" | "VIDEO") {
-    const text = prompt.trim();
-    if (!text || mediaBusy) return;
-    setMediaBusy(kind);
-    setError("");
-    try {
-      const conversationId = await ensureConversation();
-      const response = await fetch("/api/ai/media", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, prompt: text, conversationId, idempotencyKey: crypto.randomUUID() }) });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok && response.status !== 202) throw new Error(body.error || "AI_MEDIA_GENERATION_UNAVAILABLE");
-      await refreshMedia(conversationId);
-      setPrompt("");
-      if (body.job?.status === "PROCESSING" || body.pollingRequired) pollMedia(body.job?.id || "");
-    } catch (e) {
-      setError(errorMessage(e instanceof Error ? e.message : "AI_MEDIA_GENERATION_UNAVAILABLE", english));
-    } finally {
-      setMediaBusy(null);
-    }
-  }
+  async function generateImage() {
+    const text =
+      prompt.trim();
 
-  async function pollMedia(id: string) {
-    if (!id) return;
-    for (let i = 0; i < 60; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 4000));
-      const response = await fetch(`/api/ai/media/${id}`, { cache: "no-store" });
-      if (!response.ok) return;
-      const body = await response.json();
-      setMedia((current) => current.map((item) => item.id === id ? body.job : item));
-      if (["COMPLETED", "FAILED"].includes(body.job?.status)) return;
-    }
-  }
-
-  async function deleteMedia(id: string) {
-    const response = await fetch(`/api/ai/media/${id}`, { method: "DELETE" });
-    if (!response.ok) {
-      setError(errorMessage("AI_SERVICE_UNAVAILABLE", english));
+    if (
+      !text ||
+      mediaBusy
+    ) {
       return;
     }
-    setMedia((current) => current.filter((item) => item.id !== id));
+
+    setMediaBusy(
+      "IMAGE",
+    );
+
+    setError("");
+
+    try {
+      const conversationId =
+        await ensureConversation();
+
+      const form = new FormData();
+      form.set("kind", "IMAGE");
+      form.set("prompt", text);
+      form.set("aspectRatio", aspectRatio);
+      form.set("conversationId", conversationId);
+      form.set("idempotencyKey", crypto.randomUUID());
+      if (imageFile) form.set("image", imageFile);
+
+      const response =
+        await fetch(
+          "/api/ai/media",
+          {
+            method: "POST",
+            body: form,
+          },
+        );
+
+      const body =
+        await response
+          .json()
+          .catch(
+            () => ({}),
+          );
+
+      if (!response.ok) {
+        throw new Error(
+          body.error ||
+            "AI_SERVICE_UNAVAILABLE",
+        );
+      }
+
+      setPrompt("");
+      setImageFile(null);
+
+      await refreshMedia(
+        conversationId,
+      );
+    } catch (e) {
+      setError(
+        errorMessage(
+          e instanceof Error
+            ? e.message
+            : "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
+    } finally {
+      setMediaBusy(
+        null,
+      );
+    }
+  }
+
+  async function deleteMedia(
+    id: string,
+  ) {
+    const response =
+      await fetch(
+        `/api/ai/media/${id}`,
+        {
+          method:
+            "DELETE",
+        },
+      );
+
+    if (!response.ok) {
+      setError(
+        errorMessage(
+          "AI_SERVICE_UNAVAILABLE",
+          english,
+        ),
+      );
+
+      return;
+    }
+
+    setMedia(
+      (current) =>
+        current.filter(
+          (item) =>
+            item.id !== id,
+        ),
+    );
   }
 
   function startVoice() {
-    setVoiceOpen(true);
-    const SpeechRecognition = (window as Window & { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor }).SpeechRecognition || (window as Window & { webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const instance = new SpeechRecognition();
-    instance.lang = speechLang;
-    instance.continuous = false;
-    instance.interimResults = false;
-    instance.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript || "";
-      if (transcript) setPrompt(transcript);
-    };
-    instance.onerror = () => setListening(false);
-    instance.onend = () => setListening(false);
-    recognition.current = instance;
+    if (listening) {
+      return;
+    }
+
+    const SpeechRecognition =
+      (
+        window as Window & {
+          SpeechRecognition?: SpeechRecognitionCtor;
+
+          webkitSpeechRecognition?: SpeechRecognitionCtor;
+        }
+      ).SpeechRecognition ||
+      (
+        window as Window & {
+          webkitSpeechRecognition?: SpeechRecognitionCtor;
+        }
+      )
+        .webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setError(
+        t(
+          "المتصفح الحالي لا يدعم التعرف على الصوت. جرّب Chrome على الهاتف أو الكمبيوتر.",
+          "This browser does not support speech recognition. Try Chrome on your phone or computer.",
+        ),
+      );
+
+      return;
+    }
+
+    const instance =
+      new SpeechRecognition();
+
+    instance.lang =
+      speechLang;
+
+    instance.continuous =
+      false;
+
+    instance.interimResults =
+      false;
+
+    instance.onresult =
+      (event) => {
+        const transcript =
+          event.results[0]?.[0]
+            ?.transcript ||
+          "";
+
+        if (!transcript) {
+          return;
+        }
+
+        setPrompt(
+          transcript,
+        );
+
+        if (
+          mode === "VOICE" &&
+          handsFree
+        ) {
+          window.setTimeout(
+            () =>
+              void send(
+                transcript,
+              ),
+            80,
+          );
+        }
+      };
+
+    instance.onerror =
+      () =>
+        setListening(
+          false,
+        );
+
+    instance.onend =
+      () =>
+        setListening(
+          false,
+        );
+
+    recognition.current =
+      instance;
+
     setListening(true);
+
     instance.start();
   }
 
   function stopVoice() {
     recognition.current?.stop();
-    recognition.current = null;
+
+    recognition.current =
+      null;
+
     setListening(false);
   }
 
   function speakLatest() {
-    const text = [...messages].reverse().find((message) => message.role === "assistant")?.content;
-    if (!text || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const text =
+      [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role ===
+            "assistant",
+        )
+        ?.content;
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = speechLang;
-
-    // The browser controls the actual voice engine. We provide one clearly
-    // defined GameVortex style: an angry, firm delivery. If an Arabic voice
-    // exists on the device, prefer it when the interface is Arabic.
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find((voice) =>
-      english
-        ? voice.lang.toLowerCase().startsWith("en")
-        : voice.lang.toLowerCase().startsWith("ar"),
-    );
-    if (preferredVoice) utterance.voice = preferredVoice;
-
-    if (voiceStyle === "ANGRY") {
-      utterance.rate = 1.12;
-      utterance.pitch = 0.68;
-      utterance.volume = 1;
+    if (text) {
+      speakText(text);
     }
-
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
   }
 
-  useEffect(() => () => { recognition.current?.stop(); window.speechSynthesis?.cancel(); }, []);
+  useEffect(
+    () => () => {
+      recognition.current?.stop();
+
+      window.speechSynthesis?.cancel();
+    },
+    [],
+  );
+
+  const visibleMedia =
+    media.filter(
+      (job) =>
+        job.kind ===
+        "IMAGE",
+    );
+
+  const modes: Array<{
+    id: Mode;
+    icon: string;
+    ar: string;
+    en: string;
+  }> = [
+    {
+      id: "CHAT",
+      icon: "✦",
+      ar: "الدردشة",
+      en: "Chat",
+    },
+
+    {
+      id: "IMAGE",
+      icon: "▧",
+      ar: "الصور",
+      en: "Images",
+    },
+
+    {
+      id: "VIDEO",
+      icon: "▶",
+      ar: "الفيديو",
+      en: "Video",
+    },
+
+    {
+      id: "VOICE",
+      icon: "◉",
+      ar: "الصوت",
+      en: "Voice",
+    },
+  ];
 
   return (
-    <main className={styles.aiHub} dir={english ? "ltr" : "rtl"}>
-      <header className={styles.header}>
+    <main
+      className={
+        styles.aiHub
+      }
+      dir={
+        english
+          ? "ltr"
+          : "rtl"
+      }
+    >
+      <header
+        className={
+          styles.header
+        }
+      >
         <div>
-          <span className={styles.kicker}>GAMEVORTEX AI</span>
-          <h1>{t("مركز الذكاء الاصطناعي", "AI Hub")}</h1>
-          <p>{t("اختر الوضع الذي تريده من الأعلى: الدردشة، الصور، الفيديو أو الصوت.", "Choose a mode above: chat, images, video, or voice.")}</p>
+          <span
+            className={
+              styles.kicker
+            }
+          >
+            GAMEVORTEX AI
+          </span>
+
+          <h1>
+            {t(
+              "مركز الذكاء الاصطناعي",
+              "AI Hub",
+            )}
+          </h1>
+
+          <p>
+            {t(
+              "اختر الوضع الذي تريده بدل خلط الدردشة والصور والفيديو في زر واحد.",
+              "Choose a dedicated mode instead of mixing chat, images and video into one control.",
+            )}
+          </p>
         </div>
-        <button className={styles.primaryButton} onClick={() => void create()}>{t("محادثة جديدة", "New chat")}</button>
+
+        <button
+          className={
+            styles.primaryButton
+          }
+          onClick={() =>
+            void create()
+          }
+        >
+          {t(
+            "محادثة جديدة",
+            "New chat",
+          )}
+        </button>
       </header>
 
-      <nav className={styles.modeTabs} aria-label={t("أوضاع GameVortex AI", "GameVortex AI modes")}>
-        <button className={mode === "CHAT" ? styles.modeActive : ""} onClick={() => setMode("CHAT")} type="button">✦ {t("الدردشة", "Chat")}</button>
-        <button className={mode === "IMAGE" ? styles.modeActive : ""} onClick={() => setMode("IMAGE")} type="button">▧ {t("الصور", "Images")}</button>
-        <button className={mode === "VIDEO" ? styles.modeActive : ""} onClick={() => setMode("VIDEO")} type="button">▶ {t("الفيديو", "Video")}</button>
-        <button className={mode === "VOICE" ? styles.modeActive : ""} onClick={() => { setMode("VOICE"); setVoiceOpen(true); }} type="button">◉ {t("الصوت", "Voice")}</button>
+      <nav
+        className={
+          styles.modeBar
+        }
+        aria-label={t(
+          "أوضاع الذكاء الاصطناعي",
+          "AI modes",
+        )}
+      >
+        {modes.map(
+          (item) => (
+            <button
+              key={
+                item.id
+              }
+              className={`${styles.modeButton} ${
+                mode ===
+                item.id
+                  ? styles.modeActive
+                  : ""
+              } ${
+                item.id ===
+                "VIDEO"
+                  ? styles.videoMode
+                  : ""
+              }`}
+              onClick={() => {
+                setMode(
+                  item.id,
+                );
+
+                setError(
+                  "",
+                );
+              }}
+            >
+              <span>
+                {
+                  item.icon
+                }
+              </span>
+
+              <strong>
+                {t(
+                  item.ar,
+                  item.en,
+                )}
+              </strong>
+
+              {item.id ===
+                "VIDEO" && (
+                <small>
+                  {t(
+                    "لاحقًا",
+                    "Later",
+                  )}
+                </small>
+              )}
+            </button>
+          ),
+        )}
       </nav>
 
-      {error && <div className={styles.notice}>{error}</div>}
-
-      {mode === "IMAGE" && (
-        <section className={styles.modeCard}>
-          <div>
-            <span className={styles.kicker}>AI IMAGE</span>
-            <h2>{t("توليد الصور", "AI Image Generation")}</h2>
-            <p>{t("اكتب وصف الصورة ثم اضغط إنشاء الصورة. هذه الخانة الآن قابلة للضغط بشكل مستقل عن الدردشة.", "Write an image prompt and generate it. This mode is independent from chat.")}</p>
-          </div>
-          <textarea className={styles.modePrompt} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("مثال: مدينة ألعاب مستقبلية بإضاءة نيون بنفسجية", "Example: a futuristic gaming city with purple neon lights")} />
-          <button className={styles.modeAction} type="button" disabled={!prompt.trim() || !!mediaBusy} onClick={() => void generateMedia("IMAGE")}>
-            {mediaBusy === "IMAGE" ? t("جاري إنشاء الصورة…", "Generating image…") : t("إنشاء الصورة", "Generate image")}
-          </button>
-        </section>
+      {error && (
+        <div
+          className={
+            styles.notice
+          }
+        >
+          {error}
+        </div>
       )}
 
-      {mode === "VIDEO" && (
-        <section className={styles.modeCard}>
-          <div>
-            <span className={styles.kicker}>AI VIDEO</span>
-            <h2>{t("الفيديو", "AI Video")}</h2>
-            <p>{t("تم فتح خانة الفيديو بشكل مستقل. مولد الفيديو في الـAPI الحالي ما زال غير مفعّل، لذلك لن أوهمك بزر يعمل شكليًا ثم يفشل.", "The video mode is now independently clickable. The current API still has video generation disabled, so this mode will not pretend that generation works.")}</p>
-          </div>
-          <textarea className={styles.modePrompt} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("اكتب فكرة الفيديو هنا…", "Describe your video idea here…")} />
-          <button className={styles.modeAction} type="button" disabled title={t("مزود الفيديو غير مفعّل حاليًا", "Video provider is not enabled yet")}>
-            {t("توليد الفيديو غير مفعّل حاليًا", "Video generation is not enabled yet")}
-          </button>
-        </section>
-      )}
+      <section
+        className={
+          styles.workArea
+        }
+      >
+        <aside
+          className={
+            styles.sidebar
+          }
+        >
+          <div
+            className={
+              styles.sidebarHead
+            }
+          >
+            <h3>
+              {t(
+                "المحادثات",
+                "Conversations",
+              )}
+            </h3>
 
-      <section className={styles.workArea}>
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarHead}><h3>{t("المحادثات", "Conversations")}</h3><button onClick={() => void create()}>＋</button></div>
-          {items.map((item) => (
-            <div className={`${styles.historyRow} ${active === item.id ? styles.activeRow : ""}`} key={item.id}>
-              <button onClick={() => { setMode("CHAT"); void open(item.id); }}>{item.title}</button>
-              <button onClick={() => void rename(item)} aria-label={t("تعديل", "Rename")}>✎</button>
-              <button onClick={() => void remove(item.id)} aria-label={t("حذف", "Delete")}>×</button>
-            </div>
-          ))}
+            <button
+              onClick={() =>
+                void create()
+              }
+              aria-label={t(
+                "محادثة جديدة",
+                "New chat",
+              )}
+            >
+              ＋
+            </button>
+          </div>
+
+          {items.map(
+            (item) => (
+              <div
+                className={`${styles.historyRow} ${
+                  active ===
+                  item.id
+                    ? styles.activeRow
+                    : ""
+                }`}
+                key={
+                  item.id
+                }
+              >
+                <button
+                  onClick={() =>
+                    void open(
+                      item.id,
+                    )
+                  }
+                >
+                  {
+                    item.title
+                  }
+                </button>
+
+                <button
+                  onClick={() =>
+                    void rename(
+                      item,
+                    )
+                  }
+                  aria-label={t(
+                    "تعديل",
+                    "Rename",
+                  )}
+                >
+                  ✎
+                </button>
+
+                <button
+                  onClick={() =>
+                    void remove(
+                      item.id,
+                    )
+                  }
+                  aria-label={t(
+                    "حذف",
+                    "Delete",
+                  )}
+                >
+                  ×
+                </button>
+              </div>
+            ),
+          )}
+
+          {!items.length && (
+            <p
+              className={
+                styles.emptySide
+              }
+            >
+              {t(
+                "لا توجد محادثات بعد.",
+                "No conversations yet.",
+              )}
+            </p>
+          )}
         </aside>
 
-        <div className={styles.chatPanel}>
-          <div className={styles.messages}>
-            {!messages.length && !media.length && <div className={styles.welcome}><div className={styles.orbSmall}>✦</div><h2>{t("مرحبًا بك في GameVortex AI", "Welcome to GameVortex AI")}</h2><p>{t("اكتب طلبك أو اختر الصور أو الفيديو أو الصوت من الأعلى.", "Write a prompt or choose images, video, or voice above.")}</p></div>}
-            {messages.map((message, index) => (
-              <article key={message.id || `${message.role}-${index}`} className={`${styles.message} ${message.role === "user" ? styles.userMessage : styles.aiMessage}`}>
-                <strong>{message.role === "user" ? t("أنت", "You") : "GameVortex AI"}</strong>
-                <div className={styles.markdown}>{inlineMarkdown(message.content || (busy && index === messages.length - 1 ? "…" : ""))}</div>
-                {message.role === "assistant" && message.content && !busy && <div className={styles.messageActions}><button onClick={speakLatest}>🔊</button><button onClick={() => navigator.clipboard?.writeText(message.content)}>⧉</button><button onClick={() => { const previous = [...messages.slice(0, index)].reverse().find((m) => m.role === "user")?.content; if (previous) void send(previous, true); }}>↻</button></div>}
-              </article>
-            ))}
-            {media.map((job) => (
-              <article className={styles.mediaCard} key={job.id}>
-                <div className={styles.mediaMeta}><span>{job.kind === "IMAGE" ? "🖼️" : "🎬"} {job.kind === "IMAGE" ? t("صورة AI", "AI Image") : t("فيديو AI", "AI Video")}</span><button onClick={() => void deleteMedia(job.id)} aria-label={t("حذف الوسائط", "Delete media")}>🗑️</button></div>
-                {job.status !== "COMPLETED" && <div className={styles.mediaStatus}>{job.status === "FAILED" ? t("فشل الإنشاء", "Generation failed") : t("جاري الإنشاء…", "Generating…")}</div>}
-                {job.status === "COMPLETED" && job.resultUrl && (job.kind === "IMAGE" ? <img src={job.resultUrl} alt={job.prompt} className={styles.mediaResult} /> : <video src={job.resultUrl} className={styles.mediaResult} controls playsInline />)}
-                <p>{job.prompt}</p>
-              </article>
-            ))}
-            <div ref={bottom} />
+        <div
+          className={
+            styles.chatPanel
+          }
+        >
+          <div
+            className={
+              styles.modeHeader
+            }
+          >
+            <div>
+              <span>
+                {
+                  modes.find(
+                    (item) =>
+                      item.id ===
+                      mode,
+                  )?.icon
+                }
+              </span>
+
+              <strong>
+                {t(
+                  mode ===
+                    "CHAT"
+                    ? "محادثة GameVortex AI"
+                    : mode ===
+                        "IMAGE"
+                      ? "تصميم الصور بالذكاء الاصطناعي"
+                      : mode ===
+                          "VIDEO"
+                        ? "توليد الفيديو"
+                        : "المحادثة الصوتية",
+
+                  mode ===
+                    "CHAT"
+                    ? "GameVortex AI Chat"
+                    : mode ===
+                        "IMAGE"
+                      ? "AI Image Studio"
+                      : mode ===
+                          "VIDEO"
+                        ? "AI Video"
+                        : "Voice Chat",
+                )}
+              </strong>
+            </div>
+
+            {mode ===
+              "CHAT" && (
+              <span
+                className={
+                  styles.knowledgeBadge
+                }
+              >
+                {t(
+                  "متصل ببيانات GameVortex",
+                  "Connected to GameVortex data",
+                )}
+              </span>
+            )}
           </div>
 
-          <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); void send(); }}>
-            <button type="button" className={styles.voiceButton} onClick={() => { setMode("VOICE"); startVoice(); }} title={t("محادثة صوتية", "Voice chat")}>🎙️</button>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t("اسأل GameVortex AI...", "Ask GameVortex AI...")} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
-            <button type="button" onClick={() => { setMode("IMAGE"); void generateMedia("IMAGE"); }} disabled={!prompt.trim() || !!mediaBusy || busy}>🖼️</button>
-            <button type="button" onClick={() => setMode("VIDEO")} disabled={busy}>🎬</button>
-            <button type="submit" disabled={busy || !prompt.trim()}>{busy ? "…" : "↑"}</button>
-            {busy && <button type="button" onClick={() => aborter.current?.abort()}>{t("إيقاف", "Stop")}</button>}
-          </form>
-          <div className={styles.status}>{t("الصوت العصبي متاح من إعدادات المحادثة الصوتية. يمكنك فتحه من زر الصوت.", "The angry voice style is available in voice chat settings.")}</div>
+          {mode ===
+          "VIDEO" ? (
+            <div
+              className={
+                styles.comingSoon
+              }
+            >
+              <div
+                className={
+                  styles.videoIcon
+                }
+              >
+                ▶
+              </div>
+
+              <h2>
+                {t(
+                  "الفيديو مؤجل حاليًا",
+                  "Video is paused for now",
+                )}
+              </h2>
+
+              <p>
+                {t(
+                  "لن نخلط نظام الفيديو مع الصور. سنعود إليه بعد إنهاء توليد الصور واختباره بالكامل.",
+                  "Video stays separate. We will return to it after image generation is finished and tested.",
+                )}
+              </p>
+
+              <button
+                onClick={() =>
+                  setMode(
+                    "IMAGE",
+                  )
+                }
+              >
+                {t(
+                  "الانتقال إلى الصور",
+                  "Go to Images",
+                )}
+              </button>
+            </div>
+          ) : mode ===
+            "IMAGE" ? (
+            <div
+              className={
+                styles.imageStudio
+              }
+            >
+              <div
+                className={
+                  styles.studioIntro
+                }
+              >
+                <div
+                  className={
+                    styles.studioOrb
+                  }
+                >
+                  ✦
+                </div>
+
+                <div>
+                  <h2>
+                    {t(
+                      "صمّم صورتك",
+                      "Create your image",
+                    )}
+                  </h2>
+
+                  <p>
+                    {t(
+                      "اكتب وصفًا واضحًا للصورة أو ارفع صورة لتعديلها. الطلب يمر إلى Gemini من الخادم بدون كشف المفتاح للمتصفح.",
+                      "Describe an image or upload one to edit it. The request is sent to Gemini server-side without exposing the API key to the browser.",
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className={
+                  styles.optionGrid
+                }
+              >
+                <label>
+                  <span>
+                    {t(
+                      "نسبة الصورة",
+                      "Aspect ratio",
+                    )}
+                  </span>
+
+                  <select
+                    value={
+                      aspectRatio
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setAspectRatio(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
+                  >
+                    <option value="1:1">
+                      1:1
+                    </option>
+
+                    <option value="16:9">
+                      16:9
+                    </option>
+
+                    <option value="9:16">
+                      9:16
+                    </option>
+
+                    <option value="4:3">
+                      4:3
+                    </option>
+
+                    <option value="3:4">
+                      3:4
+                    </option>
+
+                    <option value="3:2">
+                      3:2
+                    </option>
+
+                    <option value="2:3">
+                      2:3
+                    </option>
+
+                    <option value="21:9">
+                      21:9
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <label className={styles.optionGrid} style={{ cursor: "pointer" }}>
+                <span>{t("رفع صورة للتعديل", "Upload an image to edit")}</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                />
+                {imageFile ? (
+                  <span className="muted">{imageFile.name} · {(imageFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                ) : null}
+              </label>
+
+              <div
+                className={
+                  styles.imagePromptBox
+                }
+              >
+                <textarea
+                  value={
+                    prompt
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setPrompt(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  placeholder={t(
+                    "مثال: شخصية لاعب ألعاب مستقبلية داخل مدينة نيون، أسلوب سينمائي واقعي، إضاءة بنفسجية وزرقاء...",
+                    "Example: a futuristic gamer inside a neon city, cinematic realistic style, purple and blue lighting...",
+                  )}
+                  onKeyDown={(
+                    event,
+                  ) => {
+                    if (
+                      event.key ===
+                        "Enter" &&
+                      (event.ctrlKey ||
+                        event.metaKey)
+                    ) {
+                      event.preventDefault();
+
+                      void generateImage();
+                    }
+                  }}
+                />
+
+                <button
+                  onClick={() =>
+                    void generateImage()
+                  }
+                  disabled={
+                    !prompt.trim() ||
+                    !!mediaBusy
+                  }
+                >
+                  {mediaBusy ===
+                  "IMAGE"
+                    ? t(
+                        "جاري التصميم...",
+                        "Generating...",
+                      )
+                    : t(
+                        "إنشاء الصورة",
+                        "Generate image",
+                      )}
+                </button>
+              </div>
+
+              <div
+                className={
+                  styles.mediaGrid
+                }
+              >
+                {visibleMedia.map(
+                  (job) => (
+                    <article
+                      className={
+                        styles.mediaCard
+                      }
+                      key={
+                        job.id
+                      }
+                    >
+                      <div
+                        className={
+                          styles.mediaMeta
+                        }
+                      >
+                        <span>
+                          {t(
+                            "صورة AI",
+                            "AI Image",
+                          )}
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            void deleteMedia(
+                              job.id,
+                            )
+                          }
+                          aria-label={t(
+                            "حذف الصورة",
+                            "Delete image",
+                          )}
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      {job.status !==
+                        "COMPLETED" && (
+                        <div
+                          className={
+                            styles.mediaStatus
+                          }
+                        >
+                          {job.status ===
+                          "FAILED"
+                            ? job.errorMessage ||
+                              t(
+                                "فشل الإنشاء",
+                                "Generation failed",
+                              )
+                            : t(
+                                "جاري الإنشاء…",
+                                "Generating…",
+                              )}
+                        </div>
+                      )}
+
+                      {job.status ===
+                        "COMPLETED" &&
+                        job.resultUrl && (
+                          <>
+                          <img
+                            src={
+                              job.resultUrl
+                            }
+                            alt={
+                              job.prompt
+                            }
+                            className={
+                              styles.mediaResult
+                            }
+                          />
+                          <a
+                            className="btn"
+                            href={job.resultUrl}
+                            download={`gamevortex-ai-${job.id}.png`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t("حفظ / تنزيل", "Save / Download")}
+                          </a>
+                          </>
+                        )}
+
+                      <p>
+                        {
+                          job.prompt
+                        }
+                      </p>
+                    </article>
+                  ),
+                )}
+
+                {!visibleMedia.length && (
+                  <div
+                    className={
+                      styles.emptyMedia
+                    }
+                  >
+                    {t(
+                      "ستظهر الصور التي تنشئها هنا.",
+                      "Your generated images will appear here.",
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : mode ===
+            "VOICE" ? (
+            <div
+              className={
+                styles.voiceModePanel
+              }
+            >
+              <div
+                className={`${styles.voiceOrb} ${
+                  listening
+                    ? styles.listening
+                    : speaking
+                      ? styles.speaking
+                      : ""
+                }`}
+              >
+                <span>
+                  {listening
+                    ? "◉"
+                    : speaking
+                      ? "✦"
+                      : "🎙"}
+                </span>
+              </div>
+
+              <h2>
+                {listening
+                  ? t(
+                      "أستمع إليك...",
+                      "Listening...",
+                    )
+                  : speaking
+                    ? t(
+                        "GameVortex AI يتحدث...",
+                        "GameVortex AI is speaking...",
+                      )
+                    : t(
+                        "تحدث مع GameVortex AI",
+                        "Talk to GameVortex AI",
+                      )}
+              </h2>
+
+              <p>
+                {t(
+                  "تحدث، وسيتم تحويل كلامك إلى رسالة وإرسالها للمحادثة. يمكنك تشغيل الرد صوتيًا وتغيير الصوت والنبرة والسرعة.",
+                  "Speak naturally, send the transcription to chat, and control the reply voice, tone and speed.",
+                )}
+              </p>
+
+              <div
+                className={
+                  styles.voiceControls
+                }
+              >
+                <button
+                  className={
+                    styles.voiceMainButton
+                  }
+                  onClick={
+                    listening
+                      ? stopVoice
+                      : startVoice
+                  }
+                >
+                  {listening
+                    ? "■"
+                    : "🎙"}
+                </button>
+
+                <button
+                  onClick={
+                    speakLatest
+                  }
+                  disabled={
+                    speaking
+                  }
+                >
+                  🔊
+                </button>
+
+                <button
+                  onClick={() => {
+                    window.speechSynthesis?.cancel();
+
+                    setSpeaking(
+                      false,
+                    );
+                  }}
+                >
+                  ■
+                </button>
+              </div>
+
+              <div
+                className={
+                  styles.voiceSettings
+                }
+              >
+                <label>
+                  <span>
+                    {t(
+                      "الصوت",
+                      "Voice",
+                    )}
+                  </span>
+
+                  <select
+                    value={
+                      selectedVoice
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setSelectedVoice(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
+                  >
+                    {voices.length
+                      ? voices.map(
+                          (
+                            voice,
+                          ) => (
+                            <option
+                              key={`${voice.name}-${voice.lang}`}
+                              value={
+                                voice.name
+                              }
+                            >
+                              {
+                                voice.name
+                              }{" "}
+                              ·{" "}
+                              {
+                                voice.lang
+                              }
+                            </option>
+                          ),
+                        )
+                      : (
+                        <option value="">
+                          {t(
+                            "صوت المتصفح الافتراضي",
+                            "Browser default",
+                          )}
+                        </option>
+                      )}
+                  </select>
+                </label>
+
+                <label>
+                  <span>
+                    {t(
+                      "النبرة",
+                      "Tone",
+                    )}
+                  </span>
+
+                  <select
+                    value={
+                      tone
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setTone(
+                        event
+                          .target
+                          .value as Tone,
+                      )
+                    }
+                  >
+                    <option value="natural">
+                      {t(
+                        "طبيعية",
+                        "Natural",
+                      )}
+                    </option>
+
+                    <option value="calm">
+                      {t(
+                        "هادئة",
+                        "Calm",
+                      )}
+                    </option>
+
+                    <option value="friendly">
+                      {t(
+                        "ودودة",
+                        "Friendly",
+                      )}
+                    </option>
+
+                    <option value="professional">
+                      {t(
+                        "احترافية",
+                        "Professional",
+                      )}
+                    </option>
+
+                    <option value="energetic">
+                      {t(
+                        "حماسية",
+                        "Energetic",
+                      )}
+                    </option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>
+                    {t(
+                      "السرعة",
+                      "Speed",
+                    )}
+                  </span>
+
+                  <select
+                    value={
+                      speechSpeed
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setSpeechSpeed(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
+                  >
+                    <option value="0.75">
+                      0.75×
+                    </option>
+
+                    <option value="0.9">
+                      0.90×
+                    </option>
+
+                    <option value="1">
+                      1.00×
+                    </option>
+
+                    <option value="1.15">
+                      1.15×
+                    </option>
+
+                    <option value="1.3">
+                      1.30×
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <div
+                className={
+                  styles.voiceToggles
+                }
+              >
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={
+                      voiceAutoSpeak
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setVoiceAutoSpeak(
+                        event
+                          .target
+                          .checked,
+                      )
+                    }
+                  />{" "}
+                  {t(
+                    "قراءة الرد تلقائيًا",
+                    "Speak replies automatically",
+                  )}
+                </label>
+
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={
+                      handsFree
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setHandsFree(
+                        event
+                          .target
+                          .checked,
+                      )
+                    }
+                  />{" "}
+                  {t(
+                    "وضع التحدث المستمر",
+                    "Hands-free conversation",
+                  )}
+                </label>
+              </div>
+
+              <div
+                className={
+                  styles.voiceTranscript
+                }
+              >
+                {prompt ||
+                  t(
+                    "اضغط الميكروفون وابدأ الكلام...",
+                    "Press the microphone and start speaking...",
+                  )}
+              </div>
+
+              <button
+                className={
+                  styles.voiceSend
+                }
+                onClick={() =>
+                  void send()
+                }
+                disabled={
+                  !prompt.trim() ||
+                  busy
+                }
+              >
+                {busy
+                  ? t(
+                      "جاري الرد...",
+                      "Replying...",
+                    )
+                  : t(
+                      "إرسال",
+                      "Send",
+                    )}
+              </button>
+            </div>
+          ) : (
+            <div
+              className={
+                styles.chatBody
+              }
+            >
+              <div
+                className={
+                  styles.messages
+                }
+              >
+                {!messages.length && (
+                  <div
+                    className={
+                      styles.welcome
+                    }
+                  >
+                    <div
+                      className={
+                        styles.orbSmall
+                      }
+                    >
+                      ✦
+                    </div>
+
+                    <h2>
+                      {t(
+                        "مرحبًا بك في GameVortex AI",
+                        "Welcome to GameVortex AI",
+                      )}
+                    </h2>
+
+                    <p>
+                      {t(
+                        "اسأل عن الألعاب أو التطبيقات أو المتجر أو VIP أو أي ميزة داخل GameVortex. المساعد يستخدم بيانات الموقع عند الإجابة عن GameVortex.",
+                        "Ask about games, apps, marketplace, VIP or other GameVortex features. The assistant uses site data for GameVortex questions.",
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {messages.map(
+                  (
+                    message,
+                    index,
+                  ) => (
+                    <article
+                      key={
+                        message.id ||
+                        `${message.role}-${index}`
+                      }
+                      className={`${styles.message} ${
+                        message.role ===
+                        "user"
+                          ? styles.userMessage
+                          : styles.aiMessage
+                      }`}
+                    >
+                      <strong>
+                        {message.role ===
+                        "user"
+                          ? t(
+                              "أنت",
+                              "You",
+                            )
+                          : "GameVortex AI"}
+                      </strong>
+
+                      <div
+                        className={
+                          styles.markdown
+                        }
+                      >
+                        {inlineMarkdown(
+                          message.content ||
+                            (busy &&
+                            index ===
+                              messages.length -
+                                1
+                              ? "…"
+                              : ""),
+                        )}
+                      </div>
+
+                      {message.role ===
+                        "assistant" &&
+                        message.content &&
+                        !busy && (
+                          <div
+                            className={
+                              styles.messageActions
+                            }
+                          >
+                            <button
+                              onClick={() =>
+                                speakText(
+                                  message.content,
+                                )
+                              }
+                            >
+                              🔊
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                navigator.clipboard?.writeText(
+                                  message.content,
+                                )
+                              }
+                            >
+                              ⧉
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const previous =
+                                  [
+                                    ...messages.slice(
+                                      0,
+                                      index,
+                                    ),
+                                  ]
+                                    .reverse()
+                                    .find(
+                                      (
+                                        item,
+                                      ) =>
+                                        item.role ===
+                                        "user",
+                                    )
+                                    ?.content;
+
+                                if (
+                                  previous
+                                ) {
+                                  void send(
+                                    previous,
+                                    true,
+                                  );
+                                }
+                              }}
+                            >
+                              ↻
+                            </button>
+                          </div>
+                        )}
+                    </article>
+                  ),
+                )}
+
+                <div
+                  ref={
+                    bottom
+                  }
+                />
+              </div>
+
+              <form
+                className={
+                  styles.composer
+                }
+                onSubmit={(
+                  event,
+                ) => {
+                  event.preventDefault();
+
+                  void send();
+                }}
+              >
+                <button
+                  type="button"
+                  className={`${styles.iconButton} ${
+                    listening
+                      ? styles.iconActive
+                      : ""
+                  }`}
+                  onClick={
+                    listening
+                      ? stopVoice
+                      : startVoice
+                  }
+                  title={t(
+                    "تحدث",
+                    "Speak",
+                  )}
+                >
+                  🎙
+                </button>
+
+                <textarea
+                  value={
+                    prompt
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setPrompt(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  placeholder={t(
+                    "اسأل GameVortex AI عن الموقع...",
+                    "Ask GameVortex AI about the site...",
+                  )}
+                  onKeyDown={(
+                    event,
+                  ) => {
+                    if (
+                      event.key ===
+                        "Enter" &&
+                      !event.shiftKey
+                    ) {
+                      event.preventDefault();
+
+                      void send();
+                    }
+                  }}
+                />
+
+                <button
+                  type="submit"
+                  className={
+                    styles.sendButton
+                  }
+                  disabled={
+                    busy ||
+                    !prompt.trim()
+                  }
+                >
+                  {busy
+                    ? "…"
+                    : "↑"}
+                </button>
+
+                {busy && (
+                  <button
+                    type="button"
+                    className={
+                      styles.stopButton
+                    }
+                    onClick={() =>
+                      aborter.current?.abort()
+                    }
+                  >
+                    {t(
+                      "إيقاف",
+                      "Stop",
+                    )}
+                  </button>
+                )}
+              </form>
+            </div>
+          )}
         </div>
       </section>
-
-      {voiceOpen && <div className={styles.voiceOverlay} role="dialog" aria-modal="true">
-        <div className={styles.voiceTop}><span>GAMEVORTEX AI</span><button onClick={() => { stopVoice(); window.speechSynthesis?.cancel(); setSpeaking(false); setVoiceOpen(false); }}>×</button></div>
-        <div className={`${styles.voiceOrb} ${listening ? styles.listening : speaking ? styles.speaking : ""}`}><span>✦</span></div>
-        <h2>{listening ? t("أستمع إليك…", "Listening…") : speaking ? t("GameVortex AI يتحدث…", "GameVortex AI is speaking…") : t("المحادثة الصوتية", "Voice chat")}</h2>
-        <p>{t("اختر النبرة العصبية ثم تحدث. سيتم استخدام صوت عربي متاح على جهازك إن كان موجودًا.", "Choose the angry style and speak. An Arabic voice available on your device will be preferred when possible.")}</p>
-        <label className={styles.voiceStyleLabel}>
-          <span>{t("نبرة الصوت", "Voice style")}</span>
-          <select value={voiceStyle} onChange={(e) => setVoiceStyle(e.target.value as VoiceStyle)}>
-            <option value="ANGRY">{t("عصبي", "Angry")}</option>
-          </select>
-        </label>
-        <div className={styles.voiceControls}>
-          <button onClick={listening ? stopVoice : startVoice}>{listening ? "🔇" : "🎙️"}</button>
-          <button onClick={() => { stopVoice(); window.speechSynthesis?.cancel(); setSpeaking(false); setVoiceOpen(false); }}>✕</button>
-          <button onClick={speakLatest}>🔊</button>
-        </div>
-        {prompt && <div className={styles.voiceTranscript}>{prompt}</div>}
-        <button className={styles.voiceSend} onClick={() => { setVoiceOpen(false); void send(); }}>{t("إرسال إلى المحادثة", "Send to chat")}</button>
-      </div>}
     </main>
   );
-}
+                          }
