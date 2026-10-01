@@ -25,6 +25,10 @@ export default async function TradingPage() {
     getRiskConfig(result.owner.id),
   ]);
 
+  const riskConfigForClient = riskConfig
+    ? { ...riskConfig, updatedAt: riskConfig.updatedAt.toISOString() }
+    : null;
+
   return (
     <AdminShell ownerLabel={result.owner.username || result.owner.email}>
       <section className={styles.ownerCard}>
@@ -52,7 +56,7 @@ export default async function TradingPage() {
         maxUsd={tradingMaxAllocationUsd()}
       />
 
-      <TradingRiskConfigPanel initial={riskConfig} />
+      <TradingRiskConfigPanel initial={riskConfigForClient} />
     </AdminShell>
   );
 }
