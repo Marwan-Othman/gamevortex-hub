@@ -11,11 +11,12 @@ export default async function AdminWallpapers() {
 
   const wallpapers = await db.wallpaper.findMany({
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-    take: 500,
+    take: 200,
     select: {
       id: true,
       titleAr: true,
       titleEn: true,
+      imageUrl: true,
       thumbnailUrl: true,
       type: true,
       category: true,

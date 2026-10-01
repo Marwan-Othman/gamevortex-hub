@@ -11,7 +11,7 @@ const categories = [
   ["", "الكل", "All"], ["GAMING", "ألعاب", "Gaming"], ["ANIME", "أنمي", "Anime"],
   ["CYBERPUNK", "سايبر", "Cyberpunk"], ["CARS", "سيارات", "Cars"], ["NATURE", "طبيعة", "Nature"],
   ["SPACE", "فضاء", "Space"], ["FANTASY", "فانتازيا", "Fantasy"], ["ARABIC", "عربي", "Arabic"],
-  ["ISLAMIC", "إسلامي", "Islamic"], ["ABSTRACT", "مجرد", "Abstract"], ["MINIMAL", "بسيط", "Minimal"], ["TECHNOLOGY", "تقنية", "Technology"], ["AI", "ذكاء اصطناعي", "AI"], ["NEON", "نيون", "Neon"], ["GAMEVORTEX", "GameVortex", "GameVortex"], ["SPORTS", "رياضة", "Sports"],
+  ["ISLAMIC", "إسلامي", "Islamic"], ["ABSTRACT", "مجرد", "Abstract"], ["MINIMAL", "بسيط", "Minimal"],
 ];
 
 export default async function Wallpapers({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -88,7 +88,7 @@ export default async function Wallpapers({ searchParams }: { searchParams: Promi
           const mediaStyle = { display: "block", width: "100%", height: "auto", aspectRatio: ratio, objectFit: "cover", background: "rgba(0,0,0,.28)" } as const;
           return <Link key={wallpaper.id} href={`/wallpapers/${wallpaper.id}`} aria-label={wallpaper.titleAr || wallpaper.titleEn} className="glass card game-card" style={{ overflow: "hidden", padding: 0, alignSelf: "start" }}>
             <div style={{ position: "relative", width: "100%", overflow: "hidden" }}>
-              {wallpaper.isVip && !vip?.isVip ? <div aria-label="VIP wallpaper locked" style={{ ...mediaStyle, minHeight: 180, display: "grid", placeItems: "center", color: "rgba(255,255,255,.78)" }}>💎 VIP</div> : wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? <video src={`/api/wallpapers/${wallpaper.id}/media`} poster={wallpaper.thumbnailUrl || undefined} muted playsInline preload="metadata" style={mediaStyle} /> : <img src={`/api/wallpapers/${wallpaper.id}/media`} alt={wallpaper.titleEn} loading="lazy" decoding="async" style={mediaStyle} />}
+              {wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl ? <video src={wallpaper.mediaUrl} poster={wallpaper.thumbnailUrl || wallpaper.imageUrl} muted playsInline preload="metadata" style={mediaStyle} /> : <img src={wallpaper.thumbnailUrl || wallpaper.imageUrl} alt={wallpaper.titleEn} loading="lazy" decoding="async" style={mediaStyle} />}
               <div style={{ position: "absolute", inset: "12px 12px auto", display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                 {wallpaper.isVip && <span className="badge">💎 VIP</span>} {wallpaper.isAnimated && <span className="badge">🎞️ متحركة</span>} {wallpaper.mediaType === "VIDEO" && <span className="badge">🎬 VIDEO</span>}
                 {wallpaper.featured && <span className="badge">⭐ FEATURED</span>}

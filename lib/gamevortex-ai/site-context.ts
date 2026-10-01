@@ -287,8 +287,8 @@ export async function buildGameVortexSiteContext(
     products,
     vipPlans,
     openRaffles,
-    mods,
     user,
+    mods,
     counts,
   ] = await Promise.all([
     db.game.findMany({
@@ -451,27 +451,9 @@ export async function buildGameVortexSiteContext(
 
     wantsMods
       ? db.mod.findMany({
-          where: {
-            published: true,
-          },
-
+          where: { published: true },
           take: 12,
-
-          orderBy: [
-            {
-              featured:
-                "desc",
-            },
-            {
-              sortOrder:
-                "asc",
-            },
-            {
-              createdAt:
-                "desc",
-            },
-          ],
-
+          orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
           select: {
             slug: true,
             titleAr: true,
@@ -482,13 +464,7 @@ export async function buildGameVortexSiteContext(
             modUrl: true,
             platform: true,
             sourceStatus: true,
-
-            game: {
-              select: {
-                titleAr: true,
-                titleEn: true,
-              },
-            },
+            game: { select: { titleAr: true, titleEn: true } },
           },
         })
       : Promise.resolve([]),
@@ -567,11 +543,7 @@ export async function buildGameVortexSiteContext(
         },
       }),
 
-      db.mod.count({
-        where: {
-          published: true,
-        },
-      }),
+      db.mod.count({ where: { published: true } }),
     ]),
   ]);
 
@@ -630,10 +602,7 @@ export async function buildGameVortexSiteContext(
   }
 
   if (mods.length) {
-    lines.push(
-      "\nMATCHING MODS:",
-    );
-
+    lines.push("\nMATCHING MODS:");
     for (const mod of mods) {
       lines.push(
         `- ${clean(mod.titleAr)} / ${clean(mod.titleEn)} | slug=${clean(mod.slug)} | game=${clean(mod.game?.titleAr)} / ${clean(mod.game?.titleEn)} | platform=${clean(mod.platform)} | source=${mod.sourceStatus} | modUrl=${clean(mod.modUrl, 300)} | download=${clean(mod.downloadUrl, 300)}`,
@@ -690,11 +659,20 @@ export async function buildGameVortexSiteContext(
       `- activeVip=${
         user.vipSubscriptions[0]
           ? `${clean(
-              user.vipSubscriptions[0].plan.nameAr,
+              user
+                .vipSubscriptions[0]
+                .plan
+                .nameAr,
             )} / ${clean(
-              user.vipSubscriptions[0].plan.nameEn,
+              user
+                .vipSubscriptions[0]
+                .plan
+                .nameEn,
             )} until ${
-              user.vipSubscriptions[0].expiresAt?.toISOString() ||
+              user
+                .vipSubscriptions[0]
+                .expiresAt
+                ?.toISOString() ||
               "permanent"
             }`
           : "none"

@@ -4,7 +4,6 @@ import {
   type HandleUploadBody,
 } from "@vercel/blob/client";
 import { getOptionalUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
 import {
   WALLPAPER_IMAGE_MIME_TYPES,
   WALLPAPER_MAX_FILE_SIZE,
@@ -83,17 +82,6 @@ function isAllowedWallpaperMimeType(
 export async function POST(
   request: NextRequest,
 ) {
-  const guard = await guardMutation(request, "admin-wallpaper-upload", 20);
-  if (guard) return guard;
-
-  const actor = await getOptionalUser();
-  if (!actor) {
-    return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
-  }
-  if (actor.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 403 });
-  }
-
   try {
     /*
      * ------------------------------------------------------------
@@ -183,16 +171,17 @@ export async function POST(
           const user =
             await getOptionalUser();
 
-          if (!user) {
+          if (
+            !user ||
+            user.role !== "SUPER_ADMIN"
+          ) {
             console.warn(
               "GameVortex wallpaper upload rejected: unauthorized user.",
             );
 
-            throw new Error("UNAUTHORIZED");
-          }
-
-          if (user.role !== "SUPER_ADMIN") {
-            throw new Error("FORBIDDEN");
+            throw new Error(
+              "UNAUTHORIZED",
+            );
           }
 
           /*
@@ -295,7 +284,10 @@ export async function POST(
      * Authentication error
      * ------------------------------------------------------------
      */
-    if (message === "UNAUTHORIZED") {
+    if (
+      message ===
+      "UNAUTHORIZED"
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -305,13 +297,6 @@ export async function POST(
         {
           status: 401,
         },
-      );
-    }
-
-    if (message === "FORBIDDEN") {
-      return NextResponse.json(
-        { success: false, error: "غير مصرح لك برفع الخلفيات." },
-        { status: 403 },
       );
     }
 

@@ -5,7 +5,6 @@ import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { normalizeWallpaperTags } from "@/lib/wallpapers";
-import { guardMutation, guardRead } from "@/lib/api";
 import {
   WALLPAPER_MAX_FILE_SIZE,
   filenameFromUrl,
@@ -322,9 +321,6 @@ async function importRemoteWallpaper(
 export async function GET(
   request: NextRequest,
 ) {
-  const guard = await guardRead(request, "admin-wallpapers-read");
-  if (guard) return guard;
-
   const user = await requireSuperAdmin();
 
   if (!user) {
@@ -391,8 +387,6 @@ export async function GET(
 export async function POST(
   request: NextRequest,
 ) {
-  const guard = await guardMutation(request, "admin-wallpapers");
-  if (guard) return guard;
   const user =
     await requireSuperAdmin();
 
@@ -715,39 +709,64 @@ export async function POST(
 export async function PATCH(
   request: NextRequest,
 ) {
-  const guard = await guardMutation(request, "admin-wallpapers");
-  if (guard) return guard;
-  const user = await requireSuperAdmin();
+  const user =
+    await requireSuperAdmin();
 
   if (!user) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      {
+        success: false,
+        error: "Unauthorized",
+      },
       { status: 401 },
     );
   }
 
   try {
-    const parsedBody: unknown = await request.json();
+    const parsedBody: unknown =
+      await request.json();
+
     if (!isJsonRecord(parsedBody)) {
       return NextResponse.json(
-        { success: false, error: "Invalid request body" },
+        {
+          success: false,
+          error: "Invalid request body",
+        },
         { status: 400 },
       );
     }
 
-    const rawIds = parsedBody.ids;
-    const singleId = typeof parsedBody.id === "string" ? parsedBody.id.trim() : "";
-    const ids = Array.from(new Set<string>([
-      ...(Array.isArray(rawIds)
-        ? rawIds.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean)
-        : []),
-      ...(singleId ? [singleId] : []),
-    ])).slice(0, 100);
+    const body = parsedBody;
 
-    if (!ids.length) {
+    const id =
+      typeof body.id === "string"
+        ? body.id.trim()
+        : "";
+
+    if (!id) {
       return NextResponse.json(
-        { success: false, error: "Wallpaper id is required" },
+        {
+          success: false,
+          error:
+            "Wallpaper id is required",
+        },
         { status: 400 },
+      );
+    }
+
+    const current =
+      await prisma.wallpaper.findUnique({
+        where: { id },
+      });
+
+    if (!current) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Wallpaper not found",
+        },
+        { status: 404 },
       );
     }
 
@@ -755,72 +774,55 @@ export async function PATCH(
       published?: boolean;
       featured?: boolean;
       isVip?: boolean;
-      category?: string;
-      type?: "MOBILE" | "DESKTOP";
     } = {};
 
-    if (typeof parsedBody.published === "boolean") data.published = parsedBody.published;
-    if (typeof parsedBody.featured === "boolean") data.featured = parsedBody.featured;
-    if (typeof parsedBody.isVip === "boolean") data.isVip = parsedBody.isVip;
-
-    const category = typeof parsedBody.category === "string"
-      ? parsedBody.category.trim().toUpperCase()
-      : "";
-    if (category) {
-      const allowed = new Set([
-        "GAMING","ANIME","CYBERPUNK","CARS","NATURE","SPACE","FANTASY","ARABIC",
-        "ISLAMIC","ABSTRACT","MINIMAL","TECHNOLOGY","AI","NEON","GAMEVORTEX","SPORTS","OTHER",
-      ]);
-      if (!allowed.has(category)) {
-        return NextResponse.json(
-          { success: false, error: "Invalid wallpaper category" },
-          { status: 400 },
-        );
-      }
-      data.category = category;
+    if (
+      typeof body.published ===
+      "boolean"
+    ) {
+      data.published =
+        body.published;
     }
 
-    if (parsedBody.type === "MOBILE" || parsedBody.type === "DESKTOP") {
-      data.type = parsedBody.type;
+    if (
+      typeof body.featured ===
+      "boolean"
+    ) {
+      data.featured =
+        body.featured;
     }
 
-    if (!Object.keys(data).length) {
-      return NextResponse.json(
-        { success: false, error: "No supported fields to update" },
-        { status: 400 },
-      );
+    if (
+      typeof body.isVip ===
+      "boolean"
+    ) {
+      data.isVip = body.isVip;
     }
 
-    const existing = await prisma.wallpaper.findMany({
-      where: { id: { in: ids } },
-      select: { id: true },
-    });
-
-    if (!existing.length) {
-      return NextResponse.json(
-        { success: false, error: "Wallpaper not found" },
-        { status: 404 },
-      );
-    }
-
-    await prisma.wallpaper.updateMany({
-      where: { id: { in: existing.map((item) => item.id) } },
-      data,
-    });
-
-    const updated = await prisma.wallpaper.findMany({
-      where: { id: { in: existing.map((item) => item.id) } },
-      orderBy: { createdAt: "desc" },
-    });
+    const wallpaper =
+      await prisma.wallpaper.update({
+        where: { id },
+        data,
+      });
 
     return NextResponse.json({
       success: true,
-      data: serializeWallpaper(updated),
+      data: serializeWallpaper(
+        wallpaper,
+      ),
     });
   } catch (error) {
-    console.error("PATCH /api/admin/wallpapers error:", error);
+    console.error(
+      "PATCH /api/admin/wallpapers error:",
+      error,
+    );
+
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Failed to update wallpaper" },
+      {
+        success: false,
+        error:
+          "Failed to update wallpaper",
+      },
       { status: 500 },
     );
   }
@@ -843,8 +845,6 @@ export async function PATCH(
 export async function DELETE(
   request: NextRequest,
 ) {
-  const guard = await guardMutation(request, "admin-wallpapers");
-  if (guard) return guard;
   const user =
     await requireSuperAdmin();
 
