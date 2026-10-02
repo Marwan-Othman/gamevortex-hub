@@ -24,6 +24,29 @@ const liveAdapter = (overrides: Partial<ExchangeAdapter["capabilities"]> = {}): 
   },
   getMarketData: async () => ({ symbol: "TEST", interval: "1m", candles: [] }),
   placeSpotBuy: async (request) => ({ accepted: true, clientOrderId: request.clientOrderId, status: "FILLED" }),
+  getOrderStatus: async () => ({
+    observation: {
+      clientOrderId: "client-test-001",
+      providerOrderId: "1",
+      symbol: "BTCUSD",
+      side: "BUY",
+      status: "FILLED",
+      executedQty: "1",
+      cumulativeQuoteQty: "100",
+      averageFillPrice: "100",
+      updatedAt: Date.now(),
+    },
+  }),
+  placeProtectedExitOco: async () => ({
+    accepted: true,
+    orderListId: "1",
+    listClientOrderId: "oco-test-001",
+    orders: [
+      { providerOrderId: "2", clientOrderId: "tp-test-001" },
+      { providerOrderId: "3", clientOrderId: "sl-test-001" },
+    ],
+    status: "EXECUTING",
+  }),
 });
 
 const validOrder: ExchangeOrderRequest = {
@@ -94,6 +117,8 @@ describe("assertLiveAdapterCapability", () => {
     expect(() => assertLiveAdapterCapability(liveAdapter({ marketData: false }))).toThrow("MARKET_DATA_NOT_SUPPORTED");
     expect(() => assertLiveAdapterCapability(liveAdapter({ paperTrading: false }))).toThrow("PAPER_TRADING_NOT_SUPPORTED");
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), placeSpotBuy: undefined })).toThrow("SPOT_BUY_ADAPTER_REQUIRED");
+    expect(() => assertLiveAdapterCapability({ ...liveAdapter(), getOrderStatus: undefined })).toThrow("ORDER_STATUS_ADAPTER_REQUIRED");
+    expect(() => assertLiveAdapterCapability({ ...liveAdapter(), placeProtectedExitOco: undefined })).toThrow("PROTECTED_EXIT_ADAPTER_REQUIRED");
   });
 });
 
