@@ -87,4 +87,34 @@ describe("risk manager", () => {
     expect(malformed.allowed).toBe(false);
     expect(malformed.reasons).toContain("INVALID_TRADE_AMOUNT");
   });
+
+  it("allows a trade exactly at the configured amount and exposure limits", () => {
+    const decision = evaluateRisk(config, {
+      requestedAmountUsd: 25,
+      dailyLossUsd: 0,
+      openTrades: 0,
+      totalExposureUsd: 15,
+      assetExposureUsd: 0,
+      consecutiveLosses: 0,
+      hasStopLoss: true,
+      hasTakeProfit: true,
+    });
+
+    expect(decision).toEqual({ allowed: true, reasons: [] });
+  });
+
+  it("blocks non-finite portfolio state instead of evaluating it as safe", () => {
+    const decision = evaluateRisk(config, {
+      requestedAmountUsd: 10,
+      dailyLossUsd: Number.POSITIVE_INFINITY,
+      openTrades: 0,
+      totalExposureUsd: 0,
+      assetExposureUsd: 0,
+      consecutiveLosses: 0,
+      hasStopLoss: true,
+      hasTakeProfit: true,
+    });
+
+    expect(decision.allowed).toBe(false);
+  });
 });
