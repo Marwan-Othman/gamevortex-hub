@@ -38,6 +38,15 @@ type Tick = {
   };
 };
 
+type TestnetCandle = {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
 const SAMPLE_TICKS: Tick[] = [
   { timestamp: "2026-10-01T10:00:00.000Z", price: 100, previousPrice: 99, fastAverage: 99, slowAverage: 98, volume: 1000, averageVolume: 900, shariah: { symbol: "BTC/USD", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
   { timestamp: "2026-10-01T10:05:00.000Z", price: 102, previousPrice: 100, fastAverage: 101, slowAverage: 99, volume: 1300, averageVolume: 1000, shariah: { symbol: "BTC/USD", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
@@ -50,12 +59,47 @@ const ERROR_TEXT: Record<string, string> = {
   INVALID_PAPER_TRADING_INPUT: "بيانات المحاكاة غير صالحة.",
   INVALID_PAPER_TRADING_CONFIG: "إعدادات المحاكاة غير صالحة.",
   INVALID_PAPER_TRADING_TICK: "إحدى نقاط السوق غير صالحة.",
+  INVALID_MARKET_DATA_SYMBOL: "رمز السوق غير صالح.",
+  INVALID_MARKET_INTERVAL: "الفاصل الزمني غير صالح.",
+  INVALID_MARKET_DATA_LIMIT: "عدد الشموع غير صالح.",
+  BINANCE_TESTNET_API_CREDENTIALS_REQUIRED: "مفاتيح Testnet غير مهيأة على الخادم.",
   FORBIDDEN: "غير مصرح.",
   RATE_LIMITED: "تم تجاوز حد الطلبات مؤقتًا.",
 };
 
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function candlesToTicks(symbol: string, candles: TestnetCandle[]): Tick[] {
+  return candles.map((candle, index) => {
+    const previous = candles[index - 1] ?? candle;
+    const fastWindow = candles.slice(Math.max(0, index - 4), index + 1).map((item) => item.close);
+    const slowWindow = candles.slice(Math.max(0, index - 19), index + 1).map((item) => item.close);
+    const volumeWindow = candles.slice(Math.max(0, index - 19), index + 1).map((item) => item.volume);
+
+    return {
+      timestamp: candle.timestamp,
+      price: candle.close,
+      previousPrice: previous.close,
+      fastAverage: average(fastWindow),
+      slowAverage: average(slowWindow),
+      volume: candle.volume,
+      averageVolume: average(volumeWindow),
+      shariah: {
+        symbol,
+        assetType: "DIGITAL_ASSET",
+        businessActivity: "spot digital asset",
+        tradingMethod: "SPOT",
+        ownershipSettlementVerified: false,
+      },
+    };
+  });
+}
+
 export default function TradingPaperPanel() {
-  const [symbol, setSymbol] = useState("BTC/USD");
+  const [symbol, setSymbol] = useState("BTC/USDT");
   const [capital, setCapital] = useState("100");
   const [amount, setAmount] = useState("1");
   const [stopLoss, setStopLoss] = useState("2");
@@ -69,6 +113,31 @@ export default function TradingPaperPanel() {
     setTicksJson(JSON.stringify(SAMPLE_TICKS, null, 2));
     setResult(null);
     setMessage("تم تحميل بيانات محاكاة فقط. لا يوجد اتصال بسوق أو أموال حقيقية.");
+  }
+
+  async function loadTestnetMarketData() {
+    setBusy(true);
+    setResult(null);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `/api/admin/trading/exchange/testnet/market-data?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=100`,
+        { method: "GET", cache: "no-store" },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(ERROR_TEXT[data.error] ?? "تعذر تحميل بيانات Binance Spot Testnet.");
+        return;
+      }
+
+      const ticks = candlesToTicks(data.symbol, data.candles as TestnetCandle[]);
+      setTicksJson(JSON.stringify(ticks, null, 2));
+      setMessage("تم تحميل بيانات سوق من Binance Spot Testnet فقط. لم يتم إرسال أي أمر، وبيانات Shariah بقيت غير معتمدة عمدًا.");
+    } catch {
+      setMessage("تعذر الاتصال بـ Binance Spot Testnet.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function run() {
@@ -115,10 +184,11 @@ export default function TradingPaperPanel() {
       </div>
       <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
         <label htmlFor="paper-ticks">بيانات السوق JSON</label>
-        <textarea id="paper-ticks" value={ticksJson} onChange={(e) => setTicksJson(e.target.value)} disabled={busy} rows={12} spellCheck={false} style={{ width: "100%", fontFamily: "monospace", resize: "vertical" }} placeholder='[{"timestamp":"2026-10-01T10:00:00.000Z","price":100,"previousPrice":99,"fastAverage":99,"slowAverage":98,"volume":1000,"averageVolume":900,"shariah":{"symbol":"BTC/USD","assetType":"DIGITAL_ASSET","businessActivity":"spot digital asset","tradingMethod":"SPOT","ownershipSettlementVerified":true}}]' />
+        <textarea id="paper-ticks" value={ticksJson} onChange={(e) => setTicksJson(e.target.value)} disabled={busy} rows={12} spellCheck={false} style={{ width: "100%", fontFamily: "monospace", resize: "vertical" }} placeholder='[{"timestamp":"2026-10-01T10:00:00.000Z","price":100,"previousPrice":99,"fastAverage":99,"slowAverage":98,"volume":1000,"averageVolume":900,"shariah":{"symbol":"BTC/USDT","assetType":"DIGITAL_ASSET","businessActivity":"spot digital asset","tradingMethod":"SPOT","ownershipSettlementVerified":false}}]' />
         <span className="muted">الحد الأقصى 10,000 نقطة. كل إشارة تمر عبر Risk Manager وShariah Guard قبل فتح مركز محاكاة.</span>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+        <button type="button" className="btn" onClick={loadTestnetMarketData} disabled={busy}>تحميل بيانات Binance Testnet</button>
         <button type="button" className="btn" onClick={loadSample} disabled={busy}>تحميل بيانات تجريبية</button>
         <button type="button" className="btn" onClick={run} disabled={busy || !ticksJson.trim()}>{busy ? "جاري المحاكاة..." : "تشغيل Paper Trading"}</button>
       </div>
