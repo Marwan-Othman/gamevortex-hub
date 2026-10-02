@@ -54,20 +54,17 @@ function positiveFinite(value: number): boolean {
 }
 
 function validateCandle(candle: BacktestCandle): void {
+  const timestamp = Date.parse(candle.timestamp);
+  const prices = [candle.open, candle.high, candle.low, candle.close];
+  const indicators = [candle.volume, candle.fastAverage, candle.slowAverage, candle.averageVolume];
+
   if (
-    !candle.timestamp ||
-    ![
-      candle.open,
-      candle.high,
-      candle.low,
-      candle.close,
-      candle.volume,
-      candle.fastAverage,
-      candle.slowAverage,
-      candle.averageVolume,
-    ].every(positiveFinite) ||
+    !Number.isFinite(timestamp) ||
+    !prices.every(positiveFinite) ||
+    !indicators.every(positiveFinite) ||
     candle.high < Math.max(candle.open, candle.close) ||
-    candle.low > Math.min(candle.open, candle.close)
+    candle.low > Math.min(candle.open, candle.close) ||
+    candle.low > candle.high
   ) {
     throw new Error("INVALID_BACKTEST_CANDLE");
   }
@@ -86,6 +83,18 @@ function validateConfig(config: BacktestConfig): void {
   }
 }
 
+function validateCandleSeries(candles: readonly BacktestCandle[]): void {
+  candles.forEach(validateCandle);
+
+  for (let index = 1; index < candles.length; index += 1) {
+    const previousTimestamp = Date.parse(candles[index - 1].timestamp);
+    const currentTimestamp = Date.parse(candles[index].timestamp);
+    if (currentTimestamp <= previousTimestamp) {
+      throw new Error("INVALID_BACKTEST_TIMESTAMP_ORDER");
+    }
+  }
+}
+
 /**
  * Simulates one spot position at a time. If one candle touches both exits,
  * STOP_LOSS wins because intrabar order is unknown and this is conservative.
@@ -97,7 +106,7 @@ export function runBacktest(
 ): BacktestResult {
   if (!symbol.trim() || candles.length === 0) throw new Error("INVALID_BACKTEST_INPUT");
   validateConfig(config);
-  candles.forEach(validateCandle);
+  validateCandleSeries(candles);
 
   let capital = config.initialCapitalUsd;
   let peakCapital = capital;
