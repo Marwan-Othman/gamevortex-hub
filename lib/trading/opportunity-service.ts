@@ -1,10 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
-import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import {
   buildOwnerPaperOpportunity,
   type TradeOpportunityResult,
 } from "@/lib/trading/opportunity-pipeline";
+import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import type { RiskSnapshot } from "@/lib/trading/risk";
 import type { ShariahAssetInput } from "@/lib/trading/shariah";
 
@@ -172,6 +172,8 @@ export async function buildOwnerPaperOpportunityFromApproval(input: {
     riskSnapshot,
     approval: {
       id: approval.id,
+      ownerId: approval.ownerId,
+      opportunityId: approval.opportunityId,
       status: "CONSUMED",
       amountUsd,
       consumedAt: approval.consumedAt.toISOString(),
