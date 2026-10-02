@@ -62,7 +62,7 @@ describe("reconcilePaperExecution", () => {
       plan,
       positionId: "position-1",
       openedAt: "2026-10-02T08:00:00Z",
-      shariahPolicyVersion: "strict-v1",
+      shariahPolicyVersion: "v1.0",
     });
 
     expect(reconcilePaperExecution(result.execution, result.position)).toEqual({
@@ -78,7 +78,7 @@ describe("reconcilePaperExecution", () => {
       plan,
       positionId: "position-1",
       openedAt: "2026-10-02T08:00:00Z",
-      shariahPolicyVersion: "strict-v1",
+      shariahPolicyVersion: "v1.0",
     });
 
     const mismatched = {
@@ -112,7 +112,7 @@ describe("reconcilePaperExecution", () => {
       plan,
       positionId: "position-1",
       openedAt: "2026-10-02T08:00:00Z",
-      shariahPolicyVersion: "strict-v1",
+      shariahPolicyVersion: "v1.0",
     });
 
     const reconciliation = reconcilePaperExecution(result.execution, {
@@ -132,7 +132,7 @@ describe("reconcilePaperExecution", () => {
       plan,
       positionId: "position-1",
       openedAt: "2026-10-02T08:00:00Z",
-      shariahPolicyVersion: "strict-v1",
+      shariahPolicyVersion: "v1.0",
     });
 
     const reconciliation = reconcilePaperExecution(result.execution, {
