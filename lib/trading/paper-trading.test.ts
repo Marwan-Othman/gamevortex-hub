@@ -72,6 +72,36 @@ describe("runPaperTrading", () => {
     expect(result.lastPreTradeDecision?.allowed).toBe(true);
   });
 
+  it("accepts slash-separated symbols used by the Paper Trading UI", () => {
+    const result = runPaperTrading(
+      {
+        symbol: "BTC/USD",
+        startingCapitalUsd: 100,
+        tradeAmountUsd: 1,
+        stopLossPercent: 2,
+        takeProfitPercent: 4,
+        riskConfig,
+        shariahPolicy,
+      },
+      [
+        tick({
+          timestamp: "2026-01-01T00:00:00Z",
+          shariah: { ...tick().shariah, symbol: "BTC/USD" },
+        }),
+        tick({
+          timestamp: "2026-01-01T00:05:00Z",
+          price: 114.4,
+          previousPrice: 110,
+          fastAverage: 112,
+          shariah: { ...tick().shariah, symbol: "BTC/USD" },
+        }),
+      ],
+    );
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].exitReason).toBe("TAKE_PROFIT");
+  });
+
   it("accepts equivalent symbol casing but stores the normalized symbol in the position lifecycle", () => {
     const result = runPaperTrading(
       {
