@@ -101,6 +101,27 @@ describe("runBacktest", () => {
     expect(result.maxDrawdownPercent).toBeGreaterThan(0);
   });
 
+  it("returns unchanged capital when the strategy produces no entry", () => {
+    const result = runBacktest("TEST", [
+      candle("2026-01-01T00:00:00Z"),
+      candle("2026-01-01T00:05:00Z"),
+      candle("2026-01-01T00:10:00Z"),
+    ], config);
+
+    expect(result.trades).toEqual([]);
+    expect(result.totalTrades).toBe(0);
+    expect(result.winningTrades).toBe(0);
+    expect(result.losingTrades).toBe(0);
+    expect(result.winRatePercent).toBe(0);
+    expect(result.initialCapitalUsd).toBe(100);
+    expect(result.finalCapitalUsd).toBe(100);
+    expect(result.pnlUsd).toBe(0);
+    expect(result.returnPercent).toBe(0);
+    expect(result.maxDrawdownUsd).toBe(0);
+    expect(result.maxDrawdownPercent).toBe(0);
+    expect(result.profitFactor).toBe(0);
+  });
+
   it("rejects invalid backtest configuration and input", () => {
     expect(() => runBacktest("TEST", [], config)).toThrow("INVALID_BACKTEST_INPUT");
     expect(() => runBacktest("TEST", [candle("2026-01-01T00:00:00Z")], {
