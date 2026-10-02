@@ -67,6 +67,52 @@ export interface ExchangeAdapter {
 }
 
 /**
+ * Validate the adapter identity/capability contract before it is registered.
+ * This does not make an adapter live; it only verifies that its declared
+ * contract is internally safe and deterministic.
+ */
+export function validateExchangeAdapterContract(adapter: ExchangeAdapter): void {
+  if (!adapter.id.trim() || adapter.id.length > 64) {
+    throw new Error("INVALID_EXCHANGE_ADAPTER_ID");
+  }
+
+  const capabilities = adapter.capabilities;
+  for (const [key, value] of Object.entries(capabilities)) {
+    if (typeof value !== "boolean") {
+      throw new Error(`INVALID_EXCHANGE_CAPABILITY_${key.toUpperCase()}`);
+    }
+  }
+
+  if (adapter.mode === "MARKET_DATA" && !capabilities.marketData) {
+    throw new Error("MARKET_DATA_MODE_REQUIRES_MARKET_DATA");
+  }
+
+  if (adapter.mode === "PAPER" && !capabilities.paperTrading) {
+    throw new Error("PAPER_MODE_REQUIRES_PAPER_TRADING");
+  }
+}
+
+/**
+ * Validate the market-data request at the exchange boundary.
+ * This keeps malformed provider calls from escaping the application.
+ */
+export function validateExchangeMarketDataRequest(request: ExchangeMarketDataRequest): void {
+  const symbol = request.symbol.trim().toUpperCase();
+  if (!symbol || !/^[A-Z0-9._:-]{1,32}$/.test(symbol)) {
+    throw new Error("INVALID_MARKET_DATA_SYMBOL");
+  }
+
+  const interval = request.interval.trim();
+  if (!interval || interval.length > 32) {
+    throw new Error("INVALID_MARKET_DATA_INTERVAL");
+  }
+
+  if (!Number.isInteger(request.limit) || request.limit < 1 || request.limit > 1000) {
+    throw new Error("INVALID_MARKET_DATA_LIMIT");
+  }
+}
+
+/**
  * Validate the order contract before an adapter can receive a spot BUY.
  * This is deliberately fail-closed and does not contact a provider.
  */
@@ -78,6 +124,10 @@ export function validateExchangeOrderRequest(request: ExchangeOrderRequest): voi
   const symbol = request.symbol.trim().toUpperCase();
   if (!symbol || !/^[A-Z0-9._:-]{1,32}$/.test(symbol)) {
     throw new Error("INVALID_ORDER_SYMBOL");
+  }
+
+  if (request.side !== "BUY") {
+    throw new Error("SPOT_BUY_ONLY");
   }
 
   if (!Number.isFinite(request.amountUsd) || request.amountUsd < 1) {
@@ -111,6 +161,8 @@ export function validateExchangeOrderRequest(request: ExchangeOrderRequest): voi
  * required capability. The function is deliberately strict and fail-closed.
  */
 export function assertLiveAdapterCapability(adapter: ExchangeAdapter): void {
+  validateExchangeAdapterContract(adapter);
+
   if (adapter.mode !== "LIVE") throw new Error("LIVE_ADAPTER_REQUIRED");
   if (!adapter.capabilities.marketData) throw new Error("MARKET_DATA_NOT_SUPPORTED");
   if (!adapter.capabilities.paperTrading) throw new Error("PAPER_TRADING_NOT_SUPPORTED");
