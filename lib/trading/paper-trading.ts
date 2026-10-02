@@ -14,6 +14,7 @@ import {
   type PaperPosition,
 } from "@/lib/trading/position";
 import type { RiskConfig } from "@/lib/trading/risk";
+import { settleClosedPaperPosition } from "@/lib/trading/settlement";
 import type { ShariahAssetInput, ShariahPolicy } from "@/lib/trading/shariah";
 import { evaluateStrategy, type StrategyDecision } from "@/lib/trading/strategy";
 
@@ -152,15 +153,17 @@ function closePositionToTrade(position: PaperPosition): PaperTrade {
     throw new Error("INVALID_PAPER_TRADE_EXIT_REASON");
   }
 
+  const settlement = settleClosedPaperPosition(position);
+
   return {
     entryTime: position.openedAt,
     exitTime: position.closedAt,
-    entryPrice: position.entryPrice,
-    exitPrice: position.exitPrice,
-    amountUsd: position.amountUsd,
-    pnlUsd: position.pnlUsd ?? 0,
+    entryPrice: settlement.entryPrice,
+    exitPrice: settlement.exitPrice,
+    amountUsd: settlement.amountUsd,
+    pnlUsd: settlement.pnlUsd,
     exitReason: position.exitReason,
-    shariahPolicyVersion: position.shariahPolicyVersion,
+    shariahPolicyVersion: settlement.shariahPolicyVersion,
   };
 }
 
