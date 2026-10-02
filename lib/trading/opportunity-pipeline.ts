@@ -123,12 +123,29 @@ function assertProposalShape(
   input: TradeOpportunityInput,
   strategy: StrategyDecision,
 ): void {
-  normalizedId(input.ownerId, "INVALID_OPPORTUNITY_OWNER");
-  normalizedId(input.opportunityId, "INVALID_OPPORTUNITY_ID");
+  const ownerId = normalizedId(input.ownerId, "INVALID_OPPORTUNITY_OWNER");
+  const opportunityId = normalizedId(input.opportunityId, "INVALID_OPPORTUNITY_ID");
   normalizedId(input.idempotencyKey, "INVALID_OPPORTUNITY_IDEMPOTENCY_KEY");
+  const approvalOwnerId = normalizedId(input.approval.ownerId, "INVALID_APPROVAL_OWNER");
+  const approvalOpportunityId = normalizedId(input.approval.opportunityId, "INVALID_APPROVAL_OPPORTUNITY");
+  normalizedId(input.approval.id, "INVALID_APPROVAL_ID");
 
-  if (!positiveFinite(input.amountUsd) || input.amountUsd < 1) {
+  // Proposal creation may happen before approval is consumed, but the proposal
+  // must never be bound to a different owner/opportunity or a tampered amount.
+  if (approvalOwnerId !== ownerId) {
+    throw new Error("APPROVAL_OWNER_MISMATCH");
+  }
+  if (approvalOpportunityId !== opportunityId) {
+    throw new Error("APPROVAL_OPPORTUNITY_MISMATCH");
+  }
+  if (!positiveFinite(input.amountUsd)) {
     throw new Error("INVALID_TRADE_AMOUNT");
+  }
+  if (!positiveFinite(input.approval.amountUsd)) {
+    throw new Error("INVALID_APPROVAL_AMOUNT");
+  }
+  if (!sameUsdAmount(input.approval.amountUsd, input.amountUsd)) {
+    throw new Error("APPROVAL_AMOUNT_MISMATCH");
   }
 
   if (strategy.side !== "BUY") throw new Error("NO_BUY_SIGNAL");
