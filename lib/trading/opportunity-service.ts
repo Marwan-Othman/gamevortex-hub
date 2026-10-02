@@ -160,7 +160,7 @@ export async function buildOwnerPaperOpportunityFromApproval(input: {
     throw new Error("APPROVAL_AMOUNT_MISMATCH");
   }
 
-  return buildOwnerPaperOpportunity({
+  const result = buildOwnerPaperOpportunity({
     ownerId: input.ownerId,
     opportunityId: input.opportunityId,
     idempotencyKey: `paper-opportunity:${approval.id}`,
@@ -177,4 +177,22 @@ export async function buildOwnerPaperOpportunityFromApproval(input: {
       consumedAt: approval.consumedAt.toISOString(),
     },
   });
+
+  await db.auditLog.create({
+    data: {
+      actorUserId: input.ownerId,
+      action: "TRADING_PAPER_OPPORTUNITY_BUILT",
+      entityType: "TradingApproval",
+      entityId: approval.id,
+      metadata: {
+        opportunityId: approval.opportunityId,
+        amountUsd,
+        symbol: input.shariah.symbol,
+        executionMode: "PAPER",
+        clientOrderId: result.executionPlan?.clientOrderId ?? null,
+      },
+    },
+  });
+
+  return result;
 }
