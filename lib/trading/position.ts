@@ -70,8 +70,22 @@ function normalizeTimestamp(value: string, code: string): string {
 
 function normalizePolicyVersion(value: string): string {
   const normalized = value.trim();
-  if (!normalized || normalized.length > 100) throw new Error("INVALID_POSITION_SHARIAH_POLICY_VERSION");
+  if (!normalized || normalized.length > 100) {
+    throw new Error("INVALID_POSITION_SHARIAH_POLICY_VERSION");
+  }
   return normalized;
+}
+
+function normalizeExitReason(value: PaperPositionExitReason): PaperPositionExitReason {
+  if (
+    value !== "STOP_LOSS" &&
+    value !== "TAKE_PROFIT" &&
+    value !== "MANUAL" &&
+    value !== "END_OF_DATA"
+  ) {
+    throw new Error("INVALID_POSITION_EXIT_REASON");
+  }
+  return value;
 }
 
 export function openPaperPosition(input: {
@@ -118,11 +132,6 @@ export function openPaperPosition(input: {
   };
 }
 
-/**
- * Determine whether the current price closes an open BUY position.
- * Stop-loss wins when both levels are touched by the same observation because
- * the intratick execution order is unknown.
- */
 export function evaluatePaperPositionExit(
   position: PaperPosition,
   currentPrice: number,
@@ -152,6 +161,7 @@ export function closePaperPosition(
   if (position.status !== "OPEN") throw new Error("POSITION_ALREADY_CLOSED");
   if (!positiveFinite(input.exitPrice)) throw new Error("INVALID_POSITION_EXIT_PRICE");
 
+  const reason = normalizeExitReason(input.reason);
   const closedAt = normalizeTimestamp(input.closedAt, "INVALID_POSITION_CLOSE_TIME");
   if (Date.parse(closedAt) < Date.parse(position.openedAt)) {
     throw new Error("INVALID_POSITION_CLOSE_TIME");
@@ -165,7 +175,7 @@ export function closePaperPosition(
     status: "CLOSED",
     closedAt,
     exitPrice: input.exitPrice,
-    exitReason: input.reason,
+    exitReason: reason,
     pnlUsd,
     returnPercent,
   };

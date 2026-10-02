@@ -22,7 +22,6 @@ function position(overrides: Record<string, unknown> = {}) {
 describe("paper position lifecycle", () => {
   it("opens only a valid spot BUY position", () => {
     const result = position();
-
     expect(result.status).toBe("OPEN");
     expect(result.side).toBe("BUY");
     expect(result.symbol).toBe("TEST");
@@ -37,21 +36,15 @@ describe("paper position lifecycle", () => {
   });
 
   it("requires the stop-loss to be below the BUY entry", () => {
-    expect(() => position({ stopLossPrice: 100 })).toThrow(
-      "INVALID_POSITION_STOP_LOSS_FOR_BUY",
-    );
+    expect(() => position({ stopLossPrice: 100 })).toThrow("INVALID_POSITION_STOP_LOSS_FOR_BUY");
   });
 
   it("requires the take-profit to be above the BUY entry", () => {
-    expect(() => position({ takeProfitPrice: 100 })).toThrow(
-      "INVALID_POSITION_TAKE_PROFIT_FOR_BUY",
-    );
+    expect(() => position({ takeProfitPrice: 100 })).toThrow("INVALID_POSITION_TAKE_PROFIT_FOR_BUY");
   });
 
   it("requires a Shariah policy version", () => {
-    expect(() => position({ shariahPolicyVersion: "" })).toThrow(
-      "INVALID_POSITION_SHARIAH_POLICY_VERSION",
-    );
+    expect(() => position({ shariahPolicyVersion: "" })).toThrow("INVALID_POSITION_SHARIAH_POLICY_VERSION");
   });
 
   it("rejects malformed identity and timestamp inputs", () => {
@@ -61,16 +54,25 @@ describe("paper position lifecycle", () => {
   });
 
   it("detects take-profit and stop-loss exits", () => {
-    const result = evaluatePaperPositionExit(position(), 120);
-    expect(result).toEqual({ reason: "TAKE_PROFIT", price: 110 });
+    expect(evaluatePaperPositionExit(position(), 120)).toEqual({ reason: "TAKE_PROFIT", price: 110 });
+    expect(evaluatePaperPositionExit(position(), 90)).toEqual({ reason: "STOP_LOSS", price: 95 });
+  });
 
-    const stop = evaluatePaperPositionExit(position(), 90);
-    expect(stop).toEqual({ reason: "STOP_LOSS", price: 95 });
+  it("gives stop-loss precedence when one observation reaches both guards", () => {
+    expect(evaluatePaperPositionExit(position({ takeProfitPrice: 100 }), 100)).toEqual({
+      reason: "STOP_LOSS",
+      price: 95,
+    });
   });
 
   it("does not create an exit while price remains between the guards", () => {
-    expect(evaluatePaperPositionExit(position(), 100)).toBeNull();
-    expect(evaluatePaperPositionExit(position(), 105)).toBeNull();
+    expect(evaluatePaperPositionExit(position(), 100)).toBeUndefined();
+    expect(evaluatePaperPositionExit(position(), 105)).toBeUndefined();
+  });
+
+  it("rejects invalid market prices", () => {
+    expect(() => evaluatePaperPositionExit(position(), 0)).toThrow("INVALID_POSITION_MARKET_PRICE");
+    expect(() => evaluatePaperPositionExit(position(), Number.NaN)).toThrow("INVALID_POSITION_MARKET_PRICE");
   });
 
   it("closes a position and calculates deterministic P&L", () => {
@@ -79,7 +81,6 @@ describe("paper position lifecycle", () => {
       reason: "TAKE_PROFIT",
       closedAt: "2026-10-01T20:05:00Z",
     });
-
     expect(result.status).toBe("CLOSED");
     expect(result.exitPrice).toBe(110);
     expect(result.exitReason).toBe("TAKE_PROFIT");
@@ -88,36 +89,44 @@ describe("paper position lifecycle", () => {
     expect(result.shariahPolicyVersion).toBe("strict-v1");
   });
 
+  it("rejects invalid exit prices and runtime exit reasons", () => {
+    expect(() => closePaperPosition(position(), {
+      exitPrice: Number.POSITIVE_INFINITY,
+      reason: "MANUAL",
+      closedAt: "2026-10-01T20:05:00Z",
+    })).toThrow("INVALID_POSITION_EXIT_PRICE");
+
+    expect(() => closePaperPosition(position(), {
+      exitPrice: 101,
+      reason: "INVALID" as never,
+      closedAt: "2026-10-01T20:05:00Z",
+    })).toThrow("INVALID_POSITION_EXIT_REASON");
+  });
+
   it("rejects closing an already closed position", () => {
     const closed = closePaperPosition(position(), {
       exitPrice: 110,
       reason: "TAKE_PROFIT",
       closedAt: "2026-10-01T20:05:00Z",
     });
-
-    expect(() =>
-      closePaperPosition(closed, {
-        exitPrice: 111,
-        reason: "MANUAL",
-        closedAt: "2026-10-01T20:06:00Z",
-      }),
-    ).toThrow("POSITION_ALREADY_CLOSED");
+    expect(() => closePaperPosition(closed, {
+      exitPrice: 111,
+      reason: "MANUAL",
+      closedAt: "2026-10-01T20:06:00Z",
+    })).toThrow("POSITION_ALREADY_CLOSED");
   });
 
   it("rejects a close time before the open time", () => {
-    expect(() =>
-      closePaperPosition(position(), {
-        exitPrice: 101,
-        reason: "MANUAL",
-        closedAt: "2026-09-30T20:00:00Z",
-      }),
-    ).toThrow("INVALID_POSITION_CLOSE_TIME");
+    expect(() => closePaperPosition(position(), {
+      exitPrice: 101,
+      reason: "MANUAL",
+      closedAt: "2026-09-30T20:00:00Z",
+    })).toThrow("INVALID_POSITION_CLOSE_TIME");
   });
 
-  it("rejects non-finite position prices and amounts", () => {
+  it("rejects non-finite position prices and amounts with the actual contract error", () => {
     expect(() => position({ amountUsd: Number.NaN })).toThrow("INVALID_POSITION_AMOUNT");
-    expect(() => position({ entryPrice: Number.POSITIVE_INFINITY })).toThrow(
-      "INVALID_POSITION_ENTRY_PRICE",
-    );
+    expect(() => position({ entryPrice: Number.POSITIVE_INFINITY })).toThrow("INVALID_POSITION_PRICES");
+    expect(() => position({ stopLossPrice: Number.NaN })).toThrow("INVALID_POSITION_PRICES");
   });
 });
