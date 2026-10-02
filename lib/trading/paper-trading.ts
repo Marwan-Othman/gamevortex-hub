@@ -15,6 +15,7 @@ import {
 } from "@/lib/trading/position";
 import type { RiskConfig } from "@/lib/trading/risk";
 import type { ShariahAssetInput, ShariahPolicy } from "@/lib/trading/shariah";
+import { evaluateStrategy, type StrategyDecision } from "@/lib/trading/strategy";
 
 export type PaperTradingTick = {
   timestamp: string;
