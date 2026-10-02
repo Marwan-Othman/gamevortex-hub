@@ -125,4 +125,23 @@ describe("reconcilePaperExecution", () => {
       expect(reconciliation.reasons).toEqual(["POSITION_ID_MISMATCH"]);
     }
   });
+
+  it("reports client-order drift through the execution identity returned to the caller", () => {
+    const plan = buildTradingExecutionPlan(planRequest());
+    const result = openPaperPositionFromExecutionPlan({
+      plan,
+      positionId: "position-1",
+      openedAt: "2026-10-02T08:00:00Z",
+      shariahPolicyVersion: "strict-v1",
+    });
+
+    const reconciliation = reconcilePaperExecution(result.execution, {
+      ...result.position,
+      amountUsd: 12,
+    });
+
+    expect(reconciliation.status).toBe("MISMATCHED");
+    expect(reconciliation.clientOrderId).toBe(result.execution.clientOrderId);
+    expect(reconciliation.positionId).toBe("position-1");
+  });
 });
