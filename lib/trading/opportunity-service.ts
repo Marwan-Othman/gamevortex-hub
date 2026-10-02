@@ -64,7 +64,11 @@ function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   const object = value as Record<string, unknown>;
-  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(",`)}}`;
+  const entries = Object.keys(object)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
+    .join(",");
+  return `{${entries}}`;
 }
 
 function buildExecutionSnapshot(input: {
@@ -94,22 +98,29 @@ function buildExecutionSnapshot(input: {
   };
 }
 
-function assertExecutionSnapshotMatches(approval: Prisma.JsonValue | null, input: {
-  strategy: {
-    price: number;
-    previousPrice: number;
-    fastAverage: number;
-    slowAverage: number;
-    volume: number;
-    averageVolume: number;
-    stopLossPercent: number;
-    takeProfitPercent: number;
-  };
-  shariah: ShariahAssetInput;
-}) {
-  if (!approval || typeof approval !== "object" || Array.isArray(approval)) throw new Error("APPROVAL_EXECUTION_SNAPSHOT_REQUIRED");
+function assertExecutionSnapshotMatches(
+  approval: Prisma.JsonValue | null,
+  input: {
+    strategy: {
+      price: number;
+      previousPrice: number;
+      fastAverage: number;
+      slowAverage: number;
+      volume: number;
+      averageVolume: number;
+      stopLossPercent: number;
+      takeProfitPercent: number;
+    };
+    shariah: ShariahAssetInput;
+  },
+) {
+  if (!approval || typeof approval !== "object" || Array.isArray(approval)) {
+    throw new Error("APPROVAL_EXECUTION_SNAPSHOT_REQUIRED");
+  }
   const expected = buildExecutionSnapshot(input);
-  if (stableJson(approval) !== stableJson(expected)) throw new Error("APPROVAL_EXECUTION_SNAPSHOT_MISMATCH");
+  if (stableJson(approval) !== stableJson(expected)) {
+    throw new Error("APPROVAL_EXECUTION_SNAPSHOT_MISMATCH");
+  }
 }
 
 export async function getConsumedOwnerApproval(input: { ownerId: string; approvalId: string; opportunityId: string }): Promise<ConsumedOwnerApproval> {
@@ -125,7 +136,14 @@ export async function getConsumedOwnerApproval(input: { ownerId: string; approva
   if (approval.status !== "CONSUMED" || !approval.consumedAt) throw new Error("OWNER_APPROVAL_NOT_CONSUMED");
   if (approval.expiresAt.getTime() <= Date.now()) throw new Error("APPROVAL_EXPIRED");
   if (approval.shariahStatus !== "APPROVED") throw new Error("SHARIAH_APPROVAL_REQUIRED");
-  return { ...approval, status: "CONSUMED", shariahStatus: "APPROVED", consumedAt: approval.consumedAt, riskSnapshot: approval.riskSnapshot ?? null, executionSnapshot: approval.executionSnapshot ?? null } as ConsumedOwnerApproval;
+  return {
+    ...approval,
+    status: "CONSUMED",
+    shariahStatus: "APPROVED",
+    consumedAt: approval.consumedAt,
+    riskSnapshot: approval.riskSnapshot ?? null,
+    executionSnapshot: approval.executionSnapshot ?? null,
+  } as ConsumedOwnerApproval;
 }
 
 export async function buildOwnerPaperOpportunityFromApproval(input: {
