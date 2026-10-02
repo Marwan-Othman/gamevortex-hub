@@ -61,7 +61,7 @@ describe("openPaperPositionFromExecutionPlan", () => {
       plan,
       positionId: "position-1",
       openedAt: "2026-10-02T08:00:00Z",
-      shariahPolicyVersion: "strict-v1",
+      shariahPolicyVersion: "v1.0",
     });
 
     expect(result.execution.clientOrderId).toBe(plan.clientOrderId);
@@ -72,7 +72,7 @@ describe("openPaperPositionFromExecutionPlan", () => {
     expect(result.position.entryPrice).toBe(plan.entryPrice);
     expect(result.position.stopLossPrice).toBe(plan.stopLossPrice);
     expect(result.position.takeProfitPrice).toBe(plan.takeProfitPrice);
-    expect(result.position.shariahPolicyVersion).toBe("strict-v1");
+    expect(result.position.shariahPolicyVersion).toBe("v1.0");
   });
 
   it("preserves the guarded execution identity", () => {
@@ -87,7 +87,7 @@ describe("openPaperPositionFromExecutionPlan", () => {
       plan,
       positionId: "position-42",
       openedAt: "2026-10-02T08:00:00Z",
-      shariahPolicyVersion: "strict-v1",
+      shariahPolicyVersion: "v1.0",
     });
 
     expect(result.execution.clientOrderId).toBe(plan.clientOrderId);
@@ -104,7 +104,7 @@ describe("openPaperPositionFromExecutionPlan", () => {
         plan: { ...plan, mode: "LIVE" } as never,
         positionId: "position-1",
         openedAt: "2026-10-02T08:00:00Z",
-        shariahPolicyVersion: "strict-v1",
+        shariahPolicyVersion: "v1.0",
       }),
     ).toThrow("PAPER_EXECUTION_PLAN_REQUIRED");
   });
@@ -117,7 +117,7 @@ describe("openPaperPositionFromExecutionPlan", () => {
         plan,
         positionId: "   ",
         openedAt: "2026-10-02T08:00:00Z",
-        shariahPolicyVersion: "strict-v1",
+        shariahPolicyVersion: "v1.0",
       }),
     ).toThrow("INVALID_POSITION_ID");
   });
@@ -130,7 +130,7 @@ describe("openPaperPositionFromExecutionPlan", () => {
         plan,
         positionId: "position-1",
         openedAt: "not-a-date",
-        shariahPolicyVersion: "strict-v1",
+        shariahPolicyVersion: "v1.0",
       }),
     ).toThrow("INVALID_POSITION_OPEN_TIME");
   });
@@ -159,5 +159,18 @@ describe("openPaperPositionFromExecutionPlan", () => {
         shariahPolicyVersion: "v".repeat(101),
       }),
     ).toThrow("INVALID_POSITION_SHARIAH_POLICY_VERSION");
+  });
+
+  it("rejects a policy version that does not match the guarded plan", () => {
+    const plan = buildTradingExecutionPlan(planRequest());
+
+    expect(() =>
+      openPaperPositionFromExecutionPlan({
+        plan,
+        positionId: "position-1",
+        openedAt: "2026-10-02T08:00:00Z",
+        shariahPolicyVersion: "different-policy",
+      }),
+    ).toThrow("SHARIAH_POLICY_VERSION_MISMATCH");
   });
 });
