@@ -43,6 +43,8 @@ export type TradeOpportunityInput = {
   shariahPolicy?: ShariahPolicy;
   approval: {
     id: string;
+    ownerId: string;
+    opportunityId: string;
     status: "PENDING" | "CONSUMED" | "REVOKED" | "EXPIRED";
     amountUsd: number;
     consumedAt?: string | null;
@@ -81,18 +83,34 @@ function normalizedId(value: string, code: string): string {
   return normalized;
 }
 
+function sameUsdAmount(left: number, right: number): boolean {
+  return Number.isFinite(left) && Number.isFinite(right) && Math.round(left * 100) === Math.round(right * 100);
+}
+
 function assertApprovalContract(input: TradeOpportunityInput): void {
+  const ownerId = normalizedId(input.ownerId, "INVALID_OPPORTUNITY_OWNER");
+  const opportunityId = normalizedId(input.opportunityId, "INVALID_OPPORTUNITY_ID");
+  const approvalOwnerId = normalizedId(input.approval.ownerId, "INVALID_APPROVAL_OWNER");
+  const approvalOpportunityId = normalizedId(input.approval.opportunityId, "INVALID_APPROVAL_OPPORTUNITY");
   normalizedId(input.approval.id, "INVALID_APPROVAL_ID");
 
+  if (approvalOwnerId !== ownerId) {
+    throw new Error("APPROVAL_OWNER_MISMATCH");
+  }
+  if (approvalOpportunityId !== opportunityId) {
+    throw new Error("APPROVAL_OPPORTUNITY_MISMATCH");
+  }
   if (input.approval.status !== "CONSUMED") {
     throw new Error("OWNER_APPROVAL_NOT_CONSUMED");
   }
 
+  if (!positiveFinite(input.amountUsd)) {
+    throw new Error("INVALID_TRADE_AMOUNT");
+  }
   if (!positiveFinite(input.approval.amountUsd)) {
     throw new Error("INVALID_APPROVAL_AMOUNT");
   }
-
-  if (input.approval.amountUsd !== input.amountUsd) {
+  if (!sameUsdAmount(input.approval.amountUsd, input.amountUsd)) {
     throw new Error("APPROVAL_AMOUNT_MISMATCH");
   }
 
@@ -125,10 +143,6 @@ function assertProposalShape(
   }
 }
 
-/**
- * Stage 1-3: create a deterministic proposal from market data and validate all
- * local trade invariants before approval can be used for execution.
- */
 export function buildTradeProposal(input: TradeOpportunityInput): TradeProposal {
   const strategy = evaluateStrategy({
     symbol: input.symbol,
@@ -173,27 +187,28 @@ export function buildTradeProposal(input: TradeOpportunityInput): TradeProposal 
   };
 }
 
-/**
- * Stage 4: approval is checked immediately before the execution plan is built.
- * The amount is re-matched against the consumed approval to prevent client-side
- * amount tampering between proposal creation and execution.
- */
 export function buildApprovedPaperExecution(
   input: TradeOpportunityInput,
   proposal: TradeProposal,
 ): TradingExecutionPlan {
   assertApprovalContract(input);
 
+  if (proposal.ownerId !== input.ownerId.trim()) {
+    throw new Error("PROPOSAL_OWNER_MISMATCH");
+  }
+  if (proposal.opportunityId !== input.opportunityId.trim()) {
+    throw new Error("PROPOSAL_OPPORTUNITY_MISMATCH");
+  }
   if (proposal.approvalId !== input.approval.id.trim()) {
     throw new Error("APPROVAL_ID_MISMATCH");
   }
   if (proposal.approvalStatus !== "CONSUMED") {
     throw new Error("OWNER_APPROVAL_NOT_CONSUMED");
   }
-  if (proposal.approvalAmountUsd !== input.approval.amountUsd) {
+  if (!sameUsdAmount(proposal.approvalAmountUsd, input.approval.amountUsd)) {
     throw new Error("APPROVAL_AMOUNT_MISMATCH");
   }
-  if (proposal.amountUsd !== input.amountUsd) {
+  if (!sameUsdAmount(proposal.amountUsd, input.amountUsd)) {
     throw new Error("PROPOSAL_AMOUNT_MISMATCH");
   }
 
@@ -215,10 +230,6 @@ export function buildApprovedPaperExecution(
   });
 }
 
-/**
- * Stage 5: one-call composition for the owner dashboard/API. Stage 6 is kept
- * pure so the same contract can be exercised by integration tests.
- */
 export function buildOwnerPaperOpportunity(
   input: TradeOpportunityInput,
 ): TradeOpportunityResult {
