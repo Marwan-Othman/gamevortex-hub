@@ -2,20 +2,41 @@
 
 import { useState } from "react";
 
+type TradingTestnetResult = {
+  ok: boolean;
+  readyForTestnetOrder?: boolean;
+  account?: {
+    canTrade: boolean;
+    canWithdraw: boolean;
+    canDeposit: boolean;
+    accountType: string;
+    permissions: string[];
+  };
+  error?: string;
+};
+
+function getSafeErrorMessage(error?: string): string {
+  switch (error) {
+    case "BINANCE_TESTNET_RESTRICTED_LOCATION":
+      return "Binance Testnet غير متاح من بيئة الخادم الحالية بسبب قيود الموقع/الأهلية لدى Binance. المفتاح صحيح، ولا نحتاج إلى إنشاء مفتاح جديد.";
+    case "BINANCE_TESTNET_API_CREDENTIALS_REQUIRED":
+      return "مفاتيح Binance Testnet غير موجودة على الخادم. أضف BINANCE_TESTNET_API_KEY وBINANCE_TESTNET_API_SECRET في Vercel كـ Secret.";
+    case "BINANCE_TESTNET_TRADING_DISABLED":
+      return "صلاحية التداول غير مفعّلة على مفتاح Binance Testnet.";
+    case "BINANCE_TESTNET_WITHDRAWALS_MUST_BE_DISABLED":
+      return "تم رفض الفحص لأن صلاحية السحب يجب أن تبقى معطّلة دائمًا.";
+    case "BINANCE_TESTNET_SPOT_PERMISSION_REQUIRED":
+      return "صلاحية Spot غير موجودة على مفتاح Binance Testnet.";
+    case "FORBIDDEN":
+      return "غير مصرح بهذا الفحص.";
+    default:
+      return error || "Testnet غير جاهز بعد.";
+  }
+}
+
 export default function TradingTestnetPanel() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{
-    ok: boolean;
-    readyForTestnetOrder?: boolean;
-    account?: {
-      canTrade: boolean;
-      canWithdraw: boolean;
-      canDeposit: boolean;
-      accountType: string;
-      permissions: string[];
-    };
-    error?: string;
-  } | null>(null);
+  const [result, setResult] = useState<TradingTestnetResult | null>(null);
 
   async function checkStatus() {
     setLoading(true);
@@ -27,18 +48,7 @@ export default function TradingTestnetPanel() {
         cache: "no-store",
       });
 
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        readyForTestnetOrder?: boolean;
-        account?: {
-          canTrade: boolean;
-          canWithdraw: boolean;
-          canDeposit: boolean;
-          accountType: string;
-          permissions: string[];
-        };
-        error?: string;
-      };
+      const payload = (await response.json()) as TradingTestnetResult;
 
       setResult({
         ok: response.ok && payload.ok === true,
@@ -72,7 +82,7 @@ export default function TradingTestnetPanel() {
           {result.ok && result.readyForTestnetOrder ? (
             <strong>جاهز لاختبار أمر Testnet.</strong>
           ) : (
-            <strong>{result.error || "Testnet غير جاهز بعد."}</strong>
+            <strong>{getSafeErrorMessage(result.error)}</strong>
           )}
 
           {account && (
