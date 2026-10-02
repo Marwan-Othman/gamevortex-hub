@@ -67,7 +67,7 @@ function positiveFinite(value: number): boolean {
 
 function normalizeSymbol(value: string): string {
   const normalized = value.trim().toUpperCase();
-  if (!normalized || !/^[A-Z0-9._:-]{1,32}$/.test(normalized)) {
+  if (!normalized || !/^[A-Z0-9._:\/-]{1,32}$/.test(normalized)) {
     throw new Error("INVALID_PAPER_TRADING_CONFIG");
   }
   return normalized;
