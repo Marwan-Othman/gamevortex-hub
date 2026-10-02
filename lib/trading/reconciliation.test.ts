@@ -83,8 +83,11 @@ describe("reconcilePaperExecution", () => {
 
     const mismatched = {
       ...result.position,
+      symbol: "OTHER",
       amountUsd: 11,
+      entryPrice: 101,
       stopLossPrice: 94,
+      takeProfitPrice: 111,
       shariahPolicyVersion: "strict-v2",
     };
 
@@ -93,10 +96,33 @@ describe("reconcilePaperExecution", () => {
     expect(reconciliation.status).toBe("MISMATCHED");
     if (reconciliation.status === "MISMATCHED") {
       expect(reconciliation.reasons).toEqual([
+        "SYMBOL_MISMATCH",
         "AMOUNT_MISMATCH",
+        "ENTRY_PRICE_MISMATCH",
         "STOP_LOSS_MISMATCH",
+        "TAKE_PROFIT_MISMATCH",
         "SHARIAH_POLICY_VERSION_MISMATCH",
       ]);
+    }
+  });
+
+  it("detects a position identity mismatch", () => {
+    const plan = buildTradingExecutionPlan(planRequest());
+    const result = openPaperPositionFromExecutionPlan({
+      plan,
+      positionId: "position-1",
+      openedAt: "2026-10-02T08:00:00Z",
+      shariahPolicyVersion: "strict-v1",
+    });
+
+    const reconciliation = reconcilePaperExecution(result.execution, {
+      ...result.position,
+      positionId: "position-2",
+    });
+
+    expect(reconciliation.status).toBe("MISMATCHED");
+    if (reconciliation.status === "MISMATCHED") {
+      expect(reconciliation.reasons).toEqual(["POSITION_ID_MISMATCH"]);
     }
   });
 });
