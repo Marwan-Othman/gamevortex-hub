@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { guardMutation, guardRead } from "@/lib/api";
 import { requireTradingOwner, tradingErrorStatus, tradingForbidden } from "@/lib/trading/access";
-import { createOwnerApproval } from "@/lib/trading/approval-store";
+import {
+  createOwnerApproval,
+  type OwnerExecutionSnapshot,
+} from "@/lib/trading/approval-store";
 import { db } from "@/lib/prisma";
 import { logSystemError } from "@/lib/observability";
 
@@ -73,9 +76,13 @@ export async function POST(request: NextRequest) {
     if (riskSnapshot !== undefined && (riskSnapshot === null || typeof riskSnapshot !== "object" || Array.isArray(riskSnapshot))) throw new Error("INVALID_RISK_SNAPSHOT");
 
     const { approval, token } = await createOwnerApproval({
-      ownerId: owner.id, opportunityId, amountUsd, shariahStatus: "APPROVED", strategyVersion,
+      ownerId: owner.id,
+      opportunityId,
+      amountUsd,
+      shariahStatus: "APPROVED",
+      strategyVersion,
       riskSnapshot: riskSnapshot as Prisma.JsonObject | undefined,
-      executionSnapshot: executionSnapshot as Prisma.JsonObject,
+      executionSnapshot: executionSnapshot as unknown as OwnerExecutionSnapshot,
       ttlSeconds,
     });
     return NextResponse.json({ ok: true, approval: serializeApproval(approval), token: token.token }, { status: 201 });
