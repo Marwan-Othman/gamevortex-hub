@@ -26,6 +26,7 @@ import {
 const DEFAULT_BASE_URL = "https://testnet.binance.vision";
 const DEFAULT_RECV_WINDOW = 5_000;
 const MAX_LIMIT = 1_000;
+const MAX_CLIENT_ORDER_ID_LENGTH = 36;
 
 export type BinanceSpotTestnetAdapterOptions = {
   apiKey?: string;
@@ -187,6 +188,10 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
   async placeSpotBuy(request: ExchangeOrderRequest): Promise<ExchangeOrderResult> {
     validateExchangeOrderRequest(request);
 
+    if (!/^[A-Za-z0-9._:-]{1,36}$/.test(request.clientOrderId) || request.clientOrderId.length > MAX_CLIENT_ORDER_ID_LENGTH) {
+      throw new Error("INVALID_BINANCE_TESTNET_CLIENT_ORDER_ID");
+    }
+
     if (!this.apiKey || !this.apiSecret) {
       throw new Error("BINANCE_TESTNET_API_CREDENTIALS_REQUIRED");
     }
@@ -223,12 +228,15 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
       throw new Error("INVALID_BINANCE_TESTNET_ORDER_RESPONSE");
     }
 
+    if (payload.status !== "FILLED") {
+      throw new Error(`BINANCE_TESTNET_ORDER_NOT_FILLED:${payload.status}`);
+    }
+
     return {
       accepted: true,
       clientOrderId: payload.clientOrderId,
       providerOrderId: String(payload.orderId),
-      status: payload.status === "FILLED" ? "FILLED" : "REJECTED",
-      ...(payload.status === "FILLED" ? {} : { reason: `BINANCE_ORDER_STATUS:${payload.status}` }),
+      status: "FILLED",
     };
   }
 }
