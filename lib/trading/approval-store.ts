@@ -56,9 +56,11 @@ function normalizeAmount(value: string | number) {
   } catch {
     throw new Error("INVALID_APPROVAL_AMOUNT");
   }
+
   if (!amount.isFinite() || amount.lessThan(MIN_APPROVAL_AMOUNT_USD)) {
     throw new Error("INVALID_APPROVAL_AMOUNT");
   }
+
   return amount.toDecimalPlaces(2);
 }
 
@@ -66,6 +68,7 @@ function validateSnapshot(snapshot: OwnerExecutionSnapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
+
   if (!snapshot.symbol?.trim()) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
@@ -80,9 +83,11 @@ function validateSnapshot(snapshot: OwnerExecutionSnapshot) {
     snapshot.stopLossPercent,
     snapshot.takeProfitPercent,
   ];
+
   if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
+
   if (!snapshot.shariah || typeof snapshot.shariah !== "object" || Array.isArray(snapshot.shariah)) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
@@ -94,12 +99,15 @@ export async function createOwnerApproval(
   if (!input.ownerId || !input.opportunityId) {
     throw new Error("INVALID_APPROVAL_INPUT");
   }
+
   if (input.shariahStatus !== "APPROVED") {
     throw new Error("SHARIAH_APPROVAL_REQUIRED");
   }
+
   if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 30 || input.ttlSeconds > 15 * 60) {
     throw new Error("INVALID_APPROVAL_TTL");
   }
+
   validateSnapshot(input.executionSnapshot);
 
   const amountUsd = normalizeAmount(input.amountUsd);
@@ -127,6 +135,7 @@ export async function createOwnerApproval(
   if (!approval) {
     throw new Error("APPROVAL_CREATION_FAILED");
   }
+
   return { approval, token: { token: tokenValue } };
 }
 
