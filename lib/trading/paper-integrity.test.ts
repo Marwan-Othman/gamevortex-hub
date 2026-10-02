@@ -22,12 +22,34 @@ describe("paper trading integrity", () => {
     );
   });
 
+  it("normalizes symbols before storing a paper position", () => {
+    const position = openPaperPosition({ ...baseInput, symbol: "  btcusd  " });
+    expect(position.symbol).toBe("BTCUSD");
+  });
+
+  it("rejects a BUY position whose stop-loss is not below entry", () => {
+    expect(() => openPaperPosition({ ...baseInput, stopLossPrice: 100 })).toThrow(
+      "INVALID_POSITION_STOP_LOSS_FOR_BUY",
+    );
+  });
+
+  it("rejects a BUY position whose take-profit is not above entry", () => {
+    expect(() => openPaperPosition({ ...baseInput, takeProfitPrice: 100 })).toThrow(
+      "INVALID_POSITION_TAKE_PROFIT_FOR_BUY",
+    );
+  });
+
   it("prioritizes stop-loss when both exit levels are touched", () => {
     const position = openPaperPosition(baseInput);
     expect(evaluatePaperPositionExit(position, 98)).toEqual({
       reason: "STOP_LOSS",
       price: 98,
     });
+  });
+
+  it("returns no exit while an open position remains between its guards", () => {
+    const position = openPaperPosition(baseInput);
+    expect(evaluatePaperPositionExit(position, 101)).toBeUndefined();
   });
 
   it("computes deterministic BUY P&L when a position closes", () => {
@@ -40,6 +62,17 @@ describe("paper trading integrity", () => {
 
     expect(closed.pnlUsd).toBeCloseTo(0.4, 10);
     expect(closed.returnPercent).toBeCloseTo(4, 10);
+  });
+
+  it("rejects a close timestamp earlier than the open timestamp", () => {
+    const position = openPaperPosition(baseInput);
+    expect(() =>
+      closePaperPosition(position, {
+        exitPrice: 104,
+        reason: "TAKE_PROFIT",
+        closedAt: "2026-10-02T05:59:59.000Z",
+      }),
+    ).toThrow("INVALID_POSITION_CLOSE_TIME");
   });
 
   it("settles a closed paper position without changing the simulated accounting result", () => {
@@ -65,7 +98,6 @@ describe("paper trading integrity", () => {
       entryPrice: position.entryPrice,
       stopLossPrice: position.stopLossPrice,
       takeProfitPrice: position.takeProfitPrice,
-      openedAt: position.openedAt,
       shariahPolicyVersion: position.shariahPolicyVersion,
     };
 
@@ -87,7 +119,6 @@ describe("paper trading integrity", () => {
       entryPrice: position.entryPrice,
       stopLossPrice: position.stopLossPrice,
       takeProfitPrice: position.takeProfitPrice,
-      openedAt: position.openedAt,
       shariahPolicyVersion: position.shariahPolicyVersion,
     };
 
@@ -95,6 +126,26 @@ describe("paper trading integrity", () => {
     expect(result.status).toBe("MISMATCHED");
     if (result.status === "MISMATCHED") {
       expect(result.reasons).toContain("AMOUNT_MISMATCH");
+    }
+  });
+
+  it("surfaces Shariah policy drift during reconciliation", () => {
+    const position = openPaperPosition(baseInput);
+    const execution: PaperExecutionRecord = {
+      positionId: position.positionId,
+      clientOrderId: "client-test-003",
+      symbol: position.symbol,
+      amountUsd: position.amountUsd,
+      entryPrice: position.entryPrice,
+      stopLossPrice: position.stopLossPrice,
+      takeProfitPrice: position.takeProfitPrice,
+      shariahPolicyVersion: "2026-10-02",
+    };
+
+    const result = reconcilePaperExecution(execution, position);
+    expect(result.status).toBe("MISMATCHED");
+    if (result.status === "MISMATCHED") {
+      expect(result.reasons).toContain("SHARIAH_POLICY_VERSION_MISMATCH");
     }
   });
 });
