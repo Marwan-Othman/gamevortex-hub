@@ -100,6 +100,10 @@ describe("assertLiveAdapterCapability", () => {
     expect(() => assertLiveAdapterCapability(liveAdapter())).not.toThrow();
   });
 
+  it("accepts a live adapter without paper-trading capability", () => {
+    expect(() => assertLiveAdapterCapability(liveAdapter({ paperTrading: false }))).not.toThrow();
+  });
+
   it("rejects a non-live adapter", () => {
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), mode: "PAPER" })).toThrow("LIVE_ADAPTER_REQUIRED");
   });
@@ -115,7 +119,6 @@ describe("assertLiveAdapterCapability", () => {
   it("rejects missing required capabilities", () => {
     expect(() => assertLiveAdapterCapability(liveAdapter({ liveOrders: false }))).toThrow("LIVE_ORDERS_NOT_SUPPORTED");
     expect(() => assertLiveAdapterCapability(liveAdapter({ marketData: false }))).toThrow("MARKET_DATA_NOT_SUPPORTED");
-    expect(() => assertLiveAdapterCapability(liveAdapter({ paperTrading: false }))).toThrow("PAPER_TRADING_NOT_SUPPORTED");
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), placeSpotBuy: undefined })).toThrow("SPOT_BUY_ADAPTER_REQUIRED");
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), getOrderStatus: undefined })).toThrow("ORDER_STATUS_ADAPTER_REQUIRED");
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), placeProtectedExitOco: undefined })).toThrow("PROTECTED_EXIT_ADAPTER_REQUIRED");
