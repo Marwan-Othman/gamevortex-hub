@@ -103,4 +103,17 @@ describe("owner approval tokens", () => {
 
     expect(result).toEqual({ valid: false, reason: "INVALID_TOKEN" });
   });
+
+  it("rejects a token when the stored expiry is malformed", () => {
+    const approval = createApprovalToken("opp-123", 60);
+    const result = verifyApprovalToken({
+      opportunityId: "opp-123",
+      token: approval.token,
+      expectedTokenHash: approval.tokenHash,
+      expiresAt: "not-a-date",
+      now: new Date(approval.issuedAt),
+    });
+
+    expect(result).toEqual({ valid: false, reason: "EXPIRED" });
+  });
 });
