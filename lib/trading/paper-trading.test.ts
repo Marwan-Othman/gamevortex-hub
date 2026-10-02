@@ -113,6 +113,36 @@ describe("runPaperTrading", () => {
     expect(result.blockedSignals[0]?.reasons).toContain("SHARIAH_REJECTED");
   });
 
+  it("resets daily loss at the UTC day boundary while preserving consecutive-loss protection", () => {
+    const result = runPaperTrading(
+      {
+        symbol: "TEST",
+        startingCapitalUsd: 100,
+        tradeAmountUsd: 10,
+        stopLossPercent: 2,
+        takeProfitPercent: 4,
+        riskConfig: {
+          ...riskConfig,
+          maxDailyLossUsd: 0.15,
+          maxConsecutiveLosses: 3,
+        },
+        shariahPolicy,
+      },
+      [
+        tick({ timestamp: "2026-01-01T23:55:00Z", price: 110 }),
+        tick({ timestamp: "2026-01-01T23:59:00Z", price: 107.8, previousPrice: 110, fastAverage: 108.5 }),
+        tick({ timestamp: "2026-01-01T23:59:30Z", price: 110, previousPrice: 107.8, fastAverage: 109 }),
+        tick({ timestamp: "2026-01-02T00:00:00Z", price: 110, previousPrice: 109, fastAverage: 109.5 }),
+      ],
+    );
+
+    expect(result.trades).toHaveLength(2);
+    expect(result.trades[0].exitReason).toBe("STOP_LOSS");
+    expect(result.trades[0].pnlUsd).toBeCloseTo(-0.2, 8);
+    expect(result.blockedSignals.some((signal) => signal.reasons.includes("MAX_DAILY_LOSS_REACHED"))).toBe(true);
+    expect(result.blockedSignals.some((signal) => signal.timestamp === "2026-01-02T00:00:00Z")).toBe(false);
+  });
+
   it("rejects invalid simulation input", () => {
     expect(() => runPaperTrading({
       symbol: "TEST",
