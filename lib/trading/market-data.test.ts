@@ -53,4 +53,47 @@ describe("market-data", () => {
   it("rejects invalid symbols", () => {
     expect(() => buildMarketSnapshot("bad symbol", candles)).toThrow("INVALID_MARKET_SYMBOL");
   });
+
+  it("rejects an empty candle timestamp", () => {
+    expect(() =>
+      buildMarketSnapshot("TEST", [
+        { ...candles[0], timestamp: "" },
+      ]),
+    ).toThrow("INVALID_MARKET_CANDLE_TIMESTAMP");
+  });
+
+  it("rejects negative volume", () => {
+    expect(() =>
+      buildMarketSnapshot("TEST", [
+        { ...candles[0], volume: -1 },
+      ]),
+    ).toThrow("INVALID_MARKET_CANDLE_VALUES");
+  });
+
+  it("rejects a low price above the open or close", () => {
+    expect(() =>
+      buildMarketSnapshot("TEST", [
+        { ...candles[0], low: 102 },
+      ]),
+    ).toThrow("INVALID_MARKET_CANDLE_LOW");
+  });
+
+  it("rejects duplicate timestamps", () => {
+    expect(() =>
+      buildMarketSnapshot("TEST", [
+        candles[0],
+        { ...candles[1], timestamp: candles[0].timestamp },
+      ]),
+    ).toThrow("MARKET_DATA_NOT_CHRONOLOGICAL");
+  });
+
+  it("preserves valid punctuation in normalized symbols", () => {
+    const snapshot = buildMarketSnapshot(" btc-usdt ", [candles[0]]);
+    expect(snapshot.symbol).toBe("BTC-USDT");
+  });
+
+  it("returns zero liquidity when all traded volume is zero", () => {
+    const zeroVolumeCandles = candles.map((candle) => ({ ...candle, volume: 0 }));
+    expect(calculateLiquidityScore(zeroVolumeCandles)).toBe(0);
+  });
 });
