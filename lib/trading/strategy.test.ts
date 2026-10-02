@@ -64,4 +64,18 @@ describe("evaluateStrategy", () => {
     expect(() => evaluateStrategy({ ...base, takeProfitPercent: 100 })).toThrow("INVALID_STRATEGY_INPUT");
     expect(() => evaluateStrategy({ ...base, symbol: "   " })).toThrow("INVALID_STRATEGY_INPUT");
   });
+
+  it("accepts volume exactly at the confirmation threshold", () => {
+    const result = evaluateStrategy({ ...base, volume: base.averageVolume });
+
+    expect(result.side).toBe("BUY");
+    expect(result.reasons).toContain("VOLUME_CONFIRMED");
+  });
+
+  it("rejects non-finite market observations", () => {
+    expect(() => evaluateStrategy({ ...base, price: Number.NaN })).toThrow("INVALID_STRATEGY_INPUT");
+    expect(() => evaluateStrategy({ ...base, volume: Number.POSITIVE_INFINITY })).toThrow(
+      "INVALID_STRATEGY_INPUT",
+    );
+  });
 });
