@@ -13,6 +13,9 @@ export type LiveOrderState =
   | "SUBMITTED"
   | "PARTIALLY_FILLED"
   | "FILLED"
+  | "PROTECTION_PENDING"
+  | "PROTECTED"
+  | "PROTECTION_FAILED"
   | "CANCELED"
   | "REJECTED"
   | "EXPIRED"
@@ -53,7 +56,17 @@ export type LiveProviderOrderObservation = {
 export type LiveReconciliation =
   | {
       status: "MATCHED";
-      nextState: Exclude<LiveOrderState, "INTENT_CREATED" | "SUBMITTING" | "UNKNOWN" | "RECONCILIATION_MISMATCH" | "CLOSED">;
+      nextState: Exclude<
+        LiveOrderState,
+        | "INTENT_CREATED"
+        | "SUBMITTING"
+        | "UNKNOWN"
+        | "RECONCILIATION_MISMATCH"
+        | "PROTECTION_PENDING"
+        | "PROTECTED"
+        | "PROTECTION_FAILED"
+        | "CLOSED"
+      >;
       clientOrderId: string;
       providerOrderId: string;
       providerStatus: LiveProviderOrderStatus;
@@ -83,7 +96,17 @@ function parseDate(value: Date | string | number): Date | null {
 
 export function mapProviderOrderStatus(
   status: LiveProviderOrderStatus,
-): Exclude<LiveOrderState, "INTENT_CREATED" | "SUBMITTING" | "UNKNOWN" | "RECONCILIATION_MISMATCH" | "CLOSED"> {
+): Exclude<
+  LiveOrderState,
+  | "INTENT_CREATED"
+  | "SUBMITTING"
+  | "UNKNOWN"
+  | "RECONCILIATION_MISMATCH"
+  | "PROTECTION_PENDING"
+  | "PROTECTED"
+  | "PROTECTION_FAILED"
+  | "CLOSED"
+> {
   switch (status) {
     case "NEW":
     case "PENDING_NEW":
