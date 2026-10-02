@@ -108,6 +108,12 @@ function validateTickSeries(ticks: readonly PaperTradingTick[]): void {
   }
 }
 
+function utcDayKey(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) throw new Error("INVALID_PAPER_TRADING_TICK");
+  return date.toISOString().slice(0, 10);
+}
+
 function closePositionToTrade(position: PaperPosition): PaperTrade {
   if (position.status !== "CLOSED" || !position.closedAt || position.exitPrice === undefined) {
     throw new Error("INVALID_CLOSED_PAPER_POSITION");
@@ -136,6 +142,11 @@ function closePositionToTrade(position: PaperPosition): PaperTrade {
 /**
  * Runs a deterministic paper-trading session over supplied market ticks.
  * One spot BUY position is allowed at a time.
+ *
+ * Daily-loss accounting is reset at each UTC calendar-day boundary. This is
+ * important because Risk Manager's maxDailyLossUsd is a daily limit, not a
+ * lifetime/session loss limit. Consecutive-loss protection remains cumulative
+ * for the entire simulation because it is a separate circuit-breaker rule.
  */
 export function runPaperTrading(
   config: PaperTradingConfig,
@@ -147,6 +158,7 @@ export function runPaperTrading(
 
   let capital = config.startingCapitalUsd;
   let dailyLossUsd = 0;
+  let currentUtcDay = utcDayKey(ticks[0].timestamp);
   let consecutiveLosses = 0;
   let position: PaperPosition | undefined;
   const trades: PaperTrade[] = [];
@@ -155,6 +167,12 @@ export function runPaperTrading(
 
   for (let index = 0; index < ticks.length; index += 1) {
     const tick = ticks[index];
+    const tickUtcDay = utcDayKey(tick.timestamp);
+
+    if (tickUtcDay !== currentUtcDay) {
+      dailyLossUsd = 0;
+      currentUtcDay = tickUtcDay;
+    }
 
     if (position) {
       const exit = evaluatePaperPositionExit(position, tick.price);
