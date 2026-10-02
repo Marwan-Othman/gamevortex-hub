@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
 const queryRaw = vi.fn();
+const auditCreate = vi.fn();
 const getRiskConfig = vi.fn();
 const buildOwnerPaperOpportunity = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
-  db: { $queryRaw: queryRaw },
+  db: {
+    $queryRaw: queryRaw,
+    auditLog: { create: auditCreate },
+  },
 }));
 
 vi.mock("@/lib/trading/risk-config-service", () => ({
@@ -49,6 +53,7 @@ describe("owner paper opportunity service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryRaw.mockResolvedValue([approvalBase]);
+    auditCreate.mockResolvedValue({ id: "audit-1" });
     getRiskConfig.mockResolvedValue({
       enabled: true,
       config: {
@@ -65,7 +70,7 @@ describe("owner paper opportunity service", () => {
     });
     buildOwnerPaperOpportunity.mockReturnValue({
       proposal: { opportunityId: "opp-1" },
-      executionPlan: { mode: "PAPER" },
+      executionPlan: { mode: "PAPER", clientOrderId: "gv-paper-test" },
     });
   });
 
@@ -156,7 +161,7 @@ describe("owner paper opportunity service", () => {
     ).rejects.toThrow("APPROVAL_AMOUNT_MISMATCH");
   });
 
-  it("uses server-side risk configuration and a deterministic approval-bound idempotency key", async () => {
+  it("uses server-side risk configuration, deterministic idempotency, and audit logging", async () => {
     const result = await buildOwnerPaperOpportunityFromApproval({
       ownerId: "owner-1",
       approvalId: "approval-1",
@@ -180,7 +185,10 @@ describe("owner paper opportunity service", () => {
       },
     });
 
-    expect(result).toEqual({ proposal: { opportunityId: "opp-1" }, executionPlan: { mode: "PAPER" } });
+    expect(result).toEqual({
+      proposal: { opportunityId: "opp-1" },
+      executionPlan: { mode: "PAPER", clientOrderId: "gv-paper-test" },
+    });
     expect(getRiskConfig).toHaveBeenCalledWith("owner-1");
     expect(buildOwnerPaperOpportunity).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -190,6 +198,16 @@ describe("owner paper opportunity service", () => {
         idempotencyKey: "paper-opportunity:approval-1",
         riskConfig: expect.any(Object),
         riskSnapshot: expect.objectContaining({ requestedAmountUsd: 10 }),
+      }),
+    );
+    expect(auditCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorUserId: "owner-1",
+          action: "TRADING_PAPER_OPPORTUNITY_BUILT",
+          entityType: "TradingApproval",
+          entityId: "approval-1",
+        }),
       }),
     );
   });
