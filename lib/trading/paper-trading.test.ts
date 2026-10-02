@@ -72,6 +72,41 @@ describe("runPaperTrading", () => {
     expect(result.lastPreTradeDecision?.allowed).toBe(true);
   });
 
+  it("accepts equivalent symbol casing but stores the normalized symbol in the position lifecycle", () => {
+    const result = runPaperTrading(
+      {
+        symbol: " test ",
+        startingCapitalUsd: 100,
+        tradeAmountUsd: 10,
+        stopLossPercent: 2,
+        takeProfitPercent: 4,
+        riskConfig,
+        shariahPolicy,
+      },
+      [tick({ timestamp: "2026-01-01T00:00:00Z" })],
+    );
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].shariahPolicyVersion).toBe(shariahPolicy.version);
+  });
+
+  it("rejects Shariah data for a different symbol instead of mixing policy evidence", () => {
+    expect(() =>
+      runPaperTrading(
+        {
+          symbol: "TEST",
+          startingCapitalUsd: 100,
+          tradeAmountUsd: 10,
+          stopLossPercent: 2,
+          takeProfitPercent: 4,
+          riskConfig,
+          shariahPolicy,
+        },
+        [tick({ shariah: { ...tick().shariah, symbol: "OTHER" } })],
+      ),
+    ).toThrow("PAPER_TRADING_SYMBOL_MISMATCH");
+  });
+
   it("preserves the Shariah policy version when a position closes at end of data", () => {
     const result = runPaperTrading(
       {
