@@ -37,20 +37,7 @@ export type BinanceSpotTestnetAdapterOptions = {
   symbolMap?: Readonly<Record<string, string>>;
 };
 
-type BinanceKline = [
-  number,
-  string,
-  string,
-  string,
-  string,
-  string,
-  number,
-  string,
-  number,
-  string,
-  string,
-  string,
-];
+type BinanceKline = [number, string, string, string, string, string, number, string, number, string, string, string];
 
 type BinanceOrderResponse = {
   symbol?: string;
@@ -59,27 +46,33 @@ type BinanceOrderResponse = {
   status?: string;
 };
 
+type BinanceAccountResponse = {
+  canTrade?: boolean;
+  canWithdraw?: boolean;
+  canDeposit?: boolean;
+  accountType?: string;
+  permissions?: unknown;
+};
+
+export type BinanceSpotTestnetAccountStatus = {
+  canTrade: boolean;
+  canWithdraw: boolean;
+  canDeposit: boolean;
+  accountType: string;
+  permissions: string[];
+};
+
 function normalizeBaseUrl(value: string | undefined): string {
   const baseUrl = (value ?? DEFAULT_BASE_URL).trim().replace(/\/$/, "");
-  if (!baseUrl || !/^https:\/\//i.test(baseUrl)) {
-    throw new Error("INVALID_BINANCE_TESTNET_BASE_URL");
-  }
-
-  if (baseUrl !== DEFAULT_BASE_URL) {
-    throw new Error("BINANCE_TESTNET_BASE_URL_MUST_BE_OFFICIAL_TESTNET");
-  }
-
+  if (!baseUrl || !/^https:\/\//i.test(baseUrl)) throw new Error("INVALID_BINANCE_TESTNET_BASE_URL");
+  if (baseUrl !== DEFAULT_BASE_URL) throw new Error("BINANCE_TESTNET_BASE_URL_MUST_BE_OFFICIAL_TESTNET");
   return baseUrl;
 }
 
 function normalizeProviderSymbol(symbol: string, symbolMap: Readonly<Record<string, string>>): string {
   const normalized = symbol.trim().toUpperCase();
   const mapped = symbolMap[normalized] ?? normalized.replaceAll("/", "");
-
-  if (!mapped || !/^[A-Z0-9]{1,20}$/.test(mapped)) {
-    throw new Error("INVALID_BINANCE_TESTNET_SYMBOL");
-  }
-
+  if (!mapped || !/^[A-Z0-9]{1,20}$/.test(mapped)) throw new Error("INVALID_BINANCE_TESTNET_SYMBOL");
   return mapped;
 }
 
@@ -114,10 +107,7 @@ function sign(query: string, secret: string): string {
 async function parseJson(response: Response): Promise<unknown> {
   const payload: unknown = await response.json();
   if (!response.ok) {
-    const message =
-      payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string"
-        ? payload.msg
-        : `HTTP_${response.status}`;
+    const message = payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string" ? payload.msg : `HTTP_${response.status}`;
     throw new Error(`BINANCE_TESTNET_${message}`);
   }
   return payload;
@@ -150,52 +140,55 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.recvWindow = options.recvWindow ?? DEFAULT_RECV_WINDOW;
     this.fetcher = options.fetcher ?? fetch;
-    this.symbolMap = Object.fromEntries(
-      Object.entries(options.symbolMap ?? {}).map(([key, value]) => [key.trim().toUpperCase(), value.trim().toUpperCase()]),
-    );
+    this.symbolMap = Object.fromEntries(Object.entries(options.symbolMap ?? {}).map(([key, value]) => [key.trim().toUpperCase(), value.trim().toUpperCase()]));
+    if (!Number.isInteger(this.recvWindow) || this.recvWindow < 1 || this.recvWindow > 60_000) throw new Error("INVALID_BINANCE_TESTNET_RECV_WINDOW");
+  }
 
-    if (!Number.isInteger(this.recvWindow) || this.recvWindow < 1 || this.recvWindow > 60_000) {
-      throw new Error("INVALID_BINANCE_TESTNET_RECV_WINDOW");
-    }
+  private requireCredentials(): { apiKey: string; apiSecret: string } {
+    if (!this.apiKey || !this.apiSecret) throw new Error("BINANCE_TESTNET_API_CREDENTIALS_REQUIRED");
+    return { apiKey: this.apiKey, apiSecret: this.apiSecret };
+  }
+
+  private signedQuery(params: Record<string, string | number>, apiSecret: string): string {
+    const query = encodeQuery(params);
+    return `${query}&signature=${sign(query, apiSecret)}`;
   }
 
   async getMarketData(request: ExchangeMarketDataRequest): Promise<ExchangeMarketDataResponse> {
     validateExchangeMarketDataRequest(request);
     if (request.limit > MAX_LIMIT) throw new Error("INVALID_MARKET_DATA_LIMIT");
-
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
     const query = encodeQuery({ symbol, interval: request.interval.trim(), limit: request.limit });
-    const response = await this.fetcher(`${this.baseUrl}/api/v3/klines?${query}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
+    const response = await this.fetcher(`${this.baseUrl}/api/v3/klines?${query}`, { method: "GET", headers: { Accept: "application/json" } });
     const payload = await parseJson(response);
-
     if (!Array.isArray(payload)) throw new Error("INVALID_BINANCE_TESTNET_KLINES_RESPONSE");
-
     const candles = payload.map((item) => {
       if (!Array.isArray(item) || item.length < 6) throw new Error("INVALID_BINANCE_TESTNET_KLINE");
       return mapKline(item as BinanceKline);
     });
+    return { symbol, interval: request.interval.trim(), candles };
+  }
 
-    return {
-      symbol,
-      interval: request.interval.trim(),
-      candles,
-    };
+  async getAccountStatus(): Promise<BinanceSpotTestnetAccountStatus> {
+    const { apiKey, apiSecret } = this.requireCredentials();
+    const timestamp = Date.now();
+    const query = this.signedQuery({ recvWindow: this.recvWindow, timestamp }, apiSecret);
+    const response = await this.fetcher(`${this.baseUrl}/api/v3/account?${query}`, {
+      method: "GET",
+      headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
+    });
+    const payload = (await parseJson(response)) as BinanceAccountResponse;
+    if (typeof payload.canTrade !== "boolean" || typeof payload.canWithdraw !== "boolean" || typeof payload.canDeposit !== "boolean" || typeof payload.accountType !== "string") {
+      throw new Error("INVALID_BINANCE_TESTNET_ACCOUNT_RESPONSE");
+    }
+    const permissions = Array.isArray(payload.permissions) ? payload.permissions.filter((value): value is string => typeof value === "string").slice(0, 20) : [];
+    return { canTrade: payload.canTrade, canWithdraw: payload.canWithdraw, canDeposit: payload.canDeposit, accountType: payload.accountType, permissions };
   }
 
   async placeSpotBuy(request: ExchangeOrderRequest): Promise<ExchangeOrderResult> {
     validateExchangeOrderRequest(request);
-
-    if (!/^[A-Za-z0-9._:-]{1,36}$/.test(request.clientOrderId) || request.clientOrderId.length > MAX_CLIENT_ORDER_ID_LENGTH) {
-      throw new Error("INVALID_BINANCE_TESTNET_CLIENT_ORDER_ID");
-    }
-
-    if (!this.apiKey || !this.apiSecret) {
-      throw new Error("BINANCE_TESTNET_API_CREDENTIALS_REQUIRED");
-    }
-
+    if (!/^[A-Za-z0-9._:-]{1,36}$/.test(request.clientOrderId) || request.clientOrderId.length > MAX_CLIENT_ORDER_ID_LENGTH) throw new Error("INVALID_BINANCE_TESTNET_CLIENT_ORDER_ID");
+    const { apiKey, apiSecret } = this.requireCredentials();
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
     const timestamp = Date.now();
     const params = {
@@ -208,35 +201,14 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
       recvWindow: this.recvWindow,
       timestamp,
     };
-    const query = encodeQuery(params);
-    const signature = sign(query, this.apiSecret);
-
-    const response = await this.fetcher(`${this.baseUrl}/api/v3/order?${query}&signature=${signature}`, {
+    const query = this.signedQuery(params, apiSecret);
+    const response = await this.fetcher(`${this.baseUrl}/api/v3/order?${query}`, {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "X-MBX-APIKEY": this.apiKey,
-      },
+      headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
     });
     const payload = (await parseJson(response)) as BinanceOrderResponse;
-
-    if (
-      typeof payload.orderId !== "number" ||
-      typeof payload.clientOrderId !== "string" ||
-      typeof payload.status !== "string"
-    ) {
-      throw new Error("INVALID_BINANCE_TESTNET_ORDER_RESPONSE");
-    }
-
-    if (payload.status !== "FILLED") {
-      throw new Error(`BINANCE_TESTNET_ORDER_NOT_FILLED:${payload.status}`);
-    }
-
-    return {
-      accepted: true,
-      clientOrderId: payload.clientOrderId,
-      providerOrderId: String(payload.orderId),
-      status: "FILLED",
-    };
+    if (typeof payload.orderId !== "number" || typeof payload.clientOrderId !== "string" || typeof payload.status !== "string") throw new Error("INVALID_BINANCE_TESTNET_ORDER_RESPONSE");
+    if (payload.status !== "FILLED") throw new Error(`BINANCE_TESTNET_ORDER_NOT_FILLED:${payload.status}`);
+    return { accepted: true, clientOrderId: payload.clientOrderId, providerOrderId: String(payload.orderId), status: "FILLED" };
   }
 }
