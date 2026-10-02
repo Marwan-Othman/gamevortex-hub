@@ -53,4 +53,49 @@ describe("settleClosedPaperPosition", () => {
     expect(settlement.returnPercent).toBeCloseTo(-5);
     expect(settlement.settlementValueUsd).toBeCloseTo(9.5);
   });
+
+  it("rejects tampered P&L instead of trusting a mutable position field", () => {
+    const closed = closePaperPosition(position(), {
+      exitPrice: 110,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T08:05:00Z",
+    });
+
+    expect(() =>
+      settleClosedPaperPosition({
+        ...closed,
+        pnlUsd: 50,
+      }),
+    ).toThrow("PAPER_SETTLEMENT_PNL_DRIFT");
+  });
+
+  it("rejects tampered return percentage instead of trusting it", () => {
+    const closed = closePaperPosition(position(), {
+      exitPrice: 110,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T08:05:00Z",
+    });
+
+    expect(() =>
+      settleClosedPaperPosition({
+        ...closed,
+        returnPercent: 500,
+      }),
+    ).toThrow("PAPER_SETTLEMENT_RETURN_DRIFT");
+  });
+
+  it("rejects invalid settlement prices", () => {
+    const closed = closePaperPosition(position(), {
+      exitPrice: 110,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T08:05:00Z",
+    });
+
+    expect(() =>
+      settleClosedPaperPosition({
+        ...closed,
+        entryPrice: 0,
+      }),
+    ).toThrow("INVALID_PAPER_SETTLEMENT_PRICES");
+  });
 });
