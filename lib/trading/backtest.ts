@@ -42,10 +42,14 @@ export type BacktestResult = {
   pnlUsd: number;
   returnPercent: number;
   maxDrawdownUsd: number;
+  maxDrawdownPercent: number;
   totalTrades: number;
   winningTrades: number;
   losingTrades: number;
   winRatePercent: number;
+  grossProfitUsd: number;
+  grossLossUsd: number;
+  profitFactor: number | null;
   trades: BacktestTrade[];
 };
 
@@ -104,7 +108,10 @@ export function runBacktest(
   candles: readonly BacktestCandle[],
   config: BacktestConfig,
 ): BacktestResult {
-  if (!symbol.trim() || candles.length === 0) throw new Error("INVALID_BACKTEST_INPUT");
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  if (!/^[A-Z0-9._:-]{1,32}$/.test(normalizedSymbol) || candles.length === 0) {
+    throw new Error("INVALID_BACKTEST_INPUT");
+  }
   validateConfig(config);
   validateCandleSeries(candles);
 
@@ -152,7 +159,7 @@ export function runBacktest(
     }
 
     const strategy = evaluateStrategy({
-      symbol,
+      symbol: normalizedSymbol,
       price: candle.close,
       previousPrice: previous.close,
       fastAverage: candle.fastAverage,
@@ -163,13 +170,18 @@ export function runBacktest(
       takeProfitPercent: config.takeProfitPercent,
     });
 
-    if (strategy.side === "BUY" && capital >= config.tradeAmountUsd) {
+    if (
+      strategy.side === "BUY" &&
+      strategy.stopLossPrice !== undefined &&
+      strategy.takeProfitPrice !== undefined &&
+      capital >= config.tradeAmountUsd
+    ) {
       entry = {
         timestamp: candle.timestamp,
         price: candle.close,
         amountUsd: config.tradeAmountUsd,
-        stopLoss: strategy.stopLossPrice!,
-        takeProfit: strategy.takeProfitPrice!,
+        stopLoss: strategy.stopLossPrice,
+        takeProfit: strategy.takeProfitPrice,
       };
     }
 
@@ -197,6 +209,12 @@ export function runBacktest(
   const pnlUsd = capital - config.initialCapitalUsd;
   const winningTrades = trades.filter((trade) => trade.pnlUsd > 0).length;
   const totalTrades = trades.length;
+  const grossProfitUsd = trades
+    .filter((trade) => trade.pnlUsd > 0)
+    .reduce((sum, trade) => sum + trade.pnlUsd, 0);
+  const grossLossUsd = trades
+    .filter((trade) => trade.pnlUsd < 0)
+    .reduce((sum, trade) => sum + Math.abs(trade.pnlUsd), 0);
 
   return {
     initialCapitalUsd: config.initialCapitalUsd,
@@ -204,10 +222,14 @@ export function runBacktest(
     pnlUsd,
     returnPercent: (pnlUsd / config.initialCapitalUsd) * 100,
     maxDrawdownUsd,
+    maxDrawdownPercent: (maxDrawdownUsd / config.initialCapitalUsd) * 100,
     totalTrades,
     winningTrades,
     losingTrades: totalTrades - winningTrades,
     winRatePercent: totalTrades === 0 ? 0 : (winningTrades / totalTrades) * 100,
+    grossProfitUsd,
+    grossLossUsd,
+    profitFactor: grossLossUsd === 0 ? (grossProfitUsd > 0 ? null : 0) : grossProfitUsd / grossLossUsd,
     trades,
   };
 }
