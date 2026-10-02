@@ -8,6 +8,7 @@ import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
 import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
 import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
 import TradingPaperPanel from "@/components/admin/TradingPaperPanel";
+import TradingAuditPanel from "@/components/admin/TradingAuditPanel";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,8 @@ export default async function TradingPage() {
       <TradingBacktestPanel />
 
       <TradingPaperPanel />
+
+      <TradingAuditPanel />
     </AdminShell>
   );
 }
