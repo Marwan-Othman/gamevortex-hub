@@ -54,12 +54,23 @@ describe("paper position lifecycle", () => {
     );
   });
 
+  it("rejects malformed identity and timestamp inputs", () => {
+    expect(() => position({ positionId: "" })).toThrow("INVALID_POSITION_ID");
+    expect(() => position({ symbol: "   " })).toThrow("INVALID_POSITION_SYMBOL");
+    expect(() => position({ openedAt: "not-a-date" })).toThrow("INVALID_POSITION_OPEN_TIME");
+  });
+
   it("detects take-profit and stop-loss exits", () => {
     const result = evaluatePaperPositionExit(position(), 120);
     expect(result).toEqual({ reason: "TAKE_PROFIT", price: 110 });
 
     const stop = evaluatePaperPositionExit(position(), 90);
     expect(stop).toEqual({ reason: "STOP_LOSS", price: 95 });
+  });
+
+  it("does not create an exit while price remains between the guards", () => {
+    expect(evaluatePaperPositionExit(position(), 100)).toBeNull();
+    expect(evaluatePaperPositionExit(position(), 105)).toBeNull();
   });
 
   it("closes a position and calculates deterministic P&L", () => {
