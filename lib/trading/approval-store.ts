@@ -51,22 +51,55 @@ function hashToken(token: string) {
 
 function normalizeAmount(value: string | number) {
   let amount: Prisma.Decimal;
-  try { amount = new Prisma.Decimal(value); } catch { throw new Error("INVALID_APPROVAL_AMOUNT"); }
-  if (!amount.isFinite() || amount.lessThan(MIN_APPROVAL_AMOUNT_USD)) throw new Error("INVALID_APPROVAL_AMOUNT");
+  try {
+    amount = new Prisma.Decimal(value);
+  } catch {
+    throw new Error("INVALID_APPROVAL_AMOUNT");
+  }
+  if (!amount.isFinite() || amount.lessThan(MIN_APPROVAL_AMOUNT_USD)) {
+    throw new Error("INVALID_APPROVAL_AMOUNT");
+  }
   return amount.toDecimalPlaces(2);
 }
 
 function validateSnapshot(snapshot: OwnerExecutionSnapshot) {
-  if (!snapshot.symbol?.trim()) throw new Error("INVALID_EXECUTION_SNAPSHOT");
-  const values = [snapshot.price, snapshot.previousPrice, snapshot.fastAverage, snapshot.slowAverage, snapshot.volume, snapshot.averageVolume, snapshot.stopLossPercent, snapshot.takeProfitPercent];
-  if (values.some((value) => !Number.isFinite(value) || value <= 0)) throw new Error("INVALID_EXECUTION_SNAPSHOT");
-  if (!snapshot.shariah || typeof snapshot.shariah !== "object" || Array.isArray(snapshot.shariah)) throw new Error("INVALID_EXECUTION_SNAPSHOT");
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    throw new Error("INVALID_EXECUTION_SNAPSHOT");
+  }
+  if (!snapshot.symbol?.trim()) {
+    throw new Error("INVALID_EXECUTION_SNAPSHOT");
+  }
+
+  const values = [
+    snapshot.price,
+    snapshot.previousPrice,
+    snapshot.fastAverage,
+    snapshot.slowAverage,
+    snapshot.volume,
+    snapshot.averageVolume,
+    snapshot.stopLossPercent,
+    snapshot.takeProfitPercent,
+  ];
+  if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new Error("INVALID_EXECUTION_SNAPSHOT");
+  }
+  if (!snapshot.shariah || typeof snapshot.shariah !== "object" || Array.isArray(snapshot.shariah)) {
+    throw new Error("INVALID_EXECUTION_SNAPSHOT");
+  }
 }
 
-export async function createOwnerApproval(input: CreateOwnerApprovalInput): Promise<{ approval: OwnerApproval; token: OwnerApprovalToken }> {
-  if (!input.ownerId || !input.opportunityId) throw new Error("INVALID_APPROVAL_INPUT");
-  if (input.shariahStatus !== "APPROVED") throw new Error("SHARIAH_APPROVAL_REQUIRED");
-  if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 30 || input.ttlSeconds > 15 * 60) throw new Error("INVALID_APPROVAL_TTL");
+export async function createOwnerApproval(
+  input: CreateOwnerApprovalInput,
+): Promise<{ approval: OwnerApproval; token: OwnerApprovalToken }> {
+  if (!input.ownerId || !input.opportunityId) {
+    throw new Error("INVALID_APPROVAL_INPUT");
+  }
+  if (input.shariahStatus !== "APPROVED") {
+    throw new Error("SHARIAH_APPROVAL_REQUIRED");
+  }
+  if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 30 || input.ttlSeconds > 15 * 60) {
+    throw new Error("INVALID_APPROVAL_TTL");
+  }
   validateSnapshot(input.executionSnapshot);
 
   const amountUsd = normalizeAmount(input.amountUsd);
@@ -91,8 +124,12 @@ export async function createOwnerApproval(input: CreateOwnerApprovalInput): Prom
   `;
 
   const approval = rows[0];
-  if (!approval) throw new Error("APPROVAL_CREATION_FAILED");
+  if (!approval) {
+    throw new Error("APPROVAL_CREATION_FAILED");
+  }
   return { approval, token: { token: tokenValue } };
 }
 
-export function hashOwnerApprovalToken(token: string) { return hashToken(token); }
+export function hashOwnerApprovalToken(token: string) {
+  return hashToken(token);
+}
