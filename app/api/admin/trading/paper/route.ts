@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardMutation } from "@/lib/api";
 import { requireTradingOwner } from "@/lib/trading/access";
+import { db } from "@/lib/prisma";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import { runPaperTrading, type PaperTradingTick } from "@/lib/trading/paper-trading";
 import { readJsonObject, tradingRouteError } from "@/lib/trading/route-helpers";
@@ -109,11 +110,34 @@ export async function POST(request: NextRequest) {
     };
 
     const result = runPaperTrading(config, ticks);
+    const sessionId = crypto.randomUUID();
+
+    await db.auditLog.create({
+      data: {
+        actorUserId: owner.id,
+        action: "PAPER_TRADING_RUN_COMPLETED",
+        entityType: "TradingPaperSession",
+        entityId: sessionId,
+        metadata: {
+          symbol: config.symbol.trim().toUpperCase(),
+          tickCount: ticks.length,
+          startingCapitalUsd: result.startingCapitalUsd,
+          finalCapitalUsd: result.finalCapitalUsd,
+          pnlUsd: result.pnlUsd,
+          returnPercent: result.returnPercent,
+          tradeCount: result.trades.length,
+          blockedSignalCount: result.blockedSignals.length,
+          shariahPolicyVersion: DEFAULT_SHARIAH_POLICY.version,
+          simulationOnly: true,
+        },
+      },
+    });
 
     return NextResponse.json({
       ok: true,
       mode: "PAPER_TRADING",
       simulationOnly: true,
+      sessionId,
       result,
     });
   } catch (error) {
