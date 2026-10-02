@@ -82,7 +82,7 @@ function validateConfig(config: PaperTradingConfig): void {
 
 function validateTick(tick: PaperTradingTick): void {
   if (
-    !tick.timestamp ||
+    !Number.isFinite(Date.parse(tick.timestamp)) ||
     [
       tick.price,
       tick.previousPrice,
@@ -93,6 +93,18 @@ function validateTick(tick: PaperTradingTick): void {
     ].some((value) => !positiveFinite(value))
   ) {
     throw new Error("INVALID_PAPER_TRADING_TICK");
+  }
+}
+
+function validateTickSeries(ticks: readonly PaperTradingTick[]): void {
+  ticks.forEach(validateTick);
+
+  for (let index = 1; index < ticks.length; index += 1) {
+    const previousTimestamp = Date.parse(ticks[index - 1].timestamp);
+    const currentTimestamp = Date.parse(ticks[index].timestamp);
+    if (currentTimestamp <= previousTimestamp) {
+      throw new Error("INVALID_PAPER_TRADING_TIMESTAMP_ORDER");
+    }
   }
 }
 
@@ -131,7 +143,7 @@ export function runPaperTrading(
 ): PaperTradingResult {
   validateConfig(config);
   if (ticks.length === 0) throw new Error("INVALID_PAPER_TRADING_INPUT");
-  ticks.forEach(validateTick);
+  validateTickSeries(ticks);
 
   let capital = config.startingCapitalUsd;
   let dailyLossUsd = 0;
@@ -184,6 +196,14 @@ export function runPaperTrading(
     });
 
     if (strategy.side !== "BUY") continue;
+
+    if (capital < config.tradeAmountUsd) {
+      blockedSignals.push({
+        timestamp: tick.timestamp,
+        reasons: ["INSUFFICIENT_PAPER_CAPITAL"],
+      });
+      continue;
+    }
 
     const riskSnapshot = {
       requestedAmountUsd: config.tradeAmountUsd,
