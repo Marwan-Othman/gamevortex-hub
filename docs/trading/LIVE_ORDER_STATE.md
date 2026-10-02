@@ -36,11 +36,22 @@ A provider observation must match the stored client order ID, symbol and BUY sid
 
 Older provider observations are treated as stale and never overwrite a newer local observation.
 
+## Protected exits
+
+A pure `buildProtectedExitPlan()` contract now requires a confirmed filled quantity and constructs a SELL OCO plan with:
+
+- take-profit `LIMIT_MAKER` above the entry price;
+- stop-loss `STOP_LOSS_LIMIT` below the entry price;
+- stop-limit price below the stop trigger for the SELL leg;
+- deterministic child client-order IDs.
+
+This planner does not submit the OCO. A future production adapter must submit the complete protected exit structure and verify it before a live position is considered protected. Binance documents Spot OCO order lists and their two-leg behavior in the Spot API documentation.
+
 ## Safety boundary
 
 This layer does not call Binance and does not submit live orders. The production flag remains disabled.
 
-The next stage still requires a separately reviewed production adapter plus protected exit-order handling, settlement verification, emergency-stop integration, and controlled first-live-order procedure.
+The next stage still requires a separately reviewed production adapter, transactional audit coverage for every state mutation, settlement verification, emergency-stop integration, and a controlled first-live-order procedure.
 
 ## External provider note
 
