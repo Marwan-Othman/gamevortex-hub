@@ -108,6 +108,15 @@ async function parseJson(response: Response): Promise<unknown> {
   const payload: unknown = await response.json();
   if (!response.ok) {
     const message = payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string" ? payload.msg : `HTTP_${response.status}`;
+
+    // Binance can reject the request at the service/eligibility layer before
+    // normal API validation. Convert that provider-specific wording into a
+    // stable internal code so the UI can explain the condition without
+    // exposing provider internals or leaking credentials.
+    if (/restricted location|service unavailable from/i.test(message)) {
+      throw new Error("BINANCE_TESTNET_RESTRICTED_LOCATION");
+    }
+
     throw new Error(`BINANCE_TESTNET_${message}`);
   }
   return payload;
