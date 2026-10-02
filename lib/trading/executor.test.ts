@@ -70,10 +70,41 @@ describe("buildTradingExecutionPlan", () => {
     expect(plan.clientOrderId).toMatch(/^gv-paper-[a-f0-9]{32}$/);
   });
 
+  it("normalizes symbols before creating the plan", () => {
+    const plan = buildTradingExecutionPlan(request({ symbol: "  test  " }));
+    expect(plan.symbol).toBe("TEST");
+  });
+
+  it("rejects symbols containing unsupported characters", () => {
+    expect(() => buildTradingExecutionPlan(request({ symbol: "TEST/USDT" }))).toThrow(
+      "INVALID_EXECUTION_SYMBOL",
+    );
+  });
+
+  it("rejects blank owner, opportunity, and idempotency identifiers", () => {
+    expect(() => buildTradingExecutionPlan(request({ ownerId: "   " }))).toThrow(
+      "INVALID_EXECUTION_OWNER",
+    );
+    expect(() => buildTradingExecutionPlan(request({ opportunityId: "   " }))).toThrow(
+      "INVALID_EXECUTION_OPPORTUNITY",
+    );
+    expect(() => buildTradingExecutionPlan(request({ idempotencyKey: "   " }))).toThrow(
+      "INVALID_EXECUTION_IDEMPOTENCY_KEY",
+    );
+  });
+
   it("is deterministic for the same idempotency key", () => {
     const first = buildTradingExecutionPlan(request());
     const second = buildTradingExecutionPlan(request());
     expect(first.clientOrderId).toBe(second.clientOrderId);
+  });
+
+  it("produces a different client order id for a different idempotency key", () => {
+    const first = buildTradingExecutionPlan(request());
+    const second = buildTradingExecutionPlan(
+      request({ idempotencyKey: "paper-opportunity-1-v2" }),
+    );
+    expect(first.clientOrderId).not.toBe(second.clientOrderId);
   });
 
   it("requires a consumed owner approval", () => {
@@ -84,6 +115,15 @@ describe("buildTradingExecutionPlan", () => {
 
   it("rejects amounts below the $1 minimum", () => {
     expect(() => buildTradingExecutionPlan(request({ amountUsd: 0.99 }))).toThrow(
+      "INVALID_TRADE_AMOUNT",
+    );
+  });
+
+  it("rejects non-finite trade amounts", () => {
+    expect(() => buildTradingExecutionPlan(request({ amountUsd: Number.NaN }))).toThrow(
+      "INVALID_TRADE_AMOUNT",
+    );
+    expect(() => buildTradingExecutionPlan(request({ amountUsd: Number.POSITIVE_INFINITY }))).toThrow(
       "INVALID_TRADE_AMOUNT",
     );
   });
@@ -118,6 +158,71 @@ describe("buildTradingExecutionPlan", () => {
         }),
       ),
     ).toThrow(/RISK_BLOCKED:.*MAX_TRADE_AMOUNT_EXCEEDED/);
+  });
+
+  it("fails closed when daily loss already reaches the configured limit", () => {
+    expect(() =>
+      buildTradingExecutionPlan(
+        request({
+          riskSnapshot: {
+            ...request().riskSnapshot,
+            dailyLossUsd: 50,
+          },
+        }),
+      ),
+    ).toThrow(/RISK_BLOCKED:.*MAX_DAILY_LOSS_EXCEEDED/);
+  });
+
+  it("fails closed when the maximum number of open trades is reached", () => {
+    expect(() =>
+      buildTradingExecutionPlan(
+        request({
+          riskSnapshot: {
+            ...request().riskSnapshot,
+            openTrades: 1,
+          },
+        }),
+      ),
+    ).toThrow(/RISK_BLOCKED:.*MAX_OPEN_TRADES_EXCEEDED/);
+  });
+
+  it("fails closed when total exposure would exceed the configured limit", () => {
+    expect(() =>
+      buildTradingExecutionPlan(
+        request({
+          riskSnapshot: {
+            ...request().riskSnapshot,
+            totalExposureUsd: 95,
+          },
+        }),
+      ),
+    ).toThrow(/RISK_BLOCKED:.*MAX_EXPOSURE_EXCEEDED/);
+  });
+
+  it("fails closed when the asset exposure would exceed the configured limit", () => {
+    expect(() =>
+      buildTradingExecutionPlan(
+        request({
+          riskSnapshot: {
+            ...request().riskSnapshot,
+            assetExposureUsd: 95,
+          },
+        }),
+      ),
+    ).toThrow(/RISK_BLOCKED:.*MAX_ASSET_EXPOSURE_EXCEEDED/);
+  });
+
+  it("fails closed when consecutive losses reach the configured limit", () => {
+    expect(() =>
+      buildTradingExecutionPlan(
+        request({
+          riskSnapshot: {
+            ...request().riskSnapshot,
+            consecutiveLosses: 3,
+          },
+        }),
+      ),
+    ).toThrow(/RISK_BLOCKED:.*MAX_CONSECUTIVE_LOSSES_EXCEEDED/);
   });
 
   it("rejects live mode until a reviewed exchange adapter exists", () => {
