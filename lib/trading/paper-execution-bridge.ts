@@ -25,6 +25,12 @@ export type OpenPaperExecution = {
   position: PaperPosition;
 };
 
+function normalizeRequiredString(value: string, code: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 100) throw new Error(code);
+  return normalized;
+}
+
 export function openPaperPositionFromExecutionPlan(input: {
   plan: TradingExecutionPlan;
   positionId: string;
@@ -35,6 +41,19 @@ export function openPaperPositionFromExecutionPlan(input: {
     throw new Error("PAPER_EXECUTION_PLAN_REQUIRED");
   }
 
+  const policyVersion = normalizeRequiredString(
+    input.shariahPolicyVersion,
+    "INVALID_POSITION_SHARIAH_POLICY_VERSION",
+  );
+  const planPolicyVersion = normalizeRequiredString(
+    input.plan.preTrade.shariah.policyVersion,
+    "INVALID_EXECUTION_SHARIAH_POLICY_VERSION",
+  );
+
+  if (policyVersion !== planPolicyVersion) {
+    throw new Error("SHARIAH_POLICY_VERSION_MISMATCH");
+  }
+
   const position = openPaperPosition({
     positionId: input.positionId,
     symbol: input.plan.symbol,
@@ -43,7 +62,7 @@ export function openPaperPositionFromExecutionPlan(input: {
     stopLossPrice: input.plan.stopLossPrice,
     takeProfitPrice: input.plan.takeProfitPrice,
     openedAt: input.openedAt,
-    shariahPolicyVersion: input.shariahPolicyVersion,
+    shariahPolicyVersion: planPolicyVersion,
   });
 
   return {
