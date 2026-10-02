@@ -9,12 +9,12 @@ import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
 import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
 import TradingPaperPanel from "@/components/admin/TradingPaperPanel";
 import TradingTestnetPanel from "@/components/admin/TradingTestnetPanel";
+import TradingLivePreflightPanel from "@/components/admin/TradingLivePreflightPanel";
 import TradingAuditPanel from "@/components/admin/TradingAuditPanel";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
 
-// Owner-only system: keep it out of search engines even if a URL leaks.
 export const metadata: Metadata = {
   title: "GameVortex AI Trading",
   robots: { index: false, follow: false },
@@ -61,13 +61,10 @@ export default async function TradingPage() {
       />
 
       <TradingRiskConfigPanel initial={riskConfigForClient} />
-
       <TradingBacktestPanel />
-
       <TradingPaperPanel />
-
       <TradingTestnetPanel />
-
+      <TradingLivePreflightPanel />
       <TradingAuditPanel />
     </AdminShell>
   );
