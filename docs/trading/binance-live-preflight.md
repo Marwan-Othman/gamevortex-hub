@@ -28,7 +28,7 @@ The owner-only endpoint `GET /api/admin/trading/exchange/live/preflight` perform
 - Internal transfers disabled for the initial isolated trading stage.
 - Explicit GameVortex live-trading flag.
 
-The Binance API exposes API-key restrictions through `GET /sapi/v1/account/apiRestrictions`; the project uses that endpoint rather than assuming that an account-level status is sufficient. citeturn1search0
+The Binance API exposes API-key restrictions through `GET /sapi/v1/account/apiRestrictions`; the project uses that endpoint rather than assuming that an account-level status is sufficient. See the official Binance Developer Documentation for the `apiRestrictions` endpoint.
 
 ## Current safety boundary
 
