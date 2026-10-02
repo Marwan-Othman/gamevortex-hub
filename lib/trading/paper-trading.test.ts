@@ -124,4 +124,35 @@ describe("runPaperTrading", () => {
       shariahPolicy,
     }, [tick()])).toThrow("INVALID_PAPER_TRADING_CONFIG");
   });
+
+  it("rejects invalid timestamps and non-monotonic tick order", () => {
+    expect(() => runPaperTrading(
+      {
+        symbol: "TEST",
+        startingCapitalUsd: 100,
+        tradeAmountUsd: 10,
+        stopLossPercent: 2,
+        takeProfitPercent: 4,
+        riskConfig,
+        shariahPolicy,
+      },
+      [tick({ timestamp: "not-a-date" })],
+    )).toThrow("INVALID_PAPER_TRADING_TICK");
+
+    expect(() => runPaperTrading(
+      {
+        symbol: "TEST",
+        startingCapitalUsd: 100,
+        tradeAmountUsd: 10,
+        stopLossPercent: 2,
+        takeProfitPercent: 4,
+        riskConfig,
+        shariahPolicy,
+      },
+      [
+        tick({ timestamp: "2026-01-01T00:05:00Z" }),
+        tick({ timestamp: "2026-01-01T00:05:00Z" }),
+      ],
+    )).toThrow("INVALID_PAPER_TRADING_TIMESTAMP_ORDER");
+  });
 });
