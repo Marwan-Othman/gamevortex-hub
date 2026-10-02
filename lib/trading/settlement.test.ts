@@ -38,4 +38,19 @@ describe("settleClosedPaperPosition", () => {
       "PAPER_POSITION_MUST_BE_CLOSED",
     );
   });
+
+  it("settles a losing position without changing the deterministic principal", () => {
+    const closed = closePaperPosition(position(), {
+      exitPrice: 95,
+      reason: "STOP_LOSS",
+      closedAt: "2026-10-02T08:05:00Z",
+    });
+
+    const settlement = settleClosedPaperPosition(closed);
+
+    expect(settlement.status).toBe("SETTLED");
+    expect(settlement.pnlUsd).toBeCloseTo(-0.5);
+    expect(settlement.returnPercent).toBeCloseTo(-5);
+    expect(settlement.settlementValueUsd).toBeCloseTo(9.5);
+  });
 });
