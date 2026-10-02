@@ -45,6 +45,23 @@ describe("BinanceSpotTestnetAdapter.getAccountStatus", () => {
     await expect(adapter.getAccountStatus()).rejects.toThrow("BINANCE_TESTNET_API_CREDENTIALS_REQUIRED");
   });
 
+  it("maps a provider location restriction to a stable internal error", async () => {
+    const adapter = new BinanceSpotTestnetAdapter({
+      apiKey: "test-api-key",
+      apiSecret: "test-api-secret",
+      fetcher: async () =>
+        new Response(
+          JSON.stringify({
+            code: -1000,
+            msg: "BINANCE_TESTNET_Service unavailable from a restricted location according to eligibility.",
+          }),
+          { status: 500, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    await expect(adapter.getAccountStatus()).rejects.toThrow("BINANCE_TESTNET_RESTRICTED_LOCATION");
+  });
+
   it("rejects an account response without explicit permission fields", async () => {
     const adapter = new BinanceSpotTestnetAdapter({
       apiKey: "test-api-key",
