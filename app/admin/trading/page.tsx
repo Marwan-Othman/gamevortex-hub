@@ -8,6 +8,7 @@ import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
 import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
 import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
 import TradingPaperPanel from "@/components/admin/TradingPaperPanel";
+import TradingTestnetPanel from "@/components/admin/TradingTestnetPanel";
 import TradingAuditPanel from "@/components/admin/TradingAuditPanel";
 import styles from "../admin.module.css";
 
@@ -64,6 +65,8 @@ export default async function TradingPage() {
       <TradingBacktestPanel />
 
       <TradingPaperPanel />
+
+      <TradingTestnetPanel />
 
       <TradingAuditPanel />
     </AdminShell>
