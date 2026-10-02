@@ -19,11 +19,11 @@ export type ExchangeAdapterCapabilities = {
   marketData: boolean;
   paperTrading: boolean;
   liveOrders: boolean;
-  withdrawals: false;
-  margin: false;
-  leverage: false;
-  shortSelling: false;
-  derivatives: false;
+  withdrawals: boolean;
+  margin: boolean;
+  leverage: boolean;
+  shortSelling: boolean;
+  derivatives: boolean;
 };
 
 export type ExchangeMarketDataRequest = {
