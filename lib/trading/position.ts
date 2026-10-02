@@ -50,7 +50,7 @@ function positiveFinite(value: number): boolean {
 
 function normalizeSymbol(symbol: string): string {
   const normalized = symbol.trim().toUpperCase();
-  if (!normalized || !/^[A-Z0-9._:-]{1,32}$/.test(normalized)) {
+  if (!normalized || !/^[A-Z0-9._:\/-]{1,32}$/.test(normalized)) {
     throw new Error("INVALID_POSITION_SYMBOL");
   }
   return normalized;
