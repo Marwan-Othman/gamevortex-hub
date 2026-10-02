@@ -2,14 +2,6 @@ import { NextResponse } from "next/server";
 import { getOptionalUser } from "../auth";
 import { logEvent } from "../observability";
 
-/**
- * Server-side gate for every GameVortex AI Trading API route (Tasks 3, 4, 6).
- *
- * - Authorization is role === SUPER_ADMIN only. Never email / username.
- * - Any unauthorized attempt (logged out, USER, STAFF, ...) returns 403.
- *   The response is identical for all of them so the endpoint does not
- *   reveal whether a session exists.
- */
 export class TradingAccessError extends Error {
   constructor() {
     super("FORBIDDEN");
@@ -18,15 +10,10 @@ export class TradingAccessError extends Error {
 
 export async function requireTradingOwner() {
   const user = await getOptionalUser();
-
   if (!user || user.role !== "SUPER_ADMIN") {
-    if (user) {
-      // Metadata only: no secrets, no request body.
-      logEvent("trading_access_denied", { userId: user.id, role: user.role });
-    }
+    if (user) logEvent("trading_access_denied", { userId: user.id, role: user.role });
     throw new TradingAccessError();
   }
-
   return user;
 }
 
@@ -48,14 +35,12 @@ const CLIENT_ERROR_STATUS: Record<string, number> = {
   ALLOCATION_ALREADY_RELEASED: 409,
   ALLOCATION_IN_USE: 409,
   INSUFFICIENT_TRADING_BALANCE: 409,
-  // Phase 2b
   INVALID_RISK_CONFIG: 400,
   INVALID_SHARIAH_INPUT: 400,
   INVALID_CONTROL_ACTION: 400,
   INVALID_CIRCUIT_BREAKER_REASON: 400,
   CONFIRMATION_REQUIRED: 400,
   SHARIAH_POLICY_NOT_FOUND: 409,
-  // Guarded owner opportunity / approval lifecycle
   INVALID_APPROVAL_INPUT: 400,
   APPROVAL_NOT_FOUND: 404,
   APPROVAL_RISK_SNAPSHOT_REQUIRED: 409,
@@ -70,12 +55,13 @@ const CLIENT_ERROR_STATUS: Record<string, number> = {
   STOP_LOSS_REQUIRED: 409,
   INVALID_TAKE_PROFIT_FOR_BUY: 400,
   PAPER_TRADING_RISK_CONFIG_REQUIRED: 409,
-  // Binance Spot Testnet execution
   INVALID_TESTNET_EXECUTION_IDENTITY: 400,
   INVALID_TESTNET_EXECUTION_STRATEGY: 400,
   TESTNET_EXECUTION_PLAN_REQUIRED: 409,
   BINANCE_TESTNET_API_CREDENTIALS_REQUIRED: 503,
   BINANCE_TESTNET_RESTRICTED_LOCATION: 503,
+  BINANCE_TESTNET_NETWORK_ERROR: 503,
+  BINANCE_TESTNET_INVALID_RESPONSE: 502,
   BINANCE_TESTNET_TRADING_DISABLED: 409,
   BINANCE_TESTNET_WITHDRAWALS_MUST_BE_DISABLED: 409,
   BINANCE_TESTNET_SPOT_PERMISSION_REQUIRED: 409,
@@ -88,6 +74,18 @@ const CLIENT_ERROR_STATUS: Record<string, number> = {
   INVALID_BINANCE_TESTNET_ORDER_RESPONSE: 502,
   INVALID_BINANCE_TESTNET_ACCOUNT_RESPONSE: 502,
   BINANCE_TESTNET_ORDER_NOT_FILLED: 409,
+  BINANCE_LIVE_API_CREDENTIALS_REQUIRED: 503,
+  BINANCE_LIVE_NETWORK_ERROR: 503,
+  BINANCE_LIVE_INVALID_RESPONSE: 502,
+  BINANCE_LIVE_SPOT_ACCOUNT_REQUIRED: 409,
+  BINANCE_LIVE_SPOT_TRADING_REQUIRED: 409,
+  BINANCE_LIVE_WITHDRAWALS_MUST_BE_DISABLED: 409,
+  BINANCE_LIVE_MARGIN_MUST_BE_DISABLED: 409,
+  BINANCE_LIVE_FUTURES_MUST_BE_DISABLED: 409,
+  BINANCE_LIVE_OPTIONS_MUST_BE_DISABLED: 409,
+  BINANCE_LIVE_PORTFOLIO_MARGIN_MUST_BE_DISABLED: 409,
+  BINANCE_LIVE_INTERNAL_TRANSFER_MUST_BE_DISABLED: 409,
+  GAMEVORTEX_LIVE_TRADING_DISABLED: 409,
 };
 
 export function tradingErrorStatus(message: string): number | null {
