@@ -203,14 +203,14 @@ export function validateExchangeOrderRequest(request: ExchangeOrderRequest): voi
 
 /**
  * A provider is valid for live trading only if it explicitly advertises every
- * required capability. The function is deliberately strict and fail-closed.
+ * required live-safety capability. Paper-trading support is intentionally not
+ * required here because paper trading is provided by a separate adapter.
  */
 export function assertLiveAdapterCapability(adapter: ExchangeAdapter): void {
   validateExchangeAdapterContract(adapter);
 
   if (adapter.mode !== "LIVE") throw new Error("LIVE_ADAPTER_REQUIRED");
   if (!adapter.capabilities.marketData) throw new Error("MARKET_DATA_NOT_SUPPORTED");
-  if (!adapter.capabilities.paperTrading) throw new Error("PAPER_TRADING_NOT_SUPPORTED");
   if (!adapter.capabilities.liveOrders) throw new Error("LIVE_ORDERS_NOT_SUPPORTED");
   if (adapter.capabilities.withdrawals) throw new Error("WITHDRAWALS_FORBIDDEN");
   if (adapter.capabilities.margin) throw new Error("MARGIN_FORBIDDEN");
