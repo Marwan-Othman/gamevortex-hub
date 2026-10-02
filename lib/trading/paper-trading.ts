@@ -13,7 +13,6 @@ import {
   openPaperPosition,
   type PaperPosition,
 } from "@/lib/trading/position";
-import { evaluateStrategy, type StrategyDecision } from "@/lib/trading/strategy";
 import type { RiskConfig } from "@/lib/trading/risk";
 import type { ShariahAssetInput, ShariahPolicy } from "@/lib/trading/shariah";
 
@@ -64,9 +63,23 @@ function positiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
-function validateConfig(config: PaperTradingConfig): void {
+function normalizeSymbol(value: string): string {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized || !/^[A-Z0-9._:-]{1,32}$/.test(normalized)) {
+    throw new Error("INVALID_PAPER_TRADING_CONFIG");
+  }
+  return normalized;
+}
+
+function validateConfig(config: PaperTradingConfig): string {
+  let symbol: string;
+  try {
+    symbol = normalizeSymbol(config.symbol);
+  } catch {
+    throw new Error("INVALID_PAPER_TRADING_CONFIG");
+  }
+
   if (
-    !config.symbol.trim() ||
     !positiveFinite(config.startingCapitalUsd) ||
     !positiveFinite(config.tradeAmountUsd) ||
     !positiveFinite(config.stopLossPercent) ||
@@ -78,9 +91,11 @@ function validateConfig(config: PaperTradingConfig): void {
   ) {
     throw new Error("INVALID_PAPER_TRADING_CONFIG");
   }
+
+  return symbol;
 }
 
-function validateTick(tick: PaperTradingTick): void {
+function validateTick(tick: PaperTradingTick, expectedSymbol: string): void {
   if (
     !Number.isFinite(Date.parse(tick.timestamp)) ||
     [
@@ -94,10 +109,19 @@ function validateTick(tick: PaperTradingTick): void {
   ) {
     throw new Error("INVALID_PAPER_TRADING_TICK");
   }
+
+  const tickSymbol =
+    typeof tick.shariah.symbol === "string" ? tick.shariah.symbol.trim().toUpperCase() : "";
+  if (!tickSymbol || tickSymbol !== expectedSymbol) {
+    throw new Error("PAPER_TRADING_SYMBOL_MISMATCH");
+  }
 }
 
-function validateTickSeries(ticks: readonly PaperTradingTick[]): void {
-  ticks.forEach(validateTick);
+function validateTickSeries(
+  ticks: readonly PaperTradingTick[],
+  expectedSymbol: string,
+): void {
+  ticks.forEach((tick) => validateTick(tick, expectedSymbol));
 
   for (let index = 1; index < ticks.length; index += 1) {
     const previousTimestamp = Date.parse(ticks[index - 1].timestamp);
@@ -152,9 +176,9 @@ export function runPaperTrading(
   config: PaperTradingConfig,
   ticks: readonly PaperTradingTick[],
 ): PaperTradingResult {
-  validateConfig(config);
+  const symbol = validateConfig(config);
   if (ticks.length === 0) throw new Error("INVALID_PAPER_TRADING_INPUT");
-  validateTickSeries(ticks);
+  validateTickSeries(ticks, symbol);
 
   let capital = config.startingCapitalUsd;
   let dailyLossUsd = 0;
@@ -202,7 +226,7 @@ export function runPaperTrading(
     }
 
     const strategy: StrategyDecision = evaluateStrategy({
-      symbol: config.symbol,
+      symbol,
       price: tick.price,
       previousPrice: tick.previousPrice,
       fastAverage: tick.fastAverage,
@@ -257,8 +281,8 @@ export function runPaperTrading(
     }
 
     position = openPaperPosition({
-      positionId: `paper-${config.symbol.trim().toUpperCase()}-${index}`,
-      symbol: config.symbol,
+      positionId: `paper-${symbol}-${index}`,
+      symbol,
       amountUsd: config.tradeAmountUsd,
       entryPrice: strategy.entryPrice,
       stopLossPrice: strategy.stopLossPrice,
