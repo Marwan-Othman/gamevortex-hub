@@ -50,16 +50,8 @@ export type CreateLiveOrderIntentInput = {
 };
 
 export type LiveOrderReconciliationResult =
-  | {
-      status: "MATCHED";
-      order: LiveOrderRow;
-      nextState: LiveOrderState;
-    }
-  | {
-      status: "MISMATCHED";
-      order: LiveOrderRow;
-      reasons: string[];
-    }
+  | { status: "MATCHED"; order: LiveOrderRow; nextState: LiveOrderState }
+  | { status: "MISMATCHED"; order: LiveOrderRow; reasons: string[] }
   | {
       status: "STALE";
       order: LiveOrderRow;
@@ -84,7 +76,6 @@ function normalizeDecimal(
   } catch {
     throw new Error(code);
   }
-
   if (!decimal.isFinite() || decimal.lessThanOrEqualTo(0)) throw new Error(code);
   return decimal.toDecimalPlaces(scale);
 }
@@ -107,17 +98,20 @@ function sameDecimal(left: Prisma.Decimal, right: Prisma.Decimal): boolean {
   return left.eq(right);
 }
 
-function assertImmutableMatch(existing: LiveOrderRow, input: {
-  ownerId: string;
-  approvalId: string;
-  opportunityId: string;
-  clientOrderId: string;
-  symbol: string;
-  amountUsd: Prisma.Decimal;
-  entryPrice: Prisma.Decimal;
-  stopLossPrice: Prisma.Decimal;
-  takeProfitPrice: Prisma.Decimal | null;
-}): void {
+function assertImmutableMatch(
+  existing: LiveOrderRow,
+  input: {
+    ownerId: string;
+    approvalId: string;
+    opportunityId: string;
+    clientOrderId: string;
+    symbol: string;
+    amountUsd: Prisma.Decimal;
+    entryPrice: Prisma.Decimal;
+    stopLossPrice: Prisma.Decimal;
+    takeProfitPrice: Prisma.Decimal | null;
+  },
+): void {
   const mismatches: string[] = [];
   if (existing.ownerId !== input.ownerId) mismatches.push("OWNER_ID_MISMATCH");
   if (existing.approvalId !== input.approvalId) mismatches.push("APPROVAL_ID_MISMATCH");
@@ -126,9 +120,7 @@ function assertImmutableMatch(existing: LiveOrderRow, input: {
   if (existing.symbol !== input.symbol) mismatches.push("SYMBOL_MISMATCH");
   if (!sameDecimal(existing.amountUsd, input.amountUsd)) mismatches.push("AMOUNT_MISMATCH");
   if (!sameDecimal(existing.entryPrice, input.entryPrice)) mismatches.push("ENTRY_PRICE_MISMATCH");
-  if (!sameDecimal(existing.stopLossPrice, input.stopLossPrice)) {
-    mismatches.push("STOP_LOSS_MISMATCH");
-  }
+  if (!sameDecimal(existing.stopLossPrice, input.stopLossPrice)) mismatches.push("STOP_LOSS_MISMATCH");
 
   if (existing.takeProfitPrice === null || input.takeProfitPrice === null) {
     if (existing.takeProfitPrice !== input.takeProfitPrice) mismatches.push("TAKE_PROFIT_MISMATCH");
@@ -142,7 +134,9 @@ function assertImmutableMatch(existing: LiveOrderRow, input: {
 }
 
 export function buildLiveClientOrderIdForIdempotency(idempotencyKey: string): string {
-  return buildLiveClientOrderId(normalizeIdentifier(idempotencyKey, "INVALID_LIVE_IDEMPOTENCY_KEY", 200));
+  return buildLiveClientOrderId(
+    normalizeIdentifier(idempotencyKey, "INVALID_LIVE_IDEMPOTENCY_KEY", 200),
+  );
 }
 
 export async function createLiveOrderIntent(
@@ -178,18 +172,9 @@ export async function createLiveOrderIntent(
       "id", "ownerId", "approvalId", "opportunityId", "idempotencyKey", "clientOrderId",
       "symbol", "side", "amountUsd", "entryPrice", "stopLossPrice", "takeProfitPrice", "status"
     ) VALUES (
-      ${id},
-      ${ownerId},
-      ${approvalId},
-      ${opportunityId},
-      ${idempotencyKey},
-      ${clientOrderId},
-      ${symbol},
-      'BUY',
-      ${amountUsd.toString()}::numeric,
-      ${entryPrice.toString()}::numeric,
-      ${stopLossPrice.toString()}::numeric,
-      ${takeProfitPrice?.toString() ?? null}::numeric,
+      ${id}, ${ownerId}, ${approvalId}, ${opportunityId}, ${idempotencyKey}, ${clientOrderId},
+      ${symbol}, 'BUY', ${amountUsd.toString()}::numeric, ${entryPrice.toString()}::numeric,
+      ${stopLossPrice.toString()}::numeric, ${takeProfitPrice?.toString() ?? null}::numeric,
       'INTENT_CREATED'
     )
     ON CONFLICT ("idempotencyKey") DO NOTHING
@@ -216,14 +201,18 @@ export async function createLiveOrderIntent(
   return existing;
 }
 
+export async function getLiveOrderById(orderId: string): Promise<LiveOrderRow | null> {
+  const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    SELECT * FROM "TradingLiveOrder" WHERE "id" = ${orderId} LIMIT 1
+  `);
+  return rows[0] ?? null;
+}
+
 export async function getLiveOrderByIdempotencyKey(
   idempotencyKey: string,
 ): Promise<LiveOrderRow | null> {
   const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
-    SELECT *
-    FROM "TradingLiveOrder"
-    WHERE "idempotencyKey" = ${idempotencyKey}
-    LIMIT 1
+    SELECT * FROM "TradingLiveOrder" WHERE "idempotencyKey" = ${idempotencyKey} LIMIT 1
   `);
   return rows[0] ?? null;
 }
@@ -232,10 +221,7 @@ export async function getLiveOrderByClientOrderId(
   clientOrderId: string,
 ): Promise<LiveOrderRow | null> {
   const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
-    SELECT *
-    FROM "TradingLiveOrder"
-    WHERE "clientOrderId" = ${clientOrderId}
-    LIMIT 1
+    SELECT * FROM "TradingLiveOrder" WHERE "clientOrderId" = ${clientOrderId} LIMIT 1
   `);
   return rows[0] ?? null;
 }
@@ -267,18 +253,13 @@ export async function transitionLiveOrderState(
 
   const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
-    SET
-      "status" = ${nextState},
-      "lastError" = ${reason ?? null},
-      "version" = "version" + 1
-    WHERE "id" = ${orderId}
-      AND "status" = ${expectedState}
+    SET "status" = ${nextState}, "lastError" = ${reason ?? null}, "version" = "version" + 1
+    WHERE "id" = ${orderId} AND "status" = ${expectedState}
     RETURNING *
   `);
 
   const order = rows[0];
   if (!order) throw new Error("LIVE_ORDER_STATE_CONFLICT");
-
   return order;
 }
 
@@ -287,17 +268,10 @@ export async function markLiveOrderUnknown(
   reason: string,
 ): Promise<LiveOrderRow> {
   const normalizedReason = normalizeIdentifier(reason, "INVALID_LIVE_ORDER_UNKNOWN_REASON", 500);
-  const current = await getLiveOrderByIdempotencyKey(orderId);
-  if (current) {
-    throw new Error("LIVE_ORDER_IDEMPOTENCY_KEY_USED_AS_ORDER_ID");
-  }
 
   const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
-    SET
-      "status" = 'UNKNOWN',
-      "lastError" = ${normalizedReason},
-      "version" = "version" + 1
+    SET "status" = 'UNKNOWN', "lastError" = ${normalizedReason}, "version" = "version" + 1
     WHERE "id" = ${orderId}
       AND "status" IN ('INTENT_CREATED', 'SUBMITTING', 'SUBMITTED', 'PARTIALLY_FILLED', 'UNKNOWN')
     RETURNING *
@@ -314,12 +288,9 @@ export async function reconcileStoredLiveOrder(
   const order = await getLiveOrderByClientOrderId(observation.clientOrderId);
   if (!order) throw new Error("LIVE_ORDER_NOT_FOUND");
 
-  const providerUpdatedAt = observation.updatedAt instanceof Date
-    ? observation.updatedAt
-    : new Date(observation.updatedAt);
-  if (Number.isNaN(providerUpdatedAt.getTime())) {
-    throw new Error("INVALID_PROVIDER_UPDATE_TIME");
-  }
+  const providerUpdatedAt =
+    observation.updatedAt instanceof Date ? observation.updatedAt : new Date(observation.updatedAt);
+  if (Number.isNaN(providerUpdatedAt.getTime())) throw new Error("INVALID_PROVIDER_UPDATE_TIME");
 
   if (order.lastProviderUpdateAt && providerUpdatedAt.getTime() < order.lastProviderUpdateAt.getTime()) {
     return {
@@ -378,17 +349,12 @@ export async function reconcileStoredLiveOrder(
       "lastReconciledAt" = CURRENT_TIMESTAMP,
       "lastError" = NULL,
       "version" = "version" + 1
-    WHERE "id" = ${order.id}
-      AND "status" <> 'RECONCILIATION_MISMATCH'
+    WHERE "id" = ${order.id} AND "status" <> 'RECONCILIATION_MISMATCH'
     RETURNING *
   `);
 
   const updated = rows[0];
   if (!updated) throw new Error("LIVE_ORDER_RECONCILIATION_UPDATE_FAILED");
 
-  return {
-    status: "MATCHED",
-    order: updated,
-    nextState: reconciliation.nextState,
-  };
+  return { status: "MATCHED", order: updated, nextState: reconciliation.nextState };
 }
