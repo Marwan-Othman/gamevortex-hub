@@ -107,6 +107,10 @@ describe("runBacktest", () => {
       ...config,
       tradeAmountUsd: 101,
     })).toThrow("INVALID_BACKTEST_CONFIG");
+    expect(() => runBacktest("TEST", [candle("2026-01-01T00:00:00Z")], {
+      ...config,
+      tradeAmountUsd: 0.99,
+    })).toThrow("INVALID_BACKTEST_CONFIG");
     expect(() => runBacktest("INVALID SYMBOL", [candle("2026-01-01T00:00:00Z")], config)).toThrow(
       "INVALID_BACKTEST_INPUT",
     );
