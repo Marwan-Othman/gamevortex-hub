@@ -24,6 +24,7 @@ describe("BinanceSpotLiveAdapter safety boundary", () => {
       adapter.placeProtectedExitOco({
         symbol: "BTCUSDT",
         quantity: "0.001",
+        entryPrice: "100",
         takeProfitClientOrderId: "gv-exit-tp-test",
         takeProfitPrice: "104",
         stopLossClientOrderId: "gv-exit-sl-test",
