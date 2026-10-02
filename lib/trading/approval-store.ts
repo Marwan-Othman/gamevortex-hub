@@ -45,12 +45,13 @@ export type CreateOwnerApprovalInput = {
   ttlSeconds: number;
 };
 
-function hashToken(token: string) {
+function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
-function normalizeAmount(value: string | number) {
+function normalizeAmount(value: string | number): Prisma.Decimal {
   let amount: Prisma.Decimal;
+
   try {
     amount = new Prisma.Decimal(value);
   } catch {
@@ -64,7 +65,7 @@ function normalizeAmount(value: string | number) {
   return amount.toDecimalPlaces(2);
 }
 
-function validateSnapshot(snapshot: OwnerExecutionSnapshot) {
+function validateSnapshot(snapshot: OwnerExecutionSnapshot): void {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
@@ -88,7 +89,11 @@ function validateSnapshot(snapshot: OwnerExecutionSnapshot) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
 
-  if (!snapshot.shariah || typeof snapshot.shariah !== "object" || Array.isArray(snapshot.shariah)) {
+  if (
+    !snapshot.shariah ||
+    typeof snapshot.shariah !== "object" ||
+    Array.isArray(snapshot.shariah)
+  ) {
     throw new Error("INVALID_EXECUTION_SNAPSHOT");
   }
 }
@@ -104,7 +109,11 @@ export async function createOwnerApproval(
     throw new Error("SHARIAH_APPROVAL_REQUIRED");
   }
 
-  if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 30 || input.ttlSeconds > 15 * 60) {
+  if (
+    !Number.isInteger(input.ttlSeconds) ||
+    input.ttlSeconds < 30 ||
+    input.ttlSeconds > 15 * 60
+  ) {
     throw new Error("INVALID_APPROVAL_TTL");
   }
 
@@ -116,7 +125,10 @@ export async function createOwnerApproval(
   const id = randomBytes(18).toString("base64url");
   const issuedAt = new Date();
   const expiresAt = new Date(issuedAt.getTime() + input.ttlSeconds * 1000);
-  const riskSnapshot = input.riskSnapshot === undefined ? null : JSON.stringify(input.riskSnapshot);
+  const riskSnapshot =
+    input.riskSnapshot === undefined
+      ? null
+      : JSON.stringify(input.riskSnapshot);
   const executionSnapshot = JSON.stringify(input.executionSnapshot);
 
   const rows = await db.$queryRaw<OwnerApproval[]>(Prisma.sql`
@@ -124,21 +136,36 @@ export async function createOwnerApproval(
       "id", "opportunityId", "ownerId", "amountUsd", "issuedAt", "expiresAt", "status",
       "strategyVersion", "shariahStatus", "riskSnapshot", "executionSnapshot", "tokenHash"
     ) VALUES (
-      ${id}, ${input.opportunityId}, ${input.ownerId}, ${amountUsd.toString()}::numeric, ${issuedAt}, ${expiresAt},
-      'PENDING', ${input.strategyVersion ?? null}, 'APPROVED', ${riskSnapshot}::jsonb, ${executionSnapshot}::jsonb, ${tokenHash}
+      ${id},
+      ${input.opportunityId},
+      ${input.ownerId},
+      ${amountUsd.toString()}::numeric,
+      ${issuedAt},
+      ${expiresAt},
+      'PENDING',
+      ${input.strategyVersion ?? null},
+      'APPROVED',
+      ${riskSnapshot}::jsonb,
+      ${executionSnapshot}::jsonb,
+      ${tokenHash}
     )
-    RETURNING "id", "opportunityId", "ownerId", "amountUsd", "issuedAt", "expiresAt", "consumedAt", "status",
-      "strategyVersion", "shariahStatus", "riskSnapshot", "executionSnapshot"
-  `;
+    RETURNING
+      "id", "opportunityId", "ownerId", "amountUsd", "issuedAt", "expiresAt",
+      "consumedAt", "status", "strategyVersion", "shariahStatus",
+      "riskSnapshot", "executionSnapshot"
+  `);
 
   const approval = rows[0];
   if (!approval) {
     throw new Error("APPROVAL_CREATION_FAILED");
   }
 
-  return { approval, token: { token: tokenValue } };
+  return {
+    approval,
+    token: { token: tokenValue },
+  };
 }
 
-export function hashOwnerApprovalToken(token: string) {
+export function hashOwnerApprovalToken(token: string): string {
   return hashToken(token);
 }
