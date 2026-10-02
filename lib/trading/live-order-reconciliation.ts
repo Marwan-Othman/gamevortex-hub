@@ -7,6 +7,19 @@
  * persistence layer can fail closed instead of overwriting local state.
  */
 
+export type LiveOrderState =
+  | "INTENT_CREATED"
+  | "SUBMITTING"
+  | "SUBMITTED"
+  | "PARTIALLY_FILLED"
+  | "FILLED"
+  | "CANCELED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "UNKNOWN"
+  | "RECONCILIATION_MISMATCH"
+  | "CLOSED";
+
 export type LiveOrderIntent = {
   clientOrderId: string;
   providerOrderId?: string | null;
@@ -40,15 +53,9 @@ export type LiveProviderOrderObservation = {
 export type LiveReconciliation =
   | {
       status: "MATCHED";
-      nextState:
-        | "SUBMITTED"
-        | "PARTIALLY_FILLED"
-        | "FILLED"
-        | "CANCELED"
-        | "REJECTED"
-        | "EXPIRED";
+      nextState: Exclude<LiveOrderState, "INTENT_CREATED" | "SUBMITTING" | "UNKNOWN" | "RECONCILIATION_MISMATCH" | "CLOSED">;
       clientOrderId: string;
-      providerOrderId: string | null;
+      providerOrderId: string;
       providerStatus: LiveProviderOrderStatus;
     }
   | {
@@ -76,7 +83,7 @@ function parseDate(value: Date | string | number): Date | null {
 
 export function mapProviderOrderStatus(
   status: LiveProviderOrderStatus,
-): LiveReconciliation["status"] extends never ? never : Exclude<LiveReconciliation, { status: "MISMATCHED" }>["nextState"] {
+): Exclude<LiveOrderState, "INTENT_CREATED" | "SUBMITTING" | "UNKNOWN" | "RECONCILIATION_MISMATCH" | "CLOSED"> {
   switch (status) {
     case "NEW":
     case "PENDING_NEW":
@@ -156,7 +163,7 @@ export function reconcileLiveOrderObservation(
     status: "MATCHED",
     nextState: mapProviderOrderStatus(observation.status),
     clientOrderId: observation.clientOrderId,
-    providerOrderId: observation.providerOrderId ?? null,
+    providerOrderId: observation.providerOrderId!,
     providerStatus: observation.status,
   };
 }
