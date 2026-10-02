@@ -64,6 +64,39 @@ describe("paper trading integrity", () => {
     expect(closed.returnPercent).toBeCloseTo(4, 10);
   });
 
+  it("rejects a stop-loss close whose price was not the configured stop-loss", () => {
+    const position = openPaperPosition(baseInput);
+    expect(() =>
+      closePaperPosition(position, {
+        exitPrice: 97,
+        reason: "STOP_LOSS",
+        closedAt: "2026-10-02T07:00:00.000Z",
+      }),
+    ).toThrow("STOP_LOSS_EXIT_PRICE_MISMATCH");
+  });
+
+  it("rejects a take-profit close whose price was not the configured take-profit", () => {
+    const position = openPaperPosition(baseInput);
+    expect(() =>
+      closePaperPosition(position, {
+        exitPrice: 103,
+        reason: "TAKE_PROFIT",
+        closedAt: "2026-10-02T07:00:00.000Z",
+      }),
+    ).toThrow("TAKE_PROFIT_EXIT_PRICE_MISMATCH");
+  });
+
+  it("rejects a take-profit reason when no take-profit guard exists", () => {
+    const position = openPaperPosition({ ...baseInput, takeProfitPrice: undefined });
+    expect(() =>
+      closePaperPosition(position, {
+        exitPrice: 104,
+        reason: "TAKE_PROFIT",
+        closedAt: "2026-10-02T07:00:00.000Z",
+      }),
+    ).toThrow("TAKE_PROFIT_NOT_CONFIGURED");
+  });
+
   it("rejects a close timestamp earlier than the open timestamp", () => {
     const position = openPaperPosition(baseInput);
     expect(() =>
