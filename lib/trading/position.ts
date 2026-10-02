@@ -167,6 +167,19 @@ export function closePaperPosition(
     throw new Error("INVALID_POSITION_CLOSE_TIME");
   }
 
+  if (reason === "STOP_LOSS" && input.exitPrice !== position.stopLossPrice) {
+    throw new Error("STOP_LOSS_EXIT_PRICE_MISMATCH");
+  }
+
+  if (reason === "TAKE_PROFIT") {
+    if (position.takeProfitPrice === undefined) {
+      throw new Error("TAKE_PROFIT_NOT_CONFIGURED");
+    }
+    if (input.exitPrice !== position.takeProfitPrice) {
+      throw new Error("TAKE_PROFIT_EXIT_PRICE_MISMATCH");
+    }
+  }
+
   const pnlUsd = position.amountUsd * ((input.exitPrice - position.entryPrice) / position.entryPrice);
   const returnPercent = (pnlUsd / position.amountUsd) * 100;
 
