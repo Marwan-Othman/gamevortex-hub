@@ -10,6 +10,8 @@ import {
 
 const MIN_LIVE_ORDER_AMOUNT_USD = new Prisma.Decimal(1);
 
+export type LiveOrderProtectionStatus = "NOT_REQUIRED" | "PENDING" | "PROTECTED" | "FAILED";
+
 export type LiveOrderRow = {
   id: string;
   ownerId: string;
@@ -25,6 +27,12 @@ export type LiveOrderRow = {
   stopLossPrice: Prisma.Decimal;
   takeProfitPrice: Prisma.Decimal | null;
   status: LiveOrderState;
+  protectionStatus: LiveOrderProtectionStatus;
+  protectionOrderId: string | null;
+  stopLossOrderId: string | null;
+  takeProfitOrderId: string | null;
+  protectionUpdatedAt: Date | null;
+  protectionError: string | null;
   providerStatus: string | null;
   executedQty: Prisma.Decimal | null;
   cumulativeQuoteQty: Prisma.Decimal | null;
@@ -231,7 +239,10 @@ const ALLOWED_TRANSITIONS: Record<LiveOrderState, readonly LiveOrderState[]> = {
   SUBMITTING: ["SUBMITTED", "REJECTED", "UNKNOWN"],
   SUBMITTED: ["PARTIALLY_FILLED", "FILLED", "CANCELED", "REJECTED", "EXPIRED", "UNKNOWN"],
   PARTIALLY_FILLED: ["FILLED", "CANCELED", "EXPIRED", "UNKNOWN"],
-  FILLED: ["CLOSED"],
+  FILLED: ["PROTECTION_PENDING", "PROTECTION_FAILED"],
+  PROTECTION_PENDING: ["PROTECTED", "PROTECTION_FAILED", "UNKNOWN"],
+  PROTECTED: ["CLOSED", "PROTECTED", "PROTECTION_FAILED", "UNKNOWN"],
+  PROTECTION_FAILED: ["PROTECTION_PENDING", "PROTECTED", "CLOSED", "UNKNOWN"],
   CANCELED: ["CLOSED"],
   REJECTED: ["CLOSED"],
   EXPIRED: ["CLOSED"],
@@ -253,13 +264,91 @@ export async function transitionLiveOrderState(
 
   const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
-    SET "status" = ${nextState}, "lastError" = ${reason ?? null}, "version" = "version" + 1
+    SET
+      "status" = ${nextState},
+      "lastError" = ${reason ?? null},
+      "version" = "version" + 1
     WHERE "id" = ${orderId} AND "status" = ${expectedState}
     RETURNING *
   `);
 
   const order = rows[0];
   if (!order) throw new Error("LIVE_ORDER_STATE_CONFLICT");
+  return order;
+}
+
+export async function markLiveOrderProtectionPending(orderId: string): Promise<LiveOrderRow> {
+  const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    UPDATE "TradingLiveOrder"
+    SET
+      "status" = 'PROTECTION_PENDING',
+      "protectionStatus" = 'PENDING',
+      "protectionUpdatedAt" = CURRENT_TIMESTAMP,
+      "protectionError" = NULL,
+      "lastError" = NULL,
+      "version" = "version" + 1
+    WHERE "id" = ${orderId}
+      AND "status" = 'FILLED'
+    RETURNING *
+  `);
+
+  const order = rows[0];
+  if (!order) throw new Error("LIVE_ORDER_PROTECTION_PENDING_CONFLICT");
+  return order;
+}
+
+export async function markLiveOrderProtected(
+  orderId: string,
+  protection: {
+    protectionOrderId?: string | null;
+    stopLossOrderId?: string | null;
+    takeProfitOrderId?: string | null;
+  },
+): Promise<LiveOrderRow> {
+  const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    UPDATE "TradingLiveOrder"
+    SET
+      "status" = 'PROTECTED',
+      "protectionStatus" = 'PROTECTED',
+      "protectionOrderId" = ${protection.protectionOrderId ?? null},
+      "stopLossOrderId" = ${protection.stopLossOrderId ?? null},
+      "takeProfitOrderId" = ${protection.takeProfitOrderId ?? null},
+      "protectionUpdatedAt" = CURRENT_TIMESTAMP,
+      "protectionError" = NULL,
+      "lastError" = NULL,
+      "version" = "version" + 1
+    WHERE "id" = ${orderId}
+      AND "status" = 'PROTECTION_PENDING'
+      AND "protectionStatus" = 'PENDING'
+    RETURNING *
+  `);
+
+  const order = rows[0];
+  if (!order) throw new Error("LIVE_ORDER_PROTECTION_CONFIRM_CONFLICT");
+  return order;
+}
+
+export async function markLiveOrderProtectionFailed(
+  orderId: string,
+  reason: string,
+): Promise<LiveOrderRow> {
+  const normalizedReason = normalizeIdentifier(reason, "INVALID_LIVE_PROTECTION_ERROR", 500);
+  const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    UPDATE "TradingLiveOrder"
+    SET
+      "status" = 'PROTECTION_FAILED',
+      "protectionStatus" = 'FAILED',
+      "protectionUpdatedAt" = CURRENT_TIMESTAMP,
+      "protectionError" = ${normalizedReason},
+      "lastError" = ${normalizedReason},
+      "version" = "version" + 1
+    WHERE "id" = ${orderId}
+      AND "status" IN ('PROTECTION_PENDING', 'PROTECTION_FAILED')
+    RETURNING *
+  `);
+
+  const order = rows[0];
+  if (!order) throw new Error("LIVE_ORDER_PROTECTION_FAILURE_CONFLICT");
   return order;
 }
 
@@ -273,7 +362,7 @@ export async function markLiveOrderUnknown(
     UPDATE "TradingLiveOrder"
     SET "status" = 'UNKNOWN', "lastError" = ${normalizedReason}, "version" = "version" + 1
     WHERE "id" = ${orderId}
-      AND "status" IN ('INTENT_CREATED', 'SUBMITTING', 'SUBMITTED', 'PARTIALLY_FILLED', 'UNKNOWN')
+      AND "status" IN ('INTENT_CREATED', 'SUBMITTING', 'SUBMITTED', 'PARTIALLY_FILLED', 'PROTECTION_PENDING', 'PROTECTION_FAILED')
     RETURNING *
   `);
 
@@ -336,11 +425,16 @@ export async function reconcileStoredLiveOrder(
       ? null
       : new Prisma.Decimal(observation.averageFillPrice);
 
+  const nextState: LiveOrderState =
+    reconciliation.nextState === "FILLED" ? "PROTECTION_PENDING" : reconciliation.nextState;
+
   const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
     SET
       "providerOrderId" = ${reconciliation.providerOrderId},
-      "status" = ${reconciliation.nextState},
+      "status" = ${nextState},
+      "protectionStatus" = CASE WHEN ${nextState} = 'PROTECTION_PENDING' THEN 'PENDING' ELSE "protectionStatus" END,
+      "protectionUpdatedAt" = CASE WHEN ${nextState} = 'PROTECTION_PENDING' THEN CURRENT_TIMESTAMP ELSE "protectionUpdatedAt" END,
       "providerStatus" = ${reconciliation.providerStatus},
       "executedQty" = ${executedQty.toString()}::numeric,
       "cumulativeQuoteQty" = ${cumulativeQuoteQty.toString()}::numeric,
@@ -356,5 +450,5 @@ export async function reconcileStoredLiveOrder(
   const updated = rows[0];
   if (!updated) throw new Error("LIVE_ORDER_RECONCILIATION_UPDATE_FAILED");
 
-  return { status: "MATCHED", order: updated, nextState: reconciliation.nextState };
+  return { status: "MATCHED", order: updated, nextState };
 }
