@@ -2,16 +2,13 @@
  * GameVortex AI Trading — exchange adapter contract.
  *
  * This module defines the boundary between the trading engine and an external
- * venue. It intentionally contains no provider SDK, credentials, network calls,
- * or live-order implementation. A future adapter must satisfy this contract
- * and remain behind the existing owner approval, Shariah, risk, and execution
- * gates.
- *
- * LIVE execution remains disabled elsewhere until a separately reviewed
- * provider implementation exists.
+ * venue. Provider credentials and network calls stay inside provider adapters.
+ * Live execution remains fail-closed and is separately gated by the live flag,
+ * owner approval, Shariah checks, risk controls, reconciliation, and audit.
  */
 
 import type { MarketCandle } from "@/lib/trading/market-data";
+import type { LiveProviderOrderObservation } from "@/lib/trading/live-order-reconciliation";
 
 export type ExchangeAdapterMode = "MARKET_DATA" | "PAPER" | "LIVE";
 
@@ -52,8 +49,42 @@ export type ExchangeOrderResult = {
   accepted: boolean;
   clientOrderId: string;
   providerOrderId?: string;
-  status: "PAPER" | "REJECTED" | "FILLED";
+  status: "PAPER" | "REJECTED" | "SUBMITTED" | "FILLED";
   reason?: string;
+  executedQty?: number;
+  cumulativeQuoteQty?: number;
+  averageFillPrice?: number;
+};
+
+export type ExchangeOrderStatusRequest = {
+  symbol: string;
+  clientOrderId: string;
+};
+
+export type ExchangeOrderStatusResult = {
+  observation: LiveProviderOrderObservation;
+};
+
+export type ExchangeProtectedExitRequest = {
+  symbol: string;
+  quantity: string;
+  takeProfitClientOrderId: string;
+  takeProfitPrice: string;
+  stopLossClientOrderId: string;
+  stopLossPrice: string;
+  stopLimitPrice: string;
+  listClientOrderId?: string;
+};
+
+export type ExchangeProtectedExitResult = {
+  accepted: boolean;
+  orderListId: string;
+  listClientOrderId: string;
+  orders: Array<{
+    providerOrderId: string;
+    clientOrderId: string;
+  }>;
+  status: string;
 };
 
 export interface ExchangeAdapter {
@@ -64,6 +95,20 @@ export interface ExchangeAdapter {
   getMarketData(request: ExchangeMarketDataRequest): Promise<ExchangeMarketDataResponse>;
 
   placeSpotBuy?(request: ExchangeOrderRequest): Promise<ExchangeOrderResult>;
+
+  /**
+   * Query a provider order by the immutable client order id. A provider
+   * adapter must normalize ambiguous/malformed responses instead of silently
+   * treating them as a successful fill.
+   */
+  getOrderStatus?(request: ExchangeOrderStatusRequest): Promise<ExchangeOrderStatusResult>;
+
+  /**
+   * Submit the complete protective SELL OCO after a confirmed BUY fill.
+   * This must never be implemented as two unrelated SELL orders because the
+   * exchange-level OCO relationship is part of the safety invariant.
+   */
+  placeProtectedExitOco?(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult>;
 }
 
 /**
@@ -173,4 +218,6 @@ export function assertLiveAdapterCapability(adapter: ExchangeAdapter): void {
   if (adapter.capabilities.shortSelling) throw new Error("SHORT_SELLING_FORBIDDEN");
   if (adapter.capabilities.derivatives) throw new Error("DERIVATIVES_FORBIDDEN");
   if (!adapter.placeSpotBuy) throw new Error("SPOT_BUY_ADAPTER_REQUIRED");
+  if (!adapter.getOrderStatus) throw new Error("ORDER_STATUS_ADAPTER_REQUIRED");
+  if (!adapter.placeProtectedExitOco) throw new Error("PROTECTED_EXIT_ADAPTER_REQUIRED");
 }
