@@ -1,0 +1,163 @@
+import { describe, expect, it } from "vitest";
+import { buildOwnerPaperOpportunity, buildTradeProposal, buildApprovedPaperExecution } from "./opportunity-pipeline";
+import type { TradeOpportunityInput } from "./opportunity-pipeline";
+
+const shariahPolicy = {
+  version: "v1.0-test",
+  prohibitedBusinessKeywords: ["alcohol", "casino", "gambling", "betting", "interest-based lending"],
+  prohibitedMethods: ["MARGIN", "LEVERAGED", "SHORT", "FUTURES", "OPTIONS", "UNKNOWN"] as const,
+  allowedMethods: ["SPOT"] as const,
+  maxInterestBearingDebtRatio: 0.33,
+  maxInterestIncomeRatio: 0.05,
+  maxImpermissibleIncomeRatio: 0.05,
+};
+
+const riskConfig = {
+  maxTradeAmountUsd: 100,
+  maxDailyLossUsd: 20,
+  maxOpenTrades: 2,
+  maxExposureUsd: 100,
+  maxExposurePerAssetUsd: 100,
+  maxConsecutiveLosses: 3,
+  requireStopLoss: true,
+  requireTakeProfit: true,
+};
+
+function makeInput(
+  overrides: Partial<TradeOpportunityInput> = {},
+): TradeOpportunityInput {
+  return {
+    ownerId: "owner-1",
+    opportunityId: "opp-1",
+    idempotencyKey: "idem-1",
+    symbol: "ABC",
+    amountUsd: 10,
+    strategy: {
+      price: 110,
+      previousPrice: 109,
+      fastAverage: 108,
+      slowAverage: 100,
+      volume: 2000,
+      averageVolume: 1500,
+      stopLossPercent: 5,
+      takeProfitPercent: 10,
+    },
+    shariah: {
+      symbol: "ABC",
+      assetType: "EQUITY",
+      businessActivity: "software services",
+      financialRatios: {
+        interestBearingDebtRatio: 0.1,
+        interestIncomeRatio: 0.01,
+        impermissibleIncomeRatio: 0.01,
+      },
+      tradingMethod: "SPOT",
+      ownershipSettlementVerified: true,
+      source: "test-fixture",
+    },
+    riskConfig,
+    riskSnapshot: {
+      requestedAmountUsd: 10,
+      dailyLossUsd: 0,
+      openTrades: 0,
+      totalExposureUsd: 0,
+      assetExposureUsd: 0,
+      consecutiveLosses: 0,
+      hasStopLoss: true,
+      hasTakeProfit: true,
+    },
+    shariahPolicy,
+    approval: {
+      id: "approval-1",
+      status: "CONSUMED",
+      amountUsd: 10,
+      consumedAt: "2026-10-02T07:00:00.000Z",
+    },
+    ...overrides,
+  };
+}
+
+describe("owner paper opportunity pipeline", () => {
+  it("builds a fully guarded PAPER execution plan", () => {
+    const result = buildOwnerPaperOpportunity(makeInput());
+
+    expect(result.proposal.side).toBe("BUY");
+    expect(result.proposal.preTrade.allowed).toBe(true);
+    expect(result.proposal.preTrade.shariah.status).toBe("APPROVED");
+    expect(result.executionPlan?.mode).toBe("PAPER");
+    expect(result.executionPlan?.orderType).toBe("SPOT_MARKET");
+    expect(result.executionPlan?.leverage).toBe(1);
+    expect(result.executionPlan?.margin).toBe(false);
+    expect(result.executionPlan?.short).toBe(false);
+    expect(result.executionPlan?.withdrawalPermission).toBe(false);
+  });
+
+  it("creates a proposal before approval but refuses execution while approval is pending", () => {
+    const input = makeInput({
+      approval: {
+        id: "approval-1",
+        status: "PENDING",
+        amountUsd: 10,
+        consumedAt: null,
+      },
+    });
+
+    const proposal = buildTradeProposal(input);
+    expect(proposal.approvalStatus).toBe("PENDING");
+    expect(() => buildApprovedPaperExecution(input, proposal)).toThrow(
+      "OWNER_APPROVAL_NOT_CONSUMED",
+    );
+  });
+
+  it("rejects approval amount tampering", () => {
+    const input = makeInput({
+      amountUsd: 20,
+      approval: {
+        id: "approval-1",
+        status: "CONSUMED",
+        amountUsd: 10,
+        consumedAt: "2026-10-02T07:00:00.000Z",
+      },
+    });
+
+    expect(() => buildTradeProposal(input)).toThrow("PRE_TRADE_BLOCKED");
+  });
+
+  it("blocks a Shariah-rejected asset before proposal creation", () => {
+    const input = makeInput({
+      shariah: {
+        ...makeInput().shariah,
+        businessActivity: "casino software and gambling",
+      },
+    });
+
+    expect(() => buildTradeProposal(input)).toThrow("PRE_TRADE_BLOCKED");
+  });
+
+  it("blocks a trade when risk policy rejects the requested exposure", () => {
+    const input = makeInput({
+      amountUsd: 50,
+      riskSnapshot: {
+        ...makeInput().riskSnapshot,
+        requestedAmountUsd: 50,
+        totalExposureUsd: 60,
+      },
+    });
+
+    expect(() => buildTradeProposal(input)).toThrow("PRE_TRADE_BLOCKED");
+  });
+
+  it("blocks proposals without a deterministic BUY signal", () => {
+    const input = makeInput({
+      strategy: {
+        ...makeInput().strategy,
+        price: 99,
+        previousPrice: 100,
+        fastAverage: 98,
+        slowAverage: 100,
+      },
+    });
+
+    expect(() => buildTradeProposal(input)).toThrow("NO_BUY_SIGNAL");
+  });
+});
