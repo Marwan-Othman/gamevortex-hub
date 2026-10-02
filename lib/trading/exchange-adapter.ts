@@ -68,6 +68,7 @@ export type ExchangeOrderStatusResult = {
 export type ExchangeProtectedExitRequest = {
   symbol: string;
   quantity: string;
+  entryPrice: string;
   takeProfitClientOrderId: string;
   takeProfitPrice: string;
   stopLossClientOrderId: string;
@@ -105,8 +106,8 @@ export interface ExchangeAdapter {
 
   /**
    * Submit the complete protective SELL OCO after a confirmed BUY fill.
-   * This must never be implemented as two unrelated SELL orders because the
-   * exchange-level OCO relationship is part of the safety invariant.
+   * The confirmed fill price is part of the request so the adapter can reject
+   * a plan whose price ordering no longer protects the actual filled position.
    */
   placeProtectedExitOco?(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult>;
 }
