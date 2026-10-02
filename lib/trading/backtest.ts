@@ -78,7 +78,9 @@ function validateConfig(config: BacktestConfig): void {
   if (!positiveFinite(config.initialCapitalUsd) || !positiveFinite(config.tradeAmountUsd)) {
     throw new Error("INVALID_BACKTEST_CONFIG");
   }
-  if (config.tradeAmountUsd > config.initialCapitalUsd) throw new Error("INVALID_BACKTEST_CONFIG");
+  if (config.tradeAmountUsd < 1 || config.tradeAmountUsd > config.initialCapitalUsd) {
+    throw new Error("INVALID_BACKTEST_CONFIG");
+  }
   if (!positiveFinite(config.stopLossPercent) || !positiveFinite(config.takeProfitPercent)) {
     throw new Error("INVALID_BACKTEST_CONFIG");
   }
