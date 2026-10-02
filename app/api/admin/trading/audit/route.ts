@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
           { entityType: "TradingExecution" },
           { entityType: "TradingSettlement" },
           { entityType: "TradingReconciliation" },
+          { entityType: "TradingPaperSession" },
         ],
       },
       orderBy: { createdAt: "desc" },
