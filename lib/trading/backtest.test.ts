@@ -8,20 +8,22 @@ const config = {
   takeProfitPercent: 4,
 };
 
+const candle = (timestamp: string) => ({
+  timestamp,
+  open: 100,
+  high: 101,
+  low: 99,
+  close: 100,
+  volume: 1000,
+  fastAverage: 99,
+  slowAverage: 98,
+  averageVolume: 900,
+});
+
 describe("runBacktest", () => {
   it("takes profit deterministically", () => {
     const result = runBacktest("TEST", [
-      {
-        timestamp: "2026-01-01T00:00:00Z",
-        open: 100,
-        high: 101,
-        low: 99,
-        close: 100,
-        volume: 1000,
-        fastAverage: 99,
-        slowAverage: 98,
-        averageVolume: 900,
-      },
+      candle("2026-01-01T00:00:00Z"),
       {
         timestamp: "2026-01-01T00:05:00Z",
         open: 100,
@@ -59,17 +61,7 @@ describe("runBacktest", () => {
 
   it("uses stop loss when both stop and target are touched in one candle", () => {
     const result = runBacktest("TEST", [
-      {
-        timestamp: "2026-01-01T00:00:00Z",
-        open: 100,
-        high: 101,
-        low: 99,
-        close: 100,
-        volume: 1000,
-        fastAverage: 99,
-        slowAverage: 98,
-        averageVolume: 900,
-      },
+      candle("2026-01-01T00:00:00Z"),
       {
         timestamp: "2026-01-01T00:05:00Z",
         open: 100,
@@ -101,18 +93,35 @@ describe("runBacktest", () => {
     expect(result.maxDrawdownUsd).toBeGreaterThan(0);
   });
 
-  it("rejects invalid backtest configuration", () => {
+  it("rejects invalid backtest configuration and input", () => {
     expect(() => runBacktest("TEST", [], config)).toThrow("INVALID_BACKTEST_INPUT");
-    expect(() => runBacktest("TEST", [{
-      timestamp: "2026-01-01T00:00:00Z",
-      open: 100,
-      high: 101,
-      low: 99,
-      close: 100,
-      volume: 1000,
-      fastAverage: 99,
-      slowAverage: 98,
-      averageVolume: 900,
-    }], { ...config, tradeAmountUsd: 101 })).toThrow("INVALID_BACKTEST_CONFIG");
+    expect(() => runBacktest("TEST", [candle("2026-01-01T00:00:00Z")], {
+      ...config,
+      tradeAmountUsd: 101,
+    })).toThrow("INVALID_BACKTEST_CONFIG");
+  });
+
+  it("rejects invalid timestamp ordering", () => {
+    expect(() => runBacktest("TEST", [
+      candle("2026-01-01T00:05:00Z"),
+      candle("2026-01-01T00:05:00Z"),
+    ], config)).toThrow("INVALID_BACKTEST_TIMESTAMP_ORDER");
+
+    expect(() => runBacktest("TEST", [
+      candle("2026-01-01T00:10:00Z"),
+      candle("2026-01-01T00:05:00Z"),
+    ], config)).toThrow("INVALID_BACKTEST_TIMESTAMP_ORDER");
+  });
+
+  it("rejects malformed market candles", () => {
+    expect(() => runBacktest("TEST", [
+      { ...candle("2026-01-01T00:00:00Z"), timestamp: "not-a-date" },
+      candle("2026-01-01T00:05:00Z"),
+    ], config)).toThrow("INVALID_BACKTEST_CANDLE");
+
+    expect(() => runBacktest("TEST", [
+      { ...candle("2026-01-01T00:00:00Z"), high: 98 },
+      candle("2026-01-01T00:05:00Z"),
+    ], config)).toThrow("INVALID_BACKTEST_CANDLE");
   });
 });
