@@ -1,0 +1,97 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getBinanceLivePreflight } from "@/lib/trading/binance-live-preflight";
+
+const ENV_KEYS = ["BINANCE_LIVE_API_KEY", "BINANCE_LIVE_API_SECRET", "GAMEVORTEX_LIVE_TRADING_ENABLED"] as const;
+const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  for (const key of ENV_KEYS) {
+    const value = originalEnv[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+describe("getBinanceLivePreflight", () => {
+  it("fails closed without production credentials", async () => {
+    delete process.env.BINANCE_LIVE_API_KEY;
+    delete process.env.BINANCE_LIVE_API_SECRET;
+    delete process.env.GAMEVORTEX_LIVE_TRADING_ENABLED;
+
+    const result = await getBinanceLivePreflight();
+
+    expect(result.credentialsConfigured).toBe(false);
+    expect(result.readyForLiveExecution).toBe(false);
+    expect(result.blockers).toEqual([
+      "BINANCE_LIVE_API_CREDENTIALS_REQUIRED",
+      "GAMEVORTEX_LIVE_TRADING_DISABLED",
+    ]);
+  });
+
+  it("passes only when Spot-only restrictions are safe and the explicit flag is enabled", async () => {
+    process.env.BINANCE_LIVE_API_KEY = "test-key";
+    process.env.BINANCE_LIVE_API_SECRET = "test-secret";
+    process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "true";
+
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        canTrade: true,
+        canWithdraw: true,
+        canDeposit: true,
+        accountType: "SPOT",
+        permissions: ["SPOT"],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ipRestrict: true,
+        enableReading: true,
+        enableWithdrawals: false,
+        enableInternalTransfer: false,
+        enableMargin: false,
+        enableFutures: false,
+        enableVanillaOptions: false,
+        enableSpotAndMarginTrading: true,
+        enablePortfolioMarginTrading: false,
+      }), { status: 200 }));
+
+    const result = await getBinanceLivePreflight(fetcher);
+
+    expect(result.readyForLiveExecution).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain("https://api.binance.com/api/v3/account?");
+    expect(String(fetcher.mock.calls[1]?.[0])).toContain("https://api.binance.com/sapi/v1/account/apiRestrictions?");
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ headers: { "X-MBX-APIKEY": "test-key" } });
+  });
+
+  it("blocks immediately when the API key can withdraw", async () => {
+    process.env.BINANCE_LIVE_API_KEY = "test-key";
+    process.env.BINANCE_LIVE_API_SECRET = "test-secret";
+    process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "true";
+
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        canTrade: true,
+        canWithdraw: true,
+        canDeposit: true,
+        accountType: "SPOT",
+        permissions: ["SPOT"],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ipRestrict: true,
+        enableReading: true,
+        enableWithdrawals: true,
+        enableInternalTransfer: false,
+        enableMargin: false,
+        enableFutures: false,
+        enableVanillaOptions: false,
+        enableSpotAndMarginTrading: true,
+        enablePortfolioMarginTrading: false,
+      }), { status: 200 }));
+
+    const result = await getBinanceLivePreflight(fetcher);
+
+    expect(result.readyForLiveExecution).toBe(false);
+    expect(result.blockers).toContain("BINANCE_LIVE_WITHDRAWALS_MUST_BE_DISABLED");
+  });
+});
