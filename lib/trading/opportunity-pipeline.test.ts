@@ -98,9 +98,9 @@ describe("owner paper opportunity pipeline", () => {
     expect(() => buildApprovedPaperExecution(input, proposal)).toThrow("OWNER_APPROVAL_NOT_CONSUMED");
   });
 
-  it("rejects approval amount tampering", () => {
+  it("rejects approval amount tampering before proposal creation", () => {
     const input = makeInput({ approval: { id: "approval-1", ownerId: "owner-1", opportunityId: "opp-1", status: "CONSUMED", amountUsd: 9, consumedAt: "2026-10-02T07:00:00.000Z" } });
-    expect(() => buildTradeProposal(input)).toThrow("PRE_TRADE_BLOCKED");
+    expect(() => buildTradeProposal(input)).toThrow("APPROVAL_AMOUNT_MISMATCH");
   });
 
   it("rejects an approval belonging to another owner", () => {
