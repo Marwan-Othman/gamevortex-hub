@@ -176,6 +176,38 @@ describe("paper trading integrity", () => {
     }
   });
 
+  it("fails closed when an execution contains malformed numeric or identity fields", () => {
+    const position = openPaperPosition(baseInput);
+    const execution: PaperExecutionRecord = {
+      positionId: "",
+      clientOrderId: " ",
+      symbol: position.symbol,
+      amountUsd: Number.NaN,
+      entryPrice: Number.POSITIVE_INFINITY,
+      stopLossPrice: 0,
+      takeProfitPrice: position.takeProfitPrice,
+      shariahPolicyVersion: position.shariahPolicyVersion,
+    };
+
+    const result = reconcilePaperExecution(execution, position);
+    expect(result.status).toBe("MISMATCHED");
+    if (result.status === "MISMATCHED") {
+      expect(result.reasons).toEqual(
+        expect.arrayContaining([
+          "INVALID_CLIENT_ORDER_ID",
+          "INVALID_EXECUTION_POSITION_ID",
+          "INVALID_EXECUTION_AMOUNT",
+          "INVALID_EXECUTION_ENTRY_PRICE",
+          "INVALID_EXECUTION_STOP_LOSS",
+          "POSITION_ID_MISMATCH",
+          "AMOUNT_MISMATCH",
+          "ENTRY_PRICE_MISMATCH",
+          "STOP_LOSS_MISMATCH",
+        ]),
+      );
+    }
+  });
+
   it("surfaces Shariah policy drift during reconciliation", () => {
     const position = openPaperPosition(baseInput);
     const execution: PaperExecutionRecord = {
