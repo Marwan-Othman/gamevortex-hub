@@ -85,7 +85,54 @@ describe("paper trading integrity", () => {
     const settlement = settleClosedPaperPosition(position);
     expect(settlement.status).toBe("SETTLED");
     expect(settlement.settlementValueUsd).toBeCloseTo(10.4, 10);
+    expect(settlement.pnlUsd).toBeCloseTo(0.4, 10);
+    expect(settlement.returnPercent).toBeCloseTo(4, 10);
     expect(settlement.shariahPolicyVersion).toBe(baseInput.shariahPolicyVersion);
+  });
+
+  it("rejects settlement when stored P&L drifts from the price-derived P&L", () => {
+    const position = closePaperPosition(openPaperPosition(baseInput), {
+      exitPrice: 104,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T07:00:00.000Z",
+    });
+
+    expect(() =>
+      settleClosedPaperPosition({
+        ...position,
+        pnlUsd: 0.5,
+      }),
+    ).toThrow("PAPER_SETTLEMENT_PNL_DRIFT");
+  });
+
+  it("rejects settlement when stored return percentage drifts from the price-derived return", () => {
+    const position = closePaperPosition(openPaperPosition(baseInput), {
+      exitPrice: 104,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T07:00:00.000Z",
+    });
+
+    expect(() =>
+      settleClosedPaperPosition({
+        ...position,
+        returnPercent: 5,
+      }),
+    ).toThrow("PAPER_SETTLEMENT_RETURN_DRIFT");
+  });
+
+  it("rejects non-positive settlement inputs", () => {
+    const position = closePaperPosition(openPaperPosition(baseInput), {
+      exitPrice: 104,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T07:00:00.000Z",
+    });
+
+    expect(() =>
+      settleClosedPaperPosition({
+        ...position,
+        exitPrice: 0,
+      }),
+    ).toThrow("INVALID_PAPER_SETTLEMENT_PRICES");
   });
 
   it("reconciles an execution and position when all immutable fields match", () => {
