@@ -56,7 +56,11 @@ describe("runBacktest", () => {
     expect(result.winningTrades).toBe(1);
     expect(result.losingTrades).toBe(0);
     expect(result.winRatePercent).toBe(100);
+    expect(result.grossProfitUsd).toBeCloseTo(0.4, 8);
+    expect(result.grossLossUsd).toBe(0);
+    expect(result.profitFactor).toBeNull();
     expect(result.maxDrawdownUsd).toBe(0);
+    expect(result.maxDrawdownPercent).toBe(0);
   });
 
   it("uses stop loss when both stop and target are touched in one candle", () => {
@@ -90,7 +94,11 @@ describe("runBacktest", () => {
     expect(result.trades[0].exitPrice).toBeCloseTo(107.8, 8);
     expect(result.losingTrades).toBe(1);
     expect(result.winRatePercent).toBe(0);
+    expect(result.grossProfitUsd).toBe(0);
+    expect(result.grossLossUsd).toBeCloseTo(0.2, 8);
+    expect(result.profitFactor).toBe(0);
     expect(result.maxDrawdownUsd).toBeGreaterThan(0);
+    expect(result.maxDrawdownPercent).toBeGreaterThan(0);
   });
 
   it("rejects invalid backtest configuration and input", () => {
@@ -99,6 +107,9 @@ describe("runBacktest", () => {
       ...config,
       tradeAmountUsd: 101,
     })).toThrow("INVALID_BACKTEST_CONFIG");
+    expect(() => runBacktest("INVALID SYMBOL", [candle("2026-01-01T00:00:00Z")], config)).toThrow(
+      "INVALID_BACKTEST_INPUT",
+    );
   });
 
   it("rejects invalid timestamp ordering", () => {
