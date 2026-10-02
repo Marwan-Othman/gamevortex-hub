@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildOwnerPaperOpportunity, buildTradeProposal, buildApprovedPaperExecution } from "./opportunity-pipeline";
+import { openPaperPosition, closePaperPosition } from "./position";
+import { reconcilePaperExecution } from "./reconciliation";
+import { settleClosedPaperPosition } from "./settlement";
 import type { TradeOpportunityInput } from "./opportunity-pipeline";
+import type { PaperExecutionRecord } from "./paper-execution-bridge";
 
 const shariahPolicy = {
   version: "v1.0-test",
@@ -89,6 +93,50 @@ describe("owner paper opportunity pipeline", () => {
     expect(result.executionPlan?.margin).toBe(false);
     expect(result.executionPlan?.short).toBe(false);
     expect(result.executionPlan?.withdrawalPermission).toBe(false);
+  });
+
+  it("runs an approved paper opportunity through position, reconciliation, and settlement", () => {
+    const input = makeInput();
+    const result = buildOwnerPaperOpportunity(input);
+    const plan = result.executionPlan;
+    expect(plan).toBeDefined();
+    if (!plan) return;
+
+    const position = openPaperPosition({
+      positionId: "pos-e2e-001",
+      symbol: plan.symbol,
+      amountUsd: plan.amountUsd,
+      entryPrice: plan.entryPrice,
+      stopLossPrice: plan.stopLossPrice,
+      takeProfitPrice: plan.takeProfitPrice,
+      openedAt: "2026-10-02T07:01:00.000Z",
+      shariahPolicyVersion: input.shariahPolicy!.version,
+    });
+
+    const execution: PaperExecutionRecord = {
+      positionId: position.positionId,
+      clientOrderId: plan.clientOrderId,
+      symbol: position.symbol,
+      amountUsd: position.amountUsd,
+      entryPrice: position.entryPrice,
+      stopLossPrice: position.stopLossPrice,
+      takeProfitPrice: position.takeProfitPrice,
+      shariahPolicyVersion: position.shariahPolicyVersion,
+    };
+
+    expect(reconcilePaperExecution(execution, position).status).toBe("MATCHED");
+
+    const closed = closePaperPosition(position, {
+      exitPrice: plan.takeProfitPrice!,
+      reason: "TAKE_PROFIT",
+      closedAt: "2026-10-02T08:01:00.000Z",
+    });
+    const settlement = settleClosedPaperPosition(closed);
+
+    expect(closed.status).toBe("CLOSED");
+    expect(closed.pnlUsd).toBeCloseTo(1, 10);
+    expect(settlement.status).toBe("SETTLED");
+    expect(settlement.settlementValueUsd).toBeCloseTo(11, 10);
   });
 
   it("creates a proposal before approval but refuses execution while approval is pending", () => {
