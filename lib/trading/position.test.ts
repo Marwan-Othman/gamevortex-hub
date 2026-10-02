@@ -113,4 +113,11 @@ describe("paper position lifecycle", () => {
       }),
     ).toThrow("INVALID_POSITION_CLOSE_TIME");
   });
+
+  it("rejects non-finite position prices and amounts", () => {
+    expect(() => position({ amountUsd: Number.NaN })).toThrow("INVALID_POSITION_AMOUNT");
+    expect(() => position({ entryPrice: Number.POSITIVE_INFINITY })).toThrow(
+      "INVALID_POSITION_ENTRY_PRICE",
+    );
+  });
 });
