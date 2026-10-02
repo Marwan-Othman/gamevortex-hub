@@ -41,7 +41,23 @@ describe("assertLiveAdapterCapability", () => {
     expect(() => assertLiveAdapterCapability(liveAdapter({ derivatives: true }))).toThrow("DERIVATIVES_FORBIDDEN");
   });
 
+  it("rejects margin trading", () => {
+    expect(() => assertLiveAdapterCapability(liveAdapter({ margin: true }))).toThrow("MARGIN_FORBIDDEN");
+  });
+
+  it("rejects short selling", () => {
+    expect(() => assertLiveAdapterCapability(liveAdapter({ shortSelling: true }))).toThrow("SHORT_SELLING_FORBIDDEN");
+  });
+
   it("rejects adapters without live order capability", () => {
     expect(() => assertLiveAdapterCapability(liveAdapter({ liveOrders: false }))).toThrow("LIVE_ORDERS_NOT_SUPPORTED");
+  });
+
+  it("rejects adapters without market data capability", () => {
+    expect(() => assertLiveAdapterCapability(liveAdapter({ marketData: false }))).toThrow("MARKET_DATA_NOT_SUPPORTED");
+  });
+
+  it("rejects adapters without paper trading capability", () => {
+    expect(() => assertLiveAdapterCapability(liveAdapter({ paperTrading: false }))).toThrow("PAPER_TRADING_NOT_SUPPORTED");
   });
 });
