@@ -139,15 +139,12 @@ export async function assertBinanceLiveBuyRules(input: {
   fetcher?: Fetcher;
 }): Promise<BinanceLiveSymbolRuleCheck> {
   if (!Number.isFinite(input.amountUsd) || input.amountUsd <= 0) throw new Error("INVALID_BINANCE_LIVE_ORDER_AMOUNT");
+  if (!Number.isFinite(input.entryPrice) || input.entryPrice <= 0) throw new Error("INVALID_BINANCE_LIVE_ENTRY_PRICE");
 
   const rules = await getBinanceLiveSymbolRules(input.symbol, input.fetcher);
-  const rawFilters = rules.minNotional;
-  if (rawFilters !== null && input.amountUsd < rawFilters) {
-    throw new Error(`BINANCE_LIVE_MIN_NOTIONAL:${rawFilters}`);
+  if (rules.minNotional !== null && input.amountUsd < rules.minNotional) {
+    throw new Error(`BINANCE_LIVE_MIN_NOTIONAL:${rules.minNotional}`);
   }
-
-  const syntheticPriceRule: BinanceFilter = { tickSize: String(rules.tickSize ?? 0) };
-  assertPrice(input.entryPrice, syntheticPriceRule, "BINANCE_LIVE_PRICE_FILTER_FAILED");
 
   return rules;
 }
