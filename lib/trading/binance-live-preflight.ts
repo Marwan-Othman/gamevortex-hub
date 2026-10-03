@@ -165,7 +165,7 @@ export async function getBinanceLivePreflight(fetcher: Fetcher = fetch): Promise
     canTrade: account.canTrade === true,
     canWithdraw: account.canWithdraw === true,
     canDeposit: account.canDeposit === true,
-    accountType: typeof account.accountType === "string" ? account.accountType : "UNKNOWN",
+    accountType: typeof account.accountType === "string" ? account.accountType.trim().toUpperCase() : "UNKNOWN",
     permissions,
   };
 
