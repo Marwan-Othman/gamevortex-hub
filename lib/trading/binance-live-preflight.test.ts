@@ -56,7 +56,7 @@ describe("getBinanceLivePreflight", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("passes only when Spot-only restrictions are safe and the explicit flag is enabled", async () => {
+  it("passes a Spot account when Binance returns a trading-group permission instead of the literal SPOT permission", async () => {
     process.env.BINANCE_LIVE_API_KEY = "test-key";
     process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
     delete process.env.BINANCE_LIVE_API_SECRET;
@@ -68,7 +68,7 @@ describe("getBinanceLivePreflight", () => {
         canWithdraw: true,
         canDeposit: true,
         accountType: "SPOT",
-        permissions: ["SPOT"],
+        permissions: ["TRD_GRP_082"],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ipRestrict: true,
@@ -84,6 +84,7 @@ describe("getBinanceLivePreflight", () => {
 
     const result = await getBinanceLivePreflight(fetcher);
 
+    expect(result.checks.spotAccount).toBe(true);
     expect(result.readyForLiveExecution).toBe(true);
     expect(result.blockers).toEqual([]);
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -104,7 +105,7 @@ describe("getBinanceLivePreflight", () => {
         canWithdraw: true,
         canDeposit: true,
         accountType: "SPOT",
-        permissions: ["SPOT"],
+        permissions: ["TRD_GRP_082"],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ipRestrict: true,
