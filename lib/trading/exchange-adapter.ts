@@ -88,6 +88,32 @@ export type ExchangeProtectedExitResult = {
   status: string;
 };
 
+export type ExchangeProtectedExitLegStatusRequest = {
+  symbol: string;
+  clientOrderId: string;
+};
+
+export type ExchangeProtectedExitLegStatusResult = {
+  symbol: string;
+  clientOrderId: string;
+  providerOrderId: string;
+  orderListId: string | null;
+  side: "SELL";
+  status:
+    | "NEW"
+    | "PARTIALLY_FILLED"
+    | "FILLED"
+    | "CANCELED"
+    | "REJECTED"
+    | "EXPIRED"
+    | "PENDING_CANCEL"
+    | "UNKNOWN";
+  executedQty: string;
+  cumulativeQuoteQty: string;
+  averageFillPrice: string | null;
+  updatedAt: Date;
+};
+
 export interface ExchangeAdapter {
   readonly id: string;
   readonly mode: ExchangeAdapterMode;
@@ -110,6 +136,15 @@ export interface ExchangeAdapter {
    * a plan whose price ordering no longer protects the actual filled position.
    */
   placeProtectedExitOco?(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult>;
+
+  /**
+   * Query one SELL leg of the protective OCO. This is deliberately separate
+   * from the BUY reconciliation contract so the provider can return SELL
+   * execution details without pretending the order is a new BUY intent.
+   */
+  getProtectedExitLegStatus?(
+    request: ExchangeProtectedExitLegStatusRequest,
+  ): Promise<ExchangeProtectedExitLegStatusResult>;
 }
 
 /**
@@ -221,4 +256,5 @@ export function assertLiveAdapterCapability(adapter: ExchangeAdapter): void {
   if (!adapter.placeSpotBuy) throw new Error("SPOT_BUY_ADAPTER_REQUIRED");
   if (!adapter.getOrderStatus) throw new Error("ORDER_STATUS_ADAPTER_REQUIRED");
   if (!adapter.placeProtectedExitOco) throw new Error("PROTECTED_EXIT_ADAPTER_REQUIRED");
+  if (!adapter.getProtectedExitLegStatus) throw new Error("PROTECTED_EXIT_STATUS_ADAPTER_REQUIRED");
 }
