@@ -106,14 +106,20 @@ export function openPaperPosition(input: {
   if (!positiveFinite(input.amountUsd) || input.amountUsd < 1) {
     throw new Error("INVALID_POSITION_AMOUNT");
   }
-  if (!positiveFinite(input.entryPrice) || !positiveFinite(input.stopLossPrice)) {
-    throw new Error("INVALID_POSITION_PRICES");
+  if (!positiveFinite(input.entryPrice)) {
+    throw new Error("INVALID_POSITION_ENTRY_PRICE");
+  }
+  if (!positiveFinite(input.stopLossPrice)) {
+    throw new Error("INVALID_POSITION_STOP_LOSS_PRICE");
   }
   if (input.stopLossPrice >= input.entryPrice) {
     throw new Error("INVALID_POSITION_STOP_LOSS_FOR_BUY");
   }
   if (input.takeProfitPrice !== undefined) {
-    if (!positiveFinite(input.takeProfitPrice) || input.takeProfitPrice <= input.entryPrice) {
+    if (!positiveFinite(input.takeProfitPrice)) {
+      throw new Error("INVALID_POSITION_TAKE_PROFIT_PRICE");
+    }
+    if (input.takeProfitPrice <= input.entryPrice) {
       throw new Error("INVALID_POSITION_TAKE_PROFIT_FOR_BUY");
     }
   }

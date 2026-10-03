@@ -134,11 +134,11 @@ describe("buildTradingExecutionPlan", () => {
   });
 
   it("fails closed when daily loss already reaches the configured limit", () => {
-    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, dailyLossUsd: 50 } }))).toThrow(/RISK_BLOCKED:.*MAX_DAILY_LOSS_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, dailyLossUsd: 50 } }))).toThrow(/RISK_BLOCKED:.*MAX_DAILY_LOSS_REACHED/);
   });
 
   it("fails closed when the maximum number of open trades is reached", () => {
-    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, openTrades: 1 } }))).toThrow(/RISK_BLOCKED:.*MAX_OPEN_TRADES_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, openTrades: 1 } }))).toThrow(/RISK_BLOCKED:.*MAX_OPEN_TRADES_REACHED/);
   });
 
   it("fails closed when total exposure would exceed the configured limit", () => {
@@ -150,7 +150,7 @@ describe("buildTradingExecutionPlan", () => {
   });
 
   it("fails closed when consecutive losses reach the configured limit", () => {
-    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, consecutiveLosses: 3 } }))).toThrow(/RISK_BLOCKED:.*MAX_CONSECUTIVE_LOSSES_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, consecutiveLosses: 3 } }))).toThrow(/RISK_BLOCKED:.*MAX_CONSECUTIVE_LOSSES_REACHED/);
   });
 
   it("rejects live mode until a reviewed exchange adapter exists", () => {
