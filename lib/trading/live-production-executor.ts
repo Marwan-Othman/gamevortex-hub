@@ -5,9 +5,9 @@
  * false, the trading control is stopped, the Shariah policy is not reviewed,
  * or Binance production preflight is not clean.
  *
- * The coordinator deliberately does not settle GameVortex wallet funds. A
- * filled exchange order is not treated as internal wallet settlement; that
- * requires a separate, reconciled close/settlement workflow.
+ * The coordinator does not directly settle GameVortex wallet funds. A fully
+ * closed exchange position is recorded as EXCHANGE_CLOSED_PENDING_WALLET
+ * until the separate allocation-backed wallet settlement stage is complete.
  */
 
 import { Prisma } from "@prisma/client";
@@ -33,6 +33,7 @@ import {
   type LiveOrderRow,
 } from "@/lib/trading/live-order-state";
 import { buildProtectedExitPlan } from "@/lib/trading/protected-exit-plan";
+import { reconcileProtectedExitSettlement } from "@/lib/trading/live-exit-settlement";
 
 const LIVE_IDEMPOTENCY_PREFIX = "live-approval:";
 const STOP_LIMIT_BUFFER = 0.001;
@@ -59,7 +60,7 @@ export type LiveExecutionResult = {
   symbol: string;
   amountUsd: string;
   protectionStatus: LiveOrderRow["protectionStatus"];
-  settlementStatus: "NOT_SETTLED";
+  settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "BLOCKED";
   blockers: string[];
 };
 
@@ -160,7 +161,11 @@ function buildProtectedPrices(fillPrice: number, snapshot: ExecutionSnapshot) {
   };
 }
 
-function result(order: LiveOrderRow, blockers: string[] = []): LiveExecutionResult {
+function result(
+  order: LiveOrderRow,
+  settlementStatus: LiveExecutionResult["settlementStatus"] = "NOT_SETTLED",
+  blockers: string[] = [],
+): LiveExecutionResult {
   return {
     realMoney: true,
     status: order.status,
@@ -170,7 +175,7 @@ function result(order: LiveOrderRow, blockers: string[] = []): LiveExecutionResu
     symbol: order.symbol,
     amountUsd: order.amountUsd.toString(),
     protectionStatus: order.protectionStatus,
-    settlementStatus: "NOT_SETTLED",
+    settlementStatus,
     blockers,
   };
 }
@@ -193,6 +198,44 @@ async function failUnknown(ownerId: string, order: LiveOrderRow, error: unknown)
   await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: reason }).catch(() => undefined);
   await audit(ownerId, "TRADING_LIVE_ORDER_UNKNOWN", updated, { reason });
   throw new Error(`LIVE_ORDER_UNKNOWN:${reason}`);
+}
+
+async function reconcileExitIfNeeded(
+  ownerId: string,
+  order: LiveOrderRow,
+  adapter: BinanceSpotLiveAdapter,
+): Promise<{ order: LiveOrderRow; settlementStatus: LiveExecutionResult["settlementStatus"]; blockers: string[] }> {
+  if (order.status !== "PROTECTED" && order.status !== "CLOSED") {
+    return { order, settlementStatus: "NOT_SETTLED", blockers: [] };
+  }
+
+  const settlement = await reconcileProtectedExitSettlement({ order, adapter });
+  if (settlement.status === "BLOCKED") {
+    await tripCircuitBreaker({
+      ownerId,
+      reason: "ORDER_FAILURE",
+      detail: settlement.blockers.join(","),
+    }).catch(() => undefined);
+    await audit(ownerId, "TRADING_LIVE_EXIT_RECONCILIATION_BLOCKED", settlement.order, {
+      blockers: settlement.blockers,
+    });
+    return { order: settlement.order, settlementStatus: "BLOCKED", blockers: settlement.blockers };
+  }
+
+  if (settlement.status === "EXCHANGE_CLOSED_PENDING_WALLET") {
+    await audit(ownerId, "TRADING_LIVE_EXCHANGE_CLOSED", settlement.order, {
+      exitPrice: settlement.exitPrice,
+      realizedPnlUsd: settlement.realizedPnlUsd,
+      settlementStatus: settlement.status,
+    });
+    return {
+      order: settlement.order,
+      settlementStatus: "EXCHANGE_CLOSED_PENDING_WALLET",
+      blockers: [],
+    };
+  }
+
+  return { order: settlement.order, settlementStatus: "NOT_SETTLED", blockers: [] };
 }
 
 async function protectFilledOrder(
@@ -327,7 +370,6 @@ export async function executeApprovedLiveOrder(input: {
     });
   }
 
-  if (order.status === "PROTECTED") return result(order);
   if (order.status === "RECONCILIATION_MISMATCH") throw new Error("LIVE_RECONCILIATION_MISMATCH_REQUIRES_MANUAL_REVIEW");
 
   const adapter = new BinanceSpotLiveAdapter({
@@ -335,6 +377,11 @@ export async function executeApprovedLiveOrder(input: {
     apiSecret: process.env.BINANCE_LIVE_API_SECRET,
     liveTradingEnabled: process.env.GAMEVORTEX_LIVE_TRADING_ENABLED === "true",
   });
+
+  if (order.status === "PROTECTED" || order.status === "CLOSED") {
+    const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
+    return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
+  }
 
   if (order.status === "SUBMITTED" || order.status === "PARTIALLY_FILLED" || order.status === "UNKNOWN" || order.status === "SUBMITTING") {
     try {
@@ -344,10 +391,14 @@ export async function executeApprovedLiveOrder(input: {
         await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: reconciled.reasons.join(",") }).catch(() => undefined);
         throw new Error(`LIVE_RECONCILIATION_MISMATCH:${reconciled.reasons.join(",")}`);
       }
-      if (reconciled.status === "STALE") return result(reconciled.order, ["STALE_PROVIDER_OBSERVATION"]);
+      if (reconciled.status === "STALE") return result(reconciled.order, "NOT_SETTLED", ["STALE_PROVIDER_OBSERVATION"]);
       order = reconciled.order;
       if (order.status === "PROTECTION_PENDING") {
         order = await protectFilledOrder(ownerId, order, snapshot, adapter);
+      }
+      if (order.status === "PROTECTED") {
+        const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
+        return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
       }
       return result(order);
     } catch (error) {
@@ -383,7 +434,7 @@ export async function executeApprovedLiveOrder(input: {
       await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: reconciled.reasons.join(",") }).catch(() => undefined);
       throw new Error(`LIVE_RECONCILIATION_MISMATCH:${reconciled.reasons.join(",")}`);
     }
-    if (reconciled.status === "STALE") return result(reconciled.order, ["STALE_PROVIDER_OBSERVATION"]);
+    if (reconciled.status === "STALE") return result(reconciled.order, "NOT_SETTLED", ["STALE_PROVIDER_OBSERVATION"]);
 
     order = reconciled.order;
     await audit(ownerId, "TRADING_LIVE_ORDER_RECONCILED", order, {
@@ -395,6 +446,17 @@ export async function executeApprovedLiveOrder(input: {
 
     if (order.status === "PROTECTION_PENDING") {
       order = await protectFilledOrder(ownerId, order, snapshot, adapter);
+    }
+
+    if (order.status === "PROTECTED") {
+      const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
+      order = reconciledExit.order;
+      if (reconciledExit.settlementStatus === "BLOCKED") {
+        return result(order, "BLOCKED", reconciledExit.blockers);
+      }
+      if (reconciledExit.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
+        return result(order, "EXCHANGE_CLOSED_PENDING_WALLET");
+      }
     }
 
     if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
