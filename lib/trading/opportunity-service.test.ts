@@ -18,6 +18,11 @@ const approvalBase = {
   id: "approval-1", opportunityId: "opp-1", ownerId: "owner-1", amountUsd: new Prisma.Decimal("10"),
   issuedAt: new Date("2026-10-02T07:00:00.000Z"), expiresAt: new Date(Date.now() + 60_000), consumedAt: new Date("2026-10-02T07:10:00.000Z"), status: "CONSUMED", strategyVersion: "v1", shariahStatus: "APPROVED",
   riskSnapshot: { requestedAmountUsd: 10, dailyLossUsd: 0, openTrades: 0, totalExposureUsd: 0, assetExposureUsd: 0, consecutiveLosses: 0, hasStopLoss: true, hasTakeProfit: true },
+  executionSnapshot: {
+    symbol: "ABC", price: 110, previousPrice: 109, fastAverage: 108, slowAverage: 100,
+    volume: 2000, averageVolume: 1500, stopLossPercent: 5, takeProfitPercent: 10,
+    shariah: { symbol: "ABC", assetType: "EQUITY", businessActivity: "software services", tradingMethod: "SPOT", ownershipSettlementVerified: true },
+  },
 };
 const commonInput = {
   ownerId: "owner-1", approvalId: "approval-1", opportunityId: "opp-1",
