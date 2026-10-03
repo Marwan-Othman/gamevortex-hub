@@ -183,7 +183,11 @@ export async function getBinanceLivePreflight(fetcher: Fetcher = fetch): Promise
 
   const checks = {
     credentials: true,
-    spotAccount: normalizedAccount.accountType === "SPOT" && permissions.includes("SPOT"),
+    // Binance accountType is the authoritative account-type field. The permissions
+    // array can contain trading-group identifiers (for example TRD_GRP_082) instead
+    // of the literal SPOT permission, so requiring permissions.includes("SPOT")
+    // incorrectly blocks valid Spot accounts.
+    spotAccount: normalizedAccount.accountType === "SPOT",
     tradingEnabled: normalizedAccount.canTrade && normalizedRestrictions.enableSpotAndMarginTrading,
     withdrawalsDisabled: !normalizedRestrictions.enableWithdrawals,
     spotTradingOnly:
