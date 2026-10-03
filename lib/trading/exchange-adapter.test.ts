@@ -47,6 +47,18 @@ const liveAdapter = (overrides: Partial<ExchangeAdapter["capabilities"]> = {}): 
     ],
     status: "EXECUTING",
   }),
+  getProtectedExitLegStatus: async (request) => ({
+    symbol: "BTCUSD",
+    clientOrderId: request.clientOrderId,
+    providerOrderId: request.clientOrderId === "tp-test-001" ? "2" : "3",
+    orderListId: "1",
+    side: "SELL",
+    status: "NEW",
+    executedQty: "0",
+    cumulativeQuoteQty: "0",
+    averageFillPrice: null,
+    updatedAt: new Date(),
+  }),
 });
 
 const validOrder: ExchangeOrderRequest = {
@@ -122,6 +134,7 @@ describe("assertLiveAdapterCapability", () => {
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), placeSpotBuy: undefined })).toThrow("SPOT_BUY_ADAPTER_REQUIRED");
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), getOrderStatus: undefined })).toThrow("ORDER_STATUS_ADAPTER_REQUIRED");
     expect(() => assertLiveAdapterCapability({ ...liveAdapter(), placeProtectedExitOco: undefined })).toThrow("PROTECTED_EXIT_ADAPTER_REQUIRED");
+    expect(() => assertLiveAdapterCapability({ ...liveAdapter(), getProtectedExitLegStatus: undefined })).toThrow("PROTECTED_EXIT_STATUS_ADAPTER_REQUIRED");
   });
 });
 
