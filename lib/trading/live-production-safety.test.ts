@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
 import { getBinanceLivePreflight } from "@/lib/trading/binance-live-preflight";
@@ -9,10 +10,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function makeEd25519PrivateKeyPem(): string {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  return privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+}
+
 describe("live production safety boundary", () => {
   it("never reports live readiness while the application live flag is disabled", async () => {
     process.env.BINANCE_LIVE_API_KEY = "key";
-    process.env.BINANCE_LIVE_API_SECRET = "secret";
+    process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
+    delete process.env.BINANCE_LIVE_API_SECRET;
     process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "false";
 
     const fetcher = vi.fn<typeof fetch>(async (input) => {
@@ -50,7 +57,7 @@ describe("live production safety boundary", () => {
     const fetcher = vi.fn<typeof fetch>();
     const adapter = new BinanceSpotLiveAdapter({
       apiKey: "key",
-      apiSecret: "secret",
+      apiPrivateKeyPem: makeEd25519PrivateKeyPem(),
       liveTradingEnabled: false,
       fetcher,
     });
