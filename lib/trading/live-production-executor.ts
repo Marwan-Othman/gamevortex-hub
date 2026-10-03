@@ -13,6 +13,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getBinanceLivePreflight } from "@/lib/trading/binance-live-preflight";
+import { assertBinanceLiveBuyRules, assertBinanceLiveProtectedExitRules } from "@/lib/trading/binance-live-symbol-rules";
 import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
 import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
@@ -208,6 +209,14 @@ async function protectFilledOrder(
   if (!quantity || Number(quantity) <= 0) throw new Error("LIVE_FILLED_QUANTITY_REQUIRED");
 
   const prices = buildProtectedPrices(fillPrice, snapshot);
+  await assertBinanceLiveProtectedExitRules({
+    symbol: order.symbol,
+    quantity: Number(quantity),
+    takeProfitPrice: Number(prices.takeProfitPrice),
+    stopLossPrice: Number(prices.stopLossPrice),
+    stopLimitPrice: Number(prices.stopLimitPrice),
+  });
+
   const plan = buildProtectedExitPlan({
     symbol: order.symbol,
     entryClientOrderId: order.clientOrderId,
@@ -349,6 +358,12 @@ export async function executeApprovedLiveOrder(input: {
   if (order.status !== "INTENT_CREATED") throw new Error(`LIVE_ORDER_STATE_NOT_EXECUTABLE:${order.status}`);
 
   try {
+    await assertBinanceLiveBuyRules({
+      symbol: order.symbol,
+      amountUsd,
+      entryPrice: order.entryPrice.toNumber(),
+    });
+
     await transitionLiveOrderState(order.id, "INTENT_CREATED", "SUBMITTING");
     const placed = await adapter.placeSpotBuy!({
       clientOrderId: order.clientOrderId,
