@@ -1,7 +1,8 @@
+import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getBinanceLivePreflight } from "@/lib/trading/binance-live-preflight";
 
-const ENV_KEYS = ["BINANCE_LIVE_API_KEY", "BINANCE_LIVE_API_SECRET", "GAMEVORTEX_LIVE_TRADING_ENABLED"] as const;
+const ENV_KEYS = ["BINANCE_LIVE_API_KEY", "BINANCE_LIVE_API_PRIVATE_KEY", "BINANCE_LIVE_API_SECRET", "GAMEVORTEX_LIVE_TRADING_ENABLED"] as const;
 const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 afterEach(() => {
@@ -13,9 +14,15 @@ afterEach(() => {
   }
 });
 
+function makeEd25519PrivateKeyPem(): string {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  return privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+}
+
 describe("getBinanceLivePreflight", () => {
   it("fails closed without production credentials", async () => {
     delete process.env.BINANCE_LIVE_API_KEY;
+    delete process.env.BINANCE_LIVE_API_PRIVATE_KEY;
     delete process.env.BINANCE_LIVE_API_SECRET;
     delete process.env.GAMEVORTEX_LIVE_TRADING_ENABLED;
 
@@ -31,7 +38,8 @@ describe("getBinanceLivePreflight", () => {
 
   it("passes only when Spot-only restrictions are safe and the explicit flag is enabled", async () => {
     process.env.BINANCE_LIVE_API_KEY = "test-key";
-    process.env.BINANCE_LIVE_API_SECRET = "test-secret";
+    process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
+    delete process.env.BINANCE_LIVE_API_SECRET;
     process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "true";
 
     const fetcher = vi.fn<typeof fetch>()
@@ -66,7 +74,8 @@ describe("getBinanceLivePreflight", () => {
 
   it("blocks immediately when the API key can withdraw", async () => {
     process.env.BINANCE_LIVE_API_KEY = "test-key";
-    process.env.BINANCE_LIVE_API_SECRET = "test-secret";
+    process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
+    delete process.env.BINANCE_LIVE_API_SECRET;
     process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "true";
 
     const fetcher = vi.fn<typeof fetch>()
