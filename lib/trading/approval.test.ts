@@ -2,118 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createApprovalToken, verifyApprovalToken } from "./approval";
 
 describe("owner approval tokens", () => {
-  it("creates a token bound to one opportunity and verifies it", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: approval.token,
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: approval.expiresAt,
-      now: new Date(approval.issuedAt),
-    });
-
-    expect(approval.token).not.toBe(approval.tokenHash);
-    expect(approval.token).toHaveLength(43);
-    expect(approval.tokenHash).toHaveLength(64);
-    expect(result).toEqual({ valid: true });
-  });
-
-  it("rejects a token for a different opportunity", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-456",
-      token: approval.token,
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: approval.expiresAt,
-      now: new Date(approval.issuedAt),
-    });
-
-    expect(result).toEqual({ valid: false, reason: "INVALID_TOKEN" });
-  });
-
-  it("rejects expired approvals", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: approval.token,
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: approval.expiresAt,
-      now: new Date(new Date(approval.expiresAt).getTime() + 1),
-    });
-
-    expect(result).toEqual({ valid: false, reason: "EXPIRED" });
-  });
-
-  it("accepts an approval exactly at its expiry boundary", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: approval.token,
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: approval.expiresAt,
-      now: new Date(approval.expiresAt),
-    });
-
-    expect(result).toEqual({ valid: true });
-  });
-
-  it("rejects invalid TTL values", () => {
-    expect(() => createApprovalToken("opp-123", 29)).toThrow("INVALID_APPROVAL_TTL");
-    expect(() => createApprovalToken("opp-123", 901)).toThrow("INVALID_APPROVAL_TTL");
-  });
-
-  it("rejects malformed token hashes", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: approval.token,
-      expectedTokenHash: "bad",
-      expiresAt: approval.expiresAt,
-    });
-
-    expect(result).toEqual({ valid: false, reason: "INVALID_TOKEN" });
-  });
-
-  it("rejects a modified token even when the opportunity and hash are correct", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const modifiedToken = `${approval.token.slice(0, -1)}${approval.token.endsWith("a") ? "b" : "a"}`;
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: modifiedToken,
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: approval.expiresAt,
-      now: new Date(approval.issuedAt),
-    });
-
-    expect(result).toEqual({ valid: false, reason: "INVALID_TOKEN" });
-  });
-
-  it("rejects blank opportunity identifiers", () => {
-    expect(() => createApprovalToken("   ", 60)).toThrow("INVALID_APPROVAL_OPPORTUNITY");
-  });
-
-  it("rejects blank verification tokens", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: "   ",
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: approval.expiresAt,
-    });
-
-    expect(result).toEqual({ valid: false, reason: "INVALID_TOKEN" });
-  });
-
-  it("rejects a token when the stored expiry is malformed", () => {
-    const approval = createApprovalToken("opp-123", 60);
-    const result = verifyApprovalToken({
-      opportunityId: "opp-123",
-      token: approval.token,
-      expectedTokenHash: approval.tokenHash,
-      expiresAt: "not-a-date",
-      now: new Date(approval.issuedAt),
-    });
-
-    expect(result).toEqual({ valid: false, reason: "EXPIRED" });
-  });
+  it("creates a token bound to one opportunity and verifies it", () => { const approval = createApprovalToken("opp-123", 60); const result = verifyApprovalToken({ opportunityId: "opp-123", token: approval.token, expectedTokenHash: approval.tokenHash, expiresAt: approval.expiresAt, now: new Date(approval.issuedAt) }); expect(approval.token).not.toBe(approval.tokenHash); expect(approval.token).toHaveLength(43); expect(approval.tokenHash).toHaveLength(64); expect(result).toEqual({ valid: true }); });
+  it("rejects a token for a different opportunity", () => { const approval = createApprovalToken("opp-123", 60); expect(verifyApprovalToken({ opportunityId: "opp-456", token: approval.token, expectedTokenHash: approval.tokenHash, expiresAt: approval.expiresAt, now: new Date(approval.issuedAt) })).toEqual({ valid: false, reason: "INVALID_TOKEN" }); });
+  it("rejects expired approvals", () => { const approval = createApprovalToken("opp-123", 60); expect(verifyApprovalToken({ opportunityId: "opp-123", token: approval.token, expectedTokenHash: approval.tokenHash, expiresAt: approval.expiresAt, now: new Date(new Date(approval.expiresAt).getTime() + 1) })).toEqual({ valid: false, reason: "EXPIRED" }); });
+  it("rejects an approval exactly at its expiry boundary", () => { const approval = createApprovalToken("opp-123", 60); expect(verifyApprovalToken({ opportunityId: "opp-123", token: approval.token, expectedTokenHash: approval.tokenHash, expiresAt: approval.expiresAt, now: new Date(approval.expiresAt) })).toEqual({ valid: false, reason: "EXPIRED" }); });
+  it("rejects invalid TTL values", () => { expect(() => createApprovalToken("opp-123", 29)).toThrow("INVALID_APPROVAL_TTL"); expect(() => createApprovalToken("opp-123", 901)).toThrow("INVALID_APPROVAL_TTL"); });
+  it("rejects malformed token hashes", () => { const approval = createApprovalToken("opp-123", 60); expect(verifyApprovalToken({ opportunityId: "opp-123", token: approval.token, expectedTokenHash: "bad", expiresAt: approval.expiresAt })).toEqual({ valid: false, reason: "INVALID_TOKEN" }); });
+  it("rejects a modified token even when the opportunity and hash are correct", () => { const approval = createApprovalToken("opp-123", 60); const modifiedToken = `${approval.token.slice(0, -1)}${approval.token.endsWith("a") ? "b" : "a"}`; expect(verifyApprovalToken({ opportunityId: "opp-123", token: modifiedToken, expectedTokenHash: approval.tokenHash, expiresAt: approval.expiresAt, now: new Date(approval.issuedAt) })).toEqual({ valid: false, reason: "INVALID_TOKEN" }); });
+  it("rejects blank opportunity identifiers", () => { expect(() => createApprovalToken("   ", 60)).toThrow("INVALID_APPROVAL_OPPORTUNITY"); });
+  it("rejects blank verification tokens", () => { const approval = createApprovalToken("opp-123", 60); expect(verifyApprovalToken({ opportunityId: "opp-123", token: "   ", expectedTokenHash: approval.tokenHash, expiresAt: approval.expiresAt, now: new Date(approval.issuedAt) })).toEqual({ valid: false, reason: "INVALID_TOKEN" }); });
+  it("rejects a token when the stored expiry is malformed", () => { const approval = createApprovalToken("opp-123", 60); expect(verifyApprovalToken({ opportunityId: "opp-123", token: approval.token, expectedTokenHash: approval.tokenHash, expiresAt: "not-a-date", now: new Date(approval.issuedAt) })).toEqual({ valid: false, reason: "EXPIRED" }); });
 });
