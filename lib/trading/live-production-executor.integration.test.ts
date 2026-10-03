@@ -34,4 +34,8 @@ describe("live production executor safety gates", () => {
       expect(canSubmitOrder({ ...safeBase, [gate]: false })).toBe(false);
     });
   }
+
+  it("keeps the safety suite active in CI", () => {
+    expect(Object.keys(safeBase)).toHaveLength(7);
+  });
 });
