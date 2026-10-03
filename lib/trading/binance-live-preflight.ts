@@ -104,6 +104,11 @@ async function requestJson(
       payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string"
         ? payload.msg
         : `HTTP_${response.status}`;
+
+    if (/restricted location/i.test(message)) {
+      throw new Error("BINANCE_LIVE_RESTRICTED_LOCATION");
+    }
+
     throw new Error(`BINANCE_LIVE_${message}`);
   }
 
