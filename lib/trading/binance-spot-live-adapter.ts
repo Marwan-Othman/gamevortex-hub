@@ -4,14 +4,12 @@
  * IMPORTANT SAFETY RULE:
  * This adapter is production-capable code but is fail-closed by default.
  * It cannot submit a live order unless GAMEVORTEX_LIVE_TRADING_ENABLED is
- * explicitly true at runtime. The application currently keeps that flag false.
- * Credentials are read server-side only and are never returned in results.
+ * explicitly true at runtime. Credentials are read server-side only.
  *
- * This adapter implements the Binance Spot REST contract needed by the next
- * live-trading stage: market data, BUY submission, order-status lookup,
- * protected SELL OCO submission, and protected-exit leg reconciliation.
- * The executor/reconciliation layer remains responsible for deciding when
- * these methods may be called.
+ * Binance currently supports Ed25519 for Spot signed REST requests. This
+ * adapter therefore treats `apiPrivateKeyPem` as the preferred credential and
+ * keeps `apiSecret` as a backwards-compatible option name for the existing
+ * executor contract. The value must contain an Ed25519 PKCS#8 PEM private key.
  */
 
 import { createHmac } from "node:crypto";
@@ -32,15 +30,17 @@ import {
   type ExchangeProtectedExitLegStatusResult,
 } from "@/lib/trading/exchange-adapter";
 import type { LiveProviderOrderObservation } from "@/lib/trading/live-order-reconciliation";
+import { signBinanceEd25519Payload } from "@/lib/trading/binance-ed25519-signer";
 
 const DEFAULT_BASE_URL = "https://api.binance.com";
 const DEFAULT_RECV_WINDOW = 5_000;
 const MAX_MARKET_DATA_LIMIT = 1_000;
-const MAX_CLIENT_ORDER_ID_LENGTH = 36;
 
 export type BinanceSpotLiveAdapterOptions = {
   apiKey?: string;
+  /** Backwards-compatible field name. The value must be the Ed25519 PKCS#8 PEM private key. */
   apiSecret?: string;
+  apiPrivateKeyPem?: string;
   baseUrl?: string;
   recvWindow?: number;
   fetcher?: typeof fetch;
@@ -81,9 +81,7 @@ type BinanceOrderListResponse = {
 
 function normalizeBaseUrl(value: string | undefined): string {
   const baseUrl = (value ?? DEFAULT_BASE_URL).trim().replace(/\/$/, "");
-  if (baseUrl !== DEFAULT_BASE_URL) {
-    throw new Error("BINANCE_LIVE_BASE_URL_MUST_BE_OFFICIAL_PRODUCTION");
-  }
+  if (baseUrl !== DEFAULT_BASE_URL) throw new Error("BINANCE_LIVE_BASE_URL_MUST_BE_OFFICIAL_PRODUCTION");
   return baseUrl;
 }
 
@@ -124,10 +122,6 @@ function encodeQuery(params: Record<string, string | number>): string {
     .join("&");
 }
 
-function sign(query: string, secret: string): string {
-  return createHmac("sha256", secret).update(query).digest("hex");
-}
-
 function normalizeClientOrderId(value: string, code: string): string {
   const normalized = value.trim();
   if (!/^[A-Za-z0-9._:-]{1,36}$/.test(normalized)) throw new Error(code);
@@ -162,9 +156,7 @@ function mapProviderStatus(status: string | undefined): LiveProviderOrderObserva
   }
 }
 
-function mapExitLegStatus(
-  status: string | undefined,
-): ExchangeProtectedExitLegStatusResult["status"] {
+function mapExitLegStatus(status: string | undefined): ExchangeProtectedExitLegStatusResult["status"] {
   switch (status) {
     case "NEW":
     case "PARTIALLY_FILLED":
@@ -192,11 +184,7 @@ async function parseJson(response: Response): Promise<unknown> {
       payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string"
         ? payload.msg
         : `HTTP_${response.status}`;
-
-    if (/restricted location|service unavailable from/i.test(message)) {
-      throw new Error("BINANCE_LIVE_RESTRICTED_LOCATION");
-    }
-
+    if (/restricted location|service unavailable from/i.test(message)) throw new Error("BINANCE_LIVE_RESTRICTED_LOCATION");
     throw new Error(`BINANCE_LIVE_${message}`);
   }
 
@@ -218,7 +206,7 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
   } as const;
 
   private readonly apiKey?: string;
-  private readonly apiSecret?: string;
+  private readonly apiPrivateKeyPem?: string;
   private readonly baseUrl: string;
   private readonly recvWindow: number;
   private readonly fetcher: typeof fetch;
@@ -227,7 +215,7 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
 
   constructor(options: BinanceSpotLiveAdapterOptions = {}) {
     this.apiKey = options.apiKey?.trim() || undefined;
-    this.apiSecret = options.apiSecret?.trim() || undefined;
+    this.apiPrivateKeyPem = options.apiPrivateKeyPem?.trim() || options.apiSecret?.trim() || undefined;
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.recvWindow = options.recvWindow ?? DEFAULT_RECV_WINDOW;
     this.fetcher = options.fetcher ?? fetch;
@@ -245,29 +233,23 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     if (!this.liveTradingEnabled) throw new Error("LIVE_TRADING_DISABLED");
   }
 
-  private requireCredentials(): { apiKey: string; apiSecret: string } {
-    if (!this.apiKey || !this.apiSecret) throw new Error("BINANCE_LIVE_API_CREDENTIALS_REQUIRED");
-    return { apiKey: this.apiKey, apiSecret: this.apiSecret };
+  private requireCredentials(): { apiKey: string; privateKeyPem: string } {
+    if (!this.apiKey || !this.apiPrivateKeyPem) throw new Error("BINANCE_LIVE_API_CREDENTIALS_REQUIRED");
+    return { apiKey: this.apiKey, privateKeyPem: this.apiPrivateKeyPem };
   }
 
-  private signedQuery(params: Record<string, string | number>, apiSecret: string): string {
+  private signedQuery(params: Record<string, string | number>, privateKeyPem: string): string {
     const query = encodeQuery(params);
-    return `${query}&signature=${sign(query, apiSecret)}`;
+    const signature = signBinanceEd25519Payload(query, privateKeyPem);
+    return `${query}&signature=${encodeURIComponent(signature)}`;
   }
 
-  private async signedRequest(
-    method: "GET" | "POST",
-    path: string,
-    params: Record<string, string | number>,
-  ): Promise<unknown> {
-    const { apiKey, apiSecret } = this.requireCredentials();
-    const query = this.signedQuery(params, apiSecret);
+  private async signedRequest(method: "GET" | "POST", path: string, params: Record<string, string | number>): Promise<unknown> {
+    const { apiKey, privateKeyPem } = this.requireCredentials();
+    const query = this.signedQuery(params, privateKeyPem);
     const response = await this.fetcher(`${this.baseUrl}${path}?${query}`, {
       method,
-      headers: {
-        Accept: "application/json",
-        "X-MBX-APIKEY": apiKey,
-      },
+      headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
     });
     return parseJson(response);
   }
@@ -275,7 +257,6 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
   async getMarketData(request: ExchangeMarketDataRequest): Promise<ExchangeMarketDataResponse> {
     validateExchangeMarketDataRequest(request);
     if (request.limit > MAX_MARKET_DATA_LIMIT) throw new Error("INVALID_MARKET_DATA_LIMIT");
-
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
     const query = encodeQuery({ symbol, interval: request.interval.trim(), limit: request.limit });
     const response = await this.fetcher(`${this.baseUrl}/api/v3/klines?${query}`, {
@@ -284,12 +265,10 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     });
     const payload = await parseJson(response);
     if (!Array.isArray(payload)) throw new Error("INVALID_BINANCE_LIVE_KLINES_RESPONSE");
-
     const candles = payload.map((item) => {
       if (!Array.isArray(item) || item.length < 6) throw new Error("INVALID_BINANCE_LIVE_KLINE");
       return mapKline(item as BinanceKline);
     });
-
     return { symbol, interval: request.interval.trim(), candles };
   }
 
@@ -298,7 +277,6 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     validateExchangeOrderRequest(request);
     const clientOrderId = normalizeClientOrderId(request.clientOrderId, "INVALID_BINANCE_LIVE_CLIENT_ORDER_ID");
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
-
     const payload = (await this.signedRequest("POST", "/api/v3/order", {
       symbol,
       side: "BUY",
@@ -314,20 +292,19 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
       throw new Error("BINANCE_LIVE_INVALID_ORDER_RESPONSE");
     }
 
-    const executedQty = typeof payload.executedQty === "string" ? nonNegativeNumber(payload.executedQty, "BINANCE_LIVE_INVALID_EXECUTED_QTY") : undefined;
+    const executedQty = typeof payload.executedQty === "string"
+      ? nonNegativeNumber(payload.executedQty, "BINANCE_LIVE_INVALID_EXECUTED_QTY")
+      : undefined;
     const cumulativeQuoteQtyRaw = payload.cumulativeQuoteQty ?? payload.cummulativeQuoteQty;
-    const cumulativeQuoteQty = typeof cumulativeQuoteQtyRaw === "string" ? nonNegativeNumber(cumulativeQuoteQtyRaw, "BINANCE_LIVE_INVALID_CUMULATIVE_QUOTE_QTY") : undefined;
+    const cumulativeQuoteQty = typeof cumulativeQuoteQtyRaw === "string"
+      ? nonNegativeNumber(cumulativeQuoteQtyRaw, "BINANCE_LIVE_INVALID_CUMULATIVE_QUOTE_QTY")
+      : undefined;
 
     return {
       accepted: payload.status === "FILLED" || payload.status === "PARTIALLY_FILLED" || payload.status === "NEW",
       clientOrderId: payload.clientOrderId,
       providerOrderId: String(payload.orderId),
-      status:
-        payload.status === "FILLED"
-          ? "FILLED"
-          : payload.status === "REJECTED"
-            ? "REJECTED"
-            : "SUBMITTED",
+      status: payload.status === "FILLED" ? "FILLED" : payload.status === "REJECTED" ? "REJECTED" : "SUBMITTED",
       executedQty,
       cumulativeQuoteQty,
       averageFillPrice:
@@ -341,7 +318,6 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     this.requireLiveExecution();
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
     const clientOrderId = normalizeClientOrderId(request.clientOrderId, "INVALID_BINANCE_LIVE_CLIENT_ORDER_ID");
-
     const payload = (await this.signedRequest("GET", "/api/v3/order", {
       symbol,
       origClientOrderId: clientOrderId,
@@ -349,12 +325,7 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
       timestamp: Date.now(),
     })) as BinanceOrderResponse;
 
-    if (
-      typeof payload.orderId !== "number" ||
-      typeof payload.clientOrderId !== "string" ||
-      typeof payload.symbol !== "string" ||
-      typeof payload.status !== "string"
-    ) {
+    if (typeof payload.orderId !== "number" || typeof payload.clientOrderId !== "string" || typeof payload.symbol !== "string" || typeof payload.status !== "string") {
       throw new Error("BINANCE_LIVE_INVALID_ORDER_STATUS_RESPONSE");
     }
 
@@ -384,15 +355,17 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     this.requireLiveExecution();
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
     const quantity = assertPositiveDecimalText(request.quantity, "INVALID_BINANCE_LIVE_EXIT_QUANTITY");
+    const entryPrice = assertPositiveDecimalText(request.entryPrice, "INVALID_BINANCE_LIVE_ENTRY_PRICE");
     const takeProfitPrice = assertPositiveDecimalText(request.takeProfitPrice, "INVALID_BINANCE_LIVE_EXIT_TAKE_PROFIT");
     const stopLossPrice = assertPositiveDecimalText(request.stopLossPrice, "INVALID_BINANCE_LIVE_EXIT_STOP_LOSS");
     const stopLimitPrice = assertPositiveDecimalText(request.stopLimitPrice, "INVALID_BINANCE_LIVE_EXIT_STOP_LIMIT");
     const takeProfitClientOrderId = normalizeClientOrderId(request.takeProfitClientOrderId, "INVALID_BINANCE_LIVE_TP_CLIENT_ORDER_ID");
     const stopLossClientOrderId = normalizeClientOrderId(request.stopLossClientOrderId, "INVALID_BINANCE_LIVE_SL_CLIENT_ORDER_ID");
-    const listClientOrderId = normalizeClientOrderId(
-      request.listClientOrderId ?? stableListClientOrderId(takeProfitClientOrderId),
-      "INVALID_BINANCE_LIVE_OCO_LIST_CLIENT_ORDER_ID",
-    );
+    const listClientOrderId = normalizeClientOrderId(request.listClientOrderId ?? stableListClientOrderId(takeProfitClientOrderId), "INVALID_BINANCE_LIVE_OCO_LIST_CLIENT_ORDER_ID");
+
+    if (!(takeProfitPrice > entryPrice && entryPrice > stopLossPrice && stopLossPrice > stopLimitPrice)) {
+      throw new Error("INVALID_BINANCE_LIVE_PROTECTED_EXIT_PRICE_ORDER");
+    }
 
     const payload = (await this.signedRequest("POST", "/api/v3/orderList/oco", {
       symbol,
@@ -412,20 +385,12 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
       timestamp: Date.now(),
     })) as BinanceOrderListResponse;
 
-    if (
-      typeof payload.orderListId !== "number" ||
-      payload.contingencyType !== "OCO" ||
-      typeof payload.listClientOrderId !== "string" ||
-      !Array.isArray(payload.orders) ||
-      payload.orders.length !== 2
-    ) {
+    if (typeof payload.orderListId !== "number" || payload.contingencyType !== "OCO" || typeof payload.listClientOrderId !== "string" || !Array.isArray(payload.orders) || payload.orders.length !== 2) {
       throw new Error("BINANCE_LIVE_INVALID_OCO_RESPONSE");
     }
 
     const orderIds = payload.orders.map((order) => {
-      if (typeof order.orderId !== "number" || typeof order.clientOrderId !== "string") {
-        throw new Error("BINANCE_LIVE_INVALID_OCO_ORDER_RESPONSE");
-      }
+      if (typeof order.orderId !== "number" || typeof order.clientOrderId !== "string") throw new Error("BINANCE_LIVE_INVALID_OCO_ORDER_RESPONSE");
       return { providerOrderId: String(order.orderId), clientOrderId: order.clientOrderId };
     });
 
@@ -443,16 +408,10 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     };
   }
 
-  async getProtectedExitLegStatus(
-    request: ExchangeProtectedExitLegStatusRequest,
-  ): Promise<ExchangeProtectedExitLegStatusResult> {
+  async getProtectedExitLegStatus(request: ExchangeProtectedExitLegStatusRequest): Promise<ExchangeProtectedExitLegStatusResult> {
     this.requireLiveExecution();
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
-    const clientOrderId = normalizeClientOrderId(
-      request.clientOrderId,
-      "INVALID_BINANCE_LIVE_EXIT_CLIENT_ORDER_ID",
-    );
-
+    const clientOrderId = normalizeClientOrderId(request.clientOrderId, "INVALID_BINANCE_LIVE_EXIT_CLIENT_ORDER_ID");
     const payload = (await this.signedRequest("GET", "/api/v3/order", {
       symbol,
       origClientOrderId: clientOrderId,
@@ -460,36 +419,22 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
       timestamp: Date.now(),
     })) as BinanceOrderResponse;
 
-    if (
-      typeof payload.orderId !== "number" ||
-      typeof payload.clientOrderId !== "string" ||
-      typeof payload.symbol !== "string" ||
-      typeof payload.status !== "string" ||
-      payload.side !== "SELL"
-    ) {
+    if (typeof payload.orderId !== "number" || typeof payload.clientOrderId !== "string" || typeof payload.symbol !== "string" || typeof payload.status !== "string" || payload.side !== "SELL") {
       throw new Error("BINANCE_LIVE_INVALID_EXIT_ORDER_RESPONSE");
     }
 
-    const executedQty = typeof payload.executedQty === "string"
-      ? nonNegativeNumber(payload.executedQty, "BINANCE_LIVE_INVALID_EXIT_EXECUTED_QTY")
-      : 0;
+    const executedQty = typeof payload.executedQty === "string" ? nonNegativeNumber(payload.executedQty, "BINANCE_LIVE_INVALID_EXIT_EXECUTED_QTY") : 0;
     const cumulativeQuoteQtyRaw = payload.cumulativeQuoteQty ?? payload.cummulativeQuoteQty;
-    const cumulativeQuoteQty = typeof cumulativeQuoteQtyRaw === "string"
-      ? nonNegativeNumber(cumulativeQuoteQtyRaw, "BINANCE_LIVE_INVALID_EXIT_CUMULATIVE_QUOTE_QTY")
-      : 0;
+    const cumulativeQuoteQty = typeof cumulativeQuoteQtyRaw === "string" ? nonNegativeNumber(cumulativeQuoteQtyRaw, "BINANCE_LIVE_INVALID_EXIT_CUMULATIVE_QUOTE_QTY") : 0;
     const averageFillPrice = executedQty > 0 ? cumulativeQuoteQty / executedQty : null;
     const updatedAt = payload.updateTime ?? payload.transactTime;
-    if (typeof updatedAt !== "number" || !Number.isFinite(updatedAt)) {
-      throw new Error("BINANCE_LIVE_INVALID_EXIT_UPDATE_TIME");
-    }
+    if (typeof updatedAt !== "number" || !Number.isFinite(updatedAt)) throw new Error("BINANCE_LIVE_INVALID_EXIT_UPDATE_TIME");
 
     return {
       symbol: payload.symbol,
       clientOrderId: payload.clientOrderId,
       providerOrderId: String(payload.orderId),
-      orderListId: typeof payload.orderListId === "number" && payload.orderListId >= 0
-        ? String(payload.orderListId)
-        : null,
+      orderListId: typeof payload.orderListId === "number" && payload.orderListId >= 0 ? String(payload.orderListId) : null,
       side: "SELL",
       status: mapExitLegStatus(payload.status),
       executedQty: String(executedQty),
