@@ -2,48 +2,12 @@ import { describe, expect, it } from "vitest";
 import { getRuntimeConfig } from "../lib/gamevortex-ai/config";
 
 describe("GameVortex AI runtime configuration", () => {
-  it("requires a runtime URL", () => {
-    expect(() => getRuntimeConfig({})).toThrowError("RUNTIME_NOT_CONFIGURED");
-  });
-
-  it("allows direct local Ollama for development", () => {
-    expect(getRuntimeConfig({ GAMEVORTEX_AI_RUNTIME_URL: "http://127.0.0.1:11434" })).toMatchObject({
-      chatUrl: "http://127.0.0.1:11434/api/chat",
-      healthUrl: "http://127.0.0.1:11434/api/tags",
-      model: "qwen3:1.7b",
-      local: true,
-    });
-  });
-
-  it("requires a secret for a remote HTTPS gateway", () => {
-    expect(() => getRuntimeConfig({ GAMEVORTEX_AI_RUNTIME_URL: "https://ai.example.test" })).toThrowError("RUNTIME_TOKEN_NOT_CONFIGURED");
-    expect(getRuntimeConfig({
-      GAMEVORTEX_AI_RUNTIME_URL: "https://ai.example.test",
-      GAMEVORTEX_AI_RUNTIME_TOKEN: "0123456789abcdef".repeat(4),
-      GAMEVORTEX_AI_MODEL: "qwen3:1.7b",
-    })).toMatchObject({
-      chatUrl: "https://ai.example.test/api/chat",
-      healthUrl: "https://ai.example.test/health",
-      local: false,
-    });
-  });
-
-  it.each([
-    "http://ai.example.test",
-    "https://user:password@ai.example.test",
-    "https://ai.example.test?token=secret",
-    "https://ai.example.test/#fragment",
-  ])("rejects unsafe remote runtime URL %s", (url) => {
-    expect(() => getRuntimeConfig({
-      GAMEVORTEX_AI_RUNTIME_URL: url,
-      GAMEVORTEX_AI_RUNTIME_TOKEN: "0123456789abcdef".repeat(4),
-    })).toThrowError("RUNTIME_CONFIGURATION_INVALID");
-  });
-
-  it("rejects weak remote runtime tokens", () => {
-    expect(() => getRuntimeConfig({
-      GAMEVORTEX_AI_RUNTIME_URL: "https://ai.example.test",
-      GAMEVORTEX_AI_RUNTIME_TOKEN: "weak",
-    })).toThrowError("RUNTIME_CONFIGURATION_INVALID");
-  });
+  it("requires a server-side Gemini API key", () => { expect(() => getRuntimeConfig({})).toThrowError("GEMINI_NOT_CONFIGURED"); });
+  it("accepts a valid server-side Gemini configuration", () => { expect(getRuntimeConfig({ GEMINI_API_KEY: "0123456789abcdef0123", GEMINI_MODEL: "gemini-3.1-flash-lite" })).toEqual({ model: "gemini-3.1-flash-lite" }); });
+  it("uses the default Gemini model when none is supplied", () => { expect(getRuntimeConfig({ GEMINI_API_KEY: "0123456789abcdef0123" })).toEqual({ model: "gemini-3.1-flash-lite" }); });
+  it("rejects weak API keys", () => { expect(() => getRuntimeConfig({ GEMINI_API_KEY: "weak" })).toThrowError("GEMINI_CONFIGURATION_INVALID"); });
+  it("rejects empty models", () => { expect(() => getRuntimeConfig({ GEMINI_API_KEY: "0123456789abcdef0123", GEMINI_MODEL: " " })).toThrowError("GEMINI_CONFIGURATION_INVALID"); });
+  it("rejects models containing control or whitespace characters", () => { expect(() => getRuntimeConfig({ GEMINI_API_KEY: "0123456789abcdef0123", GEMINI_MODEL: "gemini model" })).toThrowError("GEMINI_CONFIGURATION_INVALID"); });
+  it("rejects excessively long models", () => { expect(() => getRuntimeConfig({ GEMINI_API_KEY: "0123456789abcdef0123", GEMINI_MODEL: "m".repeat(129) })).toThrowError("GEMINI_CONFIGURATION_INVALID"); });
+  it("does not expose the API key in the returned runtime configuration", () => { const config = getRuntimeConfig({ GEMINI_API_KEY: "0123456789abcdef0123" }); expect(config).not.toHaveProperty("apiKey"); expect(config).not.toHaveProperty("GEMINI_API_KEY"); });
 });
