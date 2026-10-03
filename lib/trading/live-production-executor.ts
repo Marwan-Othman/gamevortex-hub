@@ -14,9 +14,10 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getBinanceLivePreflight } from "@/lib/trading/binance-live-preflight";
 import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
-import { getTradingControl } from "@/lib/trading/control-service";
+import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
+import { evaluateRisk, type RiskSnapshot } from "@/lib/trading/risk";
 import { checkAndRecordShariah } from "@/lib/trading/shariah-service";
 import type { ShariahAssetInput } from "@/lib/trading/shariah";
 import { getConsumedOwnerApproval } from "@/lib/trading/opportunity-service";
@@ -31,8 +32,6 @@ import {
   type LiveOrderRow,
 } from "@/lib/trading/live-order-state";
 import { buildProtectedExitPlan } from "@/lib/trading/protected-exit-plan";
-import { tripCircuitBreaker } from "@/lib/trading/control-service";
-import type { RiskSnapshot } from "@/lib/trading/risk";
 
 const LIVE_IDEMPOTENCY_PREFIX = "live-approval:";
 const STOP_LIMIT_BUFFER = 0.001;
@@ -291,6 +290,11 @@ export async function executeApprovedLiveOrder(input: {
   const riskSnapshot = parseRiskSnapshot(approval.riskSnapshot, amountUsd);
   const riskConfig = await getRiskConfig(ownerId);
   if (!riskConfig || !riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
+
+  const riskDecision = evaluateRisk(riskConfig.config, riskSnapshot);
+  if (!riskDecision.allowed) {
+    throw new Error(`LIVE_RISK_BLOCKED:${riskDecision.reasons.join(",")}`);
+  }
 
   const shariah = await checkAndRecordShariah({ actorUserId: ownerId, asset: snapshot.shariah });
   if (shariah.decision.status !== "APPROVED") {
