@@ -219,7 +219,7 @@ async function protectFilledOrder(
   });
 
   try {
-    const protection = await adapter.placeProtectedExitOco({
+    const protection = await adapter.placeProtectedExitOco!({
       symbol: plan.symbol,
       quantity: plan.quantity,
       entryPrice: String(fillPrice),
