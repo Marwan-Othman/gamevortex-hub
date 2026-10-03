@@ -28,6 +28,7 @@ const CHECK_TEXT: Record<string, string> = {
 
 const BLOCKER_TEXT: Record<string, string> = {
   BINANCE_LIVE_API_CREDENTIALS_REQUIRED: "مفاتيح Binance للإنتاج غير مضافة بعد.",
+  BINANCE_LIVE_RESTRICTED_LOCATION: "Binance رفضت اتصال خادم الإنتاج بسبب قيد موقع/أهلية الخدمة. لا يمكن تفعيل التداول الحقيقي من هذا الاتصال ولا ينبغي تجاوز القيد عبر VPN أو تغيير عنوان IP.",
   BINANCE_LIVE_SPOT_ACCOUNT_REQUIRED: "يجب أن يكون الحساب Spot وأن تظهر صلاحية SPOT.",
   BINANCE_LIVE_SPOT_TRADING_REQUIRED: "يجب تفعيل Spot Trading للمفتاح.",
   BINANCE_LIVE_WITHDRAWALS_MUST_BE_DISABLED: "السحب مفعّل على المفتاح؛ يجب تعطيله قبل أي تداول حقيقي.",
