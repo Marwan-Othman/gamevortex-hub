@@ -36,6 +36,18 @@ const adapter: ExchangeAdapter = {
     orders: [],
     status: "REJECTED",
   }),
+  getProtectedExitLegStatus: async (request) => ({
+    symbol: "TEST",
+    clientOrderId: request.clientOrderId,
+    providerOrderId: "dry-run",
+    orderListId: "dry-run",
+    side: "SELL",
+    status: "NEW",
+    executedQty: "0",
+    cumulativeQuoteQty: "0",
+    averageFillPrice: null,
+    updatedAt: new Date(),
+  }),
 };
 
 const input: LiveExecutionReadinessInput = {
