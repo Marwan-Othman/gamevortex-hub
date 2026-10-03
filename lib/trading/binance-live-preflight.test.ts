@@ -36,6 +36,26 @@ describe("getBinanceLivePreflight", () => {
     ]);
   });
 
+  it("surfaces Binance restricted-location responses as a safe blocker", async () => {
+    process.env.BINANCE_LIVE_API_KEY = "test-key";
+    process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
+    delete process.env.BINANCE_LIVE_API_SECRET;
+    process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "false";
+
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: -2015,
+          msg: "BINANCE_LIVE_Service unavailable from a restricted location according to 'b. Eligibility' in https://www.binance.com/en/terms.",
+        }),
+        { status: 403 },
+      ),
+    );
+
+    await expect(getBinanceLivePreflight(fetcher)).rejects.toThrow("BINANCE_LIVE_RESTRICTED_LOCATION");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("passes only when Spot-only restrictions are safe and the explicit flag is enabled", async () => {
     process.env.BINANCE_LIVE_API_KEY = "test-key";
     process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
