@@ -87,7 +87,7 @@ export async function releaseUnfilledLiveAllocation(input: {
         "version" = "version" + 1
       WHERE "id" = ${order.id} AND "settlementStatus" <> 'SETTLED'
       RETURNING *
-    `;
+    `);
     const updated = updatedRows[0];
     if (!updated) throw new Error("LIVE_UNFILLED_RELEASE_STATE_CONFLICT");
 
