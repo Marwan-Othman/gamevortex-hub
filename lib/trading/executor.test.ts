@@ -14,6 +14,16 @@ const shariah = {
   ownershipSettlementVerified: true,
 };
 
+const shariahPolicy = {
+  version: "strict-v1",
+  prohibitedBusinessKeywords: ["alcohol", "casino", "gambling", "betting", "interest-based lending"],
+  prohibitedMethods: ["MARGIN", "LEVERAGED", "SHORT", "FUTURES", "OPTIONS", "UNKNOWN"] as const,
+  allowedMethods: ["SPOT"] as const,
+  maxInterestBearingDebtRatio: 0.33,
+  maxInterestIncomeRatio: 0.05,
+  maxImpermissibleIncomeRatio: 0.05,
+};
+
 const riskConfig = {
   maxTradeAmountUsd: 100,
   maxDailyLossUsd: 50,
@@ -38,6 +48,7 @@ function request(overrides: Partial<TradingExecutionRequest> = {}): TradingExecu
     stopLossPrice: 95,
     takeProfitPrice: 110,
     shariah,
+    shariahPolicy,
     riskConfig,
     riskSnapshot: {
       requestedAmountUsd: 10,
@@ -56,7 +67,6 @@ function request(overrides: Partial<TradingExecutionRequest> = {}): TradingExecu
 describe("buildTradingExecutionPlan", () => {
   it("builds a normalized paper-only spot BUY plan", () => {
     const plan = buildTradingExecutionPlan(request());
-
     expect(plan.status).toBe("PAPER_READY");
     expect(plan.mode).toBe("PAPER");
     expect(plan.symbol).toBe("TEST");
@@ -71,173 +81,83 @@ describe("buildTradingExecutionPlan", () => {
   });
 
   it("normalizes symbols before creating the plan", () => {
-    const plan = buildTradingExecutionPlan(request({ symbol: "  test  " }));
-    expect(plan.symbol).toBe("TEST");
+    expect(buildTradingExecutionPlan(request({ symbol: "  test  " })).symbol).toBe("TEST");
   });
 
   it("rejects symbols containing unsupported characters", () => {
-    expect(() => buildTradingExecutionPlan(request({ symbol: "TEST/USDT" }))).toThrow(
-      "INVALID_EXECUTION_SYMBOL",
-    );
+    expect(() => buildTradingExecutionPlan(request({ symbol: "TEST/USDT" }))).toThrow("INVALID_EXECUTION_SYMBOL");
   });
 
   it("rejects blank owner, opportunity, and idempotency identifiers", () => {
-    expect(() => buildTradingExecutionPlan(request({ ownerId: "   " }))).toThrow(
-      "INVALID_EXECUTION_OWNER",
-    );
-    expect(() => buildTradingExecutionPlan(request({ opportunityId: "   " }))).toThrow(
-      "INVALID_EXECUTION_OPPORTUNITY",
-    );
-    expect(() => buildTradingExecutionPlan(request({ idempotencyKey: "   " }))).toThrow(
-      "INVALID_EXECUTION_IDEMPOTENCY_KEY",
-    );
+    expect(() => buildTradingExecutionPlan(request({ ownerId: "   " }))).toThrow("INVALID_EXECUTION_OWNER");
+    expect(() => buildTradingExecutionPlan(request({ opportunityId: "   " }))).toThrow("INVALID_EXECUTION_OPPORTUNITY");
+    expect(() => buildTradingExecutionPlan(request({ idempotencyKey: "   " }))).toThrow("INVALID_EXECUTION_IDEMPOTENCY_KEY");
   });
 
   it("is deterministic for the same idempotency key", () => {
-    const first = buildTradingExecutionPlan(request());
-    const second = buildTradingExecutionPlan(request());
-    expect(first.clientOrderId).toBe(second.clientOrderId);
+    expect(buildTradingExecutionPlan(request()).clientOrderId).toBe(buildTradingExecutionPlan(request()).clientOrderId);
   });
 
   it("produces a different client order id for a different idempotency key", () => {
     const first = buildTradingExecutionPlan(request());
-    const second = buildTradingExecutionPlan(
-      request({ idempotencyKey: "paper-opportunity-1-v2" }),
-    );
+    const second = buildTradingExecutionPlan(request({ idempotencyKey: "paper-opportunity-1-v2" }));
     expect(first.clientOrderId).not.toBe(second.clientOrderId);
   });
 
   it("requires a consumed owner approval", () => {
-    expect(() => buildTradingExecutionPlan(request({ approvalConsumed: false }))).toThrow(
-      "OWNER_APPROVAL_REQUIRED",
-    );
+    expect(() => buildTradingExecutionPlan(request({ approvalConsumed: false }))).toThrow("OWNER_APPROVAL_REQUIRED");
   });
 
   it("rejects amounts below the $1 minimum", () => {
-    expect(() => buildTradingExecutionPlan(request({ amountUsd: 0.99 }))).toThrow(
-      "INVALID_TRADE_AMOUNT",
-    );
+    expect(() => buildTradingExecutionPlan(request({ amountUsd: 0.99 }))).toThrow("INVALID_TRADE_AMOUNT");
   });
 
   it("rejects non-finite trade amounts", () => {
-    expect(() => buildTradingExecutionPlan(request({ amountUsd: Number.NaN }))).toThrow(
-      "INVALID_TRADE_AMOUNT",
-    );
-    expect(() => buildTradingExecutionPlan(request({ amountUsd: Number.POSITIVE_INFINITY }))).toThrow(
-      "INVALID_TRADE_AMOUNT",
-    );
+    expect(() => buildTradingExecutionPlan(request({ amountUsd: Number.NaN }))).toThrow("INVALID_TRADE_AMOUNT");
+    expect(() => buildTradingExecutionPlan(request({ amountUsd: Number.POSITIVE_INFINITY }))).toThrow("INVALID_TRADE_AMOUNT");
   });
 
   it("rejects a stop loss that is not below the BUY entry", () => {
-    expect(() => buildTradingExecutionPlan(request({ stopLossPrice: 100 }))).toThrow(
-      "INVALID_STOP_LOSS_FOR_BUY",
-    );
+    expect(() => buildTradingExecutionPlan(request({ stopLossPrice: 100 }))).toThrow("INVALID_STOP_LOSS_FOR_BUY");
   });
 
   it("rejects a take profit that is not above the BUY entry", () => {
-    expect(() => buildTradingExecutionPlan(request({ takeProfitPrice: 100 }))).toThrow(
-      "INVALID_TAKE_PROFIT_FOR_BUY",
-    );
+    expect(() => buildTradingExecutionPlan(request({ takeProfitPrice: 100 }))).toThrow("INVALID_TAKE_PROFIT_FOR_BUY");
   });
 
   it("fails closed when Shariah screening is not approved", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          shariah: { ...shariah, ownershipSettlementVerified: false },
-        }),
-      ),
-    ).toThrow("SHARIAH_REVIEW");
+    expect(() => buildTradingExecutionPlan(request({ shariah: { ...shariah, ownershipSettlementVerified: false } }))).toThrow("SHARIAH_REVIEW");
   });
 
   it("fails closed when risk blocks the amount", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          riskConfig: { ...riskConfig, maxTradeAmountUsd: 5 },
-        }),
-      ),
-    ).toThrow(/RISK_BLOCKED:.*MAX_TRADE_AMOUNT_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskConfig: { ...riskConfig, maxTradeAmountUsd: 5 } }))).toThrow(/RISK_BLOCKED:.*MAX_TRADE_AMOUNT_EXCEEDED/);
   });
 
   it("fails closed when daily loss already reaches the configured limit", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          riskSnapshot: {
-            ...request().riskSnapshot,
-            dailyLossUsd: 50,
-          },
-        }),
-      ),
-    ).toThrow(/RISK_BLOCKED:.*MAX_DAILY_LOSS_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, dailyLossUsd: 50 } }))).toThrow(/RISK_BLOCKED:.*MAX_DAILY_LOSS_EXCEEDED/);
   });
 
   it("fails closed when the maximum number of open trades is reached", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          riskSnapshot: {
-            ...request().riskSnapshot,
-            openTrades: 1,
-          },
-        }),
-      ),
-    ).toThrow(/RISK_BLOCKED:.*MAX_OPEN_TRADES_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, openTrades: 1 } }))).toThrow(/RISK_BLOCKED:.*MAX_OPEN_TRADES_EXCEEDED/);
   });
 
   it("fails closed when total exposure would exceed the configured limit", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          riskSnapshot: {
-            ...request().riskSnapshot,
-            totalExposureUsd: 95,
-          },
-        }),
-      ),
-    ).toThrow(/RISK_BLOCKED:.*MAX_EXPOSURE_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, totalExposureUsd: 95 } }))).toThrow(/RISK_BLOCKED:.*MAX_EXPOSURE_EXCEEDED/);
   });
 
   it("fails closed when the asset exposure would exceed the configured limit", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          riskSnapshot: {
-            ...request().riskSnapshot,
-            assetExposureUsd: 95,
-          },
-        }),
-      ),
-    ).toThrow(/RISK_BLOCKED:.*MAX_ASSET_EXPOSURE_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, assetExposureUsd: 95 } }))).toThrow(/RISK_BLOCKED:.*MAX_ASSET_EXPOSURE_EXCEEDED/);
   });
 
   it("fails closed when consecutive losses reach the configured limit", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          riskSnapshot: {
-            ...request().riskSnapshot,
-            consecutiveLosses: 3,
-          },
-        }),
-      ),
-    ).toThrow(/RISK_BLOCKED:.*MAX_CONSECUTIVE_LOSSES_EXCEEDED/);
+    expect(() => buildTradingExecutionPlan(request({ riskSnapshot: { ...request().riskSnapshot, consecutiveLosses: 3 } }))).toThrow(/RISK_BLOCKED:.*MAX_CONSECUTIVE_LOSSES_EXCEEDED/);
   });
 
   it("rejects live mode until a reviewed exchange adapter exists", () => {
-    expect(() => buildTradingExecutionPlan(request({ mode: "LIVE" }))).toThrow(
-      "LIVE_EXECUTION_DISABLED",
-    );
+    expect(() => buildTradingExecutionPlan(request({ mode: "LIVE" }))).toThrow("LIVE_EXECUTION_DISABLED");
   });
 
   it("does not permit short selling through the execution contract", () => {
-    expect(() =>
-      buildTradingExecutionPlan(
-        request({
-          shariah: { ...shariah, tradingMethod: "SHORT" },
-        }),
-      ),
-    ).toThrow("SHARIAH_REJECTED");
+    expect(() => buildTradingExecutionPlan(request({ shariah: { ...shariah, tradingMethod: "SHORT" } }))).toThrow("SHARIAH_REJECTED");
   });
 });
