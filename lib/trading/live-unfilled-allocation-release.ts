@@ -3,12 +3,16 @@ import { db } from "@/lib/prisma";
 import { OWNER_POINTS_PER_USD } from "@/lib/owner-points";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
 
+type LiveOrderSettlementRow = LiveOrderRow & {
+  settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
+};
+
 export async function releaseUnfilledLiveAllocation(input: {
   ownerId: string;
   order: LiveOrderRow;
 }): Promise<{ order: LiveOrderRow; released: boolean }> {
   return db.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    const rows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
       SELECT * FROM "TradingLiveOrder" WHERE "id" = ${input.order.id} FOR UPDATE
     `);
     const order = rows[0];
@@ -19,30 +23,19 @@ export async function releaseUnfilledLiveAllocation(input: {
 
     const executedQty = order.executedQty ? new Prisma.Decimal(order.executedQty) : new Prisma.Decimal(0);
     const quoteQty = order.cumulativeQuoteQty ? new Prisma.Decimal(order.cumulativeQuoteQty) : new Prisma.Decimal(0);
-    if (executedQty.gt(0) || quoteQty.gt(0)) {
-      throw new Error("LIVE_UNFILLED_RELEASE_HAS_EXECUTED_CAPITAL");
-    }
+    if (executedQty.gt(0) || quoteQty.gt(0)) throw new Error("LIVE_UNFILLED_RELEASE_HAS_EXECUTED_CAPITAL");
 
-    const allocation = await tx.tradingAllocation.findFirst({
-      where: { relatedTradeId: order.id, status: "ACTIVE" },
-    });
+    const allocation = await tx.tradingAllocation.findFirst({ where: { relatedTradeId: order.id, status: "ACTIVE" } });
     if (!allocation) return { order, released: false };
 
     const account = await tx.tradingAccount.findUniqueOrThrow({ where: { id: allocation.accountId } });
-    await tx.$queryRaw(Prisma.sql`
-      SELECT "id" FROM "TradingAccount" WHERE "id" = ${account.id} FOR UPDATE
-    `);
+    await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "TradingAccount" WHERE "id" = ${account.id} FOR UPDATE`);
     const lockedAccount = await tx.tradingAccount.findUniqueOrThrow({ where: { id: account.id } });
-
-    if (lockedAccount.balanceUsd.lt(new Prisma.Decimal(allocation.amountUsd))) {
-      throw new Error("INSUFFICIENT_TRADING_BALANCE_FOR_UNFILLED_RELEASE");
-    }
+    if (lockedAccount.balanceUsd.lt(new Prisma.Decimal(allocation.amountUsd))) throw new Error("INSUFFICIENT_TRADING_BALANCE_FOR_UNFILLED_RELEASE");
 
     const wallet = await tx.ownerWallet.findUniqueOrThrow({ where: { id: allocation.sourceWalletId } });
     if (wallet.ownerId !== input.ownerId) throw new Error("SETTLEMENT_SOURCE_WALLET_MISMATCH");
-    await tx.$queryRaw(Prisma.sql`
-      SELECT "id" FROM "OwnerWallet" WHERE "id" = ${wallet.id} FOR UPDATE
-    `);
+    await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "OwnerWallet" WHERE "id" = ${wallet.id} FOR UPDATE`);
 
     const released = await tx.tradingAllocation.updateMany({
       where: { id: allocation.id, status: "ACTIVE", relatedTradeId: order.id },
@@ -52,16 +45,8 @@ export async function releaseUnfilledLiveAllocation(input: {
 
     const beforeBalance = lockedAccount.balanceUsd;
     const afterBalance = beforeBalance.sub(new Prisma.Decimal(allocation.amountUsd));
-
-    await tx.tradingAccount.update({
-      where: { id: lockedAccount.id },
-      data: { balanceUsd: afterBalance },
-    });
-
-    await tx.ownerWallet.update({
-      where: { id: wallet.id },
-      data: { availablePoints: { increment: allocation.points } },
-    });
+    await tx.tradingAccount.update({ where: { id: lockedAccount.id }, data: { balanceUsd: afterBalance } });
+    await tx.ownerWallet.update({ where: { id: wallet.id }, data: { availablePoints: { increment: allocation.points } } });
 
     const baseKey = `live-unfilled-release:${order.id}`;
     await tx.ownerLedger.create({
@@ -90,7 +75,7 @@ export async function releaseUnfilledLiveAllocation(input: {
       },
     });
 
-    const updatedRows = await tx.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    const updatedRows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
       UPDATE "TradingLiveOrder"
       SET
         "settlementStatus" = 'SETTLED',
@@ -100,11 +85,9 @@ export async function releaseUnfilledLiveAllocation(input: {
         "settlementRoundingUsd" = 0::numeric,
         "settlementError" = NULL,
         "version" = "version" + 1
-      WHERE "id" = ${order.id}
-        AND "settlementStatus" <> 'SETTLED'
+      WHERE "id" = ${order.id} AND "settlementStatus" <> 'SETTLED'
       RETURNING *
     `;
-
     const updated = updatedRows[0];
     if (!updated) throw new Error("LIVE_UNFILLED_RELEASE_STATE_CONFLICT");
 
