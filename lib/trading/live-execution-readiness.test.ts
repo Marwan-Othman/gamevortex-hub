@@ -16,6 +16,26 @@ const adapter: ExchangeAdapter = {
     derivatives: false,
   },
   getMarketData: async () => ({ symbol: "TEST", interval: "1m", candles: [] }),
+  placeSpotBuy: async () => ({ accepted: false, clientOrderId: "dry-run", status: "REJECTED" as const }),
+  getOrderStatus: async () => ({
+    observation: {
+      clientOrderId: "dry-run",
+      providerOrderId: "dry-run",
+      symbol: "TEST",
+      side: "BUY" as const,
+      status: "UNKNOWN" as const,
+      executedQty: 0,
+      cumulativeQuoteQty: 0,
+      updatedAt: new Date(),
+    },
+  }),
+  placeProtectedExitOco: async () => ({
+    accepted: false,
+    orderListId: "dry-run",
+    listClientOrderId: "dry-run",
+    orders: [],
+    status: "REJECTED",
+  }),
 };
 
 const input: LiveExecutionReadinessInput = {
