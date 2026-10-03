@@ -23,9 +23,6 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/lib/trading/binance-live-preflight": [
-        "./lib/trading/binance-live-preflight-ed25519"
-      ],
       "@/*": [
         "./*"
       ]
