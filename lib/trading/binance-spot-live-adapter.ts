@@ -8,9 +8,10 @@
  * Credentials are read server-side only and are never returned in results.
  *
  * This adapter implements the Binance Spot REST contract needed by the next
- * live-trading stage: market data, BUY submission, order-status lookup, and
- * protected SELL OCO submission. The executor/reconciliation layer remains
- * responsible for deciding when these methods may be called.
+ * live-trading stage: market data, BUY submission, order-status lookup,
+ * protected SELL OCO submission, and protected-exit leg reconciliation.
+ * The executor/reconciliation layer remains responsible for deciding when
+ * these methods may be called.
  */
 
 import { createHmac } from "node:crypto";
@@ -27,6 +28,8 @@ import {
   type ExchangeOrderStatusResult,
   type ExchangeProtectedExitRequest,
   type ExchangeProtectedExitResult,
+  type ExchangeProtectedExitLegStatusRequest,
+  type ExchangeProtectedExitLegStatusResult,
 } from "@/lib/trading/exchange-adapter";
 import type { LiveProviderOrderObservation } from "@/lib/trading/live-order-reconciliation";
 
@@ -50,8 +53,10 @@ type BinanceKline = [number, string, string, string, string, string, number, str
 type BinanceOrderResponse = {
   symbol?: string;
   orderId?: number;
+  orderListId?: number;
   clientOrderId?: string;
   status?: string;
+  side?: string;
   executedQty?: string;
   cumulativeQuoteQty?: string;
   cummulativeQuoteQty?: string;
@@ -145,6 +150,23 @@ function mapProviderStatus(status: string | undefined): LiveProviderOrderObserva
   switch (status) {
     case "NEW":
     case "PENDING_NEW":
+    case "PARTIALLY_FILLED":
+    case "FILLED":
+    case "CANCELED":
+    case "REJECTED":
+    case "EXPIRED":
+    case "PENDING_CANCEL":
+      return status;
+    default:
+      return "UNKNOWN";
+  }
+}
+
+function mapExitLegStatus(
+  status: string | undefined,
+): ExchangeProtectedExitLegStatusResult["status"] {
+  switch (status) {
+    case "NEW":
     case "PARTIALLY_FILLED":
     case "FILLED":
     case "CANCELED":
@@ -418,6 +440,62 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
       listClientOrderId: payload.listClientOrderId,
       orders: orderIds,
       status: payload.listOrderStatus ?? "UNKNOWN",
+    };
+  }
+
+  async getProtectedExitLegStatus(
+    request: ExchangeProtectedExitLegStatusRequest,
+  ): Promise<ExchangeProtectedExitLegStatusResult> {
+    this.requireLiveExecution();
+    const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
+    const clientOrderId = normalizeClientOrderId(
+      request.clientOrderId,
+      "INVALID_BINANCE_LIVE_EXIT_CLIENT_ORDER_ID",
+    );
+
+    const payload = (await this.signedRequest("GET", "/api/v3/order", {
+      symbol,
+      origClientOrderId: clientOrderId,
+      recvWindow: this.recvWindow,
+      timestamp: Date.now(),
+    })) as BinanceOrderResponse;
+
+    if (
+      typeof payload.orderId !== "number" ||
+      typeof payload.clientOrderId !== "string" ||
+      typeof payload.symbol !== "string" ||
+      typeof payload.status !== "string" ||
+      payload.side !== "SELL"
+    ) {
+      throw new Error("BINANCE_LIVE_INVALID_EXIT_ORDER_RESPONSE");
+    }
+
+    const executedQty = typeof payload.executedQty === "string"
+      ? nonNegativeNumber(payload.executedQty, "BINANCE_LIVE_INVALID_EXIT_EXECUTED_QTY")
+      : 0;
+    const cumulativeQuoteQtyRaw = payload.cumulativeQuoteQty ?? payload.cummulativeQuoteQty;
+    const cumulativeQuoteQty = typeof cumulativeQuoteQtyRaw === "string"
+      ? nonNegativeNumber(cumulativeQuoteQtyRaw, "BINANCE_LIVE_INVALID_EXIT_CUMULATIVE_QUOTE_QTY")
+      : 0;
+    const averageFillPrice = executedQty > 0 ? cumulativeQuoteQty / executedQty : null;
+    const updatedAt = payload.updateTime ?? payload.transactTime;
+    if (typeof updatedAt !== "number" || !Number.isFinite(updatedAt)) {
+      throw new Error("BINANCE_LIVE_INVALID_EXIT_UPDATE_TIME");
+    }
+
+    return {
+      symbol: payload.symbol,
+      clientOrderId: payload.clientOrderId,
+      providerOrderId: String(payload.orderId),
+      orderListId: typeof payload.orderListId === "number" && payload.orderListId >= 0
+        ? String(payload.orderListId)
+        : null,
+      side: "SELL",
+      status: mapExitLegStatus(payload.status),
+      executedQty: String(executedQty),
+      cumulativeQuoteQty: String(cumulativeQuoteQty),
+      averageFillPrice: averageFillPrice === null ? null : String(averageFillPrice),
+      updatedAt: new Date(updatedAt),
     };
   }
 }
