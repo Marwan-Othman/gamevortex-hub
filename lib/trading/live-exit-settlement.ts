@@ -153,6 +153,7 @@ export async function reconcileProtectedExitSettlement(input: {
     if (seenLegIds.has(leg.clientOrderId)) blockers.push("EXIT_DUPLICATE_LEG");
     seenLegIds.add(leg.clientOrderId);
     if (leg.orderListId !== order.protectionOrderId) blockers.push("EXIT_OCO_ID_MISMATCH");
+    if (leg.status === "UNKNOWN") blockers.push("EXIT_STATUS_UNKNOWN");
   }
 
   if (legs.length !== 2 || seenLegIds.size !== 2) blockers.push("EXIT_LEG_COUNT_MISMATCH");
@@ -211,8 +212,20 @@ export async function reconcileProtectedExitSettlement(input: {
     };
   }
 
-  if (filledLegs.length === 1 && almostAtLeast(exitQty, entryQty)) {
+  if (filledLegs.length === 1 && activeLegs.length === 0 && terminalLegs.length === 2 && almostAtLeast(exitQty, entryQty)) {
     const filled = filledLegs[0];
+    const otherLegs = legs.filter((leg) => leg.clientOrderId !== filled.clientOrderId);
+    if (!otherLegs.every((leg) => leg.status === "CANCELED" || leg.status === "EXPIRED")) {
+      const blocked = await markBlocked(order.id, "OCO_OTHER_LEG_NOT_CANCELED");
+      return {
+        order: blocked,
+        status: "BLOCKED",
+        exitPrice: null,
+        realizedPnlUsd: null,
+        blockers: ["OCO_OTHER_LEG_NOT_CANCELED"],
+      };
+    }
+
     const exitQuote = decimal(filled.cumulativeQuoteQty, "INVALID_EXIT_QUOTE");
     if (exitQuote.lessThanOrEqualTo(0)) {
       const blocked = await markBlocked(order.id, "EXIT_QUOTE_REQUIRED_FOR_SETTLEMENT");
