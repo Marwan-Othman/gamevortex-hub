@@ -5,9 +5,9 @@
  * false, the trading control is stopped, the Shariah policy is not reviewed,
  * or Binance production preflight is not clean.
  *
- * The coordinator does not directly settle GameVortex wallet funds. A fully
- * closed exchange position is recorded as EXCHANGE_CLOSED_PENDING_WALLET
- * until the separate allocation-backed wallet settlement stage is complete.
+ * The coordinator does not bypass wallet accounting. A fully closed exchange
+ * position is settled through the allocation-backed owner-wallet settlement
+ * boundary only after the provider confirms the actual protected exit fill.
  */
 
 import { Prisma } from "@prisma/client";
@@ -34,6 +34,9 @@ import {
 } from "@/lib/trading/live-order-state";
 import { buildProtectedExitPlan } from "@/lib/trading/protected-exit-plan";
 import { reconcileProtectedExitSettlement } from "@/lib/trading/live-exit-settlement";
+import { bindLiveOrderToAllocation } from "@/lib/trading/live-allocation-binding";
+import { settleClosedLiveOrderToOwnerWallet } from "@/lib/trading/live-wallet-settlement";
+import { releaseUnfilledLiveAllocation } from "@/lib/trading/live-unfilled-allocation-release";
 
 const LIVE_IDEMPOTENCY_PREFIX = "live-approval:";
 const STOP_LIMIT_BUFFER = 0.001;
@@ -60,7 +63,7 @@ export type LiveExecutionResult = {
   symbol: string;
   amountUsd: string;
   protectionStatus: LiveOrderRow["protectionStatus"];
-  settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "BLOCKED";
+  settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
   blockers: string[];
 };
 
@@ -133,9 +136,8 @@ function parseRiskSnapshot(value: Prisma.JsonValue | null, amountUsd: number): R
   };
 }
 
-function positiveOrZero(value: unknown, code: string): number {
+function positiveOrZero(value: unknown, code: string): void {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error(code);
-  return value;
 }
 
 function buildProtectedPrices(fillPrice: number, snapshot: ExecutionSnapshot) {
@@ -209,33 +211,53 @@ async function reconcileExitIfNeeded(
     return { order, settlementStatus: "NOT_SETTLED", blockers: [] };
   }
 
-  const settlement = await reconcileProtectedExitSettlement({ order, adapter });
-  if (settlement.status === "BLOCKED") {
+  const exchangeSettlement = await reconcileProtectedExitSettlement({ order, adapter });
+  if (exchangeSettlement.status === "BLOCKED") {
     await tripCircuitBreaker({
       ownerId,
       reason: "ORDER_FAILURE",
-      detail: settlement.blockers.join(","),
+      detail: exchangeSettlement.blockers.join(","),
     }).catch(() => undefined);
-    await audit(ownerId, "TRADING_LIVE_EXIT_RECONCILIATION_BLOCKED", settlement.order, {
-      blockers: settlement.blockers,
+    await audit(ownerId, "TRADING_LIVE_EXIT_RECONCILIATION_BLOCKED", exchangeSettlement.order, {
+      blockers: exchangeSettlement.blockers,
     });
-    return { order: settlement.order, settlementStatus: "BLOCKED", blockers: settlement.blockers };
+    return { order: exchangeSettlement.order, settlementStatus: "BLOCKED", blockers: exchangeSettlement.blockers };
   }
 
-  if (settlement.status === "EXCHANGE_CLOSED_PENDING_WALLET") {
-    await audit(ownerId, "TRADING_LIVE_EXCHANGE_CLOSED", settlement.order, {
-      exitPrice: settlement.exitPrice,
-      realizedPnlUsd: settlement.realizedPnlUsd,
-      settlementStatus: settlement.status,
+  if (exchangeSettlement.status === "EXCHANGE_CLOSED_PENDING_WALLET") {
+    await audit(ownerId, "TRADING_LIVE_EXCHANGE_CLOSED", exchangeSettlement.order, {
+      exitPrice: exchangeSettlement.exitPrice,
+      realizedPnlUsd: exchangeSettlement.realizedPnlUsd,
+      settlementStatus: exchangeSettlement.status,
     });
-    return {
-      order: settlement.order,
-      settlementStatus: "EXCHANGE_CLOSED_PENDING_WALLET",
-      blockers: [],
-    };
+
+    const walletSettlement = await settleClosedLiveOrderToOwnerWallet({
+      ownerId,
+      order: exchangeSettlement.order,
+    });
+
+    if (walletSettlement.status === "BLOCKED") {
+      await tripCircuitBreaker({
+        ownerId,
+        reason: "ORDER_FAILURE",
+        detail: walletSettlement.blockers.join(","),
+      }).catch(() => undefined);
+      await audit(ownerId, "TRADING_LIVE_WALLET_SETTLEMENT_BLOCKED", walletSettlement.order, {
+        blockers: walletSettlement.blockers,
+      });
+      return { order: walletSettlement.order, settlementStatus: "BLOCKED", blockers: walletSettlement.blockers };
+    }
+
+    await audit(ownerId, "TRADING_LIVE_WALLET_SETTLED", walletSettlement.order, {
+      settledUsd: walletSettlement.settledUsd,
+      settledPoints: walletSettlement.settledPoints,
+      roundingUsd: walletSettlement.roundingUsd,
+    });
+
+    return { order: walletSettlement.order, settlementStatus: "SETTLED", blockers: [] };
   }
 
-  return { order: settlement.order, settlementStatus: "NOT_SETTLED", blockers: [] };
+  return { order: exchangeSettlement.order, settlementStatus: "NOT_SETTLED", blockers: [] };
 }
 
 async function protectFilledOrder(
@@ -372,6 +394,10 @@ export async function executeApprovedLiveOrder(input: {
 
   if (order.status === "RECONCILIATION_MISMATCH") throw new Error("LIVE_RECONCILIATION_MISMATCH_REQUIRES_MANUAL_REVIEW");
 
+  if (["INTENT_CREATED", "SUBMITTING", "SUBMITTED", "PARTIALLY_FILLED", "UNKNOWN", "PROTECTION_PENDING", "PROTECTED", "CLOSED"].includes(order.status)) {
+    await bindLiveOrderToAllocation({ ownerId, order });
+  }
+
   const adapter = new BinanceSpotLiveAdapter({
     apiKey: process.env.BINANCE_LIVE_API_KEY,
     apiSecret: process.env.BINANCE_LIVE_API_SECRET,
@@ -399,6 +425,10 @@ export async function executeApprovedLiveOrder(input: {
       if (order.status === "PROTECTED") {
         const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
         return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
+      }
+      if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
+        const released = await releaseUnfilledLiveAllocation({ ownerId, order });
+        return result(released.order, released.released ? "SETTLED" : "NOT_SETTLED");
       }
       return result(order);
     } catch (error) {
@@ -454,12 +484,17 @@ export async function executeApprovedLiveOrder(input: {
       if (reconciledExit.settlementStatus === "BLOCKED") {
         return result(order, "BLOCKED", reconciledExit.blockers);
       }
+      if (reconciledExit.settlementStatus === "SETTLED") {
+        return result(order, "SETTLED");
+      }
       if (reconciledExit.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
         return result(order, "EXCHANGE_CLOSED_PENDING_WALLET");
       }
     }
 
     if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
+      const released = await releaseUnfilledLiveAllocation({ ownerId, order });
+      if (released.released) return result(released.order, "SETTLED");
       await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: order.status }).catch(() => undefined);
     }
 
