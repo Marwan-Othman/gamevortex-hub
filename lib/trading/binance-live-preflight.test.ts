@@ -67,7 +67,7 @@ describe("getBinanceLivePreflight", () => {
         canTrade: true,
         canWithdraw: true,
         canDeposit: true,
-        accountType: "SPOT",
+        accountType: " spot ",
         permissions: ["TRD_GRP_082"],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
@@ -84,6 +84,7 @@ describe("getBinanceLivePreflight", () => {
 
     const result = await getBinanceLivePreflight(fetcher);
 
+    expect(result.account?.accountType).toBe("SPOT");
     expect(result.checks.spotAccount).toBe(true);
     expect(result.readyForLiveExecution).toBe(true);
     expect(result.blockers).toEqual([]);
