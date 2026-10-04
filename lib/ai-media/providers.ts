@@ -36,7 +36,7 @@ export type VideoStatusResult = {
  * The current Google documentation uses /v1/models/...:generateContent.
  */
 const GEMINI_API_BASE =
-  "https://generativelanguage.googleapis.com/v1/models";
+  "https://generativelanguage.googleapis.com/v1beta";
 
 const DEFAULT_IMAGE_MODEL =
   "gemini-3.1-flash-image";
@@ -333,7 +333,7 @@ export async function generateImage(
 
   try {
     const endpoint =
-      `${GEMINI_API_BASE}/${encodeURIComponent(
+      `${GEMINI_API_BASE}/models/${encodeURIComponent(
         model,
       )}:generateContent`;
 
@@ -367,14 +367,9 @@ export async function generateImage(
         responseModalities: [
           "IMAGE",
         ],
-
-        responseFormat: {
-          image: {
-            aspectRatio:
-              ratio,
-
-            imageSize,
-          },
+        imageConfig: {
+          aspectRatio: ratio,
+          imageSize,
         },
       },
     };
