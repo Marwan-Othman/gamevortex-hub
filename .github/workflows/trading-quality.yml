@@ -53,8 +53,7 @@ jobs:
           git add package-lock.json
           git commit -m "chore: sync package lock"
           git push origin "HEAD:${{ github.head_ref }}"
-          echo "package-lock.json was stale; a synchronized lockfile was pushed to the PR branch. The workflow will rerun on the new commit."
-          exit 1
+          echo "package-lock.json was stale and has been synchronized on the PR branch; continuing with the synchronized lockfile."
 
       - name: Stage 0 - npm ci
         run: npm ci
