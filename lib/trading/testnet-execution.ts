@@ -78,8 +78,10 @@ export async function executeOwnerBinanceSpotTestnetBuy(
 
   const adapter = getBinanceSpotTestnetAdapter();
   const account = await adapter.getAccountStatus();
+  const isSpotAccount = account.accountType === "SPOT";
   const hasSpotPermission = account.permissions.includes("SPOT");
 
+  if (!isSpotAccount) throw new Error("BINANCE_TESTNET_SPOT_ACCOUNT_REQUIRED");
   if (!account.canTrade) throw new Error("BINANCE_TESTNET_TRADING_DISABLED");
   if (account.canWithdraw) throw new Error("BINANCE_TESTNET_WITHDRAWALS_MUST_BE_DISABLED");
   if (!hasSpotPermission) throw new Error("BINANCE_TESTNET_SPOT_PERMISSION_REQUIRED");
