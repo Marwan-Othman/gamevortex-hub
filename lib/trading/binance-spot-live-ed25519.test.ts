@@ -60,4 +60,57 @@ describe("BinanceSpotLiveAdapter Ed25519 integration", () => {
 
     expect(verified).toBe(true);
   });
+
+  it("retrieves exact Binance trade fills for fee reconciliation", async () => {
+    const { privateKey } = generateKeyPairSync("ed25519");
+    const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+
+    const fetcher = vi.fn<typeof fetch>();
+    fetcher
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            symbols: [{ symbol: "BTCUSDT", status: "TRADING", baseAsset: "BTC", quoteAsset: "USDT" }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              symbol: "BTCUSDT",
+              id: 456,
+              orderId: 123,
+              price: "100000.00",
+              qty: "0.00001",
+              quoteQty: "1.00000000",
+              commission: "0.000001",
+              commissionAsset: "BTC",
+              time: 1770000000000,
+              isBuyer: true,
+            },
+          ]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+
+    const adapter = new BinanceSpotLiveAdapter({
+      apiKey: "test-api-key",
+      apiPrivateKeyPem: privateKeyPem,
+      liveTradingEnabled: true,
+      fetcher,
+    });
+
+    const result = await adapter.getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "123" });
+
+    expect(result.symbol).toBe("BTCUSDT");
+    expect(result.baseAsset).toBe("BTC");
+    expect(result.quoteAsset).toBe("USDT");
+    expect(result.fills).toHaveLength(1);
+    expect(result.fills[0]?.commissionAsset).toBe("BTC");
+    expect(result.fills[0]?.isBuyer).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(String(fetcher.mock.calls[1]?.[0])).toContain("/api/v3/myTrades?");
+  });
 });
