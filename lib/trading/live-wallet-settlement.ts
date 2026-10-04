@@ -1,18 +1,41 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { OWNER_POINTS_PER_USD } from "@/lib/owner-points";
+import { calculateLiveSpotNetExitProceeds } from "@/lib/trading/live-fee-accounting";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
 
 export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLED";
 
 type LiveOrderSettlementRow = LiveOrderRow & {
   settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
+  exitProviderOrderId: string | null;
+  exitExecutedQty: Prisma.Decimal | null;
   exitCumulativeQuoteQty: Prisma.Decimal | null;
   realizedPnlUsd: Prisma.Decimal | null;
   settledUsd: Prisma.Decimal | null;
   settledPoints: number | null;
   settlementRoundingUsd: Prisma.Decimal | null;
 };
+
+type SettlementTradeFill = {
+  qty: string;
+  quoteQty: string;
+  commission: string;
+  commissionAsset: string;
+};
+
+type SettlementTradeFillResult = {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  fills: readonly SettlementTradeFill[];
+};
+
+type SettlementTradeFillProvider = {
+  getOrderTradeFills: (request: { symbol: string; providerOrderId: string }) => Promise<SettlementTradeFillResult>;
+};
+
+const QUANTITY_TOLERANCE = new Prisma.Decimal("0.000000000001");
 
 export type LiveWalletSettlementResult = {
   order: LiveOrderRow;
@@ -63,6 +86,38 @@ export function calculateOwnerWalletSettlement(
   return { returnedUsd, settledUsd, settledPoints, roundingUsd };
 }
 
+function assertProviderExitFillMatchesOrder(
+  order: LiveOrderSettlementRow,
+  fills: SettlementTradeFillResult,
+): void {
+  if (fills.symbol.trim().toUpperCase() !== order.symbol.trim().toUpperCase()) {
+    throw new Error("SETTLEMENT_EXIT_SYMBOL_MISMATCH");
+  }
+  if (!fills.baseAsset.trim() || !fills.quoteAsset.trim()) {
+    throw new Error("SETTLEMENT_EXIT_ASSET_INFO_REQUIRED");
+  }
+  if (!fills.fills.length) throw new Error("SETTLEMENT_EXIT_FILLS_REQUIRED");
+  if (!order.exitExecutedQty || !order.exitCumulativeQuoteQty) {
+    throw new Error("SETTLEMENT_EXIT_EXECUTION_DATA_REQUIRED");
+  }
+
+  const totalQty = fills.fills.reduce(
+    (total, fill) => total.add(new Prisma.Decimal(fill.qty)),
+    new Prisma.Decimal(0),
+  );
+  const totalQuoteQty = fills.fills.reduce(
+    (total, fill) => total.add(new Prisma.Decimal(fill.quoteQty)),
+    new Prisma.Decimal(0),
+  );
+
+  if (totalQty.sub(order.exitExecutedQty).abs().greaterThan(QUANTITY_TOLERANCE)) {
+    throw new Error("SETTLEMENT_EXIT_QTY_MISMATCH");
+  }
+  if (totalQuoteQty.sub(order.exitCumulativeQuoteQty).abs().greaterThan(QUANTITY_TOLERANCE)) {
+    throw new Error("SETTLEMENT_EXIT_QUOTE_QTY_MISMATCH");
+  }
+}
+
 async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, reason: string): Promise<LiveOrderRow> {
   const rows = await tx.$queryRaw<LiveOrderRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
@@ -77,7 +132,35 @@ async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, re
 export async function settleClosedLiveOrderToOwnerWallet(input: {
   ownerId: string;
   order: LiveOrderRow;
+  tradeFillProvider: SettlementTradeFillProvider;
 }): Promise<LiveWalletSettlementResult> {
+  const inputOrder = input.order as LiveOrderSettlementRow;
+  let netExitProceeds: Prisma.Decimal | null = null;
+
+  if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
+    if (!inputOrder.exitProviderOrderId) throw new Error("SETTLEMENT_EXIT_PROVIDER_ORDER_ID_REQUIRED");
+
+    const fills = await input.tradeFillProvider.getOrderTradeFills({
+      symbol: inputOrder.symbol,
+      providerOrderId: inputOrder.exitProviderOrderId,
+    });
+
+    assertProviderExitFillMatchesOrder(inputOrder, fills);
+
+    const feeSettlement = calculateLiveSpotNetExitProceeds({
+      baseAsset: fills.baseAsset,
+      quoteAsset: fills.quoteAsset,
+      exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
+      exitQuoteQty: inputOrder.exitCumulativeQuoteQty!.toString(),
+      exitFees: fills.fills.map((fill) => ({
+        commission: fill.commission,
+        commissionAsset: fill.commissionAsset,
+      })),
+    });
+
+    netExitProceeds = feeSettlement.netExitQuoteProceeds;
+  }
+
   return db.$transaction(async (tx) => {
     const lockedRows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
       SELECT * FROM "TradingLiveOrder" WHERE "id" = ${input.order.id} FOR UPDATE
@@ -106,9 +189,14 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"] };
     }
 
-    if (!order.exitCumulativeQuoteQty) {
-      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_EXIT_PROCEEDS_REQUIRED");
-      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_PROCEEDS_REQUIRED"] };
+    if (!order.exitCumulativeQuoteQty || !order.exitExecutedQty || !netExitProceeds) {
+      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_NET_EXIT_PROCEEDS_REQUIRED");
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_NET_EXIT_PROCEEDS_REQUIRED"] };
+    }
+
+    if (order.exitProviderOrderId !== inputOrder.exitProviderOrderId) {
+      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_EXIT_PROVIDER_ORDER_CHANGED");
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_PROVIDER_ORDER_CHANGED"] };
     }
 
     const allocation = await tx.tradingAllocation.findFirst({ where: { relatedTradeId: order.id, status: "ACTIVE" } });
@@ -137,8 +225,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     }
     await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "OwnerWallet" WHERE "id" = ${wallet.id} FOR UPDATE`);
 
-    const proceeds = new Prisma.Decimal(order.exitCumulativeQuoteQty);
-    const calculation = calculateOwnerWalletSettlement(proceeds);
+    const calculation = calculateOwnerWalletSettlement(netExitProceeds);
     const beforeBalance = lockedAccount.balanceUsd;
     const afterBalance = beforeBalance.sub(new Prisma.Decimal(allocation.amountUsd));
 
@@ -160,7 +247,15 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         usdAmount: calculation.settledUsd,
         conversionRate: OWNER_POINTS_PER_USD,
         idempotencyKey: `${baseKey}:owner`,
-        metadata: { liveOrderId: order.id, allocationId: allocation.id, returnedUsd: calculation.returnedUsd.toString(), realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null, roundingUsd: calculation.roundingUsd.toString() },
+        metadata: {
+          liveOrderId: order.id,
+          allocationId: allocation.id,
+          returnedUsd: calculation.returnedUsd.toString(),
+          realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
+          roundingUsd: calculation.roundingUsd.toString(),
+          grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
+          netExitQuoteProceeds: netExitProceeds.toString(),
+        },
       },
     });
 
@@ -174,7 +269,16 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         balanceAfterUsd: afterBalance,
         relatedTradeId: order.id,
         idempotencyKey: `${baseKey}:trading`,
-        metadata: { liveOrderId: order.id, allocationId: allocation.id, settledPoints: calculation.settledPoints, settledUsd: calculation.settledUsd.toString(), roundingUsd: calculation.roundingUsd.toString(), realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null },
+        metadata: {
+          liveOrderId: order.id,
+          allocationId: allocation.id,
+          settledPoints: calculation.settledPoints,
+          settledUsd: calculation.settledUsd.toString(),
+          roundingUsd: calculation.roundingUsd.toString(),
+          realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
+          grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
+          netExitQuoteProceeds: netExitProceeds.toString(),
+        },
       },
     });
 
@@ -200,7 +304,16 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         action: "TRADING_LIVE_WALLET_SETTLED",
         entityType: "TradingLiveOrder",
         entityId: order.id,
-        metadata: { allocationId: allocation.id, returnedUsd: calculation.returnedUsd.toString(), settledUsd: calculation.settledUsd.toString(), settledPoints: calculation.settledPoints, roundingUsd: calculation.roundingUsd.toString(), realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null },
+        metadata: {
+          allocationId: allocation.id,
+          returnedUsd: calculation.returnedUsd.toString(),
+          settledUsd: calculation.settledUsd.toString(),
+          settledPoints: calculation.settledPoints,
+          roundingUsd: calculation.roundingUsd.toString(),
+          realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
+          grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
+          netExitQuoteProceeds: netExitProceeds.toString(),
+        },
       },
     });
 
