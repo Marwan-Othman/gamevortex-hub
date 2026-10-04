@@ -12,20 +12,7 @@ describe("BinanceSpotTestnetAdapter", () => {
   it("uses the official Spot Testnet host and normalizes slash-separated symbols", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       response([
-        [
-          1760000000000,
-          "100",
-          "101",
-          "99",
-          "100.5",
-          "1200",
-          1760000059999,
-          "120600",
-          100,
-          "600",
-          "60300",
-          "0",
-        ],
+        [1760000000000, "100", "101", "99", "100.5", "1200", 1760000059999, "120600", 100, "600", "60300", "0"],
       ]),
     );
 
@@ -37,13 +24,7 @@ describe("BinanceSpotTestnetAdapter", () => {
       expect.objectContaining({ method: "GET" }),
     );
     expect(result.symbol).toBe("BTCUSDT");
-    expect(result.candles[0]).toMatchObject({
-      open: 100,
-      high: 101,
-      low: 99,
-      close: 100.5,
-      volume: 1200,
-    });
+    expect(result.candles[0]).toMatchObject({ open: 100, high: 101, low: 99, close: 100.5, volume: 1200 });
   });
 
   it("rejects any non-official testnet host", () => {
@@ -70,12 +51,7 @@ describe("BinanceSpotTestnetAdapter", () => {
 
   it("signs and submits a testnet market BUY without enabling live-order capability", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      response({
-        symbol: "BTCUSDT",
-        orderId: 12345,
-        clientOrderId: "test-order-1",
-        status: "FILLED",
-      }),
+      response({ symbol: "BTCUSDT", orderId: 12345, clientOrderId: "test-order-1", status: "FILLED" }),
     );
 
     const adapter = new BinanceSpotTestnetAdapter({
@@ -116,9 +92,13 @@ describe("BinanceSpotTestnetAdapter", () => {
     });
   });
 
-  it("fails closed when the provider rejects the request", async () => {
+  it("normalizes Binance authentication errors into a stable safe code", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      response({ msg: "Invalid API-key, IP, or permissions for action." }, false, 401),
+      response(
+        { code: -2015, msg: "Invalid API-key, IP, or permissions for action." },
+        false,
+        401,
+      ),
     );
 
     const adapter = new BinanceSpotTestnetAdapter({
@@ -135,7 +115,22 @@ describe("BinanceSpotTestnetAdapter", () => {
         amountUsd: 1,
         entryPrice: 100,
         stopLossPrice: 98,
+        takeProfitPrice: 104,
       }),
-    ).rejects.toThrow("BINANCE_TESTNET_Invalid API-key, IP, or permissions for action.");
+    ).rejects.toThrow("BINANCE_TESTNET_API_AUTH_FAILED");
+  });
+
+  it("maps network failures instead of leaking fetch errors as INTERNAL_ERROR", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new Error("ECONNRESET"));
+    const adapter = new BinanceSpotTestnetAdapter({ apiKey: "test-key", apiSecret: "test-secret", fetcher });
+    await expect(adapter.getAccountStatus()).rejects.toThrow("BINANCE_TESTNET_NETWORK_ERROR");
+  });
+
+  it("maps malformed provider responses to a stable invalid-response error", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("not-json", { status: 502, headers: { "content-type": "text/plain" } }),
+    );
+    const adapter = new BinanceSpotTestnetAdapter({ apiKey: "test-key", apiSecret: "test-secret", fetcher });
+    await expect(adapter.getAccountStatus()).rejects.toThrow("BINANCE_TESTNET_INVALID_RESPONSE");
   });
 });

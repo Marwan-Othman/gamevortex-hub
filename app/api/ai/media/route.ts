@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_PROMPT_LENGTH = 4000;
 const MAX_INPUT_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_GENERATED_IMAGE_BYTES = 12 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 function errorStatus(code: string) {
@@ -45,11 +46,8 @@ function errorStatus(code: string) {
 }
 
 function serializeError(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "AI_MEDIA_GENERATION_FAILED";
+  const message = error instanceof Error ? error.message : "";
+  return new Set(["UNAUTHORIZED","GEMINI_API_KEY_NOT_CONFIGURED","GEMINI_AUTH_FAILED","GEMINI_RATE_LIMITED","GEMINI_IMAGE_TIMEOUT","GEMINI_IMAGE_BILLING_REQUIRED","GEMINI_IMAGE_GENERATION_FAILED","GEMINI_IMAGE_NOT_RETURNED","GEMINI_INVALID_RESPONSE","AI_VIDEO_GENERATION_NOT_ENABLED","AI_IMAGE_INVALID_DATA","AI_IMAGE_EMPTY","AI_IMAGE_TOO_LARGE","AI_IMAGE_TYPE_NOT_SUPPORTED","AI_IMAGE_PROMPT_REQUIRED","AI_IMAGE_PROMPT_TOO_LONG","AI_MEDIA_KIND_INVALID","CONVERSATION_NOT_FOUND"]).has(message) ? message : "AI_MEDIA_GENERATION_FAILED";
 }
 
 function dataUrlToBuffer(dataUrl: string) {
@@ -68,6 +66,10 @@ function dataUrlToBuffer(dataUrl: string) {
 
   if (!buffer.length) {
     throw new Error("AI_IMAGE_EMPTY");
+  }
+
+  if (buffer.length > MAX_GENERATED_IMAGE_BYTES) {
+    throw new Error("AI_IMAGE_TOO_LARGE");
   }
 
   return {
@@ -346,33 +348,29 @@ export async function POST(req: NextRequest) {
 
     let resultUrl = result.url;
 
-    if (
-      process.env.BLOB_READ_WRITE_TOKEN?.trim()
-    ) {
-      try {
-        const blob = await put(
-          createBlobPath(
-            user.id,
-            extension,
-          ),
-          buffer,
-          {
-            access: "public",
-            addRandomSuffix: true,
-            contentType: mimeType,
-            cacheControlMaxAge: 31536000,
-          },
-        );
+    try {
+      const blob = await put(
+        createBlobPath(
+          user.id,
+          extension,
+        ),
+        buffer,
+        {
+          access: "public",
+          addRandomSuffix: true,
+          contentType: mimeType,
+          cacheControlMaxAge: 31536000,
+        },
+      );
 
-        resultUrl = blob.url;
-      } catch (blobError) {
-        console.warn(
-          "GameVortex AI Blob storage unavailable; using data URL fallback:",
-          blobError instanceof Error
-            ? blobError.message
-            : "UNKNOWN_ERROR",
-        );
-      }
+      resultUrl = blob.url;
+    } catch (blobError) {
+      console.warn(
+        "GameVortex AI Blob storage unavailable; using data URL fallback:",
+        blobError instanceof Error
+          ? blobError.message
+          : "UNKNOWN_ERROR",
+      );
     }
 
     const completed =

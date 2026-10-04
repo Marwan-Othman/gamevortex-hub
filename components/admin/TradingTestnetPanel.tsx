@@ -21,6 +21,20 @@ function getSafeErrorMessage(error?: string): string {
       return "Binance Testnet غير متاح من بيئة الخادم الحالية بسبب قيود الموقع/الأهلية لدى Binance. المفتاح صحيح، ولا نحتاج إلى إنشاء مفتاح جديد.";
     case "BINANCE_TESTNET_API_CREDENTIALS_REQUIRED":
       return "مفاتيح Binance Testnet غير موجودة على الخادم. أضف BINANCE_TESTNET_API_KEY وBINANCE_TESTNET_API_SECRET في Vercel كـ Secret.";
+    case "BINANCE_TESTNET_API_AUTH_FAILED":
+      return "Binance رفض اعتماد مفتاح Testnet. تحقق أن المفتاح من Spot Testnet وأنه يخص نفس بيئة الاختبار.";
+    case "BINANCE_TESTNET_TIMESTAMP_INVALID":
+      return "رفض Binance الطلب بسبب مشكلة في الوقت أو recvWindow. أعد المحاولة بعد مزامنة وقت الخادم.";
+    case "BINANCE_TESTNET_SIGNATURE_INVALID":
+      return "رفض Binance توقيع الطلب. لم يتم تنفيذ أي أمر.";
+    case "BINANCE_TESTNET_RATE_LIMITED":
+      return "تم تجاوز حد طلبات Binance Testnet. انتظر قليلًا ثم أعد الفحص.";
+    case "BINANCE_TESTNET_NETWORK_ERROR":
+      return "تعذر الاتصال بـ Binance Testnet. لم يتم تنفيذ أي أمر.";
+    case "BINANCE_TESTNET_INVALID_RESPONSE":
+      return "أرسل Binance استجابة غير صالحة. لم يتم اعتبار الفحص ناجحًا.";
+    case "BINANCE_TESTNET_PROVIDER_ERROR":
+      return "رفض Binance طلب Testnet. السبب غير مصنف، ولم يتم السماح بالتنفيذ.";
     case "BINANCE_TESTNET_TRADING_DISABLED":
       return "صلاحية التداول غير مفعّلة على مفتاح Binance Testnet.";
     case "BINANCE_TESTNET_WITHDRAWALS_MUST_BE_DISABLED":
