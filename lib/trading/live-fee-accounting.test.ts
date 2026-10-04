@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { reconcileLiveSpotFees } from "@/lib/trading/live-fee-accounting";
+import {
+  calculateLiveSpotNetExitProceeds,
+  reconcileLiveSpotFees,
+} from "@/lib/trading/live-fee-accounting";
 
 describe("reconcileLiveSpotFees", () => {
   it("subtracts quote-asset commissions from entry cost and exit proceeds", () => {
@@ -80,5 +83,54 @@ describe("reconcileLiveSpotFees", () => {
         exitFees: [],
       }),
     ).toThrow("EXIT_QTY_EXCEEDS_NET_ENTRY_QTY");
+  });
+});
+
+describe("calculateLiveSpotNetExitProceeds", () => {
+  it("returns quote proceeds after quote-asset fees", () => {
+    const result = calculateLiveSpotNetExitProceeds({
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      exitExecutedQty: "0.01",
+      exitQuoteQty: "110",
+      exitFees: [{ commission: "0.11", commissionAsset: "USDT" }],
+    });
+
+    expect(result.netExitQuoteProceeds.toString()).toBe("109.89");
+  });
+
+  it("returns quote proceeds after base-asset fees", () => {
+    const result = calculateLiveSpotNetExitProceeds({
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      exitExecutedQty: "0.01",
+      exitQuoteQty: "110",
+      exitFees: [{ commission: "0.00001", commissionAsset: "BTC" }],
+    });
+
+    expect(result.netExitQuoteProceeds.toString()).toBe("109.89");
+  });
+
+  it("requires exact conversion for third-asset exit fees", () => {
+    expect(() =>
+      calculateLiveSpotNetExitProceeds({
+        baseAsset: "BTC",
+        quoteAsset: "USDT",
+        exitExecutedQty: "0.01",
+        exitQuoteQty: "110",
+        exitFees: [{ commission: "0.001", commissionAsset: "BNB" }],
+      }),
+    ).toThrow("THIRD_ASSET_FEE_CONVERSION_REQUIRED");
+
+    const result = calculateLiveSpotNetExitProceeds({
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      exitExecutedQty: "0.01",
+      exitQuoteQty: "110",
+      exitFees: [{ commission: "0.001", commissionAsset: "BNB" }],
+      thirdAssetFeeQuoteValues: ["0.8"],
+    });
+
+    expect(result.netExitQuoteProceeds.toString()).toBe("109.2");
   });
 });
