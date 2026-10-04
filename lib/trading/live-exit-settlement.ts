@@ -5,8 +5,30 @@ import type {
   ExchangeProtectedExitLegStatusResult,
 } from "@/lib/trading/exchange-adapter";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
+import { reconcileLiveSpotFees } from "@/lib/trading/live-fee-accounting";
 
 const QUANTITY_TOLERANCE = new Prisma.Decimal("0.000000000001");
+
+type TradeFill = {
+  price: string;
+  qty: string;
+  quoteQty: string;
+  commission: string;
+  commissionAsset: string;
+  time: number;
+  isBuyer: boolean;
+};
+
+type TradeFillResult = {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  fills: readonly TradeFill[];
+};
+
+type TradeFillAdapter = ExchangeAdapter & {
+  getOrderTradeFills?: (request: { symbol: string; providerOrderId: string }) => Promise<TradeFillResult>;
+};
 
 export type LiveExitSettlementStatus =
   | "NOT_SETTLED"
@@ -41,6 +63,10 @@ function almostGreater(actual: Prisma.Decimal, expected: Prisma.Decimal): boolea
   return actual.sub(QUANTITY_TOLERANCE).greaterThan(expected);
 }
 
+function almostEqual(actual: Prisma.Decimal, expected: Prisma.Decimal): boolean {
+  return actual.sub(expected).abs().lessThanOrEqualTo(QUANTITY_TOLERANCE);
+}
+
 function terminal(status: ExchangeProtectedExitLegStatusResult["status"]): boolean {
   return status === "FILLED" || status === "CANCELED" || status === "REJECTED" || status === "EXPIRED";
 }
@@ -70,10 +96,97 @@ async function markBlocked(orderId: string, reason: string): Promise<LiveOrderRo
       "version" = "version" + 1
     WHERE "id" = ${orderId}
     RETURNING *
-  `);
+  `;
 
   if (!rows[0]) throw new Error("LIVE_EXIT_SETTLEMENT_BLOCK_UPDATE_FAILED");
   return rows[0];
+}
+
+function sumTradeFills(fills: readonly TradeFill[]): { qty: Prisma.Decimal; quoteQty: Prisma.Decimal } {
+  return fills.reduce(
+    (total, fill) => ({
+      qty: total.qty.add(decimal(fill.qty, "INVALID_TRADE_FILL_QTY")),
+      quoteQty: total.quoteQty.add(decimal(fill.quoteQty, "INVALID_TRADE_FILL_QUOTE_QTY")),
+    }),
+    { qty: new Prisma.Decimal(0), quoteQty: new Prisma.Decimal(0) },
+  );
+}
+
+function assertTradeFillConsistency(
+  fills: TradeFillResult,
+  order: LiveOrderRow,
+  expectedQty: Prisma.Decimal,
+  expectedQuoteQty: Prisma.Decimal,
+  expectedBuyer: boolean,
+  codePrefix: string,
+): void {
+  if (fills.symbol.trim().toUpperCase() !== order.symbol.trim().toUpperCase()) {
+    throw new Error(`${codePrefix}_SYMBOL_MISMATCH`);
+  }
+  if (!fills.baseAsset.trim() || !fills.quoteAsset.trim()) {
+    throw new Error(`${codePrefix}_ASSET_INFO_REQUIRED`);
+  }
+  if (fills.fills.length === 0) throw new Error(`${codePrefix}_FILLS_REQUIRED`);
+  if (fills.fills.some((fill) => fill.isBuyer !== expectedBuyer)) {
+    throw new Error(`${codePrefix}_SIDE_MISMATCH`);
+  }
+
+  const totals = sumTradeFills(fills.fills);
+  if (!almostEqual(totals.qty, expectedQty)) throw new Error(`${codePrefix}_QTY_MISMATCH`);
+  if (!almostEqual(totals.quoteQty, expectedQuoteQty)) throw new Error(`${codePrefix}_QUOTE_QTY_MISMATCH`);
+}
+
+async function reconcileTradeFees(input: {
+  order: LiveOrderRow;
+  entryProviderOrderId: string;
+  exitProviderOrderId: string;
+  entryQty: Prisma.Decimal;
+  entryQuote: Prisma.Decimal;
+  exitQty: Prisma.Decimal;
+  exitQuote: Prisma.Decimal;
+  adapter: TradeFillAdapter;
+}): Promise<{
+  netRealizedPnlUsd: Prisma.Decimal;
+  netEntryQuoteCost: Prisma.Decimal;
+  netExitQuoteProceeds: Prisma.Decimal;
+  entryFills: TradeFillResult;
+  exitFills: TradeFillResult;
+}> {
+  if (!input.adapter.getOrderTradeFills) throw new Error("LIVE_TRADE_FILL_ADAPTER_REQUIRED");
+
+  const [entryFills, exitFills] = await Promise.all([
+    input.adapter.getOrderTradeFills({ symbol: input.order.symbol, providerOrderId: input.entryProviderOrderId }),
+    input.adapter.getOrderTradeFills({ symbol: input.order.symbol, providerOrderId: input.exitProviderOrderId }),
+  ]);
+
+  assertTradeFillConsistency(entryFills, input.order, input.entryQty, input.entryQuote, true, "ENTRY_TRADE_FILL");
+  assertTradeFillConsistency(exitFills, input.order, input.exitQty, input.exitQuote, false, "EXIT_TRADE_FILL");
+
+  if (
+    entryFills.baseAsset.trim().toUpperCase() !== exitFills.baseAsset.trim().toUpperCase() ||
+    entryFills.quoteAsset.trim().toUpperCase() !== exitFills.quoteAsset.trim().toUpperCase()
+  ) {
+    throw new Error("TRADE_FILL_ASSET_MISMATCH");
+  }
+
+  const feeResult = reconcileLiveSpotFees({
+    baseAsset: entryFills.baseAsset,
+    quoteAsset: entryFills.quoteAsset,
+    entryExecutedQty: input.entryQty.toString(),
+    entryQuoteQty: input.entryQuote.toString(),
+    entryFees: entryFills.fills.map((fill) => ({ commission: fill.commission, commissionAsset: fill.commissionAsset })),
+    exitExecutedQty: input.exitQty.toString(),
+    exitQuoteQty: input.exitQuote.toString(),
+    exitFees: exitFills.fills.map((fill) => ({ commission: fill.commission, commissionAsset: fill.commissionAsset })),
+  });
+
+  return {
+    netRealizedPnlUsd: feeResult.netRealizedPnlUsd,
+    netEntryQuoteCost: feeResult.netEntryQuoteCost,
+    netExitQuoteProceeds: feeResult.netExitQuoteProceeds,
+    entryFills,
+    exitFills,
+  };
 }
 
 export async function reconcileProtectedExitSettlement(input: {
@@ -238,8 +351,45 @@ export async function reconcileProtectedExitSettlement(input: {
       };
     }
 
+    if (!filled.providerOrderId) {
+      const blocked = await markBlocked(order.id, "EXIT_PROVIDER_ORDER_ID_REQUIRED");
+      return {
+        order: blocked,
+        status: "BLOCKED",
+        exitPrice: null,
+        realizedPnlUsd: null,
+        blockers: ["EXIT_PROVIDER_ORDER_ID_REQUIRED"],
+      };
+    }
+
+    let feeSettlement: Awaited<ReturnType<typeof reconcileTradeFees>>;
+    try {
+      const tradeFillAdapter = adapter as TradeFillAdapter;
+      if (!order.providerOrderId) throw new Error("ENTRY_PROVIDER_ORDER_ID_REQUIRED");
+      feeSettlement = await reconcileTradeFees({
+        order,
+        entryProviderOrderId: order.providerOrderId,
+        exitProviderOrderId: filled.providerOrderId,
+        entryQty,
+        entryQuote,
+        exitQty,
+        exitQuote,
+        adapter: tradeFillAdapter,
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message.slice(0, 300) : "LIVE_TRADE_FEE_RECONCILIATION_FAILED";
+      const blocked = await markBlocked(order.id, `LIVE_TRADE_FEE_RECONCILIATION_FAILED:${reason}`);
+      return {
+        order: blocked,
+        status: "BLOCKED",
+        exitPrice: null,
+        realizedPnlUsd: null,
+        blockers: ["LIVE_TRADE_FEE_RECONCILIATION_FAILED"],
+      };
+    }
+
     const exitPrice = exitQuote.div(exitQty);
-    const realizedPnlUsd = exitQuote.sub(entryQuote);
+    const realizedPnlUsd = feeSettlement.netRealizedPnlUsd;
 
     const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
       UPDATE "TradingLiveOrder"
