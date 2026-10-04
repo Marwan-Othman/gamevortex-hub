@@ -79,6 +79,45 @@ type BinanceOrderListResponse = {
   }>;
 };
 
+type BinanceExchangeInfoResponse = {
+  symbols?: Array<{
+    symbol?: string;
+    status?: string;
+    baseAsset?: string;
+    quoteAsset?: string;
+  }>;
+};
+
+type BinanceTradeResponse = {
+  symbol?: string;
+  id?: number;
+  orderId?: number;
+  price?: string;
+  qty?: string;
+  quoteQty?: string;
+  commission?: string;
+  commissionAsset?: string;
+  time?: number;
+  isBuyer?: boolean;
+};
+
+export type BinanceOrderTradeFill = {
+  price: string;
+  qty: string;
+  quoteQty: string;
+  commission: string;
+  commissionAsset: string;
+  time: number;
+  isBuyer: boolean;
+};
+
+export type BinanceOrderTradeFills = {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  fills: readonly BinanceOrderTradeFill[];
+};
+
 function normalizeBaseUrl(value: string | undefined): string {
   const baseUrl = (value ?? DEFAULT_BASE_URL).trim().replace(/\/$/, "");
   if (baseUrl !== DEFAULT_BASE_URL) throw new Error("BINANCE_LIVE_BASE_URL_MUST_BE_OFFICIAL_PRODUCTION");
@@ -102,6 +141,20 @@ function nonNegativeNumber(value: string, code: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) throw new Error(code);
   return parsed;
+}
+
+function decimalText(value: string, code: string, allowZero = true): string {
+  const normalized = value.trim();
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) throw new Error(code);
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || (!allowZero && parsed <= 0) || (allowZero && parsed < 0)) throw new Error(code);
+  return normalized;
+}
+
+function asset(value: string, code: string): string {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized || !/^[A-Z0-9._:-]{1,32}$/.test(normalized)) throw new Error(code);
+  return normalized;
 }
 
 function mapKline(kline: BinanceKline): MarketCandle {
@@ -134,10 +187,7 @@ function stableListClientOrderId(entryClientOrderId: string): string {
 }
 
 function assertPositiveDecimalText(value: string, code: string): string {
-  const normalized = value.trim();
-  if (!/^\d+(?:\.\d+)?$/.test(normalized)) throw new Error(code);
-  if (!Number.isFinite(Number(normalized)) || Number(normalized) <= 0) throw new Error(code);
-  return normalized;
+  return decimalText(value, code, false);
 }
 
 function mapProviderStatus(status: string | undefined): LiveProviderOrderObservation["status"] {
@@ -348,6 +398,69 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
         averageFillPrice,
         updatedAt,
       },
+    };
+  }
+
+  async getOrderTradeFills(request: { symbol: string; providerOrderId: string }): Promise<BinanceOrderTradeFills> {
+    this.requireLiveExecution();
+    const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
+    const orderId = Number(request.providerOrderId.trim());
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) throw new Error("INVALID_BINANCE_LIVE_PROVIDER_ORDER_ID");
+
+    const exchangeInfoQuery = encodeQuery({ symbol });
+    const exchangeInfoResponse = await this.fetcher(`${this.baseUrl}/api/v3/exchangeInfo?${exchangeInfoQuery}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    const exchangeInfo = (await parseJson(exchangeInfoResponse)) as BinanceExchangeInfoResponse;
+    const symbolInfo = exchangeInfo.symbols?.find((item) => item.symbol === symbol);
+    if (!symbolInfo || typeof symbolInfo.baseAsset !== "string" || typeof symbolInfo.quoteAsset !== "string") {
+      throw new Error("BINANCE_LIVE_SYMBOL_ASSET_INFO_REQUIRED");
+    }
+
+    const payload = (await this.signedRequest("GET", "/api/v3/myTrades", {
+      symbol,
+      orderId,
+      limit: 1_000,
+      recvWindow: this.recvWindow,
+      timestamp: Date.now(),
+    })) as unknown;
+
+    if (!Array.isArray(payload)) throw new Error("BINANCE_LIVE_INVALID_TRADE_FILLS_RESPONSE");
+
+    const fills = (payload as BinanceTradeResponse[]).map((fill) => {
+      if (
+        typeof fill.orderId !== "number" ||
+        fill.orderId !== orderId ||
+        typeof fill.price !== "string" ||
+        typeof fill.qty !== "string" ||
+        typeof fill.quoteQty !== "string" ||
+        typeof fill.commission !== "string" ||
+        typeof fill.commissionAsset !== "string" ||
+        typeof fill.time !== "number" ||
+        typeof fill.isBuyer !== "boolean"
+      ) {
+        throw new Error("BINANCE_LIVE_INVALID_TRADE_FILL");
+      }
+
+      return {
+        price: decimalText(fill.price, "BINANCE_LIVE_INVALID_TRADE_PRICE", false),
+        qty: decimalText(fill.qty, "BINANCE_LIVE_INVALID_TRADE_QTY", false),
+        quoteQty: decimalText(fill.quoteQty, "BINANCE_LIVE_INVALID_TRADE_QUOTE_QTY", false),
+        commission: decimalText(fill.commission, "BINANCE_LIVE_INVALID_TRADE_COMMISSION"),
+        commissionAsset: asset(fill.commissionAsset, "BINANCE_LIVE_INVALID_TRADE_COMMISSION_ASSET"),
+        time: fill.time,
+        isBuyer: fill.isBuyer,
+      } satisfies BinanceOrderTradeFill;
+    });
+
+    if (fills.length === 0) throw new Error("BINANCE_LIVE_TRADE_FILLS_REQUIRED");
+
+    return {
+      symbol,
+      baseAsset: asset(symbolInfo.baseAsset, "BINANCE_LIVE_INVALID_BASE_ASSET"),
+      quoteAsset: asset(symbolInfo.quoteAsset, "BINANCE_LIVE_INVALID_QUOTE_ASSET"),
+      fills,
     };
   }
 
