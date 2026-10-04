@@ -6,10 +6,10 @@
  * It cannot submit a live order unless GAMEVORTEX_LIVE_TRADING_ENABLED is
  * explicitly true at runtime. Credentials are read server-side only.
  *
- * Binance currently supports Ed25519 for Spot signed REST requests. This
- * adapter therefore treats `apiPrivateKeyPem` as the preferred credential and
- * keeps `apiSecret` as a backwards-compatible option name for the existing
- * executor contract. The value must contain an Ed25519 PKCS#8 PEM private key.
+ * Binance supports HMAC, RSA, and Ed25519 Spot API keys. GameVortex accepts
+ * the existing BINANCE_LIVE_API_SECRET HMAC contract and the stronger
+ * BINANCE_LIVE_API_PRIVATE_KEY Ed25519 contract. Ed25519 is preferred when
+ * both are configured.
  */
 
 import { createHmac } from "node:crypto";
@@ -30,7 +30,7 @@ import {
   type ExchangeProtectedExitLegStatusResult,
 } from "@/lib/trading/exchange-adapter";
 import type { LiveProviderOrderObservation } from "@/lib/trading/live-order-reconciliation";
-import { signBinanceEd25519Payload } from "@/lib/trading/binance-ed25519-signer";
+import { signBinancePayload } from "@/lib/trading/binance-signer";
 
 const DEFAULT_BASE_URL = "https://api.binance.com";
 const DEFAULT_RECV_WINDOW = 5_000;
@@ -38,8 +38,9 @@ const MAX_MARKET_DATA_LIMIT = 1_000;
 
 export type BinanceSpotLiveAdapterOptions = {
   apiKey?: string;
-  /** Backwards-compatible field name. The value must be the Ed25519 PKCS#8 PEM private key. */
+  /** Classic Binance HMAC-SHA256 API secret. */
   apiSecret?: string;
+  /** Optional Ed25519 PKCS#8 PEM private key; preferred when supplied. */
   apiPrivateKeyPem?: string;
   baseUrl?: string;
   recvWindow?: number;
@@ -230,12 +231,19 @@ async function parseJson(response: Response): Promise<unknown> {
   }
 
   if (!response.ok) {
-    const message =
-      payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string"
-        ? payload.msg
-        : `HTTP_${response.status}`;
+    const object = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : undefined;
+    const message = typeof object?.msg === "string" ? object.msg : `HTTP_${response.status}`;
+    const normalized = message.toLowerCase();
+    const code = typeof object?.code === "number" ? object.code : Number(object?.code);
     if (/restricted location|service unavailable from/i.test(message)) throw new Error("BINANCE_LIVE_RESTRICTED_LOCATION");
-    throw new Error(`BINANCE_LIVE_${message}`);
+    if (response.status === 401 || code === -1002 || code === -2015 || normalized.includes("invalid api-key") || normalized.includes("invalid api key")) {
+      throw new Error("BINANCE_LIVE_API_AUTH_FAILED");
+    }
+    if (code === -1021 || normalized.includes("recvwindow") || normalized.includes("timestamp")) throw new Error("BINANCE_LIVE_TIMESTAMP_INVALID");
+    if (code === -1022 || normalized.includes("signature")) throw new Error("BINANCE_LIVE_SIGNATURE_INVALID");
+    if (response.status === 429 || response.status === 418 || code === -1003 || normalized.includes("too many requests")) throw new Error("BINANCE_LIVE_RATE_LIMITED");
+    if (response.status >= 500 && response.status <= 599) throw new Error("BINANCE_LIVE_PROVIDER_ERROR");
+    throw new Error("BINANCE_LIVE_PROVIDER_ERROR");
   }
 
   return payload;
@@ -256,6 +264,7 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
   } as const;
 
   private readonly apiKey?: string;
+  private readonly apiSecret?: string;
   private readonly apiPrivateKeyPem?: string;
   private readonly baseUrl: string;
   private readonly recvWindow: number;
@@ -265,7 +274,8 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
 
   constructor(options: BinanceSpotLiveAdapterOptions = {}) {
     this.apiKey = options.apiKey?.trim() || undefined;
-    this.apiPrivateKeyPem = options.apiPrivateKeyPem?.trim() || options.apiSecret?.trim() || undefined;
+    this.apiSecret = options.apiSecret?.trim() || undefined;
+    this.apiPrivateKeyPem = options.apiPrivateKeyPem?.trim() || undefined;
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.recvWindow = options.recvWindow ?? DEFAULT_RECV_WINDOW;
     this.fetcher = options.fetcher ?? fetch;
@@ -283,20 +293,23 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
     if (!this.liveTradingEnabled) throw new Error("LIVE_TRADING_DISABLED");
   }
 
-  private requireCredentials(): { apiKey: string; privateKeyPem: string } {
-    if (!this.apiKey || !this.apiPrivateKeyPem) throw new Error("BINANCE_LIVE_API_CREDENTIALS_REQUIRED");
-    return { apiKey: this.apiKey, privateKeyPem: this.apiPrivateKeyPem };
+  private requireCredentials(): { apiKey: string; apiPrivateKeyPem?: string; apiSecret?: string } {
+    if (!this.apiKey || (!this.apiPrivateKeyPem && !this.apiSecret)) throw new Error("BINANCE_LIVE_API_CREDENTIALS_REQUIRED");
+    return { apiKey: this.apiKey, apiPrivateKeyPem: this.apiPrivateKeyPem, apiSecret: this.apiSecret };
   }
 
-  private signedQuery(params: Record<string, string | number>, privateKeyPem: string): string {
+  private signedQuery(
+    params: Record<string, string | number>,
+    credentials: { apiPrivateKeyPem?: string; apiSecret?: string },
+  ): string {
     const query = encodeQuery(params);
-    const signature = signBinanceEd25519Payload(query, privateKeyPem);
+    const signature = signBinancePayload(query, credentials);
     return `${query}&signature=${encodeURIComponent(signature)}`;
   }
 
   private async signedRequest(method: "GET" | "POST", path: string, params: Record<string, string | number>): Promise<unknown> {
-    const { apiKey, privateKeyPem } = this.requireCredentials();
-    const query = this.signedQuery(params, privateKeyPem);
+    const { apiKey, apiPrivateKeyPem, apiSecret } = this.requireCredentials();
+    const query = this.signedQuery(params, { apiPrivateKeyPem, apiSecret });
     const response = await this.fetcher(`${this.baseUrl}${path}?${query}`, {
       method,
       headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
