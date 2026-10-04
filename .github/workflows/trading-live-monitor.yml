@@ -1,0 +1,43 @@
+name: GameVortex Live Trading Monitor
+
+on:
+  schedule:
+    # GitHub Actions supports a minimum scheduled interval of 5 minutes.
+    # This is the Hobby-plan fallback for the Vercel monitor, which remains daily.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gamevortex-live-trading-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate monitor secret is configured
+        env:
+          CRON_SECRET: ${{ secrets.GAMEVORTEX_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "GAMEVORTEX_CRON_SECRET is not configured in GitHub Actions secrets."
+            exit 1
+          fi
+          if [ "${#CRON_SECRET}" -lt 16 ]; then
+            echo "GAMEVORTEX_CRON_SECRET must contain at least 16 characters."
+            exit 1
+          fi
+
+      - name: Reconcile live orders
+        env:
+          CRON_SECRET: ${{ secrets.GAMEVORTEX_CRON_SECRET }}
+        run: |
+          curl --fail --silent --show-error --location \
+            --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "https://gamevortex-hub.vercel.app/api/cron/trading-live-monitor"
