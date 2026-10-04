@@ -58,8 +58,8 @@ async function unlockMilestones(tx: any, userId: string, profileId: string, leve
     if (existing) continue;
     const result = await tx.userAchievement.create({ data: { profileId, achievementId: achievement.id } });
     unlocked.push({ ...result, achievement });
-    await tx.activity.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", message: "Unlocked " + achievement.name, metadata: { achievementKey: achievement.key } });
-    await tx.notification.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", title: "Achievement unlocked: " + achievement.name, body: achievement.description, metadata: { achievementId: achievement.id } });
+    await tx.activity.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", message: "Unlocked " + achievement.name, metadata: { achievementKey: achievement.key } } });
+    await tx.notification.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", title: "Achievement unlocked: " + achievement.name, body: achievement.description, metadata: { achievementId: achievement.id } } });
   }
   return unlocked;
 }
@@ -76,8 +76,8 @@ export async function grantXp(userId: string, amount: number, reason: string, so
     const updated = await tx.gamerProfile.update({ where: { id: profile.id }, data: { xp, level } });
     const unlocked = await unlockMilestones(tx, userId, profile.id, level, xp);
     if (level > oldLevel) {
-      await tx.activity.create({ data: { userId, type: "LEVEL_UP", message: "Reached level " + level, metadata: { level } });
-      await tx.notification.create({ data: { userId, type: "LEVEL_UP", title: "Level " + level + " unlocked", body: "You reached level " + level + " in GameVortex.", metadata: { level } });
+      await tx.activity.create({ data: { userId, type: "LEVEL_UP", message: "Reached level " + level, metadata: { level } } });
+      await tx.notification.create({ data: { userId, type: "LEVEL_UP", title: "Level " + level + " unlocked", body: "You reached level " + level + " in GameVortex.", metadata: { level } } });
     }
     return { profile: updated, unlocked, leveledUp: level > oldLevel };
   });
