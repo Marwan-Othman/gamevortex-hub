@@ -5,7 +5,7 @@ import { db } from "@/lib/prisma";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import { runPaperTrading, type PaperTradingTick } from "@/lib/trading/paper-trading";
 import { readJsonObject, tradingRouteError } from "@/lib/trading/route-helpers";
-import { DEFAULT_SHARIAH_POLICY } from "@/lib/trading/shariah";
+import { PAPER_SIMULATION_SHARIAH_POLICY } from "@/lib/trading/shariah";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       stopLossPercent: parsePositive(body.stopLossPercent, "INVALID_PAPER_TRADING_CONFIG"),
       takeProfitPercent: parsePositive(body.takeProfitPercent, "INVALID_PAPER_TRADING_CONFIG"),
       riskConfig: riskConfig.config,
-      shariahPolicy: DEFAULT_SHARIAH_POLICY,
+      shariahPolicy: PAPER_SIMULATION_SHARIAH_POLICY,
     };
 
     const result = runPaperTrading(config, ticks);
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           returnPercent: result.returnPercent,
           tradeCount: result.trades.length,
           blockedSignalCount: result.blockedSignals.length,
-          shariahPolicyVersion: DEFAULT_SHARIAH_POLICY.version,
+          shariahPolicyVersion: PAPER_SIMULATION_SHARIAH_POLICY.version,
           simulationOnly: true,
         },
       },

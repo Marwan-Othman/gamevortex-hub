@@ -48,10 +48,10 @@ type TestnetCandle = {
 };
 
 const SAMPLE_TICKS: Tick[] = [
-  { timestamp: "2026-10-01T10:00:00.000Z", price: 100, previousPrice: 99, fastAverage: 99, slowAverage: 98, volume: 1000, averageVolume: 900, shariah: { symbol: "BTC/USD", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
-  { timestamp: "2026-10-01T10:05:00.000Z", price: 102, previousPrice: 100, fastAverage: 101, slowAverage: 99, volume: 1300, averageVolume: 1000, shariah: { symbol: "BTC/USD", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
-  { timestamp: "2026-10-01T10:10:00.000Z", price: 104, previousPrice: 102, fastAverage: 103, slowAverage: 100, volume: 1500, averageVolume: 1100, shariah: { symbol: "BTC/USD", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
-  { timestamp: "2026-10-01T10:15:00.000Z", price: 106, previousPrice: 104, fastAverage: 105, slowAverage: 101, volume: 1600, averageVolume: 1200, shariah: { symbol: "BTC/USD", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
+  { timestamp: "2026-10-01T10:00:00.000Z", price: 100, previousPrice: 99, fastAverage: 99, slowAverage: 98, volume: 1000, averageVolume: 900, shariah: { symbol: "BTC/USDT", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
+  { timestamp: "2026-10-01T10:05:00.000Z", price: 102, previousPrice: 100, fastAverage: 101, slowAverage: 99, volume: 1300, averageVolume: 1000, shariah: { symbol: "BTC/USDT", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
+  { timestamp: "2026-10-01T10:10:00.000Z", price: 104, previousPrice: 102, fastAverage: 103, slowAverage: 100, volume: 1500, averageVolume: 1100, shariah: { symbol: "BTC/USDT", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
+  { timestamp: "2026-10-01T10:15:00.000Z", price: 106, previousPrice: 104, fastAverage: 105, slowAverage: 101, volume: 1600, averageVolume: 1200, shariah: { symbol: "BTC/USDT", assetType: "DIGITAL_ASSET", businessActivity: "spot digital asset", tradingMethod: "SPOT", ownershipSettlementVerified: true } },
 ];
 
 const ERROR_TEXT: Record<string, string> = {
@@ -63,6 +63,8 @@ const ERROR_TEXT: Record<string, string> = {
   INVALID_MARKET_INTERVAL: "الفاصل الزمني غير صالح.",
   INVALID_MARKET_DATA_LIMIT: "عدد الشموع غير صالح.",
   BINANCE_TESTNET_API_CREDENTIALS_REQUIRED: "مفاتيح Testnet غير مهيأة على الخادم.",
+  PAPER_TRADING_SYMBOL_MISMATCH: "الرمز في الحقل لا يطابق الرمز داخل بيانات JSON (shariah.symbol).",
+  INVALID_PAPER_TRADING_TIMESTAMP_ORDER: "ترتيب الأوقات غير صحيح: يجب أن تكون تصاعدية.",
   FORBIDDEN: "غير مصرح.",
   RATE_LIMITED: "تم تجاوز حد الطلبات مؤقتًا.",
 };
@@ -108,6 +110,7 @@ export default function TradingPaperPanel() {
   const [result, setResult] = useState<PaperResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [assumeVerified, setAssumeVerified] = useState(true);
 
   function loadSample() {
     setTicksJson(JSON.stringify(SAMPLE_TICKS, null, 2));
@@ -148,6 +151,10 @@ export default function TradingPaperPanel() {
       let ticks: unknown;
       try { ticks = JSON.parse(ticksJson); } catch { setMessage("صيغة JSON غير صالحة."); return; }
       if (!Array.isArray(ticks)) { setMessage("يجب أن تكون نقاط السوق مصفوفة JSON."); return; }
+      if (assumeVerified) {
+        // Simulation only: lets paper trading run on Testnet data, which has no ownership/settlement proof.
+        ticks = (ticks as Tick[]).map((tick) => ({ ...tick, shariah: { ...tick.shariah, ownershipSettlementVerified: true } }));
+      }
 
       const response = await fetch("/api/admin/trading/paper", {
         method: "POST",
@@ -184,9 +191,13 @@ export default function TradingPaperPanel() {
       </div>
       <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
         <label htmlFor="paper-ticks">بيانات السوق JSON</label>
-        <textarea id="paper-ticks" value={ticksJson} onChange={(e) => setTicksJson(e.target.value)} disabled={busy} rows={12} spellCheck={false} style={{ width: "100%", fontFamily: "monospace", resize: "vertical" }} placeholder='[{"timestamp":"2026-10-01T10:00:00.000Z","price":100,"previousPrice":99,"fastAverage":99,"slowAverage":98,"volume":1000,"averageVolume":900,"shariah":{"symbol":"BTC/USDT","assetType":"DIGITAL_ASSET","businessActivity":"spot digital asset","tradingMethod":"SPOT","ownershipSettlementVerified":false}}]' />
+        <textarea id="paper-ticks" dir="ltr" value={ticksJson} onChange={(e) => setTicksJson(e.target.value)} disabled={busy} rows={12} spellCheck={false} style={{ width: "100%", fontFamily: "monospace", resize: "vertical" }} placeholder='[{"timestamp":"2026-10-01T10:00:00.000Z","price":100,"previousPrice":99,"fastAverage":99,"slowAverage":98,"volume":1000,"averageVolume":900,"shariah":{"symbol":"BTC/USDT","assetType":"DIGITAL_ASSET","businessActivity":"spot digital asset","tradingMethod":"SPOT","ownershipSettlementVerified":false}}]' />
         <span className="muted">الحد الأقصى 10,000 نقطة. كل إشارة تمر عبر Risk Manager وShariah Guard قبل فتح مركز محاكاة.</span>
       </div>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
+        <input type="checkbox" checked={assumeVerified} onChange={(e) => setAssumeVerified(e.target.checked)} disabled={busy} />
+        <span>محاكاة فقط: اعتبر الملكية والتسوية موثّقة (لا ينطبق على التداول الحقيقي)</span>
+      </label>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <button type="button" className="btn" onClick={loadTestnetMarketData} disabled={busy}>تحميل بيانات Binance Testnet</button>
         <button type="button" className="btn" onClick={loadSample} disabled={busy}>تحميل بيانات تجريبية</button>

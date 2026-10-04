@@ -101,7 +101,7 @@ export default function TradingAuditPanel() {
                     {entry.entityType}
                     <div className="muted" style={{ fontSize: 12 }}>{entry.entityId}</div>
                   </td>
-                  <td style={{ padding: 8, maxWidth: 420, wordBreak: "break-word" }}>
+                  <td dir="ltr" style={{ padding: 8, minWidth: 320, maxWidth: 420, wordBreak: "break-word", overflowWrap: "anywhere", fontFamily: "monospace", fontSize: 12, textAlign: "left" }}>
                     {formatMetadata(entry.metadata)}
                   </td>
                 </tr>

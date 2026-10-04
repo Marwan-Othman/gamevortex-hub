@@ -44,6 +44,12 @@ export type ShariahPolicy = {
   maxInterestBearingDebtRatio?: number;
   maxInterestIncomeRatio?: number;
   maxImpermissibleIncomeRatio?: number;
+  /**
+   * Asset types for which company-style financial ratios (debt/interest income)
+   * do not exist (e.g. spot DIGITAL_ASSET). For these the ratio screening is
+   * skipped. Leave undefined for live trading policies.
+   */
+  financialScreeningNotApplicableAssetTypes?: readonly string[];
 };
 
 export type ShariahDecision = {
@@ -78,6 +84,16 @@ export const DEFAULT_SHARIAH_POLICY: ShariahPolicy = {
     "بنك ربوي",
   ],
   prohibitedMethods: ["MARGIN", "LEVERAGED", "SHORT", "FUTURES", "OPTIONS", "UNKNOWN"],
+};
+
+/**
+ * Policy for SIMULATION ONLY (Paper Trading). Not a religious ruling and not
+ * valid for real money: DEFAULT_SHARIAH_POLICY stays strict for live paths.
+ */
+export const PAPER_SIMULATION_SHARIAH_POLICY: ShariahPolicy = {
+  ...DEFAULT_SHARIAH_POLICY,
+  version: "paper-sim-v1",
+  financialScreeningNotApplicableAssetTypes: ["DIGITAL_ASSET"],
 };
 
 const DEFAULT_ALLOWED_METHODS: readonly TradingMethod[] = ["SPOT"];
@@ -144,8 +160,12 @@ export function evaluateShariah(
     ["impermissibleIncomeRatio", policy.maxImpermissibleIncomeRatio, "IMPERMISSIBLE_INCOME_RATIO"],
   ];
 
+  const ratiosNotApplicable = (policy.financialScreeningNotApplicableAssetTypes ?? [])
+    .map((type) => type.trim().toUpperCase())
+    .includes(input.assetType.trim().toUpperCase());
+
   for (const [key, threshold, label] of ratioRules) {
-    if (threshold === undefined) continue;
+    if (ratiosNotApplicable || threshold === undefined) continue;
     const value = ratios?.[key];
     if (!ratioIsKnown(value)) {
       reasons.push(`FINANCIAL_SCREENING_DATA_MISSING:${label}`);
@@ -154,10 +174,10 @@ export function evaluateShariah(
     }
   }
 
-  const financialPolicyConfigured = ratioRules.every(([, threshold]) => threshold !== undefined);
+  const financialPolicyConfigured = ratiosNotApplicable || ratioRules.every(([, threshold]) => threshold !== undefined);
   if (!financialPolicyConfigured) reasons.push("FINANCIAL_SCREENING_POLICY_NOT_CONFIGURED");
 
-  const hasMissingFinancialData = ratioRules.some(([key, threshold]) => threshold !== undefined && !ratioIsKnown(ratios?.[key]));
+  const hasMissingFinancialData = !ratiosNotApplicable && ratioRules.some(([key, threshold]) => threshold !== undefined && !ratioIsKnown(ratios?.[key]));
   const hasRejectedReason = reasons.some((reason) =>
     reason.startsWith("PROHIBITED_") || reason.startsWith("FINANCIAL_SCREENING_FAILED") || reason === "ASSET_IDENTITY_INCOMPLETE",
   );
