@@ -81,21 +81,31 @@ function mapKline(kline: BinanceKline): MarketCandle {
 }
 
 function encodeQuery(params: Record<string, string | number>): string {
-  return Object.entries(params).map(([key, value]) => encodeURIComponent(key) + "=" + encodeURIComponent(String(value))).join("&");
+  return Object.entries(params)
+    .map(([key, value]) => encodeURIComponent(key) + "=" + encodeURIComponent(String(value)))
+    .join("&");
 }
 
 function sign(query: string, secret: string): string {
-  return createHmac("sha256", secret).update(query).digest("hex");
+  return createHmac("sha256", secret).update(query, "utf8").digest("hex");
 }
 
 function providerErrorCode(status: number, message: string | null, code: unknown): string {
-  const normalized = (message ?? "").toLowerCase();
+  const rawMessage = message ?? "";
+  const normalized = rawMessage.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   const numericCode = typeof code === "number" ? code : Number(code);
 
-  if (/restricted location|service unavailable from/i.test(message ?? "")) {
+  if (/restricted location|service unavailable from .*restricted location|eligibility/.test(normalized)) {
     return "BINANCE_TESTNET_RESTRICTED_LOCATION";
   }
-  if (status === 401 || numericCode === -2015 || normalized.includes("invalid api-key") || normalized.includes("invalid api key")) {
+  if (
+    status === 401 ||
+    numericCode === -2015 ||
+    normalized.includes("invalid api key") ||
+    normalized.includes("invalid api-key") ||
+    normalized.includes("invalid api key, ip") ||
+    normalized.includes("permissions for action")
+  ) {
     return "BINANCE_TESTNET_API_AUTH_FAILED";
   }
   if (numericCode === -1021 || normalized.includes("recvwindow") || normalized.includes("timestamp")) {
@@ -104,7 +114,7 @@ function providerErrorCode(status: number, message: string | null, code: unknown
   if (numericCode === -1022 || normalized.includes("signature")) {
     return "BINANCE_TESTNET_SIGNATURE_INVALID";
   }
-  if (status === 429 || numericCode === -1003 || normalized.includes("too many requests") || normalized.includes("too many requests; current limit")) {
+  if (status === 429 || numericCode === -1003 || normalized.includes("too many requests")) {
     return "BINANCE_TESTNET_RATE_LIMITED";
   }
   if (status >= 500 && status <= 599) {
@@ -140,8 +150,14 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
   readonly id = "binance-spot-testnet";
   readonly mode = "MARKET_DATA" as const;
   readonly capabilities = {
-    marketData: true, paperTrading: true, liveOrders: false, withdrawals: false,
-    margin: false, leverage: false, shortSelling: false, derivatives: false,
+    marketData: true,
+    paperTrading: true,
+    liveOrders: false,
+    withdrawals: false,
+    margin: false,
+    leverage: false,
+    shortSelling: false,
+    derivatives: false,
   } as const;
 
   private readonly apiKey?: string;
@@ -157,8 +173,12 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.recvWindow = options.recvWindow ?? DEFAULT_RECV_WINDOW;
     this.fetcher = options.fetcher ?? fetch;
-    this.symbolMap = Object.fromEntries(Object.entries(options.symbolMap ?? {}).map(([key, value]) => [key.trim().toUpperCase(), value.trim().toUpperCase()]));
-    if (!Number.isInteger(this.recvWindow) || this.recvWindow < 1 || this.recvWindow > 60_000) throw new Error("INVALID_BINANCE_TESTNET_RECV_WINDOW");
+    this.symbolMap = Object.fromEntries(
+      Object.entries(options.symbolMap ?? {}).map(([key, value]) => [key.trim().toUpperCase(), value.trim().toUpperCase()]),
+    );
+    if (!Number.isInteger(this.recvWindow) || this.recvWindow < 1 || this.recvWindow > 60_000) {
+      throw new Error("INVALID_BINANCE_TESTNET_RECV_WINDOW");
+    }
   }
 
   private requireCredentials(): { apiKey: string; apiSecret: string } {
@@ -198,23 +218,43 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
       headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
     });
     const payload = (await parseJson(response)) as BinanceAccountResponse;
-    if (typeof payload.canTrade !== "boolean" || typeof payload.canWithdraw !== "boolean" || typeof payload.canDeposit !== "boolean" || typeof payload.accountType !== "string") {
+    if (
+      typeof payload.canTrade !== "boolean" ||
+      typeof payload.canWithdraw !== "boolean" ||
+      typeof payload.canDeposit !== "boolean" ||
+      typeof payload.accountType !== "string"
+    ) {
       throw new Error("INVALID_BINANCE_TESTNET_ACCOUNT_RESPONSE");
     }
-    const permissions = Array.isArray(payload.permissions) ? payload.permissions.filter((value): value is string => typeof value === "string").slice(0, 20) : [];
-    return { canTrade: payload.canTrade, canWithdraw: payload.canWithdraw, canDeposit: payload.canDeposit, accountType: payload.accountType, permissions };
+    const permissions = Array.isArray(payload.permissions)
+      ? payload.permissions.filter((value): value is string => typeof value === "string").slice(0, 20)
+      : [];
+    return {
+      canTrade: payload.canTrade,
+      canWithdraw: payload.canWithdraw,
+      canDeposit: payload.canDeposit,
+      accountType: payload.accountType.trim().toUpperCase(),
+      permissions,
+    };
   }
 
   async placeSpotBuy(request: ExchangeOrderRequest): Promise<ExchangeOrderResult> {
     const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
     const normalizedRequest = { ...request, symbol };
     validateExchangeOrderRequest(normalizedRequest);
-    if (!/^[A-Za-z0-9._:-]{1,36}$/.test(request.clientOrderId) || request.clientOrderId.length > MAX_CLIENT_ORDER_ID_LENGTH) throw new Error("INVALID_BINANCE_TESTNET_CLIENT_ORDER_ID");
+    if (!/^[A-Za-z0-9._:-]{1,36}$/.test(request.clientOrderId) || request.clientOrderId.length > MAX_CLIENT_ORDER_ID_LENGTH) {
+      throw new Error("INVALID_BINANCE_TESTNET_CLIENT_ORDER_ID");
+    }
     const { apiKey, apiSecret } = this.requireCredentials();
     const params = {
-      symbol, side: "BUY", type: "MARKET", quoteOrderQty: request.amountUsd.toFixed(8),
-      newClientOrderId: request.clientOrderId, newOrderRespType: "RESULT",
-      recvWindow: this.recvWindow, timestamp: Date.now(),
+      symbol,
+      side: "BUY",
+      type: "MARKET",
+      quoteOrderQty: request.amountUsd.toFixed(8),
+      newClientOrderId: request.clientOrderId,
+      newOrderRespType: "RESULT",
+      recvWindow: this.recvWindow,
+      timestamp: Date.now(),
     };
     const query = this.signedQuery(params, apiSecret);
     const response = await fetchWithProviderErrorMapping(this.fetcher, this.baseUrl + "/api/v3/order?" + query, {
@@ -226,6 +266,11 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
       throw new Error("INVALID_BINANCE_TESTNET_ORDER_RESPONSE");
     }
     if (payload.status !== "FILLED") throw new Error("BINANCE_TESTNET_ORDER_NOT_FILLED");
-    return { accepted: true, clientOrderId: payload.clientOrderId, providerOrderId: String(payload.orderId), status: "FILLED" };
+    return {
+      accepted: true,
+      clientOrderId: payload.clientOrderId,
+      providerOrderId: String(payload.orderId),
+      status: "FILLED",
+    };
   }
 }
