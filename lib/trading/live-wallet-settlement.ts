@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { OWNER_POINTS_PER_USD } from "@/lib/owner-points";
 import { calculateLiveSpotNetExitProceeds } from "@/lib/trading/live-fee-accounting";
+import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
 
 export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLED";
@@ -132,7 +133,7 @@ async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, re
 export async function settleClosedLiveOrderToOwnerWallet(input: {
   ownerId: string;
   order: LiveOrderRow;
-  tradeFillProvider: SettlementTradeFillProvider;
+  tradeFillProvider?: SettlementTradeFillProvider;
 }): Promise<LiveWalletSettlementResult> {
   const inputOrder = input.order as LiveOrderSettlementRow;
   let netExitProceeds: Prisma.Decimal | null = null;
@@ -140,7 +141,13 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
   if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
     if (!inputOrder.exitProviderOrderId) throw new Error("SETTLEMENT_EXIT_PROVIDER_ORDER_ID_REQUIRED");
 
-    const fills = await input.tradeFillProvider.getOrderTradeFills({
+    const tradeFillProvider = input.tradeFillProvider ?? new BinanceSpotLiveAdapter({
+      apiKey: process.env.BINANCE_LIVE_API_KEY,
+      apiSecret: process.env.BINANCE_LIVE_API_SECRET,
+      liveTradingEnabled: process.env.GAMEVORTEX_LIVE_TRADING_ENABLED === "true",
+    });
+
+    const fills = await tradeFillProvider.getOrderTradeFills({
       symbol: inputOrder.symbol,
       providerOrderId: inputOrder.exitProviderOrderId,
     });
