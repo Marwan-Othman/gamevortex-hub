@@ -15,7 +15,7 @@ env:
 jobs:
   trading-quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -75,6 +75,18 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee trading-test-output.txt
+
+      - name: Stage 1 - strategy lab research
+        run: node scripts/run-strategy-lab-research.mjs
+
+      - name: Stage 1 - upload research report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: trading-strategy-lab-report-${{ github.run_id }}
+          path: strategy-lab-research-report.json
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Stage 0 - build
         run: npm run build
