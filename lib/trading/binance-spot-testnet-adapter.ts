@@ -196,7 +196,9 @@ export class BinanceSpotTestnetAdapter implements ExchangeAdapter {
     const normalizedRequest = { ...request, symbol };
     validateExchangeMarketDataRequest(normalizedRequest);
     if (request.limit > MAX_LIMIT) throw new Error("INVALID_MARKET_DATA_LIMIT");
-    const query = encodeQuery({ symbol, interval: request.interval.trim(), limit: request.limit });
+    const klineParams: Record<string, string | number> = { symbol, interval: request.interval.trim(), limit: request.limit };
+    if (request.endTimeMs !== undefined) klineParams.endTime = request.endTimeMs;
+    const query = encodeQuery(klineParams);
     const response = await fetchWithProviderErrorMapping(this.fetcher, this.baseUrl + "/api/v3/klines?" + query, {
       method: "GET",
       headers: { Accept: "application/json" },

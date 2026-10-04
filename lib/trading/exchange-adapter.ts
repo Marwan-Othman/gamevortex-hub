@@ -27,6 +27,8 @@ export type ExchangeMarketDataRequest = {
   symbol: string;
   interval: string;
   limit: number;
+  /** Optional: only candles opening before this time (ms since epoch). Used for paging backwards. */
+  endTimeMs?: number;
 };
 
 export type ExchangeMarketDataResponse = {
@@ -212,6 +214,10 @@ export function validateExchangeMarketDataRequest(request: ExchangeMarketDataReq
 
   if (!Number.isInteger(request.limit) || request.limit < 1 || request.limit > 1000) {
     throw new Error("INVALID_MARKET_DATA_LIMIT");
+  }
+
+  if (request.endTimeMs !== undefined && (!Number.isSafeInteger(request.endTimeMs) || request.endTimeMs <= 0)) {
+    throw new Error("INVALID_MARKET_DATA_END_TIME");
   }
 }
 

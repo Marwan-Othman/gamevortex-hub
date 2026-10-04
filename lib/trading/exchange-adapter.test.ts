@@ -155,3 +155,12 @@ describe("validateExchangeOrderRequest", () => {
     expect(() => validateExchangeOrderRequest({ ...validOrder, takeProfitPrice: 100 })).toThrow("INVALID_ORDER_TAKE_PROFIT_FOR_BUY");
   });
 });
+
+describe("validateExchangeMarketDataRequest endTimeMs", () => {
+  it("accepts a positive integer endTimeMs", () => {
+    expect(() => validateExchangeMarketDataRequest({ symbol: "BTCUSD", interval: "1h", limit: 100, endTimeMs: 1_790_000_000_000 })).not.toThrow();
+  });
+  it("rejects an invalid endTimeMs", () => {
+    expect(() => validateExchangeMarketDataRequest({ symbol: "BTCUSD", interval: "1h", limit: 100, endTimeMs: -5 })).toThrow("INVALID_MARKET_DATA_END_TIME");
+  });
+});

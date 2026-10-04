@@ -78,6 +78,8 @@ export default function TradingBacktestPanel() {
   const [tradeAmountUsd, setTradeAmountUsd] = useState("1");
   const [stopLossPercent, setStopLossPercent] = useState("2");
   const [takeProfitPercent, setTakeProfitPercent] = useState("4");
+  const [candleInterval, setCandleInterval] = useState("1h");
+  const [candleCount, setCandleCount] = useState("2000");
   const [candlesJson, setCandlesJson] = useState("");
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,17 +96,43 @@ export default function TradingBacktestPanel() {
     setMessage(null);
     setResult(null);
     try {
-      const response = await fetch(
-        `/api/admin/trading/exchange/testnet/market-data?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=500`,
-        { method: "GET", cache: "no-store" },
+      const wanted = Math.min(Math.max(Number(candleCount) || 1000, 100), 5000);
+      const byTime = new Map<string, TestnetCandle>();
+      let endTime: number | null = null;
+
+      for (let page = 0; page < 6 && byTime.size < wanted; page += 1) {
+        const pageSize = Math.min(1000, wanted - byTime.size);
+        const url =
+          `/api/admin/trading/exchange/testnet/market-data?symbol=${encodeURIComponent(symbol)}` +
+          `&interval=${candleInterval}&limit=${pageSize}` +
+          (endTime ? `&endTime=${endTime}` : "");
+        const response = await fetch(url, { method: "GET", cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) {
+          setMessage(ERROR_TEXT[data.error] ?? "تعذر تحميل بيانات Binance Spot Testnet.");
+          return;
+        }
+        const batch = data.candles as TestnetCandle[];
+        if (batch.length === 0) break;
+        const before = byTime.size;
+        for (const candle of batch) byTime.set(candle.timestamp, candle);
+        if (byTime.size === before) break;
+        const oldest = Math.min(...batch.map((item) => Date.parse(item.timestamp)));
+        endTime = oldest - 1;
+      }
+
+      const sorted = Array.from(byTime.values()).sort(
+        (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
       );
-      const data = await response.json();
-      if (!response.ok) {
-        setMessage(ERROR_TEXT[data.error] ?? "تعذر تحميل بيانات Binance Spot Testnet.");
+      if (sorted.length === 0) {
+        setMessage("لم تصل أي شموع من Binance Spot Testnet.");
         return;
       }
-      setCandlesJson(JSON.stringify(withAverages(data.candles as TestnetCandle[]), null, 2));
-      setMessage("تم تحميل 500 شمعة (5 دقائق) من Binance Spot Testnet. لم يتم إرسال أي أمر.");
+      setCandlesJson(JSON.stringify(withAverages(sorted), null, 2));
+      const days = (Date.parse(sorted[sorted.length - 1].timestamp) - Date.parse(sorted[0].timestamp)) / 86_400_000;
+      setMessage(
+        `تم تحميل ${sorted.length} شمعة (${candleInterval}) تغطي حوالي ${days.toFixed(1)} يوم من Binance Spot Testnet. لم يتم إرسال أي أمر.`,
+      );
     } catch {
       setMessage("تعذر الاتصال بـ Binance Spot Testnet.");
     } finally {
@@ -188,6 +216,22 @@ export default function TradingBacktestPanel() {
         <label style={{ display: "grid", gap: 6 }}>
           <span>Take Profit %</span>
           <input type="number" min="0.01" step="any" value={takeProfitPercent} onChange={(event) => setTakeProfitPercent(event.target.value)} disabled={busy} />
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 16 }}>
+        <label>
+          فاصل الشموع
+          <select value={candleInterval} onChange={(event) => setCandleInterval(event.target.value)} disabled={busy}>
+            <option value="5m">5 دقائق</option>
+            <option value="15m">15 دقيقة</option>
+            <option value="1h">ساعة</option>
+            <option value="4h">4 ساعات</option>
+          </select>
+        </label>
+        <label>
+          عدد الشموع (100 – 5000)
+          <input type="number" min="100" max="5000" step="100" value={candleCount} onChange={(event) => setCandleCount(event.target.value)} disabled={busy} />
         </label>
       </div>
 

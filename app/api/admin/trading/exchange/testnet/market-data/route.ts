@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_SYMBOL = "BTC/USDT";
 const DEFAULT_INTERVAL = "5m";
-const MAX_LIMIT = 500;
+const MAX_LIMIT = 1000;
+const ALLOWED_INTERVALS = new Set(["5m", "15m", "1h", "4h"]);
 
 function parseLimit(value: string | null): number {
   const limit = Number(value ?? "100");
@@ -16,6 +17,15 @@ function parseLimit(value: string | null): number {
     throw new Error("INVALID_MARKET_DATA_LIMIT");
   }
   return limit;
+}
+
+function parseEndTime(value: string | null): number | undefined {
+  if (value === null || value === "") return undefined;
+  const endTime = Number(value);
+  if (!Number.isSafeInteger(endTime) || endTime <= 0) {
+    throw new Error("INVALID_MARKET_DATA_END_TIME");
+  }
+  return endTime;
 }
 
 export async function GET(request: NextRequest) {
@@ -26,10 +36,12 @@ export async function GET(request: NextRequest) {
 
     const symbol = request.nextUrl.searchParams.get("symbol")?.trim() || DEFAULT_SYMBOL;
     const interval = request.nextUrl.searchParams.get("interval")?.trim() || DEFAULT_INTERVAL;
+    if (!ALLOWED_INTERVALS.has(interval)) throw new Error("INVALID_MARKET_DATA_INTERVAL");
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
+    const endTimeMs = parseEndTime(request.nextUrl.searchParams.get("endTime"));
 
     const adapter = new BinanceSpotTestnetAdapter();
-    const result = await adapter.getMarketData({ symbol, interval, limit });
+    const result = await adapter.getMarketData({ symbol, interval, limit, endTimeMs });
 
     return NextResponse.json({
       ok: true,
