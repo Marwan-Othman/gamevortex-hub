@@ -13,6 +13,21 @@ jobs:
   trading-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: gamevortex_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d gamevortex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +43,9 @@ jobs:
 
       - name: Validate Prisma schema
         run: npm run db:validate
+
+      - name: Verify clean migration chain
+        run: npm run db:deploy
 
       - name: Typecheck
         run: npm run typecheck
