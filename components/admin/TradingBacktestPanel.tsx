@@ -23,6 +23,7 @@ type BacktestResult = {
   winningTrades: number;
   losingTrades: number;
   winRatePercent: number;
+  totalFeesUsd?: number;
   trades: BacktestTrade[];
 };
 
@@ -52,6 +53,25 @@ const SAMPLE_CANDLES: Candle[] = [
   { timestamp: "2026-10-01T10:10:00.000Z", open: 102, high: 105, low: 101, close: 104, volume: 1500, fastAverage: 103, slowAverage: 100, averageVolume: 1100 },
 ];
 
+type SweepSegment = { trades: number; winRatePercent: number; returnPercent: number; maxDrawdownPercent: number };
+type SweepRow = {
+  fastPeriod: number;
+  slowPeriod: number;
+  stopLossPercent: number;
+  takeProfitPercent: number;
+  train: SweepSegment;
+  test: SweepSegment;
+  robust: boolean;
+};
+type SweepResult = {
+  totalCombinations: number;
+  robustCount: number;
+  trainCandles: number;
+  testCandles: number;
+  buyAndHoldTestReturnPercent: number;
+  rows: SweepRow[];
+};
+
 type TestnetCandle = { timestamp: string; open: number; high: number; low: number; close: number; volume: number };
 
 function average(values: number[]): number {
@@ -80,6 +100,9 @@ export default function TradingBacktestPanel() {
   const [takeProfitPercent, setTakeProfitPercent] = useState("4");
   const [candleInterval, setCandleInterval] = useState("1h");
   const [candleCount, setCandleCount] = useState("2000");
+  const [feePercent, setFeePercent] = useState("0.1");
+  const [slippagePercent, setSlippagePercent] = useState("0.05");
+  const [sweep, setSweep] = useState<SweepResult | null>(null);
   const [candlesJson, setCandlesJson] = useState("");
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -140,6 +163,51 @@ export default function TradingBacktestPanel() {
     }
   }
 
+  async function runSweepCompare() {
+    setBusy(true);
+    setMessage(null);
+    setResult(null);
+    setSweep(null);
+    try {
+      let candles: unknown;
+      try {
+        candles = JSON.parse(candlesJson);
+      } catch {
+        setMessage("صيغة بيانات الشموع ليست JSON صالحة.");
+        return;
+      }
+      if (!Array.isArray(candles)) {
+        setMessage("يجب أن تكون بيانات الشموع مصفوفة JSON.");
+        return;
+      }
+      const response = await fetch("/api/admin/trading/backtest/sweep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol,
+          candles,
+          config: {
+            initialCapitalUsd: numberField(initialCapitalUsd, 0),
+            tradeAmountUsd: numberField(tradeAmountUsd, 0),
+            feePercent: numberField(feePercent, 0),
+            slippagePercent: numberField(slippagePercent, 0),
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(ERROR_TEXT[data.error] ?? "تعذّرت المقارنة. تحتاج 200 شمعة على الأقل.");
+        return;
+      }
+      setSweep(data.result as SweepResult);
+      setMessage("اكتملت المقارنة. النتائج بحثية فقط ولا تنفذ أي صفقة.");
+    } catch {
+      setMessage("تعذّر تشغيل المقارنة.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function run() {
     setBusy(true);
     setMessage(null);
@@ -170,6 +238,8 @@ export default function TradingBacktestPanel() {
             tradeAmountUsd: numberField(tradeAmountUsd, 0),
             stopLossPercent: numberField(stopLossPercent, 0),
             takeProfitPercent: numberField(takeProfitPercent, 0),
+            feePercent: numberField(feePercent, 0),
+            slippagePercent: numberField(slippagePercent, 0),
           },
         }),
       });
@@ -221,6 +291,17 @@ export default function TradingBacktestPanel() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 16 }}>
         <label>
+          عمولة لكل طرف %
+          <input type="number" min="0" max="5" step="any" value={feePercent} onChange={(event) => setFeePercent(event.target.value)} disabled={busy} />
+        </label>
+        <label>
+          انزلاق لكل طرف %
+          <input type="number" min="0" max="5" step="any" value={slippagePercent} onChange={(event) => setSlippagePercent(event.target.value)} disabled={busy} />
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 16 }}>
+        <label>
           فاصل الشموع
           <select value={candleInterval} onChange={(event) => setCandleInterval(event.target.value)} disabled={busy}>
             <option value="5m">5 دقائق</option>
@@ -257,9 +338,48 @@ export default function TradingBacktestPanel() {
         <button type="button" className="btn" onClick={run} disabled={busy || !candlesJson.trim()}>
           {busy ? "جاري الاختبار..." : "تشغيل Backtest"}
         </button>
+        <button type="button" className="btn" onClick={runSweepCompare} disabled={busy || !candlesJson.trim()}>مقارنة الإعدادات (تدريب/اختبار)</button>
       </div>
 
       {message ? <p style={{ marginTop: 10 }}>{message}</p> : null}
+
+      {sweep ? (
+        <div style={{ marginTop: 18 }}>
+          <p>
+            {sweep.totalCombinations} مجموعة إعدادات. تدريب: {sweep.trainCandles} شمعة، اختبار: {sweep.testCandles} شمعة.
+            الشراء والاحتفاظ بفترة الاختبار: {sweep.buyAndHoldTestReturnPercent.toFixed(2)}%.
+            مجموعات رابحة بالفترتين: {sweep.robustCount}.
+          </p>
+          <p className="muted">
+            الترتيب حسب فترة التدريب فقط. عمود الاختبار لم يُستخدم بالترتيب. حتى على بيانات عشوائية قد تظهر مجموعات "رابحة بالفترتين" بالصدفة،
+            فلا تعتمد على النتيجة قبل تكرارها على رموز وفترات أخرى.
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table dir="ltr" style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th>MA</th><th>SL%</th><th>TP%</th><th>Train %</th><th>Train #</th><th>Test %</th><th>Test #</th><th>Test win%</th><th>OK</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sweep.rows.map((row) => (
+                  <tr key={`${row.fastPeriod}-${row.slowPeriod}-${row.stopLossPercent}-${row.takeProfitPercent}`}>
+                    <td>{row.fastPeriod}/{row.slowPeriod}</td>
+                    <td>{row.stopLossPercent}</td>
+                    <td>{row.takeProfitPercent}</td>
+                    <td>{row.train.returnPercent.toFixed(2)}</td>
+                    <td>{row.train.trades}</td>
+                    <td>{row.test.returnPercent.toFixed(2)}</td>
+                    <td>{row.test.trades}</td>
+                    <td>{row.test.winRatePercent.toFixed(0)}</td>
+                    <td>{row.robust ? "✔" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       {result ? (
         <>
@@ -270,6 +390,7 @@ export default function TradingBacktestPanel() {
             <div className={styles.statTile}><strong>${result.maxDrawdownUsd.toFixed(2)}</strong><span className={styles.label}>أقصى سحب</span></div>
             <div className={styles.statTile}><strong>{result.totalTrades}</strong><span className={styles.label}>إجمالي الصفقات</span></div>
             <div className={styles.statTile}><strong>{result.winRatePercent.toFixed(2)}%</strong><span className={styles.label}>نسبة الفوز</span></div>
+            <div className={styles.statTile}><strong>${(result.totalFeesUsd ?? 0).toFixed(2)}</strong><span className={styles.label}>إجمالي العمولات</span></div>
           </div>
 
           {result.trades.length > 0 ? (

@@ -16,6 +16,14 @@ function parseFinitePositive(value: unknown, code: string): number {
   return value;
 }
 
+function parseOptionalCost(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 5) {
+    throw new Error("INVALID_BACKTEST_CONFIG");
+  }
+  return value;
+}
+
 function parseCandle(value: unknown): BacktestCandle {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("INVALID_BACKTEST_CANDLE");
@@ -50,6 +58,8 @@ function parseConfig(value: unknown): BacktestConfig {
     tradeAmountUsd: parseFinitePositive(input.tradeAmountUsd, "INVALID_BACKTEST_CONFIG"),
     stopLossPercent: parseFinitePositive(input.stopLossPercent, "INVALID_BACKTEST_CONFIG"),
     takeProfitPercent: parseFinitePositive(input.takeProfitPercent, "INVALID_BACKTEST_CONFIG"),
+    feePercent: parseOptionalCost(input.feePercent),
+    slippagePercent: parseOptionalCost(input.slippagePercent),
   };
 }
 

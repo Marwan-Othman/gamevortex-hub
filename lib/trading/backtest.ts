@@ -24,6 +24,10 @@ export type BacktestConfig = {
   tradeAmountUsd: number;
   stopLossPercent: number;
   takeProfitPercent: number;
+  /** Exchange fee per side, in percent of notional (e.g. 0.1). Defaults to 0. */
+  feePercent?: number;
+  /** Adverse slippage per side, in percent (e.g. 0.05). Defaults to 0. */
+  slippagePercent?: number;
 };
 
 export type BacktestTrade = {
@@ -33,6 +37,7 @@ export type BacktestTrade = {
   exitPrice: number;
   amountUsd: number;
   pnlUsd: number;
+  feesUsd?: number;
   exitReason: "STOP_LOSS" | "TAKE_PROFIT" | "END_OF_DATA";
 };
 
@@ -50,6 +55,7 @@ export type BacktestResult = {
   grossProfitUsd: number;
   grossLossUsd: number;
   profitFactor: number | null;
+  totalFeesUsd: number;
   trades: BacktestTrade[];
 };
 
@@ -87,6 +93,30 @@ function validateConfig(config: BacktestConfig): void {
   if (config.stopLossPercent >= 100 || config.takeProfitPercent >= 100) {
     throw new Error("INVALID_BACKTEST_CONFIG");
   }
+  for (const cost of [config.feePercent, config.slippagePercent]) {
+    if (cost !== undefined && (!Number.isFinite(cost) || cost < 0 || cost > 5)) {
+      throw new Error("INVALID_BACKTEST_CONFIG");
+    }
+  }
+}
+
+/**
+ * Applies per-side slippage and fees to a round trip. Slippage worsens both
+ * the buy and the sell price; the fee is charged on the notional of each side.
+ */
+function settleTrade(
+  amountUsd: number,
+  entryPrice: number,
+  exitPrice: number,
+  feePercent: number,
+  slippagePercent: number,
+): { pnlUsd: number; feesUsd: number; effectiveEntry: number; effectiveExit: number } {
+  const effectiveEntry = entryPrice * (1 + slippagePercent / 100);
+  const effectiveExit = exitPrice * (1 - slippagePercent / 100);
+  const exitNotional = amountUsd * (effectiveExit / effectiveEntry);
+  const feesUsd = (amountUsd + exitNotional) * (feePercent / 100);
+  const pnlUsd = exitNotional - amountUsd - feesUsd;
+  return { pnlUsd, feesUsd, effectiveEntry, effectiveExit };
 }
 
 function validateCandleSeries(candles: readonly BacktestCandle[]): void {
@@ -124,6 +154,8 @@ export function runBacktest(
     | { timestamp: string; price: number; amountUsd: number; stopLoss: number; takeProfit: number }
     | undefined;
   const trades: BacktestTrade[] = [];
+  const feePercent = config.feePercent ?? 0;
+  const slippagePercent = config.slippagePercent ?? 0;
 
   for (let index = 1; index < candles.length; index += 1) {
     const previous = candles[index - 1];
@@ -142,15 +174,16 @@ export function runBacktest(
       }
 
       if (exitPrice !== undefined && exitReason) {
-        const pnlUsd = entry.amountUsd * ((exitPrice - entry.price) / entry.price);
-        capital += pnlUsd;
+        const settled = settleTrade(entry.amountUsd, entry.price, exitPrice, feePercent, slippagePercent);
+        capital += settled.pnlUsd;
         trades.push({
           entryTime: entry.timestamp,
           exitTime: candle.timestamp,
-          entryPrice: entry.price,
-          exitPrice,
+          entryPrice: settled.effectiveEntry,
+          exitPrice: settled.effectiveExit,
           amountUsd: entry.amountUsd,
-          pnlUsd,
+          pnlUsd: settled.pnlUsd,
+          feesUsd: settled.feesUsd,
           exitReason,
         });
         entry = undefined;
@@ -193,15 +226,16 @@ export function runBacktest(
 
   if (entry) {
     const finalCandle = candles[candles.length - 1];
-    const pnlUsd = entry.amountUsd * ((finalCandle.close - entry.price) / entry.price);
-    capital += pnlUsd;
+    const settled = settleTrade(entry.amountUsd, entry.price, finalCandle.close, feePercent, slippagePercent);
+    capital += settled.pnlUsd;
     trades.push({
       entryTime: entry.timestamp,
       exitTime: finalCandle.timestamp,
-      entryPrice: entry.price,
-      exitPrice: finalCandle.close,
+      entryPrice: settled.effectiveEntry,
+      exitPrice: settled.effectiveExit,
       amountUsd: entry.amountUsd,
-      pnlUsd,
+      pnlUsd: settled.pnlUsd,
+      feesUsd: settled.feesUsd,
       exitReason: "END_OF_DATA",
     });
     peakCapital = Math.max(peakCapital, capital);
@@ -232,6 +266,7 @@ export function runBacktest(
     grossProfitUsd,
     grossLossUsd,
     profitFactor: grossLossUsd === 0 ? (grossProfitUsd > 0 ? null : 0) : grossProfitUsd / grossLossUsd,
+    totalFeesUsd: trades.reduce((sum, trade) => sum + (trade.feesUsd ?? 0), 0),
     trades,
   };
 }
