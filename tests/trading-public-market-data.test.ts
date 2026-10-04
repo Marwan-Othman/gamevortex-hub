@@ -15,6 +15,15 @@ describe('binance public market data', () => {
     expect(r.candles).toHaveLength(2);
     expect(r.candles[1].close).toBe(101);
   });
+  it('passes endTimeMs to Binance public klines', async () => {
+    let requestedUrl = '';
+    const fetcher = (async (input: RequestInfo | URL) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify([row(1_700_000_000_000, '100')]), { status: 200 });
+    }) as typeof fetch;
+    await fetchPublicKlines({ symbol: 'BTCUSDT', interval: '4h', limit: 1, endTimeMs: 1_700_000_000_123 }, fetcher);
+    expect(requestedUrl).toContain('endTime=1700000000123');
+  });
   it('validates interval, limit and maps provider status codes', async () => {
     await expect(fetchPublicKlines({ symbol: 'BTCUSDT', interval: '1d', limit: 10 }, okFetch([]))).rejects.toThrow('PUBLIC_MARKET_DATA_INVALID_INTERVAL');
     await expect(fetchPublicKlines({ symbol: 'BTCUSDT', interval: '1h', limit: 5000 }, okFetch([]))).rejects.toThrow('PUBLIC_MARKET_DATA_INVALID_LIMIT');
