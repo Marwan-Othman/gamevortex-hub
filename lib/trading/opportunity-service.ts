@@ -154,6 +154,11 @@ export async function getConsumedOwnerApproval(input: {
   ownerId: string;
   approvalId: string;
   opportunityId: string;
+  /**
+   * Monitoring/settlement of an ALREADY OPEN live position must keep working
+   * after the approval window ends. Never set this for a new order.
+   */
+  allowExpired?: boolean;
 }): Promise<ConsumedOwnerApproval> {
   if (!input.ownerId.trim() || !input.approvalId.trim() || !input.opportunityId.trim()) {
     throw new Error("INVALID_APPROVAL_INPUT");
@@ -179,7 +184,7 @@ export async function getConsumedOwnerApproval(input: {
   if (approval.status !== "CONSUMED" || !approval.consumedAt) {
     throw new Error("OWNER_APPROVAL_NOT_CONSUMED");
   }
-  if (approval.expiresAt.getTime() <= Date.now()) {
+  if (!input.allowExpired && approval.expiresAt.getTime() <= Date.now()) {
     throw new Error("APPROVAL_EXPIRED");
   }
   if (approval.shariahStatus !== "APPROVED") {

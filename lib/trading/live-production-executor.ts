@@ -13,7 +13,19 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getBinanceLivePreflight } from "@/lib/trading/binance-live-preflight";
-import { assertBinanceLiveBuyRules, assertBinanceLiveProtectedExitRules } from "@/lib/trading/binance-live-symbol-rules";
+import {
+  assertBinanceLiveBuyRules,
+  assertBinanceLiveProtectedExitRules,
+  getBinanceLiveSymbolRules,
+} from "@/lib/trading/binance-live-symbol-rules";
+import { attemptEmergencyExit } from "@/lib/trading/live-emergency-exit";
+import { computeSellableQuantity } from "@/lib/trading/live-sellable-quantity";
+import {
+  DEFAULT_LIVE_MAX_SLIPPAGE_PERCENT,
+  evaluateBuySlippage,
+  isObservationFresh,
+  resolveMaxSlippagePercent,
+} from "@/lib/trading/live-slippage";
 import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
 import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
@@ -270,29 +282,73 @@ async function protectFilledOrder(
   if (order.status !== "PROTECTION_PENDING") throw new Error("LIVE_ORDER_NOT_READY_FOR_PROTECTION");
 
   const fillPrice = order.averageFillPrice?.toNumber() ?? order.entryPrice.toNumber();
-  const quantity = order.executedQty?.toString();
-  if (!quantity || Number(quantity) <= 0) throw new Error("LIVE_FILLED_QUANTITY_REQUIRED");
+  const filledQuantity = order.executedQty?.toFixed();
+  if (!filledQuantity || Number(filledQuantity) <= 0) throw new Error("LIVE_FILLED_QUANTITY_REQUIRED");
 
-  const prices = buildProtectedPrices(fillPrice, snapshot);
-  await assertBinanceLiveProtectedExitRules({
-    symbol: order.symbol,
-    quantity: Number(quantity),
-    takeProfitPrice: Number(prices.takeProfitPrice),
-    stopLossPrice: Number(prices.stopLossPrice),
-    stopLimitPrice: Number(prices.stopLimitPrice),
-  });
-
-  const plan = buildProtectedExitPlan({
-    symbol: order.symbol,
-    entryClientOrderId: order.clientOrderId,
-    filledQuantity: quantity,
-    entryPrice: fillPrice,
-    takeProfitPrice: prices.takeProfitPrice,
-    stopLossPrice: prices.stopLossPrice,
-    stopLimitPrice: prices.stopLimitPrice,
-  });
-
+  // Post-fill slippage: the position is already open, so this never blocks
+  // protection. It stops NEW orders (circuit breaker) and leaves an audit trail.
+  let postFillLimit = DEFAULT_LIVE_MAX_SLIPPAGE_PERCENT;
   try {
+    postFillLimit = resolveMaxSlippagePercent(process.env.TRADING_LIVE_MAX_SLIPPAGE_PERCENT);
+  } catch {
+    // A misconfigured limit must never prevent protecting an open position.
+  }
+  const fillSlippage = evaluateBuySlippage({
+    expectedPrice: order.entryPrice.toNumber(),
+    observedPrice: fillPrice,
+    maxPercent: postFillLimit,
+  });
+  if (!fillSlippage.allowed) {
+    await tripCircuitBreaker({
+      ownerId,
+      reason: "ORDER_FAILURE",
+      detail: `FILL_SLIPPAGE_EXCEEDED:${fillSlippage.slippagePercent.toFixed(4)}>${postFillLimit}`,
+    }).catch(() => undefined);
+    await audit(ownerId, "TRADING_LIVE_FILL_SLIPPAGE_EXCEEDED", order, {
+      expectedPrice: order.entryPrice.toString(),
+      fillPrice,
+      slippagePercent: fillSlippage.slippagePercent,
+      maxPercent: postFillLimit,
+    });
+  }
+
+  let emergencyQuantity = filledQuantity;
+  try {
+    if (!order.providerOrderId) throw new Error("LIVE_ENTRY_PROVIDER_ORDER_ID_REQUIRED");
+
+    // Binance may charge the BUY fee in the base asset, so only the net,
+    // step-floored quantity can be sold. Using executedQty would be rejected.
+    const [entryFills, symbolRules] = await Promise.all([
+      adapter.getOrderTradeFills({ symbol: order.symbol, providerOrderId: order.providerOrderId }),
+      getBinanceLiveSymbolRules(order.symbol),
+    ]);
+    const quantity = computeSellableQuantity({
+      executedQty: filledQuantity,
+      baseAsset: entryFills.baseAsset,
+      fees: entryFills.fills.map((fill) => ({ commission: fill.commission, commissionAsset: fill.commissionAsset })),
+      stepSize: symbolRules.stepSize === null ? null : symbolRules.stepSize.toFixed(12),
+    });
+    emergencyQuantity = quantity;
+
+    const prices = buildProtectedPrices(fillPrice, snapshot);
+    await assertBinanceLiveProtectedExitRules({
+      symbol: order.symbol,
+      quantity: Number(quantity),
+      takeProfitPrice: Number(prices.takeProfitPrice),
+      stopLossPrice: Number(prices.stopLossPrice),
+      stopLimitPrice: Number(prices.stopLimitPrice),
+    });
+
+    const plan = buildProtectedExitPlan({
+      symbol: order.symbol,
+      entryClientOrderId: order.clientOrderId,
+      filledQuantity: quantity,
+      entryPrice: fillPrice,
+      takeProfitPrice: prices.takeProfitPrice,
+      stopLossPrice: prices.stopLossPrice,
+      stopLimitPrice: prices.stopLimitPrice,
+    });
+
     const protection = await adapter.placeProtectedExitOco!({
       symbol: plan.symbol,
       quantity: plan.quantity,
@@ -325,6 +381,7 @@ async function protectFilledOrder(
       protectionOrderId: protection.orderListId,
       stopLossOrderId: updated.stopLossOrderId,
       takeProfitOrderId: updated.takeProfitOrderId,
+      protectedQuantity: quantity,
     });
 
     return updated;
@@ -333,7 +390,33 @@ async function protectFilledOrder(
     const failed = await markLiveOrderProtectionFailed(order.id, reason).catch(() => order);
     await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: reason }).catch(() => undefined);
     await audit(ownerId, "TRADING_LIVE_PROTECTION_FAILED", failed, { reason });
-    throw new Error(`LIVE_PROTECTION_FAILED:${reason}`);
+
+    // The position is filled but NOT protected: try once to flatten it. This
+    // never credits a wallet; settlement of an emergency exit stays manual.
+    const emergency = await attemptEmergencyExit({
+      adapter,
+      symbol: order.symbol,
+      entryClientOrderId: order.clientOrderId,
+      quantity: emergencyQuantity,
+    });
+    await audit(
+      ownerId,
+      emergency.status === "SOLD" ? "TRADING_LIVE_EMERGENCY_EXIT_SOLD" : "TRADING_LIVE_EMERGENCY_EXIT_FAILED",
+      failed,
+      emergency.status === "SOLD"
+        ? {
+            clientOrderId: emergency.clientOrderId,
+            providerOrderId: emergency.providerOrderId,
+            executedQty: emergency.executedQty,
+            cumulativeQuoteQty: emergency.cumulativeQuoteQty,
+            quantity: emergencyQuantity,
+          }
+        : { clientOrderId: emergency.clientOrderId, reason: emergency.reason, quantity: emergencyQuantity },
+    ).catch(() => undefined);
+
+    throw new Error(
+      `LIVE_PROTECTION_FAILED:${reason}:EMERGENCY_EXIT_${emergency.status}:MANUAL_REVIEW_REQUIRED`,
+    );
   }
 }
 
@@ -341,42 +424,59 @@ export async function executeApprovedLiveOrder(input: {
   ownerId: string;
   approvalId: string;
   opportunityId: string;
+  /**
+   * "execute" (default) may submit a new BUY. "monitor" only reconciles,
+   * protects and settles an order that already exists: it can never submit a
+   * BUY, and it keeps working while the emergency stop / circuit breaker is
+   * active and after the approval window ends, because those states must not
+   * stop an open position from being reconciled.
+   */
+  mode?: "execute" | "monitor";
 }): Promise<LiveExecutionResult> {
+  const monitorOnly = input.mode === "monitor";
   const ownerId = input.ownerId.trim();
   const approvalId = input.approvalId.trim();
   const opportunityId = input.opportunityId.trim();
   if (!ownerId || !approvalId || !opportunityId) throw new Error("INVALID_LIVE_EXECUTION_INPUT");
 
-  const controlResult = await getTradingControl(ownerId);
-  const blockers = controlBlockReasons(controlResult.control);
-  if (blockers.length > 0) throw new Error(`TRADING_CONTROL_BLOCKED:${blockers.join(",")}`);
+  if (!monitorOnly) {
+    const controlResult = await getTradingControl(ownerId);
+    const blockers = controlBlockReasons(controlResult.control);
+    if (blockers.length > 0) throw new Error(`TRADING_CONTROL_BLOCKED:${blockers.join(",")}`);
 
-  const preflight = await getBinanceLivePreflight();
-  if (!preflight.readyForLiveExecution) {
-    throw new Error(`BINANCE_LIVE_PREFLIGHT_BLOCKED:${preflight.blockers.join(",")}`);
+    const preflight = await getBinanceLivePreflight();
+    if (!preflight.readyForLiveExecution) {
+      throw new Error(`BINANCE_LIVE_PREFLIGHT_BLOCKED:${preflight.blockers.join(",")}`);
+    }
   }
 
-  const approval = await getConsumedOwnerApproval({ ownerId, approvalId, opportunityId });
+  const approval = await getConsumedOwnerApproval({ ownerId, approvalId, opportunityId, allowExpired: monitorOnly });
   const amountUsd = approval.amountUsd.toNumber();
   if (!Number.isFinite(amountUsd) || amountUsd < 1) throw new Error("INVALID_APPROVAL_AMOUNT");
 
   const snapshot = parseExecutionSnapshot(approval.executionSnapshot);
   const riskSnapshot = parseRiskSnapshot(approval.riskSnapshot, amountUsd);
-  const riskConfig = await getRiskConfig(ownerId);
-  if (!riskConfig || !riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
+  if (!monitorOnly) {
+    const riskConfig = await getRiskConfig(ownerId);
+    if (!riskConfig || !riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
 
-  const riskDecision = evaluateRisk(riskConfig.config, riskSnapshot);
-  if (!riskDecision.allowed) {
-    throw new Error(`LIVE_RISK_BLOCKED:${riskDecision.reasons.join(",")}`);
-  }
+    const riskDecision = evaluateRisk(riskConfig.config, riskSnapshot);
+    if (!riskDecision.allowed) {
+      throw new Error(`LIVE_RISK_BLOCKED:${riskDecision.reasons.join(",")}`);
+    }
 
-  const shariah = await checkAndRecordShariah({ actorUserId: ownerId, asset: snapshot.shariah });
-  if (shariah.decision.status !== "APPROVED") {
-    throw new Error(`LIVE_SHARIAH_BLOCKED:${shariah.decision.reasons.join(",")}`);
+    const shariah = await checkAndRecordShariah({ actorUserId: ownerId, asset: snapshot.shariah });
+    if (shariah.decision.status !== "APPROVED") {
+      throw new Error(`LIVE_SHARIAH_BLOCKED:${shariah.decision.reasons.join(",")}`);
+    }
   }
 
   const existingKey = `${LIVE_IDEMPOTENCY_PREFIX}${approval.id}`;
   let order = await getLiveOrderByIdempotencyKey(existingKey);
+
+  if (monitorOnly && (!order || order.status === "INTENT_CREATED")) {
+    throw new Error("LIVE_MONITOR_NO_ACTIVE_ORDER");
+  }
 
   if (!order) {
     order = await createLiveOrderIntent({
@@ -409,6 +509,14 @@ export async function executeApprovedLiveOrder(input: {
     return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
   }
 
+  if (order.status === "PROTECTION_PENDING") {
+    // Filled but not yet protected (for example the process stopped right
+    // after the fill). Protecting reduces risk, so it is allowed in both modes.
+    order = await protectFilledOrder(ownerId, order, snapshot, adapter);
+    const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
+    return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
+  }
+
   if (order.status === "SUBMITTED" || order.status === "PARTIALLY_FILLED" || order.status === "UNKNOWN" || order.status === "SUBMITTING") {
     try {
       const observation = await adapter.getOrderStatus!({ symbol: order.symbol, clientOrderId: order.clientOrderId });
@@ -432,11 +540,42 @@ export async function executeApprovedLiveOrder(input: {
       }
       return result(order);
     } catch (error) {
+      // Protection failures are already recorded as PROTECTION_FAILED (with an
+      // emergency exit attempt). Do not overwrite that with UNKNOWN.
+      if (error instanceof Error && error.message.startsWith("LIVE_PROTECTION_FAILED:")) throw error;
       return failUnknown(ownerId, order, error);
     }
   }
 
   if (order.status !== "INTENT_CREATED") throw new Error(`LIVE_ORDER_STATE_NOT_EXECUTABLE:${order.status}`);
+
+  // Pre-trade guard. Runs BEFORE any state change or exchange call, so a
+  // blocked order stays INTENT_CREATED and nothing is sent to Binance.
+  // An invalid TRADING_LIVE_MAX_SLIPPAGE_PERCENT throws here, which blocks
+  // the BUY (fail closed) instead of silently using a looser limit.
+  const maxSlippagePercent = resolveMaxSlippagePercent(process.env.TRADING_LIVE_MAX_SLIPPAGE_PERCENT);
+  const marketNow = await adapter.getMarketData({ symbol: order.symbol, interval: "1m", limit: 1 });
+  const latestCandle = marketNow.candles[marketNow.candles.length - 1];
+  if (!latestCandle || !isObservationFresh(latestCandle.timestamp, Date.now(), 180_000)) {
+    throw new Error("LIVE_MARKET_DATA_STALE");
+  }
+  const entrySlippage = evaluateBuySlippage({
+    expectedPrice: order.entryPrice.toNumber(),
+    observedPrice: latestCandle.close,
+    maxPercent: maxSlippagePercent,
+  });
+  if (!entrySlippage.allowed) {
+    await audit(ownerId, "TRADING_LIVE_BUY_BLOCKED_BY_SLIPPAGE", order, {
+      expectedPrice: order.entryPrice.toString(),
+      observedPrice: latestCandle.close,
+      slippagePercent: entrySlippage.slippagePercent,
+      maxPercent: maxSlippagePercent,
+      reason: entrySlippage.reason ?? null,
+    }).catch(() => undefined);
+    throw new Error(
+      `LIVE_SLIPPAGE_BLOCKED:${entrySlippage.reason ?? "UNKNOWN"}:${Number.isFinite(entrySlippage.slippagePercent) ? entrySlippage.slippagePercent.toFixed(4) : "NaN"}%>${maxSlippagePercent}%`,
+    );
+  }
 
   try {
     await assertBinanceLiveBuyRules({
@@ -501,6 +640,7 @@ export async function executeApprovedLiveOrder(input: {
     return result(order);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("LIVE_RECONCILIATION_MISMATCH:")) throw error;
+    if (error instanceof Error && error.message.startsWith("LIVE_PROTECTION_FAILED:")) throw error;
     return failUnknown(ownerId, order, error);
   }
 }

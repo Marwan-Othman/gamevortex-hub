@@ -6,6 +6,8 @@ import type {
 } from "@/lib/trading/exchange-adapter";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
 import { reconcileLiveSpotFees } from "@/lib/trading/live-fee-accounting";
+import { getBinanceLiveSymbolRules } from "@/lib/trading/binance-live-symbol-rules";
+import { computeSellableQuantity } from "@/lib/trading/live-sellable-quantity";
 
 const QUANTITY_TOLERANCE = new Prisma.Decimal("0.000000000001");
 
@@ -177,6 +179,35 @@ async function reconcileTradeFees(input: {
   return feeResult.netRealizedPnlUsd;
 }
 
+/**
+ * The protective OCO can only sell what is actually in the wallet: the entry
+ * quantity minus any BASE-asset commission, floored to the symbol step. The
+ * "exit covers entry" checks must use that same quantity, otherwise a correct
+ * exit would be reported as an unsettled position whenever Binance charged the
+ * BUY fee in the base asset.
+ */
+async function resolveEntryCoverageQuantity(
+  order: LiveOrderRow,
+  entryQty: Prisma.Decimal,
+  adapter: ExchangeAdapter,
+): Promise<Prisma.Decimal> {
+  const fillAdapter = adapter as TradeFillAdapter;
+  if (!fillAdapter.getOrderTradeFills || !order.providerOrderId) throw new Error("LIVE_TRADE_FILL_ADAPTER_REQUIRED");
+
+  const [fills, rules] = await Promise.all([
+    fillAdapter.getOrderTradeFills({ symbol: order.symbol, providerOrderId: order.providerOrderId }),
+    getBinanceLiveSymbolRules(order.symbol),
+  ]);
+
+  const net = computeSellableQuantity({
+    executedQty: entryQty.toFixed(),
+    baseAsset: fills.baseAsset,
+    fees: fills.fills.map((fill) => ({ commission: fill.commission, commissionAsset: fill.commissionAsset })),
+    stepSize: rules.stepSize === null ? null : rules.stepSize.toFixed(12),
+  });
+  return new Prisma.Decimal(net);
+}
+
 export async function reconcileProtectedExitSettlement(input: {
   order: LiveOrderRow;
   adapter: ExchangeAdapter;
@@ -287,6 +318,9 @@ export async function reconcileProtectedExitSettlement(input: {
     (total, leg) => total.add(decimal(leg.executedQty, "INVALID_EXIT_EXECUTED_QTY")),
     new Prisma.Decimal(0),
   );
+  const coverageQty = exitQty.greaterThan(0)
+    ? await resolveEntryCoverageQuantity(order, entryQty, adapter)
+    : entryQty;
   const filledLegs = legs.filter((leg) => leg.status === "FILLED");
   const activeLegs = legs.filter((leg) => active(leg.status));
   const terminalLegs = legs.filter((leg) => terminal(leg.status));
@@ -313,7 +347,7 @@ export async function reconcileProtectedExitSettlement(input: {
     };
   }
 
-  if (filledLegs.length === 1 && activeLegs.length === 0 && terminalLegs.length === 2 && almostAtLeast(exitQty, entryQty)) {
+  if (filledLegs.length === 1 && activeLegs.length === 0 && terminalLegs.length === 2 && almostAtLeast(exitQty, coverageQty)) {
     const filled = filledLegs[0];
     const otherLegs = legs.filter((leg) => leg.clientOrderId !== filled.clientOrderId);
     if (!otherLegs.every((leg) => leg.status === "CANCELED" || leg.status === "EXPIRED")) {
@@ -420,7 +454,7 @@ export async function reconcileProtectedExitSettlement(input: {
     };
   }
 
-  if (terminalLegs.length === 2 && exitQty.lessThan(entryQty)) {
+  if (terminalLegs.length === 2 && exitQty.lessThan(coverageQty)) {
     const blocked = await markBlocked(order.id, "OCO_CLOSED_WITH_UNSETTLED_POSITION");
     return {
       order: blocked,

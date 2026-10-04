@@ -225,6 +225,22 @@ export async function getLiveOrderByIdempotencyKey(
   return rows[0] ?? null;
 }
 
+/**
+ * Open live orders that still need provider reconciliation, protection or
+ * settlement. INTENT_CREATED is deliberately excluded: the monitor must never
+ * be able to submit a new BUY.
+ */
+export async function listMonitorableLiveOrders(limit = 10): Promise<LiveOrderRow[]> {
+  const safeLimit = Number.isInteger(limit) && limit > 0 && limit <= 50 ? limit : 10;
+  return db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+    SELECT * FROM "TradingLiveOrder"
+    WHERE "status" IN ('SUBMITTING', 'SUBMITTED', 'PARTIALLY_FILLED', 'UNKNOWN', 'PROTECTION_PENDING', 'PROTECTED', 'CLOSED')
+      AND "settlementStatus" IS DISTINCT FROM 'SETTLED'
+    ORDER BY "updatedAt" ASC
+    LIMIT ${safeLimit}
+  `);
+}
+
 export async function getLiveOrderByClientOrderId(
   clientOrderId: string,
 ): Promise<LiveOrderRow | null> {

@@ -18,6 +18,8 @@ import {
   validateExchangeMarketDataRequest,
   validateExchangeOrderRequest,
   type ExchangeAdapter,
+  type ExchangeEmergencySellRequest,
+  type ExchangeEmergencySellResult,
   type ExchangeMarketDataRequest,
   type ExchangeMarketDataResponse,
   type ExchangeOrderRequest,
@@ -374,6 +376,46 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
         executedQty !== undefined && executedQty > 0 && cumulativeQuoteQty !== undefined
           ? cumulativeQuoteQty / executedQty
           : undefined,
+    };
+  }
+
+  async placeEmergencyMarketSell(request: ExchangeEmergencySellRequest): Promise<ExchangeEmergencySellResult> {
+    this.requireLiveExecution();
+    const clientOrderId = normalizeClientOrderId(request.clientOrderId, "INVALID_BINANCE_LIVE_CLIENT_ORDER_ID");
+    const symbol = normalizeProviderSymbol(request.symbol, this.symbolMap);
+    const quantity = request.quantity.trim();
+    if (!/^\d+(\.\d+)?$/.test(quantity) || Number(quantity) <= 0) throw new Error("INVALID_BINANCE_LIVE_EMERGENCY_SELL_QUANTITY");
+
+    const payload = (await this.signedRequest("POST", "/api/v3/order", {
+      symbol,
+      side: "SELL",
+      type: "MARKET",
+      quantity,
+      newClientOrderId: clientOrderId,
+      newOrderRespType: "FULL",
+      recvWindow: this.recvWindow,
+      timestamp: Date.now(),
+    })) as BinanceOrderResponse;
+
+    if (typeof payload.orderId !== "number" || typeof payload.clientOrderId !== "string" || typeof payload.status !== "string") {
+      throw new Error("BINANCE_LIVE_INVALID_ORDER_RESPONSE");
+    }
+
+    const executedQty = typeof payload.executedQty === "string"
+      ? nonNegativeNumber(payload.executedQty, "BINANCE_LIVE_INVALID_EXECUTED_QTY")
+      : undefined;
+    const cumulativeQuoteQtyRaw = payload.cumulativeQuoteQty ?? payload.cummulativeQuoteQty;
+    const cumulativeQuoteQty = typeof cumulativeQuoteQtyRaw === "string"
+      ? nonNegativeNumber(cumulativeQuoteQtyRaw, "BINANCE_LIVE_INVALID_CUMULATIVE_QUOTE_QTY")
+      : undefined;
+
+    return {
+      accepted: payload.status === "FILLED" || payload.status === "PARTIALLY_FILLED" || payload.status === "NEW",
+      clientOrderId: payload.clientOrderId,
+      providerOrderId: String(payload.orderId),
+      status: payload.status === "FILLED" ? "FILLED" : payload.status === "REJECTED" ? "REJECTED" : "SUBMITTED",
+      executedQty,
+      cumulativeQuoteQty,
     };
   }
 

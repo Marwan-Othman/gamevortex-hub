@@ -56,6 +56,22 @@ export type ExchangeOrderResult = {
   averageFillPrice?: number;
 };
 
+export type ExchangeEmergencySellRequest = {
+  clientOrderId: string;
+  symbol: string;
+  /** Plain decimal string of the sellable base quantity (already net of entry commission and step-floored). */
+  quantity: string;
+};
+
+export type ExchangeEmergencySellResult = {
+  accepted: boolean;
+  clientOrderId: string;
+  providerOrderId?: string;
+  status: "REJECTED" | "SUBMITTED" | "FILLED";
+  executedQty?: number;
+  cumulativeQuoteQty?: number;
+};
+
 export type ExchangeOrderStatusRequest = {
   symbol: string;
   clientOrderId: string;
@@ -136,6 +152,12 @@ export interface ExchangeAdapter {
    * a plan whose price ordering no longer protects the actual filled position.
    */
   placeProtectedExitOco?(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult>;
+
+  /**
+   * Last-resort MARKET SELL of an unprotected filled position when the
+   * protective OCO could not be confirmed. Spot only; never a short.
+   */
+  placeEmergencyMarketSell?(request: ExchangeEmergencySellRequest): Promise<ExchangeEmergencySellResult>;
 
   /**
    * Query one SELL leg of the protective OCO. This is deliberately separate
