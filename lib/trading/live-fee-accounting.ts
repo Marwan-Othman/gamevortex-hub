@@ -112,6 +112,11 @@ export function reconcileLiveSpotFees(input: LiveFeeAccountingInput): LiveFeeAcc
     new Prisma.Decimal(0),
   );
 
+  const entryAverageFillPrice = entryQuote.div(entryQty);
+  const exitAverageFillPrice = exitQuote.div(exitQty);
+  const entryBaseFeeQuoteValue = entry.base.mul(entryAverageFillPrice);
+  const exitBaseFeeQuoteValue = exit.base.mul(exitAverageFillPrice);
+
   const entryNetBaseQty = entryQty.sub(entry.base);
   if (entryNetBaseQty.lessThanOrEqualTo(0)) throw new Error("ENTRY_BASE_QTY_CONSUMED_BY_FEES");
 
@@ -119,8 +124,8 @@ export function reconcileLiveSpotFees(input: LiveFeeAccountingInput): LiveFeeAcc
     throw new Error("EXIT_QTY_EXCEEDS_NET_ENTRY_QTY");
   }
 
-  const netEntryQuoteCost = entryQuote.add(entry.quote);
-  const netExitQuoteProceeds = exitQuote.sub(exit.quote);
+  const netEntryQuoteCost = entryQuote.add(entry.quote).add(entryBaseFeeQuoteValue);
+  const netExitQuoteProceeds = exitQuote.sub(exit.quote).sub(exitBaseFeeQuoteValue);
   const netRealizedPnlUsd = netExitQuoteProceeds.sub(netEntryQuoteCost).sub(thirdAssetFeeQuoteValue);
 
   return {
