@@ -52,13 +52,28 @@ const SAMPLE_CANDLES: Candle[] = [
   { timestamp: "2026-10-01T10:10:00.000Z", open: 102, high: 105, low: 101, close: 104, volume: 1500, fastAverage: 103, slowAverage: 100, averageVolume: 1100 },
 ];
 
+type TestnetCandle = { timestamp: string; open: number; high: number; low: number; close: number; volume: number };
+
+function average(values: number[]): number {
+  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function withAverages(candles: TestnetCandle[]): Candle[] {
+  return candles.map((candle, index) => {
+    const fast = candles.slice(Math.max(0, index - 4), index + 1).map((item) => item.close);
+    const slow = candles.slice(Math.max(0, index - 19), index + 1).map((item) => item.close);
+    const vols = candles.slice(Math.max(0, index - 19), index + 1).map((item) => item.volume);
+    return { ...candle, fastAverage: average(fast), slowAverage: average(slow), averageVolume: average(vols) };
+  });
+}
+
 function numberField(value: string, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 export default function TradingBacktestPanel() {
-  const [symbol, setSymbol] = useState("BTC/USD");
+  const [symbol, setSymbol] = useState("BTC/USDT");
   const [initialCapitalUsd, setInitialCapitalUsd] = useState("100");
   const [tradeAmountUsd, setTradeAmountUsd] = useState("1");
   const [stopLossPercent, setStopLossPercent] = useState("2");
@@ -72,6 +87,29 @@ export default function TradingBacktestPanel() {
     setCandlesJson(JSON.stringify(SAMPLE_CANDLES, null, 2));
     setMessage("تم تحميل بيانات تجريبية فقط. هذه البيانات لا تمثل بيانات سوق حقيقية.");
     setResult(null);
+  }
+
+  async function loadTestnetCandles() {
+    setBusy(true);
+    setMessage(null);
+    setResult(null);
+    try {
+      const response = await fetch(
+        `/api/admin/trading/exchange/testnet/market-data?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=500`,
+        { method: "GET", cache: "no-store" },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(ERROR_TEXT[data.error] ?? "تعذر تحميل بيانات Binance Spot Testnet.");
+        return;
+      }
+      setCandlesJson(JSON.stringify(withAverages(data.candles as TestnetCandle[]), null, 2));
+      setMessage("تم تحميل 500 شمعة (5 دقائق) من Binance Spot Testnet. لم يتم إرسال أي أمر.");
+    } catch {
+      setMessage("تعذر الاتصال بـ Binance Spot Testnet.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function run() {
@@ -157,6 +195,7 @@ export default function TradingBacktestPanel() {
         <label htmlFor="trading-backtest-candles">بيانات الشموع JSON</label>
         <textarea
           id="trading-backtest-candles"
+          dir="ltr"
           value={candlesJson}
           onChange={(event) => setCandlesJson(event.target.value)}
           disabled={busy}
@@ -169,6 +208,7 @@ export default function TradingBacktestPanel() {
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+        <button type="button" className="btn" onClick={loadTestnetCandles} disabled={busy}>تحميل شموع Binance Testnet</button>
         <button type="button" className="btn" onClick={loadSample} disabled={busy}>تحميل بيانات تجريبية</button>
         <button type="button" className="btn" onClick={run} disabled={busy || !candlesJson.trim()}>
           {busy ? "جاري الاختبار..." : "تشغيل Backtest"}

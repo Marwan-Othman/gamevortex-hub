@@ -111,7 +111,7 @@ export function runBacktest(
   config: BacktestConfig,
 ): BacktestResult {
   const normalizedSymbol = symbol.trim().toUpperCase();
-  if (!/^[A-Z0-9._:-]{1,32}$/.test(normalizedSymbol) || candles.length === 0) {
+  if (!/^[A-Z0-9._:\/-]{1,32}$/.test(normalizedSymbol) || candles.length === 0) {
     throw new Error("INVALID_BACKTEST_INPUT");
   }
   validateConfig(config);
