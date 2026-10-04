@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 env:
   DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/gamevortex_ci?schema=public
 
@@ -37,6 +40,21 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Repair package lock if stale
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          if git diff --quiet -- package-lock.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore: sync package lock"
+          git push origin "HEAD:${{ github.head_ref }}"
+          echo "package-lock.json was stale; a synchronized lockfile was pushed to the PR branch. The workflow will rerun on the new commit."
+          exit 1
 
       - name: Stage 0 - npm ci
         run: npm ci
