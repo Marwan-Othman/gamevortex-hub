@@ -96,6 +96,20 @@ export const PAPER_SIMULATION_SHARIAH_POLICY: ShariahPolicy = {
   financialScreeningNotApplicableAssetTypes: ["DIGITAL_ASSET"],
 };
 
+/**
+ * Live policy for SPOT digital-asset trading, reviewed by the ACCOUNT OWNER
+ * personally (not by a scholar). Company-style debt/interest ratios do not
+ * exist for spot digital assets, so ratio screening is skipped for them.
+ * Margin, futures and unverified ownership/settlement are still blocked.
+ * It stays fail-closed: orders are impossible until a ShariahPolicy row with
+ * this exact version is inserted as ACTIVE with reviewedAt set.
+ */
+export const OWNER_SPOT_POLICY: ShariahPolicy = {
+  ...DEFAULT_SHARIAH_POLICY,
+  version: "owner-spot-v1",
+  financialScreeningNotApplicableAssetTypes: ["DIGITAL_ASSET"],
+};
+
 const DEFAULT_ALLOWED_METHODS: readonly TradingMethod[] = ["SPOT"];
 
 function normalized(value: string | undefined): string {

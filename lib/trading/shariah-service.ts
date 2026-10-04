@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../prisma";
 import {
-  DEFAULT_SHARIAH_POLICY,
+  OWNER_SPOT_POLICY,
   applyPolicyReviewGate,
   evaluateShariah,
   type ShariahAssetInput,
@@ -14,7 +14,7 @@ import {
  * inactive policy can never yield APPROVED.
  */
 export async function checkAndRecordShariah(input: { actorUserId: string; asset: ShariahAssetInput }) {
-  const policy = DEFAULT_SHARIAH_POLICY;
+  const policy = OWNER_SPOT_POLICY;
 
   const policyRow = await db.shariahPolicy.findUnique({ where: { version: policy.version } });
   if (!policyRow) throw new Error("SHARIAH_POLICY_NOT_FOUND");

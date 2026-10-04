@@ -23,3 +23,20 @@ describe('paper simulation Shariah policy', () => {
     expect(evaluateShariah(spot, DEFAULT_SHARIAH_POLICY).status).toBe('REVIEW');
   });
 });
+
+import { OWNER_SPOT_POLICY, applyPolicyReviewGate } from '../lib/trading/shariah';
+
+describe('owner spot live policy', () => {
+  const reviewed = { status: 'ACTIVE' as const, reviewedAt: new Date() };
+  it('approves verified spot DIGITAL_ASSET only once the policy row is ACTIVE and reviewed', () => {
+    const raw = evaluateShariah(spot, OWNER_SPOT_POLICY);
+    expect(raw.status).toBe('APPROVED');
+    expect(applyPolicyReviewGate(raw, reviewed).status).toBe('APPROVED');
+    expect(applyPolicyReviewGate(raw, { status: 'INACTIVE', reviewedAt: null }).status).toBe('REVIEW');
+    expect(applyPolicyReviewGate(raw, null).status).toBe('REVIEW');
+  });
+  it('still blocks unverified ownership and futures', () => {
+    expect(evaluateShariah({ ...spot, ownershipSettlementVerified: false }, OWNER_SPOT_POLICY).status).toBe('REVIEW');
+    expect(evaluateShariah({ ...spot, tradingMethod: 'FUTURES' }, OWNER_SPOT_POLICY).status).toBe('REJECTED');
+  });
+});
