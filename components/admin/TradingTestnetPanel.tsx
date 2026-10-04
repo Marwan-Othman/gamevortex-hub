@@ -112,7 +112,7 @@ export default function TradingTestnetPanel() {
           {account && (
             <div style={{ marginTop: 10 }}>
               <div>Spot Trading: {account.canTrade ? "مفعّل" : "غير مفعّل"}</div>
-              <div>Withdraw: {account.canWithdraw ? "مفعّل — مرفوض" : "معطّل"}</div>
+              <div>Withdraw: {account.canWithdraw ? "مفعّل (Testnet: أموال وهمية لا يمكن سحبها)" : "معطّل"}</div>
               <div>Deposit: {account.canDeposit ? "مفعّل" : "غير مفعّل"}</div>
               <div>Account: {account.accountType}</div>
               <div>Permissions: {account.permissions.join(", ") || "لا توجد"}</div>

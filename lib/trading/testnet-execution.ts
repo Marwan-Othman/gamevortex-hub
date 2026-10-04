@@ -83,7 +83,7 @@ export async function executeOwnerBinanceSpotTestnetBuy(
 
   if (!isSpotAccount) throw new Error("BINANCE_TESTNET_SPOT_ACCOUNT_REQUIRED");
   if (!account.canTrade) throw new Error("BINANCE_TESTNET_TRADING_DISABLED");
-  if (account.canWithdraw) throw new Error("BINANCE_TESTNET_WITHDRAWALS_MUST_BE_DISABLED");
+  // Spot Testnet keys cannot disable the withdraw flag and its funds are virtual (non-transferable), so this check is not applied to Testnet. It is still enforced for live trading (binance-live-preflight / live-execution-gate).
   if (!hasSpotPermission) throw new Error("BINANCE_TESTNET_SPOT_PERMISSION_REQUIRED");
 
   const order = await adapter.placeSpotBuy({

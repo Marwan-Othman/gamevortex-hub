@@ -19,7 +19,6 @@ export async function GET() {
     const readyForTestnetOrder =
       isSpotAccount &&
       account.canTrade &&
-      !account.canWithdraw &&
       hasSpotPermission;
 
     return NextResponse.json({

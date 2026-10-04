@@ -101,7 +101,6 @@ export async function POST(request: NextRequest) {
     const readyForTestnetOrder =
       isSpotAccount &&
       account.canTrade &&
-      !account.canWithdraw &&
       hasSpotPermission;
 
     return NextResponse.json({
