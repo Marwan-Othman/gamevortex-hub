@@ -19,7 +19,7 @@ describe("reconcileLiveSpotFees", () => {
     expect(result.netRealizedPnlUsd.toString()).toBe("9.79");
   });
 
-  it("reduces the available base quantity when the entry commission is paid in base", () => {
+  it("values base-asset commissions at their actual fill prices", () => {
     const result = reconcileLiveSpotFees({
       baseAsset: "BTC",
       quoteAsset: "USDT",
@@ -33,7 +33,9 @@ describe("reconcileLiveSpotFees", () => {
 
     expect(result.entryBaseCommission.toString()).toBe("0.00001");
     expect(result.exitBaseCommission.toString()).toBe("0.00001");
-    expect(result.netRealizedPnlUsd.toString()).toBe("9.89");
+    expect(result.netEntryQuoteCost.toString()).toBe("100.1");
+    expect(result.netExitQuoteProceeds.toString()).toBe("109.78");
+    expect(result.netRealizedPnlUsd.toString()).toBe("9.68");
   });
 
   it("requires an exact quote conversion for a third-asset commission", () => {
