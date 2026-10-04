@@ -82,7 +82,7 @@ const WARMUP = 200;
 const MIN_CANDLES = 600;
 const TRAIN_RATIO = 0.7;
 const MAX_HOLD_CANDLES = 100;
-const MIN_TRADES = 5;
+const MIN_TRADES = 15;
 const TOP_ROWS = 10;
 
 const MA_PAIRS: ReadonlyArray<readonly [number, number]> = [[5, 20], [10, 30], [20, 50]];
@@ -352,7 +352,7 @@ export function runStrategyLab(
     const trainPositiveSymbols = perSymbol.filter((r) => r.train.returnPercent > 0).length;
     const testPositiveSymbols = perSymbol.filter((r) => r.test.returnPercent > 0).length;
     const minTrades = Math.min(...perSymbol.flatMap((r) => [r.train.trades, r.test.trades]));
-    const needed = Math.min(2, n);
+    const needed = Math.floor(n / 2) + 1;
     const robust =
       avgTrainReturn > 0 && avgTestReturn > 0 &&
       trainPositiveSymbols >= needed && testPositiveSymbols >= needed &&
