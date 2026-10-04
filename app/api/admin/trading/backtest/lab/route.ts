@@ -16,6 +16,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   PUBLIC_MARKET_DATA_INVALID_SYMBOL: 400,
   PUBLIC_MARKET_DATA_INVALID_INTERVAL: 400,
   PUBLIC_MARKET_DATA_INVALID_LIMIT: 400,
+  PUBLIC_MARKET_DATA_INVALID_END_TIME: 400,
   PUBLIC_MARKET_DATA_SYMBOL_NOT_FOUND: 404,
   PUBLIC_MARKET_DATA_RATE_LIMITED: 429,
   PUBLIC_MARKET_DATA_REGION_BLOCKED: 502,
@@ -32,6 +33,13 @@ function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function parseEndTime(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Date.parse(String(value));
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error("PUBLIC_MARKET_DATA_INVALID_END_TIME");
+  return parsed;
+}
+
 export async function POST(request: NextRequest) {
   const blocked = await guardMutation(request, "admin:trading:backtest:lab", 5);
   if (blocked) return blocked;
@@ -46,6 +54,7 @@ export async function POST(request: NextRequest) {
     if (!INTERVALS.has(interval)) throw new Error("PUBLIC_MARKET_DATA_INVALID_INTERVAL");
     const count = Math.trunc(numberOr(body.candles, 5000));
     if (count < 1000 || count > 5000) throw new Error("PUBLIC_MARKET_DATA_INVALID_LIMIT");
+    const endTimeMs = parseEndTime(body.endTimeMs ?? body.endTime);
 
     const symbolsInput = Array.isArray(body.symbols) && body.symbols.length > 0 ? body.symbols : DEFAULT_SYMBOLS;
     if (symbolsInput.length > 4) throw new Error("INVALID_BACKTEST_INPUT");
@@ -59,11 +68,11 @@ export async function POST(request: NextRequest) {
     };
 
     const datasets = await Promise.all(
-      symbols.map(async (symbol) => ({ symbol, candles: await fetchPublicKlinesPaged(symbol, interval, count) })),
+      symbols.map(async (symbol) => ({ symbol, candles: await fetchPublicKlinesPaged(symbol, interval, count, endTimeMs) })),
     );
     const result = runStrategyLab(datasets, config);
 
-    return NextResponse.json({ ok: true, mode: "STRATEGY_LAB", researchOnly: true, symbols, interval, result });
+    return NextResponse.json({ ok: true, mode: "STRATEGY_LAB", researchOnly: true, symbols, interval, endTimeMs: endTimeMs ?? null, result });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     if (STATUS_BY_CODE[code]) return NextResponse.json({ error: code }, { status: STATUS_BY_CODE[code] });
