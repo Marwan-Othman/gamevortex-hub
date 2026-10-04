@@ -22,11 +22,21 @@ describe('strategy lab', () => {
   });
   it('ranks by train only and returns benchmarks', () => {
     const r = runStrategyLab([{ symbol: 'A', candles: series(1) }, { symbol: 'B', candles: series(2) }], config);
-    const qualified = r.rows.filter((x) => Math.min(...x.perSymbol.map((p) => p.train.trades)) >= 5);
+    const qualified = r.rows.filter((x) => Math.min(...x.perSymbol.map((p) => p.train.trades)) >= 15);
     const trains = qualified.map((x) => x.avgTrainReturn);
     expect([...trains].sort((a, b) => b - a)).toEqual(trains);
     expect(r.benchmarks).toHaveLength(2);
     expect(r.trainCandles).toBeGreaterThan(r.testCandles);
+  });
+  it('requires 15 trades and a majority of symbols for robustness', () => {
+    const r = runStrategyLab([{ symbol: 'A', candles: series(1) }, { symbol: 'B', candles: series(2) }], config);
+    for (const row of r.rows.filter((x) => x.robust)) {
+      expect(row.minTrades).toBeGreaterThanOrEqual(15);
+      expect(row.trainPositiveSymbols).toBeGreaterThan(1);
+      expect(row.testPositiveSymbols).toBeGreaterThan(1);
+      expect(row.avgTrainReturn).toBeGreaterThan(0);
+      expect(row.avgTestReturn).toBeGreaterThan(0);
+    }
   });
   it('rejects short data and invalid config', () => {
     expect(() => runStrategyLab([{ symbol: 'A', candles: series(1, 100) }], config)).toThrow('INVALID_BACKTEST_INPUT');
