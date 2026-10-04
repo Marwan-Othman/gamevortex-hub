@@ -80,12 +80,20 @@ export default function WalletClient() {
 
         <article className="glass card">
           <span className="badge">إضافة أموال</span>
-          <h2>أضف إلى المحفظة</h2>
+          <h2>تعبئة المحفظة بالفيزا</h2>
+          <p className="muted" style={{ marginTop: 6 }}>
+            ادفع بأمان باستخدام بطاقة Visa أو بطاقة دفع مدعومة. سيتم فتح صفحة الدفع الآمنة لدى مزود الدفع، ولن تمر بيانات البطاقة عبر خادم GameVortex.
+          </p>
           <div className="gv-wallet-actions gv-wallet-amounts">
             {[1, 5, 10, 50, 100].map((value) => <button key={value} className="btn" type="button" onClick={() => setAmount(String(value))}>${value}</button>)}
           </div>
-          <input className="input" style={{ marginTop: 12 }} type="number" min="1" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
-          <button className="btn" style={{ marginTop: 10 }} type="button" disabled={loading} onClick={() => void deposit()}>{loading ? "جارٍ إنشاء الدفع..." : "إضافة الأموال"}</button>
+          <input className="input" style={{ marginTop: 12 }} type="number" min="1" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} aria-label="مبلغ تعبئة المحفظة بالدولار" />
+          <button className="btn" style={{ marginTop: 10 }} type="button" disabled={loading} onClick={() => void deposit()}>
+            {loading ? "جارٍ فتح الدفع الآمن..." : "الدفع بالفيزا وإضافة الأموال"}
+          </button>
+          <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
+            الحد الأدنى $1.00. لا نطلب رقم البطاقة أو CVV داخل GameVortex.
+          </p>
           {message && <p className="muted" style={{ marginTop: 10, overflowWrap: "anywhere" }}>{message}</p>}
         </article>
       </section>
