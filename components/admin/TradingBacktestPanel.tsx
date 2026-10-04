@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import styles from "../../app/admin/admin.module.css";
+import TradingStrategyLabPanel from "./TradingStrategyLabPanel";
 
 type BacktestTrade = {
   entryTime: string;
@@ -266,6 +267,7 @@ export default function TradingBacktestPanel() {
   }
 
   return (
+    <>
     <section className={styles.panel}>
       <div className={styles.panelHead}>
         <span>Backtesting</span>
@@ -432,5 +434,7 @@ export default function TradingBacktestPanel() {
         </>
       ) : null}
     </section>
+    <TradingStrategyLabPanel />
+    </>
   );
 }

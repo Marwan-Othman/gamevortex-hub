@@ -100,3 +100,27 @@ export async function fetchPublicKlines(
   });
   return { symbol, interval, candles };
 }
+
+/** Pages backwards through public klines until `total` candles (max 5000) are collected. */
+export async function fetchPublicKlinesPaged(
+  symbol: string,
+  interval: string,
+  total: number,
+  fetcher: typeof fetch = fetch,
+): Promise<MarketCandle[]> {
+  if (!Number.isInteger(total) || total < 1 || total > 5_000) throw new Error("PUBLIC_MARKET_DATA_INVALID_LIMIT");
+  const byTime = new Map<string, MarketCandle>();
+  let endTimeMs: number | undefined;
+  for (let page = 0; page < 7 && byTime.size < total; page += 1) {
+    const batch = await fetchPublicKlines(
+      { symbol, interval, limit: Math.min(1_000, total - byTime.size), endTimeMs },
+      fetcher,
+    );
+    if (batch.candles.length === 0) break;
+    const before = byTime.size;
+    for (const candle of batch.candles) byTime.set(candle.timestamp, candle);
+    if (byTime.size === before) break;
+    endTimeMs = Math.min(...batch.candles.map((c) => Date.parse(c.timestamp))) - 1;
+  }
+  return Array.from(byTime.values()).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+}
