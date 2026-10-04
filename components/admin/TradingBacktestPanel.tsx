@@ -43,6 +43,11 @@ const ERROR_TEXT: Record<string, string> = {
   INVALID_BACKTEST_INPUT: "بيانات الاختبار غير صالحة.",
   INVALID_BACKTEST_CANDLE: "إحدى شموع السوق غير صالحة.",
   INVALID_BACKTEST_CONFIG: "إعدادات الاختبار غير صالحة.",
+  PUBLIC_MARKET_DATA_INVALID_SYMBOL: "رمز غير صالح. استخدم مثل BTC/USDT أو ETH/USDT.",
+  PUBLIC_MARKET_DATA_SYMBOL_NOT_FOUND: "الرمز غير موجود على Binance.",
+  PUBLIC_MARKET_DATA_RATE_LIMITED: "Binance حدّت الطلبات مؤقتًا. حاول بعد دقيقة.",
+  PUBLIC_MARKET_DATA_REGION_BLOCKED: "Binance تحجب الوصول من منطقة الخادم.",
+  PUBLIC_MARKET_DATA_NETWORK_ERROR: "تعذر الاتصال ببيانات Binance العامة.",
   FORBIDDEN: "غير مصرح.",
   RATE_LIMITED: "تم تجاوز حد الطلبات مؤقتًا.",
 };
@@ -98,6 +103,7 @@ export default function TradingBacktestPanel() {
   const [tradeAmountUsd, setTradeAmountUsd] = useState("1");
   const [stopLossPercent, setStopLossPercent] = useState("2");
   const [takeProfitPercent, setTakeProfitPercent] = useState("4");
+  const [dataSource, setDataSource] = useState<"public" | "testnet">("public");
   const [candleInterval, setCandleInterval] = useState("1h");
   const [candleCount, setCandleCount] = useState("2000");
   const [feePercent, setFeePercent] = useState("0.1");
@@ -126,13 +132,13 @@ export default function TradingBacktestPanel() {
       for (let page = 0; page < 6 && byTime.size < wanted; page += 1) {
         const pageSize = Math.min(1000, wanted - byTime.size);
         const url =
-          `/api/admin/trading/exchange/testnet/market-data?symbol=${encodeURIComponent(symbol)}` +
+          `/api/admin/trading/exchange/${dataSource}/market-data?symbol=${encodeURIComponent(symbol)}` +
           `&interval=${candleInterval}&limit=${pageSize}` +
           (endTime ? `&endTime=${endTime}` : "");
         const response = await fetch(url, { method: "GET", cache: "no-store" });
         const data = await response.json();
         if (!response.ok) {
-          setMessage(ERROR_TEXT[data.error] ?? "تعذر تحميل بيانات Binance Spot Testnet.");
+          setMessage(ERROR_TEXT[data.error] ?? "تعذر تحميل بيانات السوق.");
           return;
         }
         const batch = data.candles as TestnetCandle[];
@@ -148,13 +154,13 @@ export default function TradingBacktestPanel() {
         (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
       );
       if (sorted.length === 0) {
-        setMessage("لم تصل أي شموع من Binance Spot Testnet.");
+        setMessage("لم تصل أي شموع.");
         return;
       }
       setCandlesJson(JSON.stringify(withAverages(sorted), null, 2));
       const days = (Date.parse(sorted[sorted.length - 1].timestamp) - Date.parse(sorted[0].timestamp)) / 86_400_000;
       setMessage(
-        `تم تحميل ${sorted.length} شمعة (${candleInterval}) تغطي حوالي ${days.toFixed(1)} يوم من Binance Spot Testnet. لم يتم إرسال أي أمر.`,
+        `تم تحميل ${sorted.length} شمعة (${candleInterval}) تغطي حوالي ${days.toFixed(1)} يوم من ${dataSource === "public" ? "بيانات Binance العامة (قراءة فقط)" : "Binance Spot Testnet"}. لم يتم إرسال أي أمر.`,
       );
     } catch {
       setMessage("تعذر الاتصال بـ Binance Spot Testnet.");
@@ -302,6 +308,13 @@ export default function TradingBacktestPanel() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 16 }}>
         <label>
+          مصدر البيانات
+          <select value={dataSource} onChange={(event) => setDataSource(event.target.value as "public" | "testnet")} disabled={busy}>
+            <option value="public">Binance حقيقي (عام، قراءة فقط)</option>
+            <option value="testnet">Binance Testnet</option>
+          </select>
+        </label>
+        <label>
           فاصل الشموع
           <select value={candleInterval} onChange={(event) => setCandleInterval(event.target.value)} disabled={busy}>
             <option value="5m">5 دقائق</option>
@@ -333,7 +346,7 @@ export default function TradingBacktestPanel() {
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-        <button type="button" className="btn" onClick={loadTestnetCandles} disabled={busy}>تحميل شموع Binance Testnet</button>
+        <button type="button" className="btn" onClick={loadTestnetCandles} disabled={busy}>تحميل الشموع</button>
         <button type="button" className="btn" onClick={loadSample} disabled={busy}>تحميل بيانات تجريبية</button>
         <button type="button" className="btn" onClick={run} disabled={busy || !candlesJson.trim()}>
           {busy ? "جاري الاختبار..." : "تشغيل Backtest"}
