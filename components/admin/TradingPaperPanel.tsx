@@ -133,7 +133,8 @@ export default function TradingPaperPanel() {
         return;
       }
 
-      const ticks = candlesToTicks(data.symbol, data.candles as TestnetCandle[]);
+      // Binance returns BTCUSDT; the paper engine requires the same symbol string as the form field (e.g. BTC/USDT).
+      const ticks = candlesToTicks(symbol.trim().toUpperCase(), data.candles as TestnetCandle[]);
       setTicksJson(JSON.stringify(ticks, null, 2));
       setMessage("تم تحميل بيانات سوق من Binance Spot Testnet فقط. لم يتم إرسال أي أمر، وبيانات Shariah بقيت غير معتمدة عمدًا.");
     } catch {
