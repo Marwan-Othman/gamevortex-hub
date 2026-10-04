@@ -22,7 +22,7 @@ function getSafeErrorMessage(error?: string): string {
     case "BINANCE_TESTNET_API_CREDENTIALS_REQUIRED":
       return "مفاتيح Binance Testnet غير موجودة على الخادم. أضف BINANCE_TESTNET_API_KEY وBINANCE_TESTNET_API_SECRET في Vercel كـ Secret.";
     case "BINANCE_TESTNET_API_AUTH_FAILED":
-      return "Binance رفض اعتماد مفتاح Testnet. تحقق أن المفتاح من Spot Testnet وأنه يخص نفس بيئة الاختبار.";
+      return "Binance رفض اعتماد مفتاح Testnet. تحقق أن المفتاح من Spot Testnet وأنه يخص نفس بيئة الاختبار وأنه غير مقيد بعنوان IP غير صحيح.";
     case "BINANCE_TESTNET_TIMESTAMP_INVALID":
       return "رفض Binance الطلب بسبب مشكلة في الوقت أو recvWindow. أعد المحاولة بعد مزامنة وقت الخادم.";
     case "BINANCE_TESTNET_SIGNATURE_INVALID":
@@ -41,6 +41,16 @@ function getSafeErrorMessage(error?: string): string {
       return "تم رفض الفحص لأن صلاحية السحب يجب أن تبقى معطّلة دائمًا.";
     case "BINANCE_TESTNET_SPOT_PERMISSION_REQUIRED":
       return "صلاحية Spot غير موجودة على مفتاح Binance Testnet.";
+    case "BINANCE_TESTNET_SPOT_ACCOUNT_REQUIRED":
+      return "الحساب المرتبط بالمفتاح ليس حساب Spot. تم منع التنفيذ.";
+    case "INVALID_BINANCE_TESTNET_ACCOUNT_RESPONSE":
+      return "استجابة حساب Binance Testnet ناقصة أو غير صالحة. لم يتم السماح بالتنفيذ.";
+    case "BINANCE_TESTNET_ORDER_NOT_FILLED":
+      return "لم يؤكد Binance أن أمر Testnet تم تنفيذه بالكامل، لذلك تم رفض النتيجة.";
+    case "BINANCE_TESTNET_ORDER_NOT_CONFIRMED":
+      return "لم يتم تأكيد أمر Testnet بشكل كامل. لم يتم اعتبار التداول ناجحًا.";
+    case "PRE_TRADE_BLOCKED":
+      return "تم حظر العملية بواسطة بوابات Risk Manager أو Shariah Guard أو الموافقة المسبقة.";
     case "FORBIDDEN":
       return "غير مصرح بهذا الفحص.";
     default:
