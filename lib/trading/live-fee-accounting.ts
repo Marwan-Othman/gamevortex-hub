@@ -5,10 +5,9 @@
  * accounting only when the conversion is exact. It deliberately refuses to
  * guess the value of a commission paid in a third asset.
  *
- * Binance defines `commission` as the fee paid on a trade and
- * `commissionAsset` as the asset from which the fee was deducted. Therefore
- * a gross quote P/L cannot be treated as final net settlement without the
- * actual fill-level commission records.
+ * Binance reports the commission amount and commission asset on each trade.
+ * Therefore gross quote P/L or gross exit proceeds must never be treated as
+ * final net settlement without the actual fill-level commission records.
  */
 
 import { Prisma } from "@prisma/client";
@@ -40,6 +39,23 @@ export type LiveFeeAccountingResult = {
   netEntryQuoteCost: Prisma.Decimal;
   netExitQuoteProceeds: Prisma.Decimal;
   netRealizedPnlUsd: Prisma.Decimal;
+};
+
+export type LiveSpotExitFeeAccountingInput = {
+  baseAsset: string;
+  quoteAsset: string;
+  exitExecutedQty: string;
+  exitQuoteQty: string;
+  exitFees: readonly LiveTradeFee[];
+  /** Exact quote-asset value for third-asset commissions, when available. */
+  thirdAssetFeeQuoteValues?: readonly string[];
+};
+
+export type LiveSpotExitFeeAccountingResult = {
+  exitBaseCommission: Prisma.Decimal;
+  exitQuoteFees: Prisma.Decimal;
+  thirdAssetFeeQuoteValue: Prisma.Decimal;
+  netExitQuoteProceeds: Prisma.Decimal;
 };
 
 function decimal(value: string, code: string): Prisma.Decimal {
@@ -84,6 +100,66 @@ function sumFees(
   return { base, quote, thirdCount };
 }
 
+function resolveThirdAssetFeeValue(
+  values: readonly string[] | undefined,
+  thirdAssetCount: number,
+): Prisma.Decimal {
+  const thirdAssetValues = (values ?? []).map((value) =>
+    decimal(value, "INVALID_THIRD_ASSET_FEE_QUOTE_VALUE"),
+  );
+
+  if (thirdAssetValues.length !== thirdAssetCount) {
+    throw new Error("THIRD_ASSET_FEE_CONVERSION_REQUIRED");
+  }
+
+  return thirdAssetValues.reduce(
+    (total, value) => total.add(value),
+    new Prisma.Decimal(0),
+  );
+}
+
+export function calculateLiveSpotNetExitProceeds(
+  input: LiveSpotExitFeeAccountingInput,
+): LiveSpotExitFeeAccountingResult {
+  const baseAsset = asset(input.baseAsset, "INVALID_BASE_ASSET");
+  const quoteAsset = asset(input.quoteAsset, "INVALID_QUOTE_ASSET");
+  if (baseAsset === quoteAsset) throw new Error("BASE_AND_QUOTE_ASSET_MUST_DIFFER");
+
+  const exitQty = decimal(input.exitExecutedQty, "INVALID_EXIT_EXECUTED_QTY");
+  const exitQuote = decimal(input.exitQuoteQty, "INVALID_EXIT_QUOTE_QTY");
+  if (exitQty.lessThanOrEqualTo(0) || exitQuote.lessThanOrEqualTo(0)) {
+    throw new Error("EXIT_FILL_REQUIRED");
+  }
+
+  const exit = sumFees(input.exitFees, baseAsset, quoteAsset);
+  const thirdAssetFeeQuoteValue = resolveThirdAssetFeeValue(
+    input.thirdAssetFeeQuoteValues,
+    exit.thirdCount,
+  );
+
+  const exitAverageFillPrice = exitQuote.div(exitQty);
+  const exitBaseFeeQuoteValue = exit.base.mul(exitAverageFillPrice);
+  if (exit.base.greaterThanOrEqualTo(exitQty)) {
+    throw new Error("EXIT_BASE_QTY_CONSUMED_BY_FEES");
+  }
+
+  const netExitQuoteProceeds = exitQuote
+    .sub(exit.quote)
+    .sub(exitBaseFeeQuoteValue)
+    .sub(thirdAssetFeeQuoteValue);
+
+  if (netExitQuoteProceeds.isNegative()) {
+    throw new Error("NEGATIVE_NET_EXIT_PROCEEDS");
+  }
+
+  return {
+    exitBaseCommission: exit.base,
+    exitQuoteFees: exit.quote,
+    thirdAssetFeeQuoteValue,
+    netExitQuoteProceeds,
+  };
+}
+
 export function reconcileLiveSpotFees(input: LiveFeeAccountingInput): LiveFeeAccountingResult {
   const baseAsset = asset(input.baseAsset, "INVALID_BASE_ASSET");
   const quoteAsset = asset(input.quoteAsset, "INVALID_QUOTE_ASSET");
@@ -99,17 +175,9 @@ export function reconcileLiveSpotFees(input: LiveFeeAccountingInput): LiveFeeAcc
   const entry = sumFees(input.entryFees, baseAsset, quoteAsset);
   const exit = sumFees(input.exitFees, baseAsset, quoteAsset);
   const thirdAssetCount = entry.thirdCount + exit.thirdCount;
-  const thirdAssetValues = (input.thirdAssetFeeQuoteValues ?? []).map((value) =>
-    decimal(value, "INVALID_THIRD_ASSET_FEE_QUOTE_VALUE"),
-  );
-
-  if (thirdAssetValues.length !== thirdAssetCount) {
-    throw new Error("THIRD_ASSET_FEE_CONVERSION_REQUIRED");
-  }
-
-  const thirdAssetFeeQuoteValue = thirdAssetValues.reduce(
-    (total, value) => total.add(value),
-    new Prisma.Decimal(0),
+  const thirdAssetFeeQuoteValue = resolveThirdAssetFeeValue(
+    input.thirdAssetFeeQuoteValues,
+    thirdAssetCount,
   );
 
   const entryAverageFillPrice = entryQuote.div(entryQty);
