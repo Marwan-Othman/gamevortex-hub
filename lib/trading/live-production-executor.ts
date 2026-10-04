@@ -313,18 +313,27 @@ async function protectFilledOrder(
       throw new Error("LIVE_PROTECTED_EXIT_CLIENT_IDS_MISMATCH");
     }
 
+    const stopLoss = protection.orders.find((item) => item.clientOrderId === plan.stopLoss.clientOrderId);
+    const takeProfit = protection.orders.find((item) => item.clientOrderId === plan.takeProfit.clientOrderId);
+    if (!stopLoss?.clientOrderId || !takeProfit?.clientOrderId || !stopLoss.providerOrderId || !takeProfit.providerOrderId) {
+      throw new Error("LIVE_PROTECTED_EXIT_IDENTIFIERS_INCOMPLETE");
+    }
+
     const updated = await markLiveOrderProtected(order.id, {
       protectionOrderId: protection.orderListId,
-      stopLossOrderId:
-        protection.orders.find((item) => item.clientOrderId === plan.stopLoss.clientOrderId)?.providerOrderId,
-      takeProfitOrderId:
-        protection.orders.find((item) => item.clientOrderId === plan.takeProfit.clientOrderId)?.providerOrderId,
+      // These fields are consumed by getProtectedExitLegStatus as Binance
+      // origClientOrderId values. Provider order IDs remain available on the
+      // exchange response and are used later for trade-fill reconciliation.
+      stopLossOrderId: stopLoss.clientOrderId,
+      takeProfitOrderId: takeProfit.clientOrderId,
     });
 
     await audit(ownerId, "TRADING_LIVE_ORDER_PROTECTED", updated, {
       protectionOrderId: protection.orderListId,
       stopLossOrderId: updated.stopLossOrderId,
       takeProfitOrderId: updated.takeProfitOrderId,
+      stopLossProviderOrderId: stopLoss.providerOrderId,
+      takeProfitProviderOrderId: takeProfit.providerOrderId,
     });
 
     return updated;
