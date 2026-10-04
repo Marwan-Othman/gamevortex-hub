@@ -1,4 +1,4 @@
-import { signBinanceEd25519Payload } from "@/lib/trading/binance-ed25519-signer";
+import { signBinancePayload, hasBinanceSigningCredential } from "@/lib/trading/binance-signer";
 
 const BASE_URL = "https://api.binance.com";
 const DEFAULT_RECV_WINDOW = 5_000;
@@ -69,10 +69,31 @@ function encodeQuery(params: Record<string, string | number>): string {
     .join("&");
 }
 
-function signedQuery(params: Record<string, string | number>, privateKeyPem: string): string {
+function signedQuery(
+  params: Record<string, string | number>,
+  credentials: { apiPrivateKeyPem?: string; apiSecret?: string },
+): string {
   const encoded = encodeQuery(params);
-  const signature = signBinanceEd25519Payload(encoded, privateKeyPem);
+  const signature = signBinancePayload(encoded, credentials);
   return `${encoded}&signature=${encodeURIComponent(signature)}`;
+}
+
+function providerErrorCode(status: number, message: string | null, code: unknown): string {
+  const normalized = (message ?? "").toLowerCase();
+  const numericCode = typeof code === "number" ? code : Number(code);
+
+  if (/restricted location|service unavailable from/i.test(message ?? "")) return "BINANCE_LIVE_RESTRICTED_LOCATION";
+  if (
+    status === 401 ||
+    numericCode === -1002 ||
+    numericCode === -2015 ||
+    normalized.includes("invalid api-key") ||
+    normalized.includes("invalid api key")
+  ) return "BINANCE_LIVE_API_AUTH_FAILED";
+  if (numericCode === -1021 || normalized.includes("recvwindow") || normalized.includes("timestamp")) return "BINANCE_LIVE_TIMESTAMP_INVALID";
+  if (numericCode === -1022 || normalized.includes("signature")) return "BINANCE_LIVE_SIGNATURE_INVALID";
+  if (status === 429 || status === 418 || numericCode === -1003 || normalized.includes("too many requests")) return "BINANCE_LIVE_RATE_LIMITED";
+  return "BINANCE_LIVE_PROVIDER_ERROR";
 }
 
 async function requestJson(
@@ -80,11 +101,11 @@ async function requestJson(
   path: string,
   params: Record<string, string | number>,
   apiKey: string,
-  privateKeyPem: string,
+  credentials: { apiPrivateKeyPem?: string; apiSecret?: string },
 ): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetcher(`${BASE_URL}${path}?${signedQuery(params, privateKeyPem)}`, {
+    response = await fetcher(`${BASE_URL}${path}?${signedQuery(params, credentials)}`, {
       method: "GET",
       headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
     });
@@ -100,16 +121,9 @@ async function requestJson(
   }
 
   if (!response.ok) {
-    const message =
-      payload && typeof payload === "object" && "msg" in payload && typeof payload.msg === "string"
-        ? payload.msg
-        : `HTTP_${response.status}`;
-
-    if (/restricted location/i.test(message)) {
-      throw new Error("BINANCE_LIVE_RESTRICTED_LOCATION");
-    }
-
-    throw new Error(`BINANCE_LIVE_${message}`);
+    const object = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : undefined;
+    const message = typeof object?.msg === "string" ? object.msg : null;
+    throw new Error(providerErrorCode(response.status, message, object?.code));
   }
 
   return payload;
@@ -118,15 +132,20 @@ async function requestJson(
 export function hasBinanceLiveCredentials(): boolean {
   return Boolean(
     process.env.BINANCE_LIVE_API_KEY?.trim() &&
-      (process.env.BINANCE_LIVE_API_PRIVATE_KEY?.trim() || process.env.BINANCE_LIVE_API_SECRET?.trim()),
+      hasBinanceSigningCredential({
+        apiPrivateKeyPem: process.env.BINANCE_LIVE_API_PRIVATE_KEY,
+        apiSecret: process.env.BINANCE_LIVE_API_SECRET,
+      }),
   );
 }
 
 export async function getBinanceLivePreflight(fetcher: Fetcher = fetch): Promise<BinanceLivePreflight> {
   const apiKey = process.env.BINANCE_LIVE_API_KEY?.trim();
-  const privateKeyPem = process.env.BINANCE_LIVE_API_PRIVATE_KEY?.trim() || process.env.BINANCE_LIVE_API_SECRET?.trim();
+  const apiPrivateKeyPem = process.env.BINANCE_LIVE_API_PRIVATE_KEY?.trim();
+  const apiSecret = process.env.BINANCE_LIVE_API_SECRET?.trim();
+  const credentials = { apiPrivateKeyPem, apiSecret };
   const liveFlagEnabled = process.env.GAMEVORTEX_LIVE_TRADING_ENABLED === "true";
-  const credentialsConfigured = Boolean(apiKey && privateKeyPem);
+  const credentialsConfigured = Boolean(apiKey && hasBinanceSigningCredential(credentials));
 
   const baseChecks = {
     credentials: credentialsConfigured,
@@ -154,8 +173,8 @@ export async function getBinanceLivePreflight(fetcher: Fetcher = fetch): Promise
 
   const timestamp = Date.now();
   const commonParams = { recvWindow: DEFAULT_RECV_WINDOW, timestamp };
-  const account = (await requestJson(fetcher, "/api/v3/account", commonParams, apiKey!, privateKeyPem!)) as AccountStatusResponse;
-  const restrictions = (await requestJson(fetcher, "/sapi/v1/account/apiRestrictions", commonParams, apiKey!, privateKeyPem!)) as ApiRestrictionsResponse;
+  const account = (await requestJson(fetcher, "/api/v3/account", commonParams, apiKey!, credentials)) as AccountStatusResponse;
+  const restrictions = (await requestJson(fetcher, "/sapi/v1/account/apiRestrictions", commonParams, apiKey!, credentials)) as ApiRestrictionsResponse;
 
   const permissions = Array.isArray(account.permissions)
     ? account.permissions.filter((value): value is string => typeof value === "string").slice(0, 20)
@@ -183,10 +202,6 @@ export async function getBinanceLivePreflight(fetcher: Fetcher = fetch): Promise
 
   const checks = {
     credentials: true,
-    // Binance accountType is the authoritative account-type field. The permissions
-    // array can contain trading-group identifiers (for example TRD_GRP_082) instead
-    // of the literal SPOT permission, so requiring permissions.includes("SPOT")
-    // incorrectly blocks valid Spot accounts.
     spotAccount: normalizedAccount.accountType === "SPOT",
     tradingEnabled: normalizedAccount.canTrade && normalizedRestrictions.enableSpotAndMarginTrading,
     withdrawalsDisabled: !normalizedRestrictions.enableWithdrawals,
