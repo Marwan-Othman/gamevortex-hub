@@ -48,11 +48,15 @@ jobs:
           if git diff --quiet -- package-lock.json; then
             exit 0
           fi
+          cp package-lock.json /tmp/gamevortex-package-lock.json
+          git fetch origin "${{ github.head_ref }}"
+          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
+          cp /tmp/gamevortex-package-lock.json package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package-lock.json
           git commit -m "chore: sync package lock"
-          git push origin "HEAD:${{ github.head_ref }}"
+          git push origin "${{ github.head_ref }}"
           echo "package-lock.json was stale and has been synchronized on the PR branch; continuing with the synchronized lockfile."
 
       - name: Stage 0 - npm ci
