@@ -96,7 +96,7 @@ async function markBlocked(orderId: string, reason: string): Promise<LiveOrderRo
       "version" = "version" + 1
     WHERE "id" = ${orderId}
     RETURNING *
-  `;
+  `);
 
   if (!rows[0]) throw new Error("LIVE_EXIT_SETTLEMENT_BLOCK_UPDATE_FAILED");
   return rows[0];
@@ -145,13 +145,7 @@ async function reconcileTradeFees(input: {
   exitQty: Prisma.Decimal;
   exitQuote: Prisma.Decimal;
   adapter: TradeFillAdapter;
-}): Promise<{
-  netRealizedPnlUsd: Prisma.Decimal;
-  netEntryQuoteCost: Prisma.Decimal;
-  netExitQuoteProceeds: Prisma.Decimal;
-  entryFills: TradeFillResult;
-  exitFills: TradeFillResult;
-}> {
+}): Promise<Prisma.Decimal> {
   if (!input.adapter.getOrderTradeFills) throw new Error("LIVE_TRADE_FILL_ADAPTER_REQUIRED");
 
   const [entryFills, exitFills] = await Promise.all([
@@ -180,13 +174,7 @@ async function reconcileTradeFees(input: {
     exitFees: exitFills.fills.map((fill) => ({ commission: fill.commission, commissionAsset: fill.commissionAsset })),
   });
 
-  return {
-    netRealizedPnlUsd: feeResult.netRealizedPnlUsd,
-    netEntryQuoteCost: feeResult.netEntryQuoteCost,
-    netExitQuoteProceeds: feeResult.netExitQuoteProceeds,
-    entryFills,
-    exitFills,
-  };
+  return feeResult.netRealizedPnlUsd;
 }
 
 export async function reconcileProtectedExitSettlement(input: {
@@ -362,11 +350,11 @@ export async function reconcileProtectedExitSettlement(input: {
       };
     }
 
-    let feeSettlement: Awaited<ReturnType<typeof reconcileTradeFees>>;
+    let realizedPnlUsd: Prisma.Decimal;
     try {
       const tradeFillAdapter = adapter as TradeFillAdapter;
       if (!order.providerOrderId) throw new Error("ENTRY_PROVIDER_ORDER_ID_REQUIRED");
-      feeSettlement = await reconcileTradeFees({
+      realizedPnlUsd = await reconcileTradeFees({
         order,
         entryProviderOrderId: order.providerOrderId,
         exitProviderOrderId: filled.providerOrderId,
@@ -389,7 +377,6 @@ export async function reconcileProtectedExitSettlement(input: {
     }
 
     const exitPrice = exitQuote.div(exitQty);
-    const realizedPnlUsd = feeSettlement.netRealizedPnlUsd;
 
     const rows = await db.$queryRaw<LiveOrderRow[]>(Prisma.sql`
       UPDATE "TradingLiveOrder"
