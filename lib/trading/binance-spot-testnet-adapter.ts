@@ -91,11 +91,25 @@ function sign(query: string, secret: string): string {
 function providerErrorCode(status: number, message: string | null, code: unknown): string {
   const normalized = (message ?? "").toLowerCase();
   const numericCode = typeof code === "number" ? code : Number(code);
-  if (status === 401 || numericCode === -2015 || normalized.includes("invalid api-key")) return "BINANCE_TESTNET_API_AUTH_FAILED";
-  if (numericCode === -1021 || normalized.includes("recvwindow") || normalized.includes("timestamp")) return "BINANCE_TESTNET_TIMESTAMP_INVALID";
-  if (numericCode === -1022 || normalized.includes("signature")) return "BINANCE_TESTNET_SIGNATURE_INVALID";
-  if (status === 429 || numericCode === -1003 || normalized.includes("too many requests")) return "BINANCE_TESTNET_RATE_LIMITED";
-  if (/restricted location|service unavailable from/i.test(message ?? "")) return "BINANCE_TESTNET_RESTRICTED_LOCATION";
+
+  if (/restricted location|service unavailable from/i.test(message ?? "")) {
+    return "BINANCE_TESTNET_RESTRICTED_LOCATION";
+  }
+  if (status === 401 || numericCode === -2015 || normalized.includes("invalid api-key") || normalized.includes("invalid api key")) {
+    return "BINANCE_TESTNET_API_AUTH_FAILED";
+  }
+  if (numericCode === -1021 || normalized.includes("recvwindow") || normalized.includes("timestamp")) {
+    return "BINANCE_TESTNET_TIMESTAMP_INVALID";
+  }
+  if (numericCode === -1022 || normalized.includes("signature")) {
+    return "BINANCE_TESTNET_SIGNATURE_INVALID";
+  }
+  if (status === 429 || numericCode === -1003 || normalized.includes("too many requests") || normalized.includes("too many requests; current limit")) {
+    return "BINANCE_TESTNET_RATE_LIMITED";
+  }
+  if (status >= 500 && status <= 599) {
+    return "BINANCE_TESTNET_PROVIDER_ERROR";
+  }
   return "BINANCE_TESTNET_PROVIDER_ERROR";
 }
 
