@@ -12,7 +12,7 @@ env:
 jobs:
   trading-quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -38,8 +38,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: Stage 0 - npm ci
+        run: npm ci
 
       - name: Validate Prisma schema
         run: npm run db:validate
@@ -47,13 +47,16 @@ jobs:
       - name: Verify clean migration chain
         run: npm run db:deploy
 
-      - name: Typecheck
+      - name: Stage 0 - typecheck
         run: npm run typecheck
 
-      - name: Run tests
+      - name: Stage 0 - test
         run: |
           set -o pipefail
           npm test 2>&1 | tee trading-test-output.txt
+
+      - name: Stage 0 - build
+        run: npm run build
 
       - name: Upload test output
         if: ${{ always() }}
