@@ -1,6 +1,8 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export function xpForLevel(level: number) { return 100 * level * level; }
+
 export function levelFromXp(xp: number) {
   let level = 1;
   while (xp >= xpForLevel(level + 1)) level++;
@@ -15,8 +17,24 @@ export const XP_REWARDS = {
   COMPLETED_GAME: 200,
 } as const;
 
+/**
+ * Concurrent requests can race on the unique GamerProfile.userId constraint.
+ * Recover the loser of that race by reading the row created by the winner.
+ */
 export async function getOrCreateGamerProfile(userId: string) {
-  return prisma.gamerProfile.upsert({ where: { userId }, update: {}, create: { userId } });
+  try {
+    return await prisma.gamerProfile.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const existing = await prisma.gamerProfile.findUnique({ where: { userId } });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 
 async function unlockMilestones(tx: any, userId: string, profileId: string, level: number, xp: number) {
@@ -40,8 +58,8 @@ async function unlockMilestones(tx: any, userId: string, profileId: string, leve
     if (existing) continue;
     const result = await tx.userAchievement.create({ data: { profileId, achievementId: achievement.id } });
     unlocked.push({ ...result, achievement });
-    await tx.activity.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", message: `Unlocked ${achievement.name}`, metadata: { achievementKey: achievement.key } } });
-    await tx.notification.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", title: `Achievement unlocked: ${achievement.name}`, body: achievement.description, metadata: { achievementId: achievement.id } } });
+    await tx.activity.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", message: `Unlocked ${achievement.name}`, metadata: { achievementKey: achievement.key } });
+    await tx.notification.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", title: `Achievement unlocked: ${achievement.name}`, body: achievement.description, metadata: { achievementId: achievement.id } });
   }
   return unlocked;
 }
@@ -58,8 +76,8 @@ export async function grantXp(userId: string, amount: number, reason: string, so
     const updated = await tx.gamerProfile.update({ where: { id: profile.id }, data: { xp, level } });
     const unlocked = await unlockMilestones(tx, userId, profile.id, level, xp);
     if (level > oldLevel) {
-      await tx.activity.create({ data: { userId, type: "LEVEL_UP", message: `Reached level ${level}`, metadata: { level } } });
-      await tx.notification.create({ data: { userId, type: "LEVEL_UP", title: `Level ${level} unlocked`, body: `You reached level ${level} in GameVortex.`, metadata: { level } } });
+      await tx.activity.create({ data: { userId, type: "LEVEL_UP", message: `Reached level ${level}`, metadata: { level } });
+      await tx.notification.create({ data: { userId, type: "LEVEL_UP", title: `Level ${level} unlocked`, body: `You reached level ${level} in GameVortex.`, metadata: { level } });
     }
     return { profile: updated, unlocked, leveledUp: level > oldLevel };
   });
