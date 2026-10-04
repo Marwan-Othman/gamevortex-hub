@@ -106,21 +106,25 @@ export async function fetchPublicKlinesPaged(
   symbol: string,
   interval: string,
   total: number,
+  endTimeMs?: number,
   fetcher: typeof fetch = fetch,
 ): Promise<MarketCandle[]> {
   if (!Number.isInteger(total) || total < 1 || total > 5_000) throw new Error("PUBLIC_MARKET_DATA_INVALID_LIMIT");
+  if (endTimeMs !== undefined && (!Number.isSafeInteger(endTimeMs) || endTimeMs <= 0)) {
+    throw new Error("PUBLIC_MARKET_DATA_INVALID_END_TIME");
+  }
   const byTime = new Map<string, MarketCandle>();
-  let endTimeMs: number | undefined;
+  let cursorEndTimeMs: number | undefined = endTimeMs;
   for (let page = 0; page < 7 && byTime.size < total; page += 1) {
     const batch = await fetchPublicKlines(
-      { symbol, interval, limit: Math.min(1_000, total - byTime.size), endTimeMs },
+      { symbol, interval, limit: Math.min(1_000, total - byTime.size), endTimeMs: cursorEndTimeMs },
       fetcher,
     );
     if (batch.candles.length === 0) break;
     const before = byTime.size;
     for (const candle of batch.candles) byTime.set(candle.timestamp, candle);
     if (byTime.size === before) break;
-    endTimeMs = Math.min(...batch.candles.map((c) => Date.parse(c.timestamp))) - 1;
+    cursorEndTimeMs = Math.min(...batch.candles.map((c) => Date.parse(c.timestamp))) - 1;
   }
   return Array.from(byTime.values()).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
 }
