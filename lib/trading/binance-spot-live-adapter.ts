@@ -273,9 +273,9 @@ export class BinanceSpotLiveAdapter implements ExchangeAdapter {
   private readonly liveTradingEnabled: boolean;
 
   constructor(options: BinanceSpotLiveAdapterOptions = {}) {
-    this.apiKey = options.apiKey?.trim() || undefined;
-    this.apiSecret = options.apiSecret?.trim() || undefined;
-    this.apiPrivateKeyPem = options.apiPrivateKeyPem?.trim() || undefined;
+    this.apiKey = options.apiKey?.trim() || process.env.BINANCE_LIVE_API_KEY?.trim() || undefined;
+    this.apiSecret = options.apiSecret?.trim() || process.env.BINANCE_LIVE_API_SECRET?.trim() || undefined;
+    this.apiPrivateKeyPem = options.apiPrivateKeyPem?.trim() || process.env.BINANCE_LIVE_API_PRIVATE_KEY?.trim() || undefined;
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.recvWindow = options.recvWindow ?? DEFAULT_RECV_WINDOW;
     this.fetcher = options.fetcher ?? fetch;
