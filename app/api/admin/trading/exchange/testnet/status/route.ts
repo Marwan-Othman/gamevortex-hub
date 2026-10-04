@@ -14,8 +14,8 @@ export async function GET() {
 
     const adapter = getBinanceSpotTestnetAdapter();
     const account = await adapter.getAccountStatus();
-    const isSpotAccount = account.accountType.trim().toUpperCase() === "SPOT";
-    const hasSpotPermission = account.permissions.length === 0 || account.permissions.includes("SPOT");
+    const isSpotAccount = account.accountType === "SPOT";
+    const hasSpotPermission = account.permissions.includes("SPOT");
     const readyForTestnetOrder =
       isSpotAccount &&
       account.canTrade &&
