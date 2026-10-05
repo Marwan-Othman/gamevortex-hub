@@ -4,13 +4,93 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 
 const W = 1080;
 const H = 1920;
+const MAX_IMAGES = 6;
+const MAX_FILE_BYTES = 15 * 1024 * 1024;
+const SEGMENTER_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm";
+const SEGMENTER_MODEL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
 
-type Item = { id: string; name: string; url: string; file: File };
-
+type Item = { id: string; name: string; url: string; file: File; cutout: boolean };
 type Layout = "stack" | "grid" | "hero";
+type Segmenter = { segment: (image: HTMLImageElement) => { categoryMask?: { width: number; height: number; getAsUint8Array(): Uint8Array } }; close?: () => void };
+
+let segmenterPromise: Promise<Segmenter> | null = null;
 
 function uid() {
   return crypto.randomUUID();
+}
+
+async function getSegmenter(): Promise<Segmenter> {
+  if (!segmenterPromise) {
+    segmenterPromise = (async () => {
+      const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
+      const vision = await FilesetResolver.forVisionTasks(SEGMENTER_WASM);
+      return ImageSegmenter.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: SEGMENTER_MODEL },
+        runningMode: "IMAGE",
+        outputCategoryMask: true,
+      }) as unknown as Segmenter;
+    })();
+  }
+  return segmenterPromise;
+}
+
+async function makeCutout(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("IMAGE_LOAD_FAILED"));
+    });
+
+    const segmenter = await getSegmenter();
+    const result = segmenter.segment(image);
+    const mask = result.categoryMask;
+    if (!mask) throw new Error("SEGMENTATION_MASK_MISSING");
+
+    const source = document.createElement("canvas");
+    source.width = image.naturalWidth;
+    source.height = image.naturalHeight;
+    const sourceCtx = source.getContext("2d", { willReadFrequently: true });
+    if (!sourceCtx) throw new Error("CANVAS_UNAVAILABLE");
+    sourceCtx.drawImage(image, 0, 0);
+
+    const output = document.createElement("canvas");
+    output.width = image.naturalWidth;
+    output.height = image.naturalHeight;
+    const outputCtx = output.getContext("2d");
+    if (!outputCtx) throw new Error("CANVAS_UNAVAILABLE");
+    outputCtx.drawImage(source, 0, 0);
+
+    const maskData = mask.getAsUint8Array();
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = mask.width;
+    maskCanvas.height = mask.height;
+    const maskCtx = maskCanvas.getContext("2d");
+    if (!maskCtx) throw new Error("CANVAS_UNAVAILABLE");
+
+    const pixels = new Uint8ClampedArray(mask.width * mask.height * 4);
+    for (let i = 0; i < maskData.length; i += 1) {
+      const value = maskData[i] > 0 ? 255 : 0;
+      const offset = i * 4;
+      pixels[offset] = 255;
+      pixels[offset + 1] = 255;
+      pixels[offset + 2] = 255;
+      pixels[offset + 3] = value;
+    }
+    maskCtx.putImageData(new ImageData(pixels, mask.width, mask.height), 0, 0);
+
+    outputCtx.globalCompositeOperation = "destination-in";
+    outputCtx.drawImage(maskCanvas, 0, 0, output.width, output.height);
+    outputCtx.globalCompositeOperation = "source-over";
+
+    const blob = await new Promise<Blob | null>((resolve) => output.toBlob(resolve, "image/png", 1));
+    if (!blob) throw new Error("CUTOUT_EXPORT_FAILED");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export default function SmartMerge() {
@@ -19,15 +99,16 @@ export default function SmartMerge() {
   const [layout, setLayout] = useState<Layout>("hero");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cuttingId, setCuttingId] = useState<string | null>(null);
 
   useEffect(() => () => items.forEach((item) => URL.revokeObjectURL(item.url)), [items]);
 
   function addImages(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
     if (!files.length) return;
-    const accepted = files.slice(0, 6).filter((file) => file.size <= 15 * 1024 * 1024);
-    const next = accepted.map((file) => ({ id: uid(), name: file.name, url: URL.createObjectURL(file), file }));
-    setItems((current) => [...current, ...next].slice(0, 6));
+    const accepted = files.slice(0, MAX_IMAGES).filter((file) => file.size <= MAX_FILE_BYTES);
+    const next = accepted.map((file) => ({ id: uid(), name: file.name, url: URL.createObjectURL(file), file, cutout: false }));
+    setItems((current) => [...current, ...next].slice(0, MAX_IMAGES));
     setStatus(`${next.length} صورة أضيفت إلى الدمج.`);
     event.target.value = "";
   }
@@ -38,6 +119,29 @@ export default function SmartMerge() {
       if (found) URL.revokeObjectURL(found.url);
       return current.filter((item) => item.id !== id);
     });
+  }
+
+  async function cutout(id: string) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item || item.cutout) return;
+    setCuttingId(id);
+    setStatus("AI يعزل العنصر من الصورة محليًا على جهازك...");
+    try {
+      const blob = await makeCutout(item.file);
+      const file = new File([blob], `${item.name.replace(/\.[^.]+$/, "")}-cutout.png`, { type: "image/png" });
+      const url = URL.createObjectURL(file);
+      setItems((current) => current.map((candidate) => {
+        if (candidate.id !== id) return candidate;
+        URL.revokeObjectURL(candidate.url);
+        return { ...candidate, file, url, cutout: true };
+      }));
+      setStatus("تم عزل العنصر. الآن يمكنك دمجه مع بقية الصور.");
+    } catch (error) {
+      console.error("GameVortex local AI cutout failed", error);
+      setStatus("تعذر عزل العنصر تلقائيًا. جرّب صورة يظهر فيها الشخص/العنصر بوضوح.");
+    } finally {
+      setCuttingId(null);
+    }
   }
 
   async function merge() {
@@ -117,7 +221,7 @@ export default function SmartMerge() {
       shade.addColorStop(1, "rgba(0,0,0,.38)");
       ctx.fillStyle = shade;
       ctx.fillRect(0, 0, W, H);
-      setStatus("تم دمج الصور. يمكنك تنزيل النتيجة ثم فتحها في Wallpaper Studio لإضافة الساعة والاسم والتأثيرات.");
+      setStatus("تم الدمج. استخدم الناتج داخل Wallpaper Studio لإضافة الساعة والاسم والتأثيرات.");
     } catch {
       setStatus("تعذر دمج إحدى الصور. جرّب صورًا أخرى.");
     } finally {
@@ -142,8 +246,8 @@ export default function SmartMerge() {
     <main className="wrap" dir="rtl" style={{ maxWidth: 1180, paddingBottom: 48 }}>
       <section className="glass hero" style={{ padding: 20 }}>
         <p className="muted" style={{ margin: 0 }}>GAMEVORTEX SMART MERGE</p>
-        <h1 style={{ margin: "6px 0" }}>ادمج صورك في Wallpaper واحد</h1>
-        <p className="muted" style={{ margin: 0 }}>أضف عدة صور، اختر طريقة التركيب، ثم استخدم الناتج داخل Wallpaper Studio.</p>
+        <h1 style={{ margin: "6px 0" }}>ادمج صورك بذكاء في Wallpaper واحد</h1>
+        <p className="muted" style={{ margin: 0 }}>ارفع صورك، استخدم العزل المحلي بالذكاء الاصطناعي عند الحاجة، ثم ركبها داخل Wallpaper بدقة 1080×1920.</p>
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 18, marginTop: 18, alignItems: "start" }}>
@@ -156,7 +260,7 @@ export default function SmartMerge() {
         <aside className="glass card" style={{ padding: 16 }}>
           <input id="smart-merge-images" type="file" accept="image/*" multiple hidden onChange={addImages} />
           <label htmlFor="smart-merge-images" className="btn" style={{ display: "block", textAlign: "center", cursor: "pointer" }}>+ إضافة صور من الهاتف</label>
-          <p className="muted" style={{ fontSize: 13 }}>حتى 6 صور، بحد أقصى 15MB للصورة.</p>
+          <p className="muted" style={{ fontSize: 13 }}>حتى 6 صور، بحد أقصى 15MB للصورة. المعالجة الذكية تتم محليًا ولا تحتاج API Key.</p>
 
           <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
             <strong>طريقة الدمج</strong>
@@ -169,10 +273,13 @@ export default function SmartMerge() {
 
           <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
             {items.map((item, index) => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 12, background: "rgba(255,255,255,.05)" }}>
+              <div key={item.id} style={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) auto", alignItems: "center", gap: 8, padding: 8, borderRadius: 12, background: "rgba(255,255,255,.05)" }}>
                 <img src={item.url} alt="" width={48} height={64} style={{ objectFit: "cover", borderRadius: 8 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{index + 1}. {item.name}</span>
-                <button className="btn secondary" onClick={() => remove(item.id)} aria-label={`حذف ${item.name}`}>حذف</button>
+                <span style={{ minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{index + 1}. {item.name}{item.cutout ? " • معزولة" : ""}</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn secondary" disabled={cuttingId !== null} onClick={() => cutout(item.id)}>{cuttingId === item.id ? "AI..." : item.cutout ? "معزولة" : "عزل AI"}</button>
+                  <button className="btn secondary" onClick={() => remove(item.id)} aria-label={`حذف ${item.name}`}>حذف</button>
+                </div>
               </div>
             ))}
           </div>
