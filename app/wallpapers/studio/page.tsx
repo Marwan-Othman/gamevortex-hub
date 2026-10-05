@@ -1,0 +1,36 @@
+import { db } from "@/lib/prisma";
+import { getOptionalUser } from "@/lib/auth";
+import { getVipAccess } from "@/lib/vip";
+import WallpaperStudioClient from "./WallpaperStudioClient";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export default async function WallpaperStudioPage() {
+  const user = await getOptionalUser();
+  const vip = user ? await getVipAccess(user.id) : null;
+  const wallpapers = await db.wallpaper.findMany({
+    where: { published: true, mediaType: "IMAGE", ...(vip?.isVip ? {} : { isVip: false }) },
+    orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    take: 24,
+    select: {
+      id: true,
+      titleAr: true,
+      titleEn: true,
+      width: true,
+      height: true,
+      isVip: true,
+    },
+  });
+
+  const library = wallpapers.map((item) => ({
+    id: item.id,
+    title: item.titleAr || item.titleEn || "GameVortex",
+    src: `/api/wallpapers/${item.id}/media`,
+    width: item.width,
+    height: item.height,
+    isVip: item.isVip,
+  }));
+
+  return <WallpaperStudioClient library={library} />;
+}

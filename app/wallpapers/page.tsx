@@ -61,6 +61,11 @@ export default async function Wallpapers({ searchParams }: { searchParams: Promi
         <LocaleText as="h1" ar="مكتبة خلفيات GameVortex" en="GameVortex Wallpaper Library" />
         <p className="muted"><LocaleText as="span" ar="خلفيات مجانية، خلفيات VIP، ومحتوى أصلي قابل للتوسع إلى آلاف الصور." en="Free wallpapers, VIP wallpapers, and original content built to scale to thousands of images." /></p>
 
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+          <Link href="/wallpapers/studio" className="btn">🎨 افتح استوديو التصميم</Link>
+          <Link href="/wallpapers/favorites" className="btn secondary">❤️ خلفياتي المحفوظة</Link>
+        </div>
+
         <form method="get" className="filter-row" style={{ marginTop: 16 }}>
           <input className="input" name="q" defaultValue={q || ""} placeholder="ابحث عن Gaming, Cyberpunk..." aria-label="Search wallpapers" />
           {type && <input type="hidden" name="type" value={type} />}
