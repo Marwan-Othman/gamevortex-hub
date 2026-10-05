@@ -30,5 +30,14 @@ export default async function WallpaperStudioPage() {
     isVip: item.isVip,
   }));
 
-  return <WallpaperStudioPro library={library} />;
+  return (
+    <>
+      <div className="wrap" dir="rtl" style={{ maxWidth: 1200, paddingTop: 18 }}>
+        <a href="/wallpapers/merge" className="btn secondary" style={{ display: "inline-flex" }}>
+          ✨ Smart Merge — دمج عدة صور
+        </a>
+      </div>
+      <WallpaperStudioPro library={library} />
+    </>
+  );
 }
