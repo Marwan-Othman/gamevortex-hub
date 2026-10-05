@@ -28,7 +28,6 @@ type Layer = {
 
 const W = 1080;
 const H = 1920;
-const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1080&q=85";
 
 function uid() {
   return crypto.randomUUID();
@@ -53,7 +52,9 @@ function formatDates() {
 export default function WallpaperStudioClient({ library }: { library: LibraryItem[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [background, setBackground] = useState(DEFAULT_IMAGE);
+  const dragStartLayersRef = useRef<Layer[] | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+  const [background, setBackground] = useState(() => library[0]?.src ?? "");
   const [layers, setLayers] = useState<Layer[]>(initialLayers);
   const [selected, setSelected] = useState<string | null>(null);
   const [effect, setEffect] = useState<"none" | "dim" | "grain" | "vignette" | "blue">("none");
@@ -74,6 +75,10 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
     })));
   }, []);
 
+  useEffect(() => () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+  }, []);
+
   const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -83,6 +88,21 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
     ctx.fillStyle = "#111";
     ctx.fillRect(0, 0, W, H);
 
+    const drawContent = () => {
+      drawEffects(ctx);
+      layers.filter((layer) => layer.visible).forEach((layer) => drawLayer(ctx, layer));
+    };
+
+    if (!background) {
+      const gradient = ctx.createLinearGradient(0, 0, W, H);
+      gradient.addColorStop(0, "#111827");
+      gradient.addColorStop(1, "#020617");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, W, H);
+      drawContent();
+      return;
+    }
+
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.onload = () => {
@@ -90,14 +110,12 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
       const iw = image.width * scale;
       const ih = image.height * scale;
       ctx.drawImage(image, (W - iw) / 2, (H - ih) / 2, iw, ih);
-      drawEffects(ctx);
-      layers.filter((layer) => layer.visible).forEach((layer) => drawLayer(ctx, layer));
+      drawContent();
     };
     image.onerror = () => {
       ctx.fillStyle = "#1d2635";
       ctx.fillRect(0, 0, W, H);
-      drawEffects(ctx);
-      layers.filter((layer) => layer.visible).forEach((layer) => drawLayer(ctx, layer));
+      drawContent();
     };
     image.src = background;
   };
@@ -195,12 +213,16 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
   function exportImage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const url = canvas.toDataURL("image/png", 1);
-    setPreviewUrl(url);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `gamevortex-wallpaper-${Date.now()}.png`;
-    link.click();
+    try {
+      const url = canvas.toDataURL("image/png", 1);
+      setPreviewUrl(url);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `gamevortex-wallpaper-${Date.now()}.png`;
+      link.click();
+    } catch {
+      window.alert("تعذر تصدير الصورة. اختر خلفية من مكتبة GameVortex أو ارفع صورة من هاتفك ثم حاول مرة أخرى.");
+    }
   }
 
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -210,8 +232,11 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
       window.alert("الصورة أكبر من 15MB. اختر صورة أصغر.");
       return;
     }
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(file);
+    objectUrlRef.current = url;
     setBackground(url);
+    event.target.value = "";
   }
 
   function canvasPoint(event: React.PointerEvent<HTMLCanvasElement>) {
@@ -233,8 +258,13 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
     setSelected(id);
     if (id) {
       const layer = layers.find((item) => item.id === id);
-      if (layer) setDrag({ id, dx: point.x - layer.x, dy: point.y - layer.y });
+      if (layer) {
+        dragStartLayersRef.current = layers;
+        setDrag({ id, dx: point.x - layer.x, dy: point.y - layer.y });
+      }
       event.currentTarget.setPointerCapture(event.pointerId);
+    } else {
+      dragStartLayersRef.current = null;
     }
   }
 
@@ -245,7 +275,10 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
   }
 
   function pointerUp() {
-    if (drag) setHistory((h) => [...h.slice(-29), layers]);
+    if (drag && dragStartLayersRef.current) {
+      setHistory((h) => [...h.slice(-29), dragStartLayersRef.current!]);
+    }
+    dragStartLayersRef.current = null;
     setDrag(null);
   }
 
@@ -277,7 +310,7 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
 
         <aside className="glass card" style={{ padding: 14 }}>
           <div className="platform-list" style={{ marginBottom: 12 }}>
-            {([ ["background", "الخلفية"], ["tools", "الأدوات"], ["text", "النص"], ["effects", "التأثيرات"] ] as const).map(([key, label]) => <button key={key} className={`platform-chip ${activeTab === key ? "active" : ""}`} onClick={() => setActiveTab(key)}>{label}</button>)}
+            {([["background", "الخلفية"], ["tools", "الأدوات"], ["text", "النص"], ["effects", "التأثيرات"]] as const).map(([key, label]) => <button key={key} className={`platform-chip ${activeTab === key ? "active" : ""}`} onClick={() => setActiveTab(key)}>{label}</button>)}
           </div>
 
           {activeTab === "background" && <div>
@@ -317,7 +350,7 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
           </div>}
 
           {activeTab === "effects" && <div style={{ display: "grid", gap: 8 }}>
-            {([ ["none", "بدون تأثير"], ["dim", "تعتيم"], ["vignette", "Vignette"], ["grain", "Grain"], ["blue", "Blue Tone"] ] as const).map(([value, label]) => <button key={value} className={`btn ${effect === value ? "" : "secondary"}`} onClick={() => setEffect(value)}>{label}</button>)}
+            {([["none", "بدون تأثير"], ["dim", "تعتيم"], ["vignette", "Vignette"], ["grain", "Grain"], ["blue", "Blue Tone"]] as const).map(([value, label]) => <button key={value} className={`btn ${effect === value ? "" : "secondary"}`} onClick={() => setEffect(value)}>{label}</button>)}
             <p className="muted" style={{ fontSize: 13 }}>كل التأثيرات الأساسية تعمل محليًا داخل المتصفح ولا تحتاج API خارجي.</p>
           </div>}
         </aside>
