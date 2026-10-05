@@ -2,6 +2,7 @@ import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { getVipAccess } from "@/lib/vip";
 import WallpaperStudioPro from "./WallpaperStudioPro";
+import StudioMergeImport from "./StudioMergeImport";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,6 +39,7 @@ export default async function WallpaperStudioPage() {
         </a>
       </div>
       <WallpaperStudioPro library={library} />
+      <StudioMergeImport />
     </>
   );
 }
