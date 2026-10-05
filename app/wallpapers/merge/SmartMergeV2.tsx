@@ -98,12 +98,21 @@ async function makeCutout(file: File): Promise<Blob> {
 export default function SmartMergeV2() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const itemsRef = useRef<Item[]>([]);
   const [layout, setLayout] = useState<Layout>("hero");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [cuttingId, setCuttingId] = useState<string | null>(null);
 
-  useEffect(() => () => items.forEach((item) => URL.revokeObjectURL(item.url)), [items]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    return () => {
+      itemsRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, []);
 
   function addImages(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
