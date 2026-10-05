@@ -16,9 +16,22 @@ type ManusResponse = {
   share_visibility?: string;
   has_more?: boolean;
   next_cursor?: string;
-  messages?: unknown[];
-  data?: unknown;
+  messages?: ManusMessage[];
   error?: { code?: string; message?: string } | string;
+};
+
+export type ManusMessage = {
+  id?: string;
+  type?: string;
+  timestamp?: number;
+  assistant_message?: { content?: string | Array<{ type?: string; text?: string }> };
+  error_message?: { content?: string; message?: string };
+  status_update?: { agent_status?: string; status?: string };
+  structured_output_result?: {
+    success?: boolean;
+    value?: unknown;
+    error?: string;
+  };
 };
 
 export type ManusTaskCreateInput = {
@@ -36,6 +49,16 @@ export type ManusTaskCreated = {
   taskUrl: string;
   title: string | null;
 };
+
+export type ManusTaskMessages = {
+  requestId: string;
+  taskId: string;
+  messages: ManusMessage[];
+  hasMore: boolean;
+  nextCursor?: string;
+};
+
+export type ManusApiResponse = ManusResponse;
 
 export type ManusClientOptions = {
   apiKey?: string;
@@ -73,7 +96,8 @@ async function parseResponse(response: Response): Promise<ManusResponse> {
 
   if (failed) {
     const raw = typeof body.error === "string" ? body.error : body.error?.message;
-    const message = String(raw ?? "").toLowerCase();
+    const code = typeof body.error === "object" ? body.error?.code?.toLowerCase() : "";
+    const message = `${code} ${String(raw ?? "")}`.toLowerCase();
 
     if (response.status === 401 || response.status === 403 || message.includes("unauthenticated") || message.includes("api key")) {
       throw new Error("MANUS_AUTH_FAILED");
@@ -131,19 +155,23 @@ export class ManusApiClient {
 
     const body: Record<string, unknown> = {
       message: {
-        content,
-        visibility: "private",
+        content: [
+          {
+            type: "text",
+            text: content,
+            visibility: "visible",
+          },
+        ],
       },
       locale: input.locale ?? "ar",
+      interactive_mode: false,
       hide_in_task_list: input.hideInTaskList ?? true,
       share_visibility: "private",
+      agent_profile: input.agentProfile ?? "standard",
     };
 
     if (input.title?.trim()) {
       body.title = input.title.trim().slice(0, 200);
-    }
-    if (input.agentProfile) {
-      body.agent_profile = input.agentProfile;
     }
     if (input.structuredOutputSchema) {
       body.structured_output_schema = input.structuredOutputSchema;
@@ -166,7 +194,7 @@ export class ManusApiClient {
     };
   }
 
-  async listMessages(taskId: string, cursor?: string, limit = 50): Promise<ManusResponse> {
+  async listMessages(taskId: string, cursor?: string, limit = 50, order: "asc" | "desc" = "desc"): Promise<ManusTaskMessages> {
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
       throw new Error("MANUS_INVALID_TASK_ID");
     }
@@ -176,14 +204,22 @@ export class ManusApiClient {
 
     const query = new URLSearchParams({
       task_id: taskId,
-      order: "asc",
+      order,
       limit: String(limit),
     });
     if (cursor) query.set("cursor", cursor);
 
-    return this.request(`/v2/task.listMessages?${query.toString()}`, {
+    const result = await this.request(`/v2/task.listMessages?${query.toString()}`, {
       method: "GET",
     });
+
+    return {
+      requestId: result.request_id ?? "",
+      taskId,
+      messages: Array.isArray(result.messages) ? result.messages : [],
+      hasMore: result.has_more === true,
+      nextCursor: result.next_cursor,
+    };
   }
 
   async listUsage(cursor?: string, limit = 20): Promise<ManusResponse> {
