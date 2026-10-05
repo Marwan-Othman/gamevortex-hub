@@ -160,8 +160,8 @@ async function makeInteractiveCutout(file: File, x: number, y: number): Promise<
 
 export default function SmartMerge() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pickerImageRef = useRef<HTMLImageElement>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const itemsRef = useRef<Item[]>([]);
   const [layout, setLayout] = useState<Layout>("hero");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -169,7 +169,13 @@ export default function SmartMerge() {
   const [interactiveId, setInteractiveId] = useState<string | null>(null);
   const [interactiveBusy, setInteractiveBusy] = useState(false);
 
-  useEffect(() => () => items.forEach((item) => URL.revokeObjectURL(item.url)), [items]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => () => {
+    itemsRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+  }, []);
 
   function addImages(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
@@ -191,20 +197,17 @@ export default function SmartMerge() {
   }
 
   async function replaceWithCutout(id: string, blob: Blob, mode: "auto" | "interactive") {
-    const item = items.find((candidate) => candidate.id === id);
+    const item = itemsRef.current.find((candidate) => candidate.id === id);
     if (!item) return;
     const file = new File([blob], `${item.name.replace(/\.[^.]+$/, "")}-cutout.png`, { type: "image/png" });
     const url = URL.createObjectURL(file);
-    setItems((current) => current.map((candidate) => {
-      if (candidate.id !== id) return candidate;
-      URL.revokeObjectURL(candidate.url);
-      return { ...candidate, file, url, cutout: true };
-    }));
+    URL.revokeObjectURL(item.url);
+    setItems((current) => current.map((candidate) => candidate.id === id ? { ...candidate, file, url, cutout: true } : candidate));
     setStatus(mode === "interactive" ? "تم عزل العنصر المحدد. الآن يمكنك دمجه مع بقية الصور." : "تم عزل العنصر. الآن يمكنك دمجه مع بقية الصور.");
   }
 
   async function cutout(id: string) {
-    const item = items.find((candidate) => candidate.id === id);
+    const item = itemsRef.current.find((candidate) => candidate.id === id);
     if (!item || item.cutout) return;
     setCuttingId(id);
     setStatus("AI يعزل العنصر من الصورة محليًا على جهازك...");
@@ -220,7 +223,7 @@ export default function SmartMerge() {
   }
 
   async function interactiveCutout(id: string, event: React.MouseEvent<HTMLImageElement>) {
-    const item = items.find((candidate) => candidate.id === id);
+    const item = itemsRef.current.find((candidate) => candidate.id === id);
     if (!item || interactiveBusy) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
@@ -251,6 +254,7 @@ export default function SmartMerge() {
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) throw new Error("CANVAS");
       ctx.clearRect(0, 0, W, H);
+
       const gradient = ctx.createLinearGradient(0, 0, 0, H);
       gradient.addColorStop(0, "#080b14");
       gradient.addColorStop(1, "#020308");
@@ -258,6 +262,7 @@ export default function SmartMerge() {
       ctx.fillRect(0, 0, W, H);
 
       const loaded = await Promise.all(items.map((item) => loadImage(item.url)));
+      const cutoutIndexes = items.map((item, index) => item.cutout ? index : -1).filter((index) => index >= 0);
 
       const drawCover = (image: HTMLImageElement, x: number, y: number, w: number, h: number, radius = 34) => {
         const scale = Math.max(w / image.width, h / image.height);
@@ -273,7 +278,54 @@ export default function SmartMerge() {
         ctx.restore();
       };
 
-      if (layout === "hero") {
+      const drawContain = (image: HTMLImageElement, x: number, y: number, w: number, h: number, shadow = true) => {
+        const scale = Math.min(w / image.width, h / image.height);
+        const iw = image.width * scale;
+        const ih = image.height * scale;
+        const dx = x + (w - iw) / 2;
+        const dy = y + (h - ih) / 2;
+        ctx.save();
+        if (shadow) {
+          ctx.shadowColor = "rgba(0,0,0,.65)";
+          ctx.shadowBlur = 34;
+          ctx.shadowOffsetY = 18;
+        }
+        ctx.drawImage(image, dx, dy, iw, ih);
+        ctx.restore();
+      };
+
+      if (cutoutIndexes.length > 0) {
+        const backgroundIndex = items.findIndex((item) => !item.cutout);
+        if (backgroundIndex >= 0) {
+          drawCover(loaded[backgroundIndex], 24, 24, W - 48, H - 48, 44);
+        }
+
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        const glow = ctx.createRadialGradient(W / 2, H * 0.48, 40, W / 2, H * 0.48, W * 0.65);
+        glow.addColorStop(0, "rgba(180,90,255,.7)");
+        glow.addColorStop(1, "rgba(20,10,40,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+
+        const overlays = cutoutIndexes.slice(0, 5);
+        overlays.forEach((index, overlayIndex) => {
+          const isPrimary = overlayIndex === 0;
+          const boxW = isPrimary ? W * 0.84 : W * 0.34;
+          const boxH = isPrimary ? H * 0.78 : H * 0.34;
+          const x = isPrimary ? W * 0.08 : 34 + ((overlayIndex - 1) % 3) * (W * 0.31);
+          const y = isPrimary ? H * 0.11 : H * 0.64;
+          drawContain(loaded[index], x, y, boxW, boxH, true);
+        });
+
+        const vignette = ctx.createLinearGradient(0, 0, 0, H);
+        vignette.addColorStop(0, "rgba(0,0,0,.04)");
+        vignette.addColorStop(0.62, "rgba(0,0,0,.02)");
+        vignette.addColorStop(1, "rgba(0,0,0,.48)");
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, W, H);
+      } else if (layout === "hero") {
         drawCover(loaded[0], 30, 30, W - 60, H - 60, 46);
         if (loaded.length > 1) {
           const smallW = 300;
@@ -305,14 +357,9 @@ export default function SmartMerge() {
         loaded.forEach((image, index) => drawCover(image, gap, gap + index * (cellH + gap), cellW, cellH, 32));
       }
 
-      const shade = ctx.createLinearGradient(0, 0, 0, H);
-      shade.addColorStop(0, "rgba(0,0,0,.05)");
-      shade.addColorStop(.65, "rgba(0,0,0,.08)");
-      shade.addColorStop(1, "rgba(0,0,0,.38)");
-      ctx.fillStyle = shade;
-      ctx.fillRect(0, 0, W, H);
-      setStatus("تم الدمج. استخدم الناتج داخل Wallpaper Studio لإضافة الساعة والاسم والتأثيرات.");
-    } catch {
+      setStatus("تم الدمج الاحترافي. النتيجة جاهزة للتنزيل أو المتابعة داخل Wallpaper Studio.");
+    } catch (error) {
+      console.error("GameVortex smart merge failed", error);
       setStatus("تعذر دمج إحدى الصور. جرّب صورًا أخرى.");
     } finally {
       setBusy(false);
@@ -403,7 +450,6 @@ export default function SmartMerge() {
               </div>
               <div style={{ marginTop: 14, position: "relative", display: "grid", placeItems: "center", background: "#05060a", borderRadius: 18, overflow: "hidden" }}>
                 <img
-                  ref={pickerImageRef}
                   src={item.url}
                   alt="اختر العنصر المطلوب عزله"
                   onClick={(event) => interactiveCutout(item.id, event)}
