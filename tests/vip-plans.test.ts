@@ -15,13 +15,17 @@ describe('VIP plan catalog', () => {
     const byCode = Object.fromEntries(VIP_PLANS.map((plan) => [plan.code, plan]));
 
     expect(byCode.FREE.priceCents).toBe(0);
-    expect(byCode.VIP_1M.priceCents).toBe(299);
+    expect(byCode.VIP_1M.priceCents).toBe(499);
+    expect(byCode.VIP_1M.gvcGrant).toBe(500);
     expect(byCode.VIP_1M.durationMonths).toBe(1);
-    expect(byCode.VIP_3M.priceCents).toBe(749);
+    expect(byCode.VIP_3M.priceCents).toBe(1299);
+    expect(byCode.VIP_3M.gvcGrant).toBe(1800);
     expect(byCode.VIP_3M.durationMonths).toBe(3);
     expect(byCode.VIP_6M.priceCents).toBe(1999);
+    expect(byCode.VIP_6M.gvcGrant).toBe(4000);
     expect(byCode.VIP_6M.durationMonths).toBe(6);
     expect(byCode.VIP_1Y.priceCents).toBe(4999);
+    expect(byCode.VIP_1Y.gvcGrant).toBe(10000);
     expect(byCode.VIP_1Y.durationMonths).toBe(12);
     expect(byCode.OWNER.priceCents).toBe(0);
     expect(byCode.OWNER.durationMonths).toBeNull();
@@ -107,12 +111,13 @@ describe('formatUsdCents / toPublicVipPlan', () => {
       emoji: '💎',
       nameAr: 'VIP 3 أشهر',
       nameEn: 'VIP 3 Months',
-      priceCents: 749,
-      priceLabel: '$7.49',
+      priceCents: 1299,
+      priceLabel: '$12.99',
       currency: 'USD',
       durationMonths: 3,
       purchasable: true,
       pointsMultiplier: 1.5,
+      gvcGrant: 1800,
     });
   });
 });

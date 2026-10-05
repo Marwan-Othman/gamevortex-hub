@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
             )
               ? pointsMultiplier
               : 1,
+          gvcGrant: plan.gvcGrant,
         };
       },
     ),

@@ -1323,6 +1323,7 @@ model VipPlan {
   durationMonths Int?
 
   pointsMultiplier Decimal @default(1.0) @db.Decimal(5, 2)
+  gvcGrant         Int     @default(0)
 
   active    Boolean @default(true)
   sortOrder Int     @default(0)
@@ -1694,6 +1695,7 @@ enum AiCreditKind {
   CHAT
   IMAGE
   VIDEO
+  GVC
 }
 
 model AiMediaJob {

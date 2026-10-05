@@ -31,6 +31,33 @@ type RenewVipInput = {
   metadata?: Prisma.InputJsonValue;
 };
 
+async function grantVipGvc(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  amount: number,
+  idempotencyKey: string,
+) {
+  if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("INVALID_VIP_GVC_GRANT");
+  if (amount === 0) return;
+  const existing = await tx.aiCreditLedger.findUnique({ where: { idempotencyKey } });
+  if (existing) return;
+  await tx.aiCreditBalance.upsert({
+    where: { userId },
+    create: { userId, gvcBalance: amount },
+    update: { gvcBalance: { increment: amount } },
+  });
+  await tx.aiCreditLedger.create({
+    data: {
+      userId,
+      kind: "GVC",
+      delta: amount,
+      reason: "VIP_GVC_GRANT",
+      referenceId: idempotencyKey,
+      idempotencyKey,
+    },
+  });
+}
+
 type CancelVipInput = {
   subscriptionId: string;
   reason?: string;
@@ -375,6 +402,13 @@ export async function activateVipSubscription(
           },
         });
 
+      await grantVipGvc(
+        tx,
+        subscription.userId,
+        subscription.plan.gvcGrant,
+        `vip:activation:${subscription.id}:${input.paymentId}`,
+      );
+
       /*
        * Keep VipPurchase synchronized when
        * a purchase record already exists.
@@ -640,6 +674,13 @@ export async function renewVipSubscription(
             plan: true,
           },
         });
+
+      await grantVipGvc(
+        tx,
+        subscription.userId,
+        subscription.plan.gvcGrant,
+        `vip:renewal:${subscription.id}:${input.paymentId}`,
+      );
 
       await tx.vipPurchase.updateMany({
         where: {

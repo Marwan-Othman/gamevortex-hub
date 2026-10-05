@@ -30,6 +30,7 @@ export type VipPlan = {
   /** هل يمكن شراؤها. Free و Owner لا تُشترى. */
   readonly purchasable: boolean;
   readonly pointsMultiplier: number;
+  readonly gvcGrant: number;
 };
 
 export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
@@ -44,6 +45,7 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: null,
     purchasable: false,
     pointsMultiplier: 1,
+    gvcGrant: 0,
   },
   {
     code: "VIP_1M",
@@ -51,11 +53,12 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     emoji: "👑",
     nameAr: "VIP شهر",
     nameEn: "VIP 1 Month",
-    priceCents: 299,
+    priceCents: 499,
     currency: "USD",
     durationMonths: 1,
     purchasable: true,
     pointsMultiplier: 1.25,
+    gvcGrant: 500,
   },
   {
     code: "VIP_3M",
@@ -63,11 +66,12 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     emoji: "💎",
     nameAr: "VIP 3 أشهر",
     nameEn: "VIP 3 Months",
-    priceCents: 749,
+    priceCents: 1299,
     currency: "USD",
     durationMonths: 3,
     purchasable: true,
     pointsMultiplier: 1.5,
+    gvcGrant: 1800,
   },
   {
     code: "VIP_6M",
@@ -80,6 +84,7 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: 6,
     purchasable: true,
     pointsMultiplier: 1.75,
+    gvcGrant: 4000,
   },
   {
     code: "VIP_1Y",
@@ -92,6 +97,7 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: 12,
     purchasable: true,
     pointsMultiplier: 2,
+    gvcGrant: 10000,
   },
   {
     code: "OWNER",
@@ -104,6 +110,7 @@ export const VIP_PLANS: readonly VipPlan[] = Object.freeze([
     durationMonths: null,
     purchasable: false,
     pointsMultiplier: 1,
+    gvcGrant: 0,
   },
 ]);
 
@@ -185,6 +192,7 @@ export type PublicVipPlan = {
   durationMonths: number | null;
   purchasable: boolean;
   pointsMultiplier: number;
+  gvcGrant: number;
 };
 
 export function toPublicVipPlan(plan: VipPlan): PublicVipPlan {
@@ -200,5 +208,6 @@ export function toPublicVipPlan(plan: VipPlan): PublicVipPlan {
     durationMonths: plan.durationMonths,
     purchasable: plan.purchasable,
     pointsMultiplier: plan.pointsMultiplier,
+    gvcGrant: plan.gvcGrant,
   };
 }

@@ -18,6 +18,7 @@ type Plan = {
   durationMonths: number | null;
   purchasable: boolean;
   pointsMultiplier: number;
+  gvcGrant: number;
 };
 
 type Status = {
@@ -186,6 +187,7 @@ function getDurationLabel(plan: Plan, english: boolean) {
 
 function getFeatures(plan: Plan, english: boolean) {
   return [
+    english ? `${plan.gvcGrant.toLocaleString()} GVC included` : `${plan.gvcGrant.toLocaleString()} GVC رصيد مشمول`,
     english ? `Points multiplier ×${plan.pointsMultiplier}` : `مضاعف النقاط ×${plan.pointsMultiplier}`,
     english ? "Exclusive VIP benefits" : "مزايا VIP الحصرية",
   ];
