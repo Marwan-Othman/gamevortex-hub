@@ -17,6 +17,7 @@ type ManusResponse = {
   has_more?: boolean;
   next_cursor?: string;
   messages?: ManusMessage[];
+  task?: ManusTaskDetail;
   error?: { code?: string; message?: string } | string;
 };
 
@@ -32,6 +33,14 @@ export type ManusMessage = {
     value?: unknown;
     error?: string;
   };
+};
+
+export type ManusTaskDetail = {
+  id?: string;
+  status?: "running" | "stopped" | "waiting" | "error";
+  has_running_background_jobs?: boolean;
+  credit_usage?: number;
+  task_url?: string;
 };
 
 export type ManusTaskCreateInput = {
@@ -170,21 +179,15 @@ export class ManusApiClient {
       agent_profile: input.agentProfile ?? "standard",
     };
 
-    if (input.title?.trim()) {
-      body.title = input.title.trim().slice(0, 200);
-    }
-    if (input.structuredOutputSchema) {
-      body.structured_output_schema = input.structuredOutputSchema;
-    }
+    if (input.title?.trim()) body.title = input.title.trim().slice(0, 200);
+    if (input.structuredOutputSchema) body.structured_output_schema = input.structuredOutputSchema;
 
     const result = await this.request("/v2/task.create", {
       method: "POST",
       body: JSON.stringify(body),
     });
 
-    if (!result.task_id || !result.task_url) {
-      throw new Error("MANUS_INVALID_TASK_RESPONSE");
-    }
+    if (!result.task_id || !result.task_url) throw new Error("MANUS_INVALID_TASK_RESPONSE");
 
     return {
       requestId: result.request_id ?? "",
@@ -195,23 +198,13 @@ export class ManusApiClient {
   }
 
   async listMessages(taskId: string, cursor?: string, limit = 50, order: "asc" | "desc" = "desc"): Promise<ManusTaskMessages> {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
-      throw new Error("MANUS_INVALID_TASK_ID");
-    }
-    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
-      throw new Error("MANUS_INVALID_MESSAGE_LIMIT");
-    }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) throw new Error("MANUS_INVALID_TASK_ID");
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error("MANUS_INVALID_MESSAGE_LIMIT");
 
-    const query = new URLSearchParams({
-      task_id: taskId,
-      order,
-      limit: String(limit),
-    });
+    const query = new URLSearchParams({ task_id: taskId, order, limit: String(limit) });
     if (cursor) query.set("cursor", cursor);
 
-    const result = await this.request(`/v2/task.listMessages?${query.toString()}`, {
-      method: "GET",
-    });
+    const result = await this.request(`/v2/task.listMessages?${query.toString()}`, { method: "GET" });
 
     return {
       requestId: result.request_id ?? "",
@@ -222,16 +215,24 @@ export class ManusApiClient {
     };
   }
 
+  async getTaskDetail(taskId: string): Promise<{ requestId: string; task: ManusTaskDetail }> {
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) throw new Error("MANUS_INVALID_TASK_ID");
+
+    const result = await this.request(`/v2/task.detail?task_id=${encodeURIComponent(taskId)}`, { method: "GET" });
+    if (!result.task || typeof result.task !== "object") throw new Error("MANUS_INVALID_TASK_RESPONSE");
+
+    return {
+      requestId: result.request_id ?? "",
+      task: result.task,
+    };
+  }
+
   async listUsage(cursor?: string, limit = 20): Promise<ManusResponse> {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-      throw new Error("MANUS_INVALID_USAGE_LIMIT");
-    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("MANUS_INVALID_USAGE_LIMIT");
 
     const query = new URLSearchParams({ limit: String(limit) });
     if (cursor) query.set("cursor", cursor);
 
-    return this.request(`/v2/usage.list?${query.toString()}`, {
-      method: "GET",
-    });
+    return this.request(`/v2/usage.list?${query.toString()}`, { method: "GET" });
   }
 }
