@@ -303,6 +303,41 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     return { observation: { clientOrderId: order.orderLinkId, providerOrderId: order.orderId, symbol: order.symbol, side: "BUY", status: mapStatus(order.orderStatus), executedQty, cumulativeQuoteQty, averageFillPrice: typeof order.avgPrice === "string" && Number(order.avgPrice) > 0 ? Number(order.avgPrice) : undefined, updatedAt } };
   }
 
+  async getOrderTradeFills(request: { symbol: string; providerOrderId: string }): Promise<{
+    symbol: string;
+    baseAsset: string;
+    quoteAsset: string;
+    fills: ReadonlyArray<{ qty: string; quoteQty: string; commission: string; commissionAsset: string }>;
+  }> {
+    this.requireLive();
+    const symbol = normalizeSymbol(request.symbol, this.symbolMap);
+    const orderId = request.providerOrderId.trim();
+    if (!/^[A-Za-z0-9-]{8,80}$/.test(orderId)) throw new Error("INVALID_BYBIT_LIVE_PROVIDER_ORDER_ID");
+    const instrumentResponse = await this.fetcher(`${this.baseUrl}/v5/market/instruments-info?${encodeQuery({ category: "spot", symbol })}`, { method: "GET", headers: { Accept: "application/json" } });
+    const instrumentPayload = await parseResponse(instrumentResponse);
+    const instrumentResult = objectResult(instrumentPayload, "BYBIT_LIVE_INVALID_INSTRUMENT_RESPONSE");
+    const instruments = instrumentResult.list;
+    const instrument = Array.isArray(instruments) && instruments[0] && typeof instruments[0] === "object" ? instruments[0] as Record<string, unknown> : undefined;
+    const baseAsset = typeof instrument?.baseCoin === "string" ? instrument.baseCoin.trim().toUpperCase() : "";
+    const quoteAsset = typeof instrument?.quoteCoin === "string" ? instrument.quoteCoin.trim().toUpperCase() : "";
+    if (!baseAsset || !quoteAsset) throw new Error("BYBIT_LIVE_SYMBOL_ASSET_INFO_REQUIRED");
+    const payload = await this.request("GET", "/v5/execution/list", { category: "spot", orderId, limit: 100 });
+    const result = objectResult(payload, "BYBIT_LIVE_INVALID_TRADE_FILLS_RESPONSE");
+    const list = result.list;
+    if (!Array.isArray(list) || list.length === 0) throw new Error("BYBIT_LIVE_TRADE_FILLS_REQUIRED");
+    const fills = list.map((item) => {
+      if (!item || typeof item !== "object") throw new Error("BYBIT_LIVE_INVALID_TRADE_FILL");
+      const fill = item as Record<string, unknown>;
+      const qty = typeof fill.execQty === "string" ? decimal(fill.execQty, "BYBIT_LIVE_INVALID_TRADE_QTY", false) : "";
+      const quoteQty = typeof fill.execValue === "string" ? decimal(fill.execValue, "BYBIT_LIVE_INVALID_TRADE_QUOTE_QTY", false) : "";
+      const commission = typeof fill.execFee === "string" ? decimal(fill.execFee, "BYBIT_LIVE_INVALID_TRADE_COMMISSION") : "";
+      const commissionAsset = typeof fill.feeCurrency === "string" ? fill.feeCurrency.trim().toUpperCase() : "";
+      if (!qty || !quoteQty || !commission || !/^[A-Z0-9._:-]{1,32}$/.test(commissionAsset)) throw new Error("BYBIT_LIVE_INVALID_TRADE_FILL");
+      return { qty, quoteQty, commission, commissionAsset };
+    });
+    return { symbol, baseAsset, quoteAsset, fills };
+  }
+
   async placeProtectedExitOco(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult> {
     this.requireLive();
     const symbol = normalizeSymbol(request.symbol, this.symbolMap);
