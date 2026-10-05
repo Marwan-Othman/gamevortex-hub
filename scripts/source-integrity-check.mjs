@@ -11,7 +11,7 @@ const required = [
 const missing = required.filter((f) => !fs.existsSync(path.join(root, f)));
 if (missing.length) { console.error("Missing required source files:", missing); process.exit(1); }
 const schema = fs.readFileSync(path.join(root, "prisma/schema.prisma"), "utf8");
-if (!schema.includes('sessionVersion Int @default(1)')) throw new Error('sessionVersion field missing from Prisma schema');
+if (!/sessionVersion\s+Int\s+@default\(1\)/.test(schema)) throw new Error('sessionVersion field missing from Prisma schema');
 const migration = fs.readFileSync(path.join(root, "prisma/migrations/20260819090000_v10_hardening/migration.sql"), "utf8");
 if (!migration.includes('ADD COLUMN "sessionVersion"')) throw new Error('V10 session migration missing');
 const envExample = fs.existsSync('.env.production.example') ? fs.readFileSync('.env.production.example','utf8') : '';
