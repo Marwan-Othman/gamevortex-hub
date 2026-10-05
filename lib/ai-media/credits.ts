@@ -1,4 +1,4 @@
-import { AiCreditKind, Prisma } from '@prisma/client';
+import { AiCreditKind } from '@prisma/client';
 import { db } from '@/lib/prisma';
 
 export async function consumeAiCredit(
@@ -96,10 +96,6 @@ export async function refundAiCredit(
         reason: 'AI_GVC_REFUND',
         referenceId: idempotencyKey,
         idempotencyKey: refundKey,
-        metadata: {
-          reservationId: reservation.id,
-          reservedAmount,
-        } as Prisma.InputJsonValue,
       },
     });
 
