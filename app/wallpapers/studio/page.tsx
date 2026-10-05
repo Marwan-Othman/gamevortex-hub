@@ -1,7 +1,7 @@
 import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { getVipAccess } from "@/lib/vip";
-import WallpaperStudioClient from "./WallpaperStudioClient";
+import WallpaperStudioPro from "./WallpaperStudioPro";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,10 +27,8 @@ export default async function WallpaperStudioPage() {
     id: item.id,
     title: item.titleAr || item.titleEn || "GameVortex",
     src: `/api/wallpapers/${item.id}/media`,
-    width: item.width,
-    height: item.height,
     isVip: item.isVip,
   }));
 
-  return <WallpaperStudioClient library={library} />;
+  return <WallpaperStudioPro library={library} />;
 }
