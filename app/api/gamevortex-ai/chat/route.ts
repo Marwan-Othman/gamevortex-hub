@@ -5,6 +5,7 @@ import { guardMutation } from "@/lib/api";
 import { db } from "@/lib/prisma";
 import { getVipAccess } from "@/lib/vip";
 import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
+import { getAiCost } from "@/lib/ai-media/costs";
 import { createChatStream } from "@/lib/gamevortex-ai/runtime";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,9 @@ export async function POST(request: NextRequest) {
   const idempotencyKey = typeof body?.idempotencyKey === "string" && body.idempotencyKey.trim()
     ? body.idempotencyKey.trim()
     : `chat:${conversationId}:${randomUUID()}`;
+  const creditAmount = body?.advanced === true || body?.mode === "advanced"
+    ? getAiCost("ADVANCED_CHAT_COST")
+    : getAiCost("CHAT_COST");
 
   if (
     !prompt ||
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
   if (!vip.isVip) return errorResponse("AI_VIP_REQUIRED", 403, requestId);
 
   try {
-    await consumeAiCredit(user.id, "CHAT", idempotencyKey);
+    await consumeAiCredit(user.id, "CHAT", idempotencyKey, creditAmount);
   } catch (error) {
     const code = error instanceof Error ? error.message : "AI_CREDITS_EXHAUSTED";
     return errorResponse(code === "AI_CREDITS_EXHAUSTED" ? code : "AI_CREDITS_EXHAUSTED", 402, requestId);
@@ -275,7 +279,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    await refundAiCredit(user.id, "CHAT", idempotencyKey).catch(() => undefined);
+    await refundAiCredit(user.id, "CHAT", idempotencyKey, creditAmount).catch(() => undefined);
     const safeCode = classifyError(error);
 
     if (safeCode !== "RUNTIME_REQUEST_CANCELLED") {

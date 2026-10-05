@@ -5,6 +5,7 @@ import { getOptionalUser } from "@/lib/auth";
 import { guardMutation, guardRead } from "@/lib/api";
 import { getVipAccess } from "@/lib/vip";
 import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
+import { getImageCost } from "@/lib/ai-media/costs";
 import { generateImage } from "@/lib/ai-media/providers";
 
 export const runtime = "nodejs";
@@ -239,6 +240,10 @@ export async function POST(req: NextRequest) {
     input.operation === "TRANSFORM"
       ? input.operation
       : "EDIT";
+  const creditAmount = getImageCost(
+    operation === "EDIT" && !uploadedImage ? "GENERATE" : operation,
+    typeof input.quality === "string" ? input.quality : undefined,
+  );
 
   if (kind !== "IMAGE") {
     return NextResponse.json(
@@ -334,7 +339,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await consumeAiCredit(user.id, "IMAGE", idempotencyKey);
+  await consumeAiCredit(user.id, "IMAGE", idempotencyKey, creditAmount);
 
   let job;
   try {
@@ -353,7 +358,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    await refundAiCredit(user.id, "IMAGE", idempotencyKey).catch(() => undefined);
+    await refundAiCredit(user.id, "IMAGE", idempotencyKey, creditAmount).catch(() => undefined);
     throw error;
   }
 
@@ -442,7 +447,7 @@ export async function POST(req: NextRequest) {
       },
     );
   } catch (error) {
-    await refundAiCredit(user.id, "IMAGE", idempotencyKey).catch(() => undefined);
+    await refundAiCredit(user.id, "IMAGE", idempotencyKey, creditAmount).catch(() => undefined);
     const code =
       serializeError(error);
 
