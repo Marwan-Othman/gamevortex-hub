@@ -4,6 +4,7 @@ import { getVipAccess } from "@/lib/vip";
 import WallpaperStudioClient from "./WallpaperStudioClient";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export default async function WallpaperStudioPage() {
   const user = await getOptionalUser();
