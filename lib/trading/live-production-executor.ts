@@ -49,6 +49,11 @@ import { reconcileProtectedExitSettlement } from "@/lib/trading/live-exit-settle
 import { bindLiveOrderToAllocation } from "@/lib/trading/live-allocation-binding";
 import { settleClosedLiveOrderToOwnerWallet } from "@/lib/trading/live-wallet-settlement";
 import { releaseUnfilledLiveAllocation } from "@/lib/trading/live-unfilled-allocation-release";
+import {
+  isLiveDirectFundingEnabled,
+  releaseUnfilledLiveOrderDirect,
+  settleClosedLiveOrderDirect,
+} from "@/lib/trading/live-direct-funding";
 
 const LIVE_IDEMPOTENCY_PREFIX = "live-approval:";
 const STOP_LIMIT_BUFFER = 0.001;
@@ -243,10 +248,13 @@ async function reconcileExitIfNeeded(
       settlementStatus: exchangeSettlement.status,
     });
 
-    const walletSettlement = await settleClosedLiveOrderToOwnerWallet({
-      ownerId,
-      order: exchangeSettlement.order,
-    });
+    const directFunding = isLiveDirectFundingEnabled();
+    const walletSettlement = directFunding
+      ? await settleClosedLiveOrderDirect({ ownerId, order: exchangeSettlement.order })
+      : await settleClosedLiveOrderToOwnerWallet({
+          ownerId,
+          order: exchangeSettlement.order,
+        });
 
     if (walletSettlement.status === "BLOCKED") {
       await tripCircuitBreaker({
@@ -260,11 +268,14 @@ async function reconcileExitIfNeeded(
       return { order: walletSettlement.order, settlementStatus: "BLOCKED", blockers: walletSettlement.blockers };
     }
 
-    await audit(ownerId, "TRADING_LIVE_WALLET_SETTLED", walletSettlement.order, {
-      settledUsd: walletSettlement.settledUsd,
-      settledPoints: walletSettlement.settledPoints,
-      roundingUsd: walletSettlement.roundingUsd,
-    });
+    // Direct funding writes its own TRADING_LIVE_DIRECT_SETTLED audit row.
+    if (!directFunding) {
+      await audit(ownerId, "TRADING_LIVE_WALLET_SETTLED", walletSettlement.order, {
+        settledUsd: walletSettlement.settledUsd,
+        settledPoints: walletSettlement.settledPoints,
+        roundingUsd: walletSettlement.roundingUsd,
+      });
+    }
 
     return { order: walletSettlement.order, settlementStatus: "SETTLED", blockers: [] };
   }
@@ -495,7 +506,7 @@ export async function executeApprovedLiveOrder(input: {
   if (order.status === "RECONCILIATION_MISMATCH") throw new Error("LIVE_RECONCILIATION_MISMATCH_REQUIRES_MANUAL_REVIEW");
 
   if (["INTENT_CREATED", "SUBMITTING", "SUBMITTED", "PARTIALLY_FILLED", "UNKNOWN", "PROTECTION_PENDING", "PROTECTED", "CLOSED"].includes(order.status)) {
-    await bindLiveOrderToAllocation({ ownerId, order });
+    if (!isLiveDirectFundingEnabled()) await bindLiveOrderToAllocation({ ownerId, order });
   }
 
   const adapter = new BinanceSpotLiveAdapter({
@@ -535,7 +546,7 @@ export async function executeApprovedLiveOrder(input: {
         return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
       }
       if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
-        const released = await releaseUnfilledLiveAllocation({ ownerId, order });
+        const released = await (isLiveDirectFundingEnabled() ? releaseUnfilledLiveOrderDirect : releaseUnfilledLiveAllocation)({ ownerId, order });
         return result(released.order, released.released ? "SETTLED" : "NOT_SETTLED");
       }
       return result(order);
@@ -632,7 +643,7 @@ export async function executeApprovedLiveOrder(input: {
     }
 
     if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
-      const released = await releaseUnfilledLiveAllocation({ ownerId, order });
+      const released = await (isLiveDirectFundingEnabled() ? releaseUnfilledLiveOrderDirect : releaseUnfilledLiveAllocation)({ ownerId, order });
       if (released.released) return result(released.order, "SETTLED");
       await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: order.status }).catch(() => undefined);
     }

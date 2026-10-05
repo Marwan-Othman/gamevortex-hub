@@ -30,3 +30,16 @@ The exit-settlement check "exit quantity covers entry quantity" now compares aga
 - The Shariah policy v1.0 is seeded `INACTIVE` and unreviewed. It must be reviewed by a qualified scholar and activated before any order can be APPROVED.
 - Emergency-exit wallet accounting.
 - Executor-level failure drills that need a database.
+
+
+## Direct funding mode (owner trades own Binance balance)
+
+By default a live order needs an ACTIVE Owner Wallet allocation with exactly the order amount, and the result is credited back to the wallet ledger.
+
+Setting `GAMEVORTEX_LIVE_DIRECT_FUNDING=true` switches to direct funding:
+
+- no allocation is bound, and no wallet/ledger/trading-account row is changed;
+- when the protected exit has closed on Binance the order is marked `SETTLED` and a `TRADING_LIVE_DIRECT_SETTLED` audit row records the realized P/L;
+- all other gates are unchanged: Shariah, Risk Manager, emergency stop / circuit breaker, per-trade owner approval, typed `EXECUTE LIVE ORDER`, Binance preflight, slippage guard, minimum notional, protective OCO.
+
+The admin "Live Order" panel (`/admin/trading`) uses `POST /api/admin/trading/live/prepare` (checks + short-lived approval, never sends an order), then the existing approval-consume and `/live/execute` routes. `GET/POST /api/admin/trading/live/orders` lists orders and refreshes one in monitor mode.

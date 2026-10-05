@@ -10,6 +10,7 @@ import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
 import TradingPaperPanel from "@/components/admin/TradingPaperPanel";
 import TradingTestnetPanel from "@/components/admin/TradingTestnetPanel";
 import TradingLivePreflightPanel from "@/components/admin/TradingLivePreflightPanel";
+import TradingLiveOrderPanel from "@/components/admin/TradingLiveOrderPanel";
 import TradingAuditPanel from "@/components/admin/TradingAuditPanel";
 import styles from "../admin.module.css";
 
@@ -65,6 +66,7 @@ export default async function TradingPage() {
       <TradingPaperPanel />
       <TradingTestnetPanel />
       <TradingLivePreflightPanel />
+      <TradingLiveOrderPanel />
       <TradingAuditPanel />
     </AdminShell>
   );
