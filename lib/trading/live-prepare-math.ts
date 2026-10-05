@@ -38,7 +38,11 @@ export function buildMarketSnapshot(candles: readonly PrepareCandle[]): MarketSn
   const last = candles[candles.length - 1];
   const previous = candles[candles.length - 2];
 
-  const averageVolume = mean(volumes.slice(-SLOW_WINDOW));
+  // Ignore zero-volume candles when calculating the fallback. A newly opened
+  // candle may legitimately report zero volume, and including it would
+  // understate both the fallback volume and the market snapshot.
+  const recentPositiveVolumes = volumes.slice(-SLOW_WINDOW).filter((volume) => volume > 0);
+  const averageVolume = mean(recentPositiveVolumes);
   const snapshot: MarketSnapshot = {
     price: last.close,
     previousPrice: previous.close,
