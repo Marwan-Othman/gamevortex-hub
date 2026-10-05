@@ -37,6 +37,13 @@ const BLOCKER_TEXT: Record<string, string> = {
   BINANCE_LIVE_OPTIONS_MUST_BE_DISABLED: "Options مفعّل؛ يجب تعطيله.",
   BINANCE_LIVE_PORTFOLIO_MARGIN_MUST_BE_DISABLED: "Portfolio Margin مفعّل؛ يجب تعطيله.",
   BINANCE_LIVE_INTERNAL_TRANSFER_MUST_BE_DISABLED: "Internal Transfer مفعّل؛ يجب تعطيله لهذه المرحلة.",
+  BINANCE_LIVE_API_AUTH_FAILED: "Binance رفضت المفتاح (Invalid API-key أو صلاحيات/تقييد IP). تأكد إن المفتاح من binance.com الحقيقي، وبدون تقييد IP، وأن القيمة منسوخة كاملة بدون فراغات.",
+  BINANCE_LIVE_SIGNATURE_INVALID: "التوقيع مرفوض: غالباً BINANCE_LIVE_API_SECRET غلط أو ناقص أو فيه فراغ/سطر زائد.",
+  BINANCE_LIVE_TIMESTAMP_INVALID: "فرق التوقيت بين الخادم وBinance كبير. أعد المحاولة.",
+  BINANCE_LIVE_RATE_LIMITED: "Binance حدّت الطلبات مؤقتاً. انتظر دقيقة وأعد المحاولة.",
+  BINANCE_LIVE_NETWORK_ERROR: "تعذر وصول الخادم إلى api.binance.com.",
+  BINANCE_LIVE_INVALID_RESPONSE: "ردّ Binance غير مفهوم.",
+  BINANCE_LIVE_PROVIDER_ERROR: "Binance رجّعت خطأ غير معروف. راجع Vercel Logs.",
   GAMEVORTEX_LIVE_TRADING_DISABLED: "التفعيل البرمجي للتداول الحقيقي ما زال مغلقًا عمدًا.",
 };
 
@@ -53,7 +60,7 @@ export default function TradingLivePreflightPanel() {
       const payload = await response.json();
       if (!response.ok) {
         setData(null);
-        setMessage(BLOCKER_TEXT[payload.error] ?? "تعذر فحص جاهزية Binance للإنتاج.");
+        setMessage((BLOCKER_TEXT[payload.error] ?? "تعذر فحص جاهزية Binance للإنتاج.") + (payload.error ? ` [${payload.error}]` : ""));
         return;
       }
       setData(payload as Preflight);
