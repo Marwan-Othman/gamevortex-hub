@@ -56,6 +56,7 @@ const ERROR_TEXT: Record<string, string> = {
   LIVE_RISK_CONFIG_REQUIRED: "احفظ إعدادات Risk Manager أولاً.",
   LIVE_MARKET_DATA_UNAVAILABLE: "ما قدرت أجيب بيانات سوق كافية لهذا الرمز.",
   LIVE_WALLET_MODE_REQUIRES_WHOLE_USD: "وضع المحفظة يحتاج مبلغ بدولارات صحيحة.",
+  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر من رصيد المنصة معطل أمنيًا؛ استخدم Trading Allocation.",
   TRADING_ALLOCATION_REQUIRED:
     "ما في تخصيص من المحفظة بنفس المبلغ. إما خصّص من المحفظة، أو فعّل GAMEVORTEX_LIVE_DIRECT_FUNDING=true لاستخدام رصيدك على Binance.",
   BINANCE_LIVE_INSUFFICIENT_BALANCE: "رصيد USDT الحر على Binance أقل من مبلغ الصفقة.",

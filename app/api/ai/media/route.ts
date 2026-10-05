@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
+import { guardMutation, guardRead } from "@/lib/api";
+import { getVipAccess } from "@/lib/vip";
+import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
 import { generateImage } from "@/lib/ai-media/providers";
 
 export const runtime = "nodejs";
@@ -16,6 +19,15 @@ function errorStatus(code: string) {
   switch (code) {
     case "UNAUTHORIZED":
       return 401;
+
+    case "AI_VIP_REQUIRED":
+      return 403;
+
+    case "AI_CREDITS_EXHAUSTED":
+      return 402;
+
+    case "AI_IDEMPOTENCY_KEY_OWNED_BY_OTHER_USER":
+      return 409;
 
     case "GEMINI_API_KEY_NOT_CONFIGURED":
       return 503;
@@ -47,7 +59,7 @@ function errorStatus(code: string) {
 
 function serializeError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  return new Set(["UNAUTHORIZED","GEMINI_API_KEY_NOT_CONFIGURED","GEMINI_AUTH_FAILED","GEMINI_RATE_LIMITED","GEMINI_IMAGE_TIMEOUT","GEMINI_IMAGE_BILLING_REQUIRED","GEMINI_IMAGE_GENERATION_FAILED","GEMINI_IMAGE_NOT_RETURNED","GEMINI_INVALID_RESPONSE","AI_VIDEO_GENERATION_NOT_ENABLED","AI_IMAGE_INVALID_DATA","AI_IMAGE_EMPTY","AI_IMAGE_TOO_LARGE","AI_IMAGE_TYPE_NOT_SUPPORTED","AI_IMAGE_PROMPT_REQUIRED","AI_IMAGE_PROMPT_TOO_LONG","AI_MEDIA_KIND_INVALID","CONVERSATION_NOT_FOUND"]).has(message) ? message : "AI_MEDIA_GENERATION_FAILED";
+  return new Set(["UNAUTHORIZED","AI_VIP_REQUIRED","AI_CREDITS_EXHAUSTED","AI_IDEMPOTENCY_KEY_OWNED_BY_OTHER_USER","GEMINI_API_KEY_NOT_CONFIGURED","GEMINI_AUTH_FAILED","GEMINI_RATE_LIMITED","GEMINI_IMAGE_TIMEOUT","GEMINI_IMAGE_BILLING_REQUIRED","GEMINI_IMAGE_GENERATION_FAILED","GEMINI_IMAGE_NOT_RETURNED","GEMINI_INVALID_RESPONSE","AI_VIDEO_GENERATION_NOT_ENABLED","AI_IMAGE_INVALID_DATA","AI_IMAGE_EMPTY","AI_IMAGE_TOO_LARGE","AI_IMAGE_TYPE_NOT_SUPPORTED","AI_IMAGE_PROMPT_REQUIRED","AI_IMAGE_PROMPT_TOO_LONG","AI_MEDIA_KIND_INVALID","CONVERSATION_NOT_FOUND"]).has(message) ? message : "AI_MEDIA_GENERATION_FAILED";
 }
 
 function dataUrlToBuffer(dataUrl: string) {
@@ -105,6 +117,8 @@ function createBlobPath(userId: string, extension: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const blocked = await guardRead(req, "ai-media:read", 120);
+  if (blocked) return blocked;
   const user = await getOptionalUser();
 
   if (!user) {
@@ -154,6 +168,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = await guardMutation(req, "ai-media:generate", 6);
+  if (blocked) return blocked;
   const user = await getOptionalUser();
 
   if (!user) {
@@ -270,6 +286,12 @@ export async function POST(req: NextRequest) {
   });
 
   if (existing) {
+    if (existing.userId !== user.id) {
+      return NextResponse.json(
+        { error: "AI_IDEMPOTENCY_KEY_OWNED_BY_OTHER_USER" },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({
       job: {
         id: existing.id,
@@ -281,6 +303,11 @@ export async function POST(req: NextRequest) {
         createdAt: existing.createdAt,
       },
     });
+  }
+
+  const vip = await getVipAccess(user.id);
+  if (!vip.isVip) {
+    return NextResponse.json({ error: "AI_VIP_REQUIRED" }, { status: 403 });
   }
 
   if (conversationId) {
@@ -307,20 +334,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const job = await db.aiMediaJob.create({
-    data: {
-      userId: user.id,
-      kind: "IMAGE",
-      provider: "INTERNAL",
-      model:
-        process.env.GEMINI_IMAGE_MODEL?.trim() ||
-        "gemini-3.1-flash-image",
-      prompt: `[${operation}] ${prompt}`,
-      status: "PROCESSING",
-      conversationId,
-      idempotencyKey,
-    },
-  });
+  await consumeAiCredit(user.id, "IMAGE", idempotencyKey);
+
+  let job;
+  try {
+    job = await db.aiMediaJob.create({
+      data: {
+        userId: user.id,
+        kind: "IMAGE",
+        provider: "INTERNAL",
+        model:
+          process.env.GEMINI_IMAGE_MODEL?.trim() ||
+          "gemini-3.1-flash-image",
+        prompt: `[${operation}] ${prompt}`,
+        status: "PROCESSING",
+        conversationId,
+        idempotencyKey,
+      },
+    });
+  } catch (error) {
+    await refundAiCredit(user.id, "IMAGE", idempotencyKey).catch(() => undefined);
+    throw error;
+  }
 
   try {
     const operationInstruction =
@@ -407,6 +442,7 @@ export async function POST(req: NextRequest) {
       },
     );
   } catch (error) {
+    await refundAiCredit(user.id, "IMAGE", idempotencyKey).catch(() => undefined);
     const code =
       serializeError(error);
 

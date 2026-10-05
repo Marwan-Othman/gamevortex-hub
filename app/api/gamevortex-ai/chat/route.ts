@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOptionalUser } from "@/lib/auth";
 import { guardMutation } from "@/lib/api";
 import { db } from "@/lib/prisma";
+import { getVipAccess } from "@/lib/vip";
+import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
 import { createChatStream } from "@/lib/gamevortex-ai/runtime";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,8 @@ function classifyError(error: unknown) {
 
   const known = new Set([
     "UNAUTHORIZED",
+    "AI_VIP_REQUIRED",
+    "AI_CREDITS_EXHAUSTED",
     "INVALID_REQUEST",
     "CONVERSATION_NOT_FOUND",
     "REGENERATION_NOT_AVAILABLE",
@@ -71,6 +75,9 @@ export async function POST(request: NextRequest) {
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   const conversationId = typeof body?.conversationId === "string" ? body.conversationId : "";
   const regenerate = body?.regenerate === true;
+  const idempotencyKey = typeof body?.idempotencyKey === "string" && body.idempotencyKey.trim()
+    ? body.idempotencyKey.trim()
+    : `chat:${conversationId}:${randomUUID()}`;
 
   if (
     !prompt ||
@@ -79,6 +86,16 @@ export async function POST(request: NextRequest) {
     (body?.regenerate !== undefined && typeof body.regenerate !== "boolean")
   ) {
     return errorResponse("INVALID_REQUEST", 400, requestId);
+  }
+
+  const vip = await getVipAccess(user.id);
+  if (!vip.isVip) return errorResponse("AI_VIP_REQUIRED", 403, requestId);
+
+  try {
+    await consumeAiCredit(user.id, "CHAT", idempotencyKey);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "AI_CREDITS_EXHAUSTED";
+    return errorResponse(code === "AI_CREDITS_EXHAUSTED" ? code : "AI_CREDITS_EXHAUSTED", 402, requestId);
   }
 
   try {
@@ -258,6 +275,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    await refundAiCredit(user.id, "CHAT", idempotencyKey).catch(() => undefined);
     const safeCode = classifyError(error);
 
     if (safeCode !== "RUNTIME_REQUEST_CANCELLED") {

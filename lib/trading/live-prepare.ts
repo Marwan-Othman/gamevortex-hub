@@ -122,6 +122,9 @@ export async function prepareLiveOrder(input: {
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
 
   const direct = isLiveDirectFundingEnabled();
+  if (direct) {
+    throw new Error("LIVE_DIRECT_FUNDING_DISABLED");
+  }
 
   // 1. Emergency stop / circuit breaker.
   const { control } = await getTradingControl(input.ownerId);
