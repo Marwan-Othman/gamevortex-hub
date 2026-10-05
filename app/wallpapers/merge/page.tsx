@@ -1,4 +1,4 @@
-import SmartMerge from "./SmartMerge";
+import SmartMerge from "./SmartMergeV2";
 
 export const dynamic = "force-dynamic";
 
