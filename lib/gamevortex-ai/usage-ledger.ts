@@ -43,6 +43,7 @@ export async function startAiUsage(input: AiUsageStartInput) {
       requestId: input.requestId?.trim() || null,
       taskId: input.taskId?.trim() || null,
       gvcReserved,
+      idempotencyKey: input.idempotencyKey,
       status: AiUsageStatus.QUEUED,
     },
   });
