@@ -87,6 +87,44 @@ export async function buildGameVortexSiteContext(
   const terms =
     termsFromPrompt(prompt);
 
+  const wantsSiteContext =
+    terms.length > 0 ||
+    containsAny(prompt, [
+      "gamevortex",
+      "جيم فورتكس",
+      "الموقع",
+      "المتجر",
+      "اللعبة",
+      "الألعاب",
+      "التطبيق",
+      "التطبيقات",
+      "المنتج",
+      "المنتجات",
+      "vip",
+      "اشتراك",
+      "محفظة",
+      "رصيد",
+      "نقاط",
+      "طلب",
+      "طلبات",
+      "مكتبة",
+      "library",
+      "marketplace",
+      "wallet",
+      "points",
+      "orders",
+      "store",
+      "games",
+      "apps",
+      "mods",
+      "raffle",
+      "referral",
+    ]);
+
+  // Generic conversation does not need a database-wide GameVortex snapshot.
+  // Skipping it avoids several PostgreSQL queries and keeps normal chat fast.
+  if (!wantsSiteContext) return "";
+
   const containsTerms =
     terms.length > 0;
 
