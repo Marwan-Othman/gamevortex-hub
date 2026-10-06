@@ -134,6 +134,36 @@ export async function getVipAccess(
   };
 }
 
+export async function getVipPointsMultiplierInTransaction(
+  transaction: Prisma.TransactionClient,
+  userId: string,
+): Promise<number> {
+  if (!userId) throw new Error("USER_ID_REQUIRED");
+
+  const subscription = await transaction.vipSubscription.findFirst({
+    where: {
+      userId,
+      status: VipSubscriptionStatus.ACTIVE,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: new Date() } },
+      ],
+    },
+    select: {
+      plan: {
+        select: {
+          pointsMultiplier: true,
+        },
+      },
+    },
+    orderBy: {
+      expiresAt: "desc",
+    },
+  });
+
+  return safeMultiplier(subscription?.plan.pointsMultiplier);
+}
+
 export async function requireActiveVip(
   userId: string,
 ): Promise<VipAccess> {
