@@ -7,6 +7,11 @@ import { getVipAccess } from "@/lib/vip";
 import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
 import { getAiCost } from "@/lib/ai-media/costs";
 import { createChatStream } from "@/lib/gamevortex-ai/runtime";
+import {
+  finishAiUsage,
+  startAiUsage,
+  updateAiUsage,
+} from "@/lib/gamevortex-ai/usage-ledger";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -102,14 +107,34 @@ export async function POST(request: NextRequest) {
     return errorResponse(code === "AI_CREDITS_EXHAUSTED" ? code : "AI_CREDITS_EXHAUSTED", 402, requestId);
   }
 
+  let usageId: string | undefined;
+
   try {
-    const { response, replaceMessageId } = await createChatStream(
+    const usage = await startAiUsage({
+      userId: user.id,
+      provider: "manus",
+      operation: body?.advanced === true || body?.mode === "advanced" ? "ADVANCED_CHAT" : "CHAT",
+      idempotencyKey,
+      gvcReserved: creditAmount,
+      requestId,
+    });
+    usageId = usage.usage.id;
+
+    const { response, replaceMessageId, requestId: manusRequestId, taskId } =
+      await createChatStream(
       user.id,
       conversationId,
       prompt,
       request.signal,
       regenerate
     );
+
+    await updateAiUsage(usageId, user.id, {
+      status: "PROCESSING",
+      requestId: manusRequestId || requestId,
+      taskId,
+      startedAt: new Date(),
+    });
 
     if (!response.body) {
       throw new Error("RUNTIME_INVALID_RESPONSE");
@@ -232,9 +257,25 @@ export async function POST(request: NextRequest) {
             });
           });
 
+          await finishAiUsage(usageId!, user.id, {
+            status: "COMPLETED",
+            gvcUsed: creditAmount,
+            gvcRefunded: 0,
+          });
+
           controller.close();
         } catch (error) {
           const code = classifyError(error);
+
+          const stopped = code === "RUNTIME_REQUEST_CANCELLED";
+          await refundAiCredit(user.id, "CHAT", idempotencyKey, creditAmount).catch(() => undefined);
+          await finishAiUsage(usageId!, user.id, {
+            status: stopped ? "STOPPED" : "FAILED",
+            gvcUsed: 0,
+            gvcRefunded: creditAmount,
+            errorCode: code,
+          }).catch(() => undefined);
+
           console.error(
             JSON.stringify({
               event: "gamevortex_ai_stream_failed",
@@ -279,8 +320,16 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    await refundAiCredit(user.id, "CHAT", idempotencyKey, creditAmount).catch(() => undefined);
     const safeCode = classifyError(error);
+    await refundAiCredit(user.id, "CHAT", idempotencyKey, creditAmount).catch(() => undefined);
+    if (usageId) {
+      await finishAiUsage(usageId, user.id, {
+        status: safeCode === "RUNTIME_REQUEST_CANCELLED" ? "STOPPED" : "FAILED",
+        gvcUsed: 0,
+        gvcRefunded: creditAmount,
+        errorCode: safeCode,
+      }).catch(() => undefined);
+    }
 
     if (safeCode !== "RUNTIME_REQUEST_CANCELLED") {
       console.error(
@@ -310,6 +359,16 @@ export async function POST(request: NextRequest) {
       RUNTIME_INVALID_RESPONSE: 502,
       RUNTIME_STREAM_FAILED: 502,
       RUNTIME_EMPTY_RESPONSE: 502,
+      MANUS_TASK_FAILED: 502,
+      MANUS_TASK_WAITING_FOR_INPUT: 409,
+      MANUS_EMPTY_RESPONSE: 502,
+      MANUS_TIMEOUT: 504,
+      MANUS_AUTH_FAILED: 502,
+      MANUS_RATE_LIMITED: 429,
+      MANUS_UNAVAILABLE: 502,
+      MANUS_PROVIDER_ERROR: 502,
+      MANUS_INVALID_RESPONSE: 502,
+      MANUS_INVALID_TASK_RESPONSE: 502,
       GEMINI_NOT_CONFIGURED: 503,
       GEMINI_CONFIGURATION_INVALID: 503,
       DATABASE_UNAVAILABLE: 503,
