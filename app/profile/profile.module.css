@@ -1242,3 +1242,14 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Luxury Fusion v7 — gamer identity dashboard */
+.page { max-width: 1240px; padding-block: clamp(24px, 4vw, 56px); gap: 22px; }
+.hero { border-color: rgba(168,85,247,.46); background: radial-gradient(560px 300px at 76% 18%, rgba(168,85,247,.26), transparent 70%), linear-gradient(145deg, rgba(15,20,47,.95), rgba(6,9,20,.98)); box-shadow: 0 28px 90px rgba(0,0,0,.54); }
+.avatar { border-color: rgba(246,202,99,.65); box-shadow: 0 0 0 5px rgba(246,202,99,.08), 0 0 34px rgba(168,85,247,.34); }
+.progressFill { background: linear-gradient(90deg, #7c3aed, #25d9ff 62%, #f6ca63) !important; }
+.actionBtn { min-height: 42px; border-radius: 999px; background: linear-gradient(145deg, rgba(168,85,247,.18), rgba(37,217,255,.06)); border-color: rgba(168,85,247,.30); }
+.actionBtn:hover { border-color: rgba(37,217,255,.52); box-shadow: 0 0 24px rgba(37,217,255,.13); }
+.panel, .statTile { background: linear-gradient(145deg, rgba(15,20,47,.90), rgba(6,9,20,.97)); border-color: rgba(168,85,247,.24); }
+.statTile strong { color: #fff; }
+@media (max-width: 640px) { .page { padding-inline: 10px; } .hero { padding: 18px; } .actionRow { grid-template-columns: repeat(2, 1fr); } .statsGrid { grid-template-columns: repeat(2, 1fr); } .chartsGrid { grid-template-columns: 1fr; } }

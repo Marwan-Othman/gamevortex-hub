@@ -464,3 +464,12 @@
 .langSwitch button[aria-pressed="true"]{background:rgba(139,61,255,.20);color:#d9b4ff}
 .brandText strong span{color:#b95cff}
 .heading h1{background:linear-gradient(180deg,#fff,#e8dcff 65%,#b95cff);-webkit-background-clip:text;background-clip:text}
+
+/* Luxury Fusion v5 — auth surfaces */
+.page { background: radial-gradient(700px 440px at 8% 8%, rgba(124,58,237,.22), transparent 64%), radial-gradient(560px 420px at 92% 90%, rgba(246,202,99,.08), transparent 66%), linear-gradient(180deg, #03040a, #07091a 56%, #03040a) !important; }
+.card { border-radius: 26px; border-color: rgba(168,85,247,.42); background: linear-gradient(145deg, rgba(15,20,47,.92), rgba(6,9,20,.98)) !important; box-shadow: 0 0 0 1px rgba(168,85,247,.10), 0 28px 90px rgba(0,0,0,.60) !important; }
+.heading h1 { letter-spacing: -.03em; }
+.inputRow { min-height: 52px; border-radius: 15px; background: rgba(5,8,20,.82) !important; }
+.submitBtn { min-height: 50px; border-radius: 999px; background: linear-gradient(135deg, #ffe994, #f6ca63 48%, #d89f28) !important; color: #171106 !important; box-shadow: 0 0 0 1px rgba(246,202,99,.28), 0 14px 36px rgba(246,202,99,.16) !important; }
+.featureIcon { border-radius: 14px; background: rgba(37,217,255,.08) !important; border-color: rgba(37,217,255,.28) !important; color: #25d9ff !important; }
+@media (max-width: 640px) { .page { padding-inline: 10px; } .card { padding: 20px 16px 22px; } }

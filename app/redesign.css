@@ -2188,3 +2188,436 @@ button, input, select, textarea { max-width: 100%; }
     backdrop-filter: none !important;
   }
 }
+
+/* =====================================================================
+   GameVortex Luxury Fusion v4
+   Unified visual layer: neon gaming + premium commerce + social hub +
+   calm responsive utility. Loaded last so legacy pages inherit one system.
+   ===================================================================== */
+:root {
+  --gv-v4-void: #03040b;
+  --gv-v4-night: #070a17;
+  --gv-v4-surface: rgba(13, 17, 38, .84);
+  --gv-v4-surface-strong: rgba(10, 13, 29, .96);
+  --gv-v4-purple: #a855f7;
+  --gv-v4-violet: #7c3aed;
+  --gv-v4-cyan: #25d9ff;
+  --gv-v4-gold: #f6ca63;
+  --gv-v4-text: #f8f9ff;
+  --gv-v4-muted: #a2a8be;
+  --gv-v4-border: rgba(168, 85, 247, .24);
+  --gv-v4-border-soft: rgba(255, 255, 255, .09);
+  --gv-v4-radius-sm: 12px;
+  --gv-v4-radius-md: 18px;
+  --gv-v4-radius-lg: 26px;
+  --gv-v4-shadow: 0 22px 70px rgba(0, 0, 0, .42);
+  --gv-v4-neon-shadow: 0 0 0 1px rgba(168, 85, 247, .22), 0 16px 48px rgba(59, 22, 125, .25);
+  --gv-v4-gold-shadow: 0 0 0 1px rgba(246, 202, 99, .28), 0 12px 32px rgba(246, 202, 99, .14);
+}
+
+html { background: var(--gv-v4-void) !important; }
+body {
+  color: var(--gv-v4-text) !important;
+  background:
+    radial-gradient(900px 520px at 5% -12%, rgba(124, 58, 237, .23), transparent 65%),
+    radial-gradient(760px 520px at 100% 12%, rgba(37, 217, 255, .09), transparent 65%),
+    radial-gradient(680px 460px at 48% 108%, rgba(246, 202, 99, .06), transparent 68%),
+    linear-gradient(180deg, var(--gv-v4-void), var(--gv-v4-night) 52%, var(--gv-v4-void)) !important;
+}
+body::after {
+  background-image: linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px) !important;
+  background-size: 56px 56px !important;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 82%) !important;
+}
+
+/* Shared page rhythm */
+.gv-app-main { min-height: calc(100vh - 72px); isolation: isolate; }
+.gv-app-main > * { min-width: 0; }
+.wrap, .page, .content, .contentWrap, .adminPage, .adminShell, .dashboard, .dashboardPage {
+  width: min(var(--wrap, 1440px), calc(100% - 32px));
+  margin-inline: auto;
+}
+.page, .pageHero, .page-header, .pageHeader, .sectionHero, .storeHero, .gamesHero,
+.profileHero, .walletHero, .quranHero, .communityHero, .adminHero, .dashboardHero, .searchHero {
+  position: relative;
+}
+
+/* Consistent luxury surfaces across all feature areas */
+.hero, .card, .stat, .glass, .panel, .section, .tableCard, .authCard, .auth-panel,
+.loginCard, .registerCard, .balanceCard, .moneyCard, .checkoutSummary, .orderSummary,
+.paymentSummary, .pageHero, .page-header, .pageHeader, .sectionHero, .storeHero,
+.gamesHero, .profileHero, .walletHero, .quranHero, .communityHero, .adminHero,
+.dashboardHero, .searchHero {
+  background: linear-gradient(145deg, rgba(15, 20, 47, .88), rgba(6, 9, 20, .96)) !important;
+  border: 1px solid var(--gv-v4-border) !important;
+  border-radius: var(--gv-v4-radius-md) !important;
+  box-shadow: var(--gv-v4-shadow), inset 0 1px 0 rgba(255,255,255,.035) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.hero, .pageHero, .page-header, .pageHeader, .sectionHero, .storeHero, .gamesHero,
+.profileHero, .walletHero, .quranHero, .communityHero, .adminHero, .dashboardHero, .searchHero {
+  overflow: hidden;
+}
+.hero::before, .pageHero::before, .page-header::before, .pageHeader::before, .sectionHero::before,
+.storeHero::before, .gamesHero::before, .profileHero::before, .walletHero::before,
+.quranHero::before, .communityHero::before, .adminHero::before, .dashboardHero::before,
+.searchHero::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 42%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gv-v4-cyan), transparent);
+  opacity: .65;
+  pointer-events: none;
+}
+.card:hover, .game-card:hover, .stat:hover, .glass:hover, .panel:hover {
+  border-color: rgba(168, 85, 247, .58) !important;
+  box-shadow: var(--gv-v4-neon-shadow) !important;
+}
+
+/* Typography and actions */
+h1, h2, h3, h4 { color: var(--gv-v4-text); text-wrap: balance; }
+p, li, label { color: inherit; }
+.muted, .subtle, small { color: var(--gv-v4-muted); }
+.btn, button, .heroCta, .vipBtn, .dealBtn, .auth-submit {
+  min-height: 42px;
+  border-radius: 999px !important;
+  font-family: inherit;
+  font-weight: 800;
+}
+.btn, .heroCta, .vipBtn, .dealBtn, .auth-submit {
+  background: linear-gradient(135deg, #ffe994 0%, var(--gv-v4-gold) 48%, #d89f28 100%) !important;
+  color: #171106 !important;
+  border: 0 !important;
+  box-shadow: var(--gv-v4-gold-shadow) !important;
+}
+.btn.secondary, .heroGhost, .btn.ghost, .btn.outline {
+  color: var(--gv-v4-text) !important;
+  background: rgba(124, 58, 237, .12) !important;
+  border: 1px solid rgba(168, 85, 247, .48) !important;
+  box-shadow: none !important;
+}
+.btn:hover, .heroCta:hover, .vipBtn:hover, .dealBtn:hover, .auth-submit:hover,
+.btn.secondary:hover, .heroGhost:hover, .btn.ghost:hover, .btn.outline:hover {
+  transform: translateY(-2px);
+}
+.badge, .pill, .tag, .chip, .status, .platform-chip {
+  border-radius: 999px !important;
+  background: rgba(168, 85, 247, .12) !important;
+  border: 1px solid rgba(168, 85, 247, .30) !important;
+  color: #ddb8ff !important;
+}
+.product-price, .price, .amount, .gold, .premium, .vipPrice { color: var(--gv-v4-gold) !important; }
+.input, input, select, textarea {
+  min-height: 42px;
+  background: rgba(5, 8, 20, .82) !important;
+  border: 1px solid var(--gv-v4-border) !important;
+  border-radius: var(--gv-v4-radius-sm) !important;
+  color: var(--gv-v4-text) !important;
+}
+.input:focus, input:focus, select:focus, textarea:focus {
+  border-color: var(--gv-v4-cyan) !important;
+  box-shadow: 0 0 0 3px rgba(37, 217, 255, .12) !important;
+}
+
+/* Header, drawer and mobile navigation */
+.gv-header {
+  background: rgba(3, 5, 14, .78) !important;
+  border-bottom: 1px solid rgba(168, 85, 247, .24) !important;
+  box-shadow: 0 14px 48px rgba(0,0,0,.38) !important;
+}
+.gv-brand-name {
+  background: linear-gradient(90deg, #fff 20%, #d9bcff 58%, var(--gv-v4-cyan)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+.gv-nav-link { color: #dfe4f4 !important; }
+.gv-nav-link:hover, .gv-nav-link.is-active {
+  background: linear-gradient(135deg, rgba(168,85,247,.22), rgba(37,217,255,.08)) !important;
+  border-color: rgba(168,85,247,.50) !important;
+  box-shadow: 0 8px 24px rgba(79, 33, 150, .20) !important;
+}
+.gv-search input { background: rgba(7, 10, 24, .76) !important; }
+.gv-drawer { background: linear-gradient(180deg, #0d1126, #04050d) !important; }
+.gv-drawer-link.is-active { background: rgba(168,85,247,.18) !important; border-color: rgba(168,85,247,.50) !important; }
+.gv-drawer-icon { color: var(--gv-v4-cyan) !important; }
+.gv-bottom-nav {
+  background: rgba(5, 8, 20, .88) !important;
+  border-color: rgba(168,85,247,.28) !important;
+  box-shadow: 0 -18px 54px rgba(0,0,0,.55) !important;
+  backdrop-filter: blur(22px);
+}
+.gv-bottom-nav a.active {
+  background: linear-gradient(135deg, rgba(168,85,247,.24), rgba(37,217,255,.10)) !important;
+  border-color: rgba(168,85,247,.52) !important;
+}
+
+/* Home and commerce emphasis */
+.heroTitle, .hero h1 { text-shadow: 0 12px 36px rgba(0,0,0,.34); }
+.heroTag, .heroEyebrow { color: var(--gv-v4-cyan) !important; }
+.heroGrid .hero, .hero-home, .vipWide, .sideAi {
+  border-color: rgba(168,85,247,.42) !important;
+  box-shadow: 0 0 0 1px rgba(168,85,247,.10), 0 28px 90px rgba(0,0,0,.55) !important;
+}
+.vipWide, .vip-card, .vipHero {
+  background: radial-gradient(520px 250px at 72% 40%, rgba(168,85,247,.32), transparent 68%),
+    radial-gradient(360px 220px at 20% 100%, rgba(246,202,99,.18), transparent 65%),
+    linear-gradient(135deg, #160d2d, #060710) !important;
+  border-color: rgba(246,202,99,.34) !important;
+}
+.store-shell, .marketplace-grid, .shop-layout, .adminLayout, .dashboardLayout { min-width: 0; }
+.product-grid, .game-grid, .apps-grid, .wallpaper-grid, .gift-grid, .cards-grid {
+  align-items: stretch;
+}
+.product-grid > *, .game-grid > *, .apps-grid > *, .wallpaper-grid > *, .gift-grid > *, .cards-grid > * { min-width: 0; }
+
+/* Tables, charts, admin and dense screens */
+.tableWrap, .table-container, .dataTable, .tableCard, .adminTable, table {
+  max-width: 100%;
+}
+.tableWrap, .table-container, .dataTable, .adminTable { overflow-x: auto; }
+th { color: #d9bcff !important; font-weight: 800 !important; }
+td, th { border-color: rgba(168,85,247,.16) !important; }
+.adminSidebar, .ownerSidebar, .controlSidebar {
+  background: linear-gradient(180deg, rgba(15,20,47,.94), rgba(6,9,20,.98)) !important;
+  border-color: rgba(168,85,247,.22) !important;
+}
+.adminNav a, .ownerNav a, .controlNav a { border-radius: 12px; }
+.adminNav a:hover, .ownerNav a:hover, .controlNav a:hover,
+.adminNav a.active, .ownerNav a.active, .controlNav a.active {
+  background: rgba(168,85,247,.17) !important;
+  border-color: rgba(168,85,247,.38) !important;
+}
+
+/* RTL/LTR and touch-safe responsive behavior */
+[dir="rtl"] .gv-brand, [dir="rtl"] .gv-header-inner { direction: rtl; }
+[dir="ltr"] .gv-brand, [dir="ltr"] .gv-header-inner { direction: ltr; }
+button, a, input, select, textarea { touch-action: manipulation; }
+img, video, canvas, svg { max-width: 100%; }
+
+@media (max-width: 1100px) {
+  .gv-header-inner { gap: 8px; }
+  .gv-nav-link { padding-inline: 9px; font-size: 13px; }
+  .wrap, .page, .content, .contentWrap, .adminPage, .adminShell, .dashboard, .dashboardPage {
+    width: min(var(--wrap, 1440px), calc(100% - 24px));
+  }
+}
+@media (max-width: 900px) {
+  .store-shell, .marketplace-grid, .shop-layout, .adminLayout, .dashboardLayout { grid-template-columns: 1fr !important; }
+  .side-panel, .adminSidebar, .ownerSidebar, .controlSidebar { position: static !important; width: 100% !important; }
+  .adminNav, .ownerNav, .controlNav { overflow-x: auto; padding-bottom: 6px; }
+  .adminNav a, .ownerNav a, .controlNav a { flex: 0 0 auto; white-space: nowrap; }
+  .hero-home, .heroGrid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 640px) {
+  body { padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+  .gv-header-inner { min-height: 60px !important; }
+  .gv-brand-name { font-size: 18px !important; }
+  .gv-brand-mark, .gv-brand-mark svg { width: 32px !important; height: 32px !important; }
+  .gv-icon-button, .gv-menu-button, .gv-profile-button { width: 36px !important; height: 36px !important; }
+  .wrap, .page, .content, .contentWrap, .adminPage, .adminShell, .dashboard, .dashboardPage {
+    width: calc(100% - 16px) !important;
+  }
+  .hero, .card, .stat, .glass, .panel, .section, .pageHero, .page-header, .pageHeader,
+  .sectionHero, .storeHero, .gamesHero, .profileHero, .walletHero, .quranHero,
+  .communityHero, .adminHero, .dashboardHero, .searchHero { border-radius: 17px !important; }
+  .hero, .pageHero, .page-header, .pageHeader, .sectionHero, .storeHero, .gamesHero,
+  .profileHero, .walletHero, .quranHero, .communityHero, .adminHero, .dashboardHero, .searchHero {
+    padding: 20px !important;
+  }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .feature-grid { grid-template-columns: 1fr !important; }
+  .btn, .heroCta, .vipBtn, .dealBtn, .auth-submit { min-height: 44px; }
+  .actions, .draw-actions, .action-row, .review-footer { align-items: stretch; }
+  .actions > *, .draw-actions > *, .action-row > * { flex: 1 1 150px; }
+  input, select, textarea, button { font-size: 16px !important; }
+  th, td { padding: 10px !important; white-space: nowrap; }
+}
+@media (max-width: 430px) {
+  .grid { grid-template-columns: 1fr !important; }
+  .gv-mobile-tabs a { padding-inline: 9px !important; font-size: 12px !important; }
+  .section-head { align-items: flex-start; flex-direction: column; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .hero, .card, .stat, .glass, .panel, .gv-header, .gv-bottom-nav { backdrop-filter: none !important; }
+}
+
+/* =====================================================================
+   GameVortex Luxury Fusion v5 — inner pages and feature surfaces
+   ===================================================================== */
+.wrap { padding-block: clamp(22px, 4vw, 44px) !important; }
+.wrap > .hero:first-child, .wrap > .glass.hero:first-child { margin-bottom: 24px; }
+.section-head, .sectionHead { min-height: 42px; padding-block: 6px; border-bottom: 1px solid rgba(168,85,247,.16); }
+.section-head h1, .section-head h2, .sectionHead h1, .sectionHead h2 { letter-spacing: -.02em; }
+.eyebrow { color: var(--ref-cyan) !important; font-size: 11px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+
+.store-shell { align-items: start; gap: 22px !important; }
+.store-shell > .side-panel { padding: 22px !important; border-color: rgba(255,212,90,.24) !important; background: linear-gradient(160deg, rgba(25,20,44,.92), rgba(7,9,20,.96)) !important; }
+.store-shell > .side-panel h2, .store-shell > .side-panel h3 { color: var(--ref-gold); }
+.store-shell .filter-list a { border: 1px solid transparent; transition: background .22s ease, border-color .22s ease, color .22s ease; }
+.store-shell .filter-list a:hover { color: #fff; background: rgba(168,85,247,.14); border-color: rgba(168,85,247,.30); }
+.product, .order-card, .checkout-card { min-height: 100%; padding: 20px !important; display: grid; gap: 12px; }
+.product h2, .product h3 { line-height: 1.25; }
+.product .product-meta { margin-top: auto; }
+.product-price, .fromPrice, .denomPrice { text-shadow: 0 0 18px rgba(255,212,90,.18); }
+.brandGrid, .denomGrid { gap: 14px !important; }
+.brandTile, .denomTile { background: linear-gradient(145deg, rgba(16,21,47,.86), rgba(7,9,20,.96)) !important; border-color: rgba(168,85,247,.25) !important; }
+.brandTile:hover, .denomTile:hover { border-color: rgba(255,212,90,.55) !important; box-shadow: var(--ref-gold-glow) !important; }
+
+.filters { padding: 14px; border: 1px solid rgba(168,85,247,.20); border-radius: var(--ref-radius); background: rgba(8,11,27,.64); }
+.filter-row { align-items: center; }
+.filter-row .input { flex-basis: 220px; }
+.game-card, .apps-grid > *, .wallpaper-grid > * { overflow: hidden; background: linear-gradient(145deg, rgba(15,20,47,.90), rgba(6,9,20,.97)) !important; }
+.game-card img, .game-card .cover, .wallpaper-grid img { transition: transform .35s ease, filter .35s ease; }
+.game-card:hover img, .game-card:hover .cover, .wallpaper-grid > *:hover img { transform: scale(1.035); filter: saturate(1.08) contrast(1.04); }
+.game-card .card-top { gap: 8px; }
+.gameRating, .rating, .stars { color: var(--ref-gold) !important; }
+.game-detail { align-items: stretch; padding: clamp(18px, 3vw, 30px) !important; }
+.detail-cover { border: 1px solid rgba(168,85,247,.35); box-shadow: 0 24px 70px rgba(0,0,0,.48), 0 0 28px rgba(168,85,247,.14); }
+.wallpaper-detail-media { border-radius: var(--ref-radius) !important; border: 1px solid rgba(39,215,255,.26); box-shadow: 0 22px 70px rgba(0,0,0,.45); }
+.platform-list { gap: 8px !important; flex-wrap: wrap; }
+.platform-chip { min-height: 34px; display: inline-flex; align-items: center; }
+
+.orb { background: radial-gradient(circle at 35% 30%, rgba(39,215,255,.32), rgba(168,85,247,.20) 42%, rgba(7,9,20,.94) 74%) !important; border-color: rgba(39,215,255,.36) !important; box-shadow: 0 0 36px rgba(39,215,255,.16); }
+.stat-row, .stats { gap: 12px !important; }
+.stat, .stats > .stat { background: linear-gradient(145deg, rgba(17,23,52,.84), rgba(7,10,24,.96)) !important; }
+.progress-track { background: rgba(255,255,255,.08) !important; }
+.progress-fill { background: linear-gradient(90deg, var(--ref-purple), var(--ref-cyan), var(--ref-gold)) !important; }
+.referral-table { overflow: hidden; border: 1px solid rgba(168,85,247,.18); border-radius: 14px; }
+.referral-table th { background: rgba(168,85,247,.10); }
+.tabs { padding: 5px; border: 1px solid rgba(168,85,247,.18); border-radius: 999px; background: rgba(7,10,24,.62); }
+.tabs > * { border-radius: 999px; }
+
+.chatMessage, .message, .aiMessage { border: 1px solid rgba(168,85,247,.20) !important; background: linear-gradient(145deg, rgba(16,21,47,.86), rgba(7,9,20,.94)) !important; border-radius: 18px !important; }
+.glitch-loader, .loadingCard { min-height: 42vh; }
+.notifications-container { filter: drop-shadow(0 16px 32px rgba(0,0,0,.42)); }
+.success, .alert-success, .formSuccess { background: rgba(11,18,29,.94) !important; border-color: rgba(39,215,255,.28) !important; }
+.alert-error, .formError { background: rgba(37,8,25,.74) !important; }
+.gv-footer, footer, .site-footer, .footer { background: linear-gradient(180deg, rgba(5,8,20,.20), rgba(3,4,11,.92)) !important; }
+.gv-footer a, footer a, .site-footer a, .footer a { color: #b9c4df; }
+.gv-footer a:hover, footer a:hover, .site-footer a:hover, .footer a:hover { color: var(--ref-cyan); }
+
+@media (min-width: 1100px) { .product-grid, .game-grid, .apps-grid, .wallpaper-grid, .gift-grid, .cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .wrap { padding-block: 18px !important; }
+  .section-head, .sectionHead { margin-top: 24px; }
+  .filters { padding: 10px; }
+  .filter-row .input, .filter-row .btn { flex: 1 1 100%; width: 100%; }
+  .product, .order-card, .checkout-card { padding: 16px !important; }
+  .referral-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+/* =====================================================================
+   GameVortex Luxury Fusion v6 — utility, account and content pages
+   ===================================================================== */
+
+/* Library and account dashboards */
+.gv-app-main .tabs[role="tablist"] { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.gv-app-main .tabs[role="tablist"] .btn { flex: 0 0 auto; }
+.notification-unread { border-color: rgba(37,217,255,.42) !important; box-shadow: var(--ref-cyan-glow) !important; }
+.gv-wallet-grid { align-items: stretch; gap: 16px !important; }
+.gv-wallet-balance { background: radial-gradient(420px 220px at 75% 25%, rgba(168,85,247,.28), transparent 70%), linear-gradient(145deg, rgba(16,21,47,.94), rgba(6,9,20,.98)) !important; border-color: rgba(37,217,255,.28) !important; }
+.gv-wallet-amount { color: #ffe08a !important; font-size: clamp(34px, 6vw, 58px); letter-spacing: -.04em; text-shadow: 0 0 28px rgba(255,212,90,.20); }
+.gv-wallet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gv-wallet-amounts .btn { flex: 1 1 72px; }
+.gv-wallet-table { overflow: hidden; border-radius: 16px; }
+.gv-wallet-table tr:hover td { background: rgba(37,217,255,.045) !important; }
+
+/* Payment return / status pages */
+.gv-payment-state { width: min(680px, calc(100% - 24px)); min-height: 62vh; margin: 0 auto; display: grid; place-items: center; padding-block: 44px; }
+.gv-payment-card { width: 100%; padding: clamp(28px, 6vw, 54px); text-align: center; border: 1px solid rgba(168,85,247,.36); border-radius: 28px; background: radial-gradient(360px 240px at 50% 0%, rgba(168,85,247,.20), transparent 68%), linear-gradient(145deg, rgba(15,20,47,.94), rgba(6,9,20,.98)); box-shadow: 0 28px 90px rgba(0,0,0,.56); }
+.gv-payment-orb { width: 92px; height: 92px; margin: 0 auto 20px; display: grid; place-items: center; border-radius: 50%; font-size: 40px; background: linear-gradient(135deg, rgba(255,212,90,.22), rgba(168,85,247,.25)); border: 1px solid rgba(255,212,90,.38); box-shadow: var(--ref-gold-glow); }
+
+/* Legal and long-form information */
+.gv-legal-card { max-width: 920px; margin-inline: auto; padding: clamp(22px, 5vw, 48px) !important; line-height: 2; }
+.gv-legal-card h2, .gv-legal-card h3 { margin-top: 30px; color: #e3d0ff !important; }
+.gv-legal-card ul, .gv-legal-card ol { padding-inline-start: 1.4em; }
+.gv-legal-card a { color: var(--ref-cyan); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Quran / reading surfaces */
+.quranHero, .quran-card, .quranPage .card { background: radial-gradient(520px 240px at 70% 10%, rgba(37,217,255,.12), transparent 68%), linear-gradient(145deg, rgba(14,24,44,.94), rgba(6,10,21,.98)) !important; }
+.quranPage, [class*="quran"] { line-height: 2; }
+.quranPage .card:hover { border-color: rgba(37,217,255,.42) !important; box-shadow: var(--ref-cyan-glow) !important; }
+
+/* API, support and operational screens */
+.api-access, .apiPage, .supportPage { min-width: 0; }
+.supportPage .card, .apiPage .card { border-color: rgba(37,217,255,.20) !important; }
+.supportPage textarea { min-height: 150px; resize: vertical; }
+.codeBlock, pre, code { border-radius: 14px; background: #050814 !important; border: 1px solid rgba(37,217,255,.16); }
+pre { padding: 16px; overflow-x: auto; }
+
+/* Draws, rewards and event cards */
+.draw-actions, .actions { gap: 10px !important; }
+.draw-actions .btn, .actions .btn { flex: 0 0 auto; }
+.card [data-status="OPEN"], .badge[data-status="OPEN"] { color: #8df2c4 !important; border-color: rgba(85,230,165,.32) !important; background: rgba(85,230,165,.08) !important; }
+
+@media (max-width: 700px) {
+  .gv-wallet-grid { grid-template-columns: 1fr !important; }
+  .gv-wallet-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .gv-payment-state { min-height: 52vh; padding-block: 24px; }
+  .gv-payment-card { padding: 28px 18px; border-radius: 20px; }
+  .gv-legal-card { padding: 22px 18px !important; line-height: 1.9; }
+  .gv-app-main .tabs[role="tablist"] .btn { flex: 1 1 140px; }
+}
+
+/* =====================================================================
+   GameVortex Luxury Fusion v8 — final all-pages consistency pass
+   ===================================================================== */
+
+/* Stable page rhythm for every route */
+main.wrap, main.page, main[class*="page"], .gv-app-main > main { isolation: isolate; }
+main.wrap > section, main.page > section { min-width: 0; }
+main.wrap > .hero, main.wrap > .glass.hero, main.page > .hero { margin-bottom: 20px; }
+main.wrap h1, main.page h1 { font-size: clamp(30px, 5vw, 58px); line-height: 1.08; }
+main.wrap h2, main.page h2 { line-height: 1.18; }
+main.wrap p, main.page p { overflow-wrap: anywhere; }
+
+/* All interactive controls share one premium language */
+a, button { -webkit-tap-highlight-color: transparent; }
+a:not(.btn):not(.gv-nav-link):not(.gv-drawer-link):not(.gv-bottom-nav a) { text-underline-offset: 3px; }
+button:disabled, .btn:disabled { filter: saturate(.35); }
+::selection { color: #fff; background: rgba(168,85,247,.58); }
+
+/* Media safety and consistent image presentation */
+main img { max-width: 100%; }
+main video { max-width: 100%; border-radius: var(--ref-radius); }
+.cover, .detail-cover, .wallpaper-detail-media, [class*="cover"] { object-fit: cover; }
+
+/* Dense sections never overflow the viewport */
+.tableWrap, .table-container, .dataTable, .gv-wallet-table, .referral-table { max-width: 100%; overflow-x: auto; }
+pre, .codeBlock, .markdown { max-width: 100%; overflow-x: auto; }
+.grid > *, .feature-grid > *, .stats > *, .heroGrid > *, .store-shell > * { min-width: 0; }
+
+/* Shared loading, empty and error states */
+.empty, .emptyState, .emptyGames, .loadingCard, .glitch-loader, .errorBox {
+  border-radius: var(--ref-radius) !important;
+  border: 1px dashed rgba(168,85,247,.30) !important;
+  background: linear-gradient(145deg, rgba(15,20,47,.68), rgba(6,9,20,.84)) !important;
+}
+
+/* Touch-safe mobile layout for every page */
+@media (max-width: 700px) {
+  main.wrap h1, main.page h1 { font-size: clamp(28px, 9vw, 42px); }
+  main.wrap h2, main.page h2 { font-size: clamp(20px, 6vw, 30px); }
+  main.wrap > .hero, main.wrap > .glass.hero, main.page > .hero { margin-bottom: 14px; }
+  .actions, .heroActions, .draw-actions, .action-row, .hero-actions { gap: 8px !important; }
+  .actions > .btn, .heroActions > *, .draw-actions > .btn, .action-row > * { min-width: 0; }
+  .section-head, .sectionHead { gap: 8px; }
+  .section-head a, .sectionHead a { white-space: normal; }
+  .gv-app-main table { min-width: 560px; }
+  .gv-app-main .tableWrap, .gv-app-main .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 390px) {
+  .gv-brand-name { font-size: 16px !important; }
+  .gv-mobile-tabs a { padding-inline: 7px !important; font-size: 11px !important; }
+  .gv-bottom-nav a { font-size: 10px !important; }
+}
+
+/* Keyboard and reduced-motion quality */
+:where(a, button, input, select, textarea):focus-visible { outline: 2px solid var(--ref-cyan) !important; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
+}
