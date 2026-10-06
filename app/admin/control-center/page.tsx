@@ -3,6 +3,7 @@ import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
 import AdminShell from "@/components/admin/AdminShell";
 import { calculateOwnerCashSummary } from "@/lib/owner-points";
+import WalletOrderRefunds from "@/components/admin/WalletOrderRefunds";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ export default async function OwnerControlCenter() {
     mobileGames,
     ownerWallet,
     withdrawalTotals,
+    recentWalletOrders,
   ] = await Promise.all([
     db.user.count(),
     db.game.count(),
@@ -53,6 +55,27 @@ export default async function OwnerControlCenter() {
     db.withdrawalRequest.groupBy({
       by: ["status"],
       _sum: { usdAmount: true },
+    }),
+
+    db.order.findMany({
+      where: {
+        payments: {
+          some: {
+            provider: "wallet",
+            status: { in: ["SUCCEEDED", "REFUNDED"] },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        totalCents: true,
+        currency: true,
+        status: true,
+        createdAt: true,
+        user: { select: { username: true, email: true } },
+      },
     }),
   ]);
 
@@ -156,6 +179,17 @@ export default async function OwnerControlCenter() {
           <div className={styles.indicatorTile}><strong>${ownerCash.pendingOutUsd.toFixed(2)}</strong><span>السحوبات المعلقة</span></div>
         </div>
       </section>
+
+      <WalletOrderRefunds
+        orders={recentWalletOrders.map((order) => ({
+          id: order.id,
+          userLabel: order.user.username || order.user.email,
+          totalCents: order.totalCents,
+          currency: order.currency,
+          status: order.status,
+          createdAt: order.createdAt.toISOString(),
+        }))}
+      />
 
       <section style={{ marginTop: 18 }}>
         <div className={styles.panelHead}><span>الأنظمة والتكاملات</span></div>
