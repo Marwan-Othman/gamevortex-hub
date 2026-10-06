@@ -539,11 +539,24 @@ async function refundOwnerRevenue(
     return;
   }
 
+  const originalPayment =
+    await transaction.payment.findFirst({
+      where: {
+        orderId: order.id,
+        provider,
+        status: "SUCCEEDED",
+      },
+      orderBy: { createdAt: "asc" },
+      select: { providerPaymentId: true },
+    });
+
+  if (!originalPayment) return;
+
   const saleLedger =
     await transaction.ownerLedger.findUnique({
       where: {
         idempotencyKey:
-          `sale-revenue:${order.id}:${provider}:${paymentId}`,
+          `sale-revenue:${order.id}:${provider}:${originalPayment.providerPaymentId}`,
       },
     });
 
@@ -605,11 +618,24 @@ async function refundOwnerPoints(
     return;
   }
 
+  const originalPayment =
+    await transaction.payment.findFirst({
+      where: {
+        orderId: order.id,
+        provider,
+        status: "SUCCEEDED",
+      },
+      orderBy: { createdAt: "asc" },
+      select: { providerPaymentId: true },
+    });
+
+  if (!originalPayment) return;
+
   const saleLedger =
     await transaction.ownerLedger.findUnique({
       where: {
         idempotencyKey:
-          `sale-points:${order.id}:${provider}:${paymentId}`,
+          `sale-points:${order.id}:${provider}:${originalPayment.providerPaymentId}`,
       },
     });
 
