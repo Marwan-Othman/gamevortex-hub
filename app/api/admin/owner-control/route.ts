@@ -61,6 +61,21 @@ export async function PATCH(request: NextRequest) {
       if (target.email.trim().toLowerCase() !== configuredOwnerEmail) {
         return NextResponse.json({ error: "ONLY_CONFIGURED_OWNER_CAN_BE_SUPER_ADMIN" }, { status: 409 });
       }
+
+      const otherOwner = await db.user.findFirst({
+        where: {
+          role: Role.SUPER_ADMIN,
+          id: { not: target.id },
+        },
+        select: { id: true },
+      });
+
+      if (otherOwner) {
+        return NextResponse.json(
+          { error: "SUPER_ADMIN_ALREADY_EXISTS" },
+          { status: 409 },
+        );
+      }
     }
 
     const updated = await db.$transaction(async (tx) => {
