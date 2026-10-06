@@ -27,7 +27,7 @@
     "wallpapers:seed": "node scripts/seed-wallpaper-library.mjs",
     "db:backup": "sh scripts/backup-postgres.sh",
     "validate:env": "node scripts/validate-env.mjs",
-    "production:validate": "npm run validate:env && npm run test:source && npm run db:validate && npm run db:generate && npm run db:deploy && npm run typecheck && next build && npm run test:smoke",
+    "production:validate": "npm run validate:env && npm run test:source && npm run db:validate && npm run db:generate && npm run db:deploy && npm test && npm run typecheck && next build && npm run test:smoke",
     "production:start": "node scripts/start-production.mjs",
     "production:seed": "node scripts/seed-production.mjs",
     "production:bootstrap": "node scripts/bootstrap-production.mjs",
