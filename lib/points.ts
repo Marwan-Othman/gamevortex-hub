@@ -92,14 +92,10 @@ export async function reversePointsInTransaction(
   }
 
   const updated = await transaction.user.updateMany({
-    where: { id: input.userId, points: { gte: input.amount } },
+    where: { id: input.userId },
     data: { points: { decrement: input.amount } },
   });
-  if (updated.count !== 1) {
-    const user = await transaction.user.findUnique({ where: { id: input.userId }, select: { id: true } });
-    if (!user) throw new Error("User not found");
-    throw new Error("INSUFFICIENT_POINTS");
-  }
+  if (updated.count !== 1) throw new Error("User not found");
   const user = await transaction.user.findUnique({ where: { id: input.userId }, select: { points: true } });
   if (!user) throw new Error("User not found");
   return transaction.pointLedger.create({
