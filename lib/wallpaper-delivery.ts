@@ -39,10 +39,10 @@ export async function openWallpaperSource(url: string) {
     const filePath = localPublicFilePath(url);
     if (!filePath) throw new Error("LOCAL_IMAGE_PATH_INVALID");
     try {
-      const info = await stat(filePath);
+      const info = await stat(/* turbopackIgnore: true */ filePath);
       if (info.isFile()) {
         return {
-          stream: Readable.toWeb(createReadStream(filePath)) as unknown as ReadableStream<Uint8Array>,
+          stream: Readable.toWeb(createReadStream(/* turbopackIgnore: true */ filePath)) as unknown as ReadableStream<Uint8Array>,
           contentType: CONTENT_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream",
           contentLength: info.size,
         };
