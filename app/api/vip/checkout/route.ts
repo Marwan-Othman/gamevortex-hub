@@ -855,6 +855,20 @@ export async function POST(
     );
   } catch (error) {
     if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return NextResponse.json(
+        {
+          error: "VIP_CHECKOUT_CONFLICT_RETRY",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    if (
       error instanceof
       z.ZodError
     ) {
