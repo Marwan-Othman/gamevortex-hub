@@ -9,7 +9,7 @@ import { runChatWithFailover } from "@/lib/ai/provider-manager";
 import { AiProviderError } from "@/lib/ai/types";
 
 const MAX_PROMPT = 6000;
-const MAX_HISTORY = 40;
+const MAX_HISTORY = 12;
 
 export async function executeChat(options: {
   userId: string;
