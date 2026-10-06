@@ -32,7 +32,10 @@ export async function runChatWithFailover(input: AiChatInput) {
     if (provider === "gemini" && !process.env.GEMINI_API_KEY?.trim()) continue;
     if (provider === "manus" && !process.env.MANUS_API_KEY?.trim()) continue;
     try {
-      const result = await call(provider, input);
+      const providerInput = provider === "gemini" && input.previousInteractionId
+        ? { ...input, history: [] }
+        : input;
+      const result = await call(provider, providerInput);
       attempts.push({ provider, result });
       return { result, attempts };
     } catch (error) {
