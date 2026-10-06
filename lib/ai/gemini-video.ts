@@ -151,9 +151,13 @@ export async function geminiVideo(prompt: string, image?: { base64: string; mime
   const output = videoFromSteps(result) || videoFromSdkShape(result);
   if (!output) throw new AiProviderError({ provider: "gemini", code: "VIDEO_NOT_RETURNED", failoverable: true });
 
-  const buffer = "data" in output
-    ? Buffer.from(output.data, "base64")
-    : await downloadGeneratedVideo(output.uri);
+  const inlineData = "data" in output && typeof output.data === "string" ? output.data : null;
+  const uri = "uri" in output && typeof output.uri === "string" ? output.uri : null;
+  if (!inlineData && !uri) throw new AiProviderError({ provider: "gemini", code: "VIDEO_OUTPUT_INVALID", failoverable: true });
+
+  const buffer = inlineData
+    ? Buffer.from(inlineData, "base64")
+    : await downloadGeneratedVideo(uri!);
 
   if (!buffer.length) throw new AiProviderError({ provider: "gemini", code: "VIDEO_EMPTY", failoverable: true });
 
