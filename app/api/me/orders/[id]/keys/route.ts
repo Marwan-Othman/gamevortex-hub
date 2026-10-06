@@ -15,7 +15,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id: rawId } = await params;
     const id = z.string().cuid().parse(rawId);
     const order = await db.order.findFirst({
-      where: { id, userId: user.id, paymentStatus: PaymentStatus.SUCCEEDED },
+      where: {
+        id,
+        userId: user.id,
+        OR: [
+          { paymentStatus: PaymentStatus.SUCCEEDED },
+          {
+            paymentStatus: PaymentStatus.NOT_REQUIRED,
+            status: "COMPLETED",
+          },
+        ],
+      },
       include: {
         items: {
           include: {
