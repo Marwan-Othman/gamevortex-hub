@@ -46,7 +46,6 @@ export async function executeChat(options: {
 
   const owner = vip.isOwner;
   const creditAmount = options.advanced ? getAiCost("ADVANCED_CHAT_COST") : getAiCost("CHAT_COST");
-  if (!owner) await consumeAiCredit(options.userId, "CHAT", options.idempotencyKey, creditAmount);
 
   const requestId = randomUUID();
   const history = conversation.messages
@@ -64,11 +63,26 @@ export async function executeChat(options: {
     conversation.systemInstructions ? "Conversation instructions:\n" + conversation.systemInstructions : "",
   ].filter(Boolean).join("\n\n");
 
-  await db.gameVortexAiMessage.create({
-    data: { conversationId: options.conversationId, role: "user", content: prompt, idempotencyKey: options.idempotencyKey },
-  });
+  try {
+    await db.gameVortexAiMessage.create({
+      data: { conversationId: options.conversationId, role: "user", content: prompt, idempotencyKey: options.idempotencyKey },
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "P2002") {
+      throw new Error("AI_REQUEST_IN_PROGRESS");
+    }
+    throw error;
+  }
 
   try {
+    if (!owner) {
+      try {
+        await consumeAiCredit(options.userId, "CHAT", options.idempotencyKey, creditAmount);
+      } catch (error) {
+        await db.gameVortexAiMessage.deleteMany({ where: { conversationId: options.conversationId, idempotencyKey: options.idempotencyKey } }).catch(() => undefined);
+        throw error;
+      }
+    }
     const { result, attempts } = await runChatWithFailover({ prompt, history, systemInstruction });
     for (const attempt of attempts) {
       const usage = await startAiUsage({
