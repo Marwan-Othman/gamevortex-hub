@@ -766,3 +766,20 @@
     height: 56px;
   }
 }
+
+/* Luxury Fusion v7 — AI command center */
+.aiHub { max-width: 1480px; padding-block: clamp(20px, 4vw, 46px); }
+.header h1 { letter-spacing: -.035em; background: linear-gradient(100deg, #fff, #d9bcff 55%, #25d9ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.primaryButton, .imagePromptBox button, .comingSoon button, .voiceSend { min-height: 46px; border-radius: 999px; background: linear-gradient(135deg, #ffe994, #f6ca63 48%, #d89f28); color: #171106; box-shadow: 0 0 0 1px rgba(246,202,99,.26), 0 12px 30px rgba(246,202,99,.13); }
+.modeBar { border-color: rgba(168,85,247,.28); background: rgba(8,11,27,.82); }
+.modeButton { border-radius: 15px; }
+.modeActive { border-color: rgba(37,217,255,.38); background: linear-gradient(135deg, rgba(168,85,247,.24), rgba(37,217,255,.10)); box-shadow: 0 0 24px rgba(168,85,247,.13); }
+.sidebar, .chatPanel { border-color: rgba(168,85,247,.28); background: linear-gradient(145deg, rgba(15,20,47,.94), rgba(6,9,20,.98)); box-shadow: 0 24px 80px rgba(0,0,0,.48); }
+.activeRow { border-color: rgba(37,217,255,.34); background: rgba(37,217,255,.08); }
+.orbSmall, .studioOrb { box-shadow: 0 0 80px rgba(168,85,247,.34), 0 0 34px rgba(37,217,255,.18); }
+.aiMessage { border-color: rgba(37,217,255,.18); background: linear-gradient(145deg, rgba(16,21,47,.90), rgba(7,9,20,.96)); }
+.userMessage { background: linear-gradient(135deg, rgba(124,58,237,.72), rgba(37,105,150,.56)); }
+.composer { background: rgba(5,8,20,.92); border-top-color: rgba(168,85,247,.22); }
+.composer textarea, .imagePromptBox textarea { border-color: rgba(168,85,247,.26); background: rgba(4,7,19,.90); border-radius: 16px; }
+.sendButton { min-height: 50px; border-radius: 999px; background: linear-gradient(135deg, #a855f7, #25d9ff); }
+@media (max-width: 760px) { .aiHub { padding-inline: 10px; } .modeBar { grid-template-columns: repeat(2, 1fr); } .workArea { grid-template-columns: 1fr; min-height: 0; } .sidebar { max-height: 240px; } .chatPanel { min-height: 620px; } .header { align-items: flex-start; flex-direction: column; } }
