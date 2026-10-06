@@ -679,6 +679,14 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       throw new Error("PAYMENT_AMOUNT_MISMATCH");
     }
 
+    // Wallet.balance is a single USD-denominated balance. A webhook with a
+    // different currency must never be allowed to credit or debit it.
+    const eventCurrency = event.currency?.toUpperCase();
+    const depositCurrency = deposit.currency.toUpperCase();
+    if (depositCurrency !== "USD" || eventCurrency !== depositCurrency) {
+      throw new Error("PAYMENT_CURRENCY_MISMATCH");
+    }
+
     if (deposit.providerPaymentId && deposit.providerPaymentId !== event.paymentId) {
       throw new Error("PAYMENT_ID_MISMATCH");
     }
