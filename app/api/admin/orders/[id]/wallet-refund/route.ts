@@ -180,15 +180,12 @@ export async function POST(
         });
       }
 
-      const gameIds = order.items
-        .map((item) => item.product.gameId)
-        .filter((gameId): gameId is string => Boolean(gameId));
-
-      if (gameIds.length > 0) {
+      if (orderItemIds.length > 0) {
         await tx.entitlement.updateMany({
           where: {
             userId: order.userId,
-            gameId: { in: gameIds },
+            orderItemId: { in: orderItemIds },
+            revokedAt: null,
           },
           data: { revokedAt: new Date() },
         });
