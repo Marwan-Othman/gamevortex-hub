@@ -1,7 +1,7 @@
 import { AiProviderError } from "@/lib/ai/types";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_MODEL = "gemini-omni-1.1-flash";
+const DEFAULT_MODEL = "gemini-omni-flash-preview";
 const TIMEOUT_MS = 300_000;
 const POLL_INTERVAL_MS = 5_000;
 
@@ -126,11 +126,6 @@ export async function geminiVideo(prompt: string, image?: { base64: string; mime
         { type: "text", text: prompt },
       ]
     : prompt;
-  const resolution = process.env.GEMINI_VIDEO_RESOLUTION === "1080p"
-    ? "1080p"
-    : process.env.GEMINI_VIDEO_RESOLUTION === "4k"
-      ? "4k"
-      : "720p";
   const aspectRatio = process.env.GEMINI_VIDEO_ASPECT_RATIO === "16:9" ? "16:9" : "9:16";
   const started = Date.now();
 
@@ -143,8 +138,10 @@ export async function geminiVideo(prompt: string, image?: { base64: string; mime
         type: "video",
         delivery: "uri",
         aspect_ratio: aspectRatio,
-        resolution,
       },
+      ...(image
+        ? { generation_config: { video_config: { task: "image_to_video" } } }
+        : {}),
     }),
   });
 
