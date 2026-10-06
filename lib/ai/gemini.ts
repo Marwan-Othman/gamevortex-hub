@@ -93,7 +93,7 @@ export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
     model,
     input: [history, "User: " + input.prompt].filter(Boolean).join("\n\n"),
     system_instruction: input.systemInstruction || undefined,
-    generation_config: { max_output_tokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048), temperature: 0.7 },
+    generation_config: { max_output_tokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048), temperature: 0.7, thinking_level: process.env.GEMINI_THINKING_LEVEL?.trim() || "low" },
   }, input.signal);
   const answer = textFromPayload(result.payload);
   if (!answer) throw new AiProviderError({ provider: "gemini", code: "EMPTY_RESPONSE", failoverable: true });
