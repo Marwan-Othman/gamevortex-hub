@@ -31,7 +31,12 @@ if (process.env.DATABASE_URL) {
     if (production && ['localhost', '127.0.0.1', '::1'].includes(url.hostname)) errors.push('DATABASE_URL must not point to localhost in production.');
   } catch { errors.push('DATABASE_URL must be a valid PostgreSQL URL.'); }
 }
-if (process.env.GAMEVORTEX_AI_RUNTIME_URL) {
+if (production && (!process.env.GEMINI_API_KEY || !process.env.MANUS_API_KEY)) errors.push('GEMINI_API_KEY and MANUS_API_KEY are required in production.');
+const exposedSecretNames = Object.keys(process.env).filter((key) => /^NEXT_PUBLIC_.*(KEY|SECRET|TOKEN|PASSWORD)/i.test(key));
+if (exposedSecretNames.length) errors.push('Secrets must not use NEXT_PUBLIC_: ' + exposedSecretNames.join(', '));
+/* legacy runtime variables are ignored by the application and should be removed from deployment settings. */
+if (process.env.GAMEVORTEX_AI_RUNTIME_URL || process.env.GAMEVORTEX_AI_RUNTIME_TOKEN || process.env.GAMEVORTEX_AI_MODEL) errors.push('Legacy GameVortex AI runtime variables are no longer supported.');
+/*
   try {
     const url = new URL(process.env.GAMEVORTEX_AI_RUNTIME_URL);
     const local = ['localhost', '127.0.0.1', '::1', '[::1]', 'ollama'].includes(url.hostname.toLowerCase());
@@ -40,12 +45,13 @@ if (process.env.GAMEVORTEX_AI_RUNTIME_URL) {
     if (!local && !process.env.GAMEVORTEX_AI_RUNTIME_TOKEN) errors.push('GAMEVORTEX_AI_RUNTIME_TOKEN is required for a remote GameVortex AI gateway.');
   } catch { errors.push('GAMEVORTEX_AI_RUNTIME_URL must be a valid URL.'); }
 }
-if (process.env.GAMEVORTEX_AI_RUNTIME_TOKEN && (process.env.GAMEVORTEX_AI_RUNTIME_TOKEN.length < 64 || /^(.)\1+$/.test(process.env.GAMEVORTEX_AI_RUNTIME_TOKEN) || /replace|change.?me|example/i.test(process.env.GAMEVORTEX_AI_RUNTIME_TOKEN))) {
+if (false) {
   errors.push('GAMEVORTEX_AI_RUNTIME_TOKEN must be a non-placeholder secret of at least 64 characters.');
 }
-if (process.env.GAMEVORTEX_AI_MODEL && (!process.env.GAMEVORTEX_AI_MODEL.trim() || process.env.GAMEVORTEX_AI_MODEL.length > 128 || /[\u0000-\u0020]/.test(process.env.GAMEVORTEX_AI_MODEL))) {
+if (false) {
   errors.push('GAMEVORTEX_AI_MODEL must be a valid model identifier of at most 128 characters.');
 }
+*/
 if (process.env.OWNER_WITHDRAWAL_ENABLED === 'true') {
   if (!process.env.OWNER_EXTERNAL_WALLET_ADDRESS) errors.push('OWNER_EXTERNAL_WALLET_ADDRESS is required when owner withdrawals are enabled.');
   if (!process.env.PAYOUT_PROVIDER || !process.env.PAYOUT_PROVIDER_BASE_URL || !process.env.PAYOUT_PROVIDER_SECRET) errors.push('PAYOUT_PROVIDER, PAYOUT_PROVIDER_BASE_URL and PAYOUT_PROVIDER_SECRET are required when owner withdrawals are enabled.');
