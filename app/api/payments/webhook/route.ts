@@ -386,9 +386,26 @@ async function refundBuyerPoints(
   provider: string,
   paymentId: string,
 ) {
-  const purchaseKey = `purchase-points:${order.id}:${provider}:${paymentId}`;
-  const reward = await transaction.pointLedger.findUnique({ where: { idempotencyKey: purchaseKey } });
+  const originalPayment = await transaction.payment.findFirst({
+    where: {
+      orderId: order.id,
+      provider,
+      status: "SUCCEEDED",
+    },
+    orderBy: { createdAt: "asc" },
+    select: { providerPaymentId: true },
+  });
+
+  if (!originalPayment?.providerPaymentId) return;
+
+  const purchaseKey =
+    `purchase-points:${order.id}:${provider}:${originalPayment.providerPaymentId}`;
+  const reward = await transaction.pointLedger.findUnique({
+    where: { idempotencyKey: purchaseKey },
+  });
+
   if (!reward || reward.userId !== order.userId || reward.amount <= 0) return;
+
   await reversePointsInTransaction(transaction, {
     userId: order.userId,
     amount: reward.amount,
