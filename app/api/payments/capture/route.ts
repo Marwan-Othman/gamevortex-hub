@@ -219,9 +219,21 @@ export async function POST(
       if (walletDeposit.status === "COMPLETED") {
         return NextResponse.json({ ok: true, reused: true, provider: "paypal", paymentId: body.paymentId });
       }
-      if (walletDeposit.providerPaymentId && walletDeposit.providerPaymentId !== body.paymentId) {
+      // The capture request must refer to the exact provider payment
+      // created for this wallet deposit. Never allow the browser to substitute
+      // an arbitrary PayPal payment ID.
+      if (!walletDeposit.providerPaymentId) {
+        return NextResponse.json({ error: "PAYMENT_NOT_READY" }, { status: 409 });
+      }
+
+      if (walletDeposit.providerPaymentId !== body.paymentId) {
         return NextResponse.json({ error: "PAYMENT_ID_MISMATCH" }, { status: 409 });
       }
+
+      if (walletDeposit.amountCents < 100) {
+        return NextResponse.json({ error: "PAYMENT_AMOUNT_INVALID" }, { status: 400 });
+      }
+
       await provider.capturePayment(body.paymentId);
       return NextResponse.json({ ok: true, provider: "paypal", paymentId: body.paymentId });
     }
