@@ -57,7 +57,26 @@ describe("attemptEmergencyExit", () => {
     });
   });
 
-  it("does not report SOLD for an accepted but unfilled emergency order", async () => {\n    const outcome = await attemptEmergencyExit({\n      ...base,\n      adapter: {\n        placeEmergencyMarketSell: async (request) => ({\n          accepted: true,\n          clientOrderId: request.clientOrderId,\n          providerOrderId: "78",\n          status: "SUBMITTED",\n        }),\n      },\n    });\n    expect(outcome).toEqual({\n      status: "FAILED",\n      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),\n      reason: "EMERGENCY_SELL_NOT_CONFIRMED",\n    });\n  });\n\n  it("reports FAILED when the adapter cannot sell or the quantity is invalid", async () => {
+  it("does not report SOLD for an accepted but unfilled emergency order", async () => {
+    const outcome = await attemptEmergencyExit({
+      ...base,
+      adapter: {
+        placeEmergencyMarketSell: async (request) => ({
+          accepted: true,
+          clientOrderId: request.clientOrderId,
+          providerOrderId: "78",
+          status: "SUBMITTED",
+        }),
+      },
+    });
+    expect(outcome).toEqual({
+      status: "FAILED",
+      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),
+      reason: "EMERGENCY_SELL_NOT_CONFIRMED",
+    });
+  });
+
+  it("reports FAILED when the adapter cannot sell or the quantity is invalid", async () => {
     expect((await attemptEmergencyExit({ ...base, adapter: {} })).status).toBe("FAILED");
     for (const quantity of ["0", "-1", "1e-7", ""]) {
       const outcome = await attemptEmergencyExit({
