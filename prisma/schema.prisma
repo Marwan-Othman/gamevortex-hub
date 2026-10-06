@@ -290,6 +290,7 @@ model GameVortexAiMessage {
   conversationId String
   role           String   @db.VarChar(16)
   content        String   @db.Text
+  idempotencyKey String?  @unique
   createdAt      DateTime @default(now())
 
   conversation GameVortexAiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
