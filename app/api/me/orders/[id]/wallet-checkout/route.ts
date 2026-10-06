@@ -48,7 +48,7 @@ async function deliverGameKeys(tx: Prisma.TransactionClient, order: OrderWithIte
 async function recordOwnerRevenue(tx: Prisma.TransactionClient, order: OrderWithItems, walletTransactionId: string) {
   const owner = await tx.user.findFirst({ where: { role: "SUPER_ADMIN" }, select: { id: true } });
   if (!owner) throw new Error("OWNER_ACCOUNT_NOT_FOUND");
-  const idempotencyKey = \`sale-revenue:\${order.id}:wallet:\${walletTransactionId}\`;
+  const idempotencyKey = `sale-revenue:${order.id}:wallet:${walletTransactionId}`;
   const existing = await tx.ownerLedger.findUnique({ where: { idempotencyKey }, select: { id: true } });
   if (existing) return;
   const wallet = await tx.ownerWallet.upsert({
@@ -76,7 +76,7 @@ async function rewardOwnerPoints(tx: Prisma.TransactionClient, order: OrderWithI
   if (!Number.isInteger(points) || points <= 0) return;
   const owner = await tx.user.findFirst({ where: { role: "SUPER_ADMIN" }, select: { id: true } });
   if (!owner) throw new Error("OWNER_ACCOUNT_NOT_FOUND");
-  const idempotencyKey = \`sale-points:\${order.id}:wallet:\${walletTransactionId}\`;
+  const idempotencyKey = `sale-points:${order.id}:wallet:${walletTransactionId}`;
   const existing = await tx.ownerLedger.findUnique({ where: { idempotencyKey }, select: { id: true } });
   if (existing) return;
   const wallet = await tx.ownerWallet.upsert({
@@ -114,13 +114,13 @@ async function rewardBuyerPoints(tx: Prisma.TransactionClient, order: OrderWithI
     amount: points,
     reason: "STORE_PURCHASE_REWARD",
     sourceId: order.id,
-    idempotencyKey: \`purchase-points:\${order.id}:wallet:\${walletTransactionId}\`,
+    idempotencyKey: `purchase-points:${order.id}:wallet:${walletTransactionId}`,
     metadata: { orderId: order.id, provider: "wallet", walletTransactionId, currency: order.currency },
   });
 }
 
 async function createNotification(tx: Prisma.TransactionClient, order: OrderWithItems, walletTransactionId: string) {
-  const idempotencyKey = \`notification:store-purchase:\${order.id}:wallet:\${walletTransactionId}\`;
+  const idempotencyKey = `notification:store-purchase:${order.id}:wallet:${walletTransactionId}`;
   const existing = await tx.notification.findFirst({
     where: { userId: order.userId, type: "STORE_PURCHASE_COMPLETED", metadata: { path: ["idempotencyKey"], equals: idempotencyKey } },
     select: { id: true },
@@ -172,13 +172,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const wallet = await tx.wallet.findUnique({ where: { userId: user.id } });
       if (!wallet) throw new Error("WALLET_NOT_FOUND");
 
-      await tx.$queryRaw(Prisma.sql\`SELECT "id" FROM "Wallet" WHERE "id" = \${wallet.id} FOR UPDATE\`);
+      await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`);
       const lockedWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
       const amount = new Prisma.Decimal(order.totalCents).div(100);
 
       if (lockedWallet.balance.lt(amount)) throw new Error("INSUFFICIENT_WALLET_BALANCE");
 
-      const idempotencyKey = \`wallet-purchase:\${order.id}\`;
+      const idempotencyKey = `wallet-purchase:${order.id}`;
       const existingTransaction = await tx.walletTransaction.findUnique({ where: { idempotencyKey } });
       if (existingTransaction) {
         if (existingTransaction.type === "PURCHASE" && existingTransaction.referenceType === "ORDER" && existingTransaction.referenceId === order.id) {
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           orderId: order.id,
           provider: "wallet",
-          providerPaymentId: \`wallet:\${walletTransaction.id}\`,
+          providerPaymentId: `wallet:${walletTransaction.id}`,
           status: "SUCCEEDED",
           amountCents: order.totalCents,
           currency: order.currency,
