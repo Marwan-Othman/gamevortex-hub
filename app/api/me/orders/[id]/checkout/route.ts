@@ -416,6 +416,7 @@ export async function POST(
             checkoutReturnUrl(
               order.id,
             ),
+          idempotencyKey: `order-payment:${order.id}`,
         },
       );
 
