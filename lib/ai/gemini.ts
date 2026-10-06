@@ -77,11 +77,41 @@ function textFromPayload(payload: unknown) {
 }
 
 function imageFromPayload(payload: unknown) {
-  const block = modelOutputBlocks(payload).find(item => item.type === "image" && typeof item.data === "string");
+  if (payload && typeof payload === "object") {
+    const outputImage = (payload as {
+      output_image?: {
+        data?: unknown;
+        mime_type?: unknown;
+        mimeType?: unknown;
+      };
+    }).output_image;
+
+    if (outputImage && typeof outputImage.data === "string" && outputImage.data.length > 0) {
+      const rawMime =
+        typeof outputImage.mime_type === "string"
+          ? outputImage.mime_type
+          : typeof outputImage.mimeType === "string"
+            ? outputImage.mimeType
+            : "";
+
+      return {
+        base64: outputImage.data,
+        mimeType: rawMime.startsWith("image/") ? rawMime : "image/png",
+      };
+    }
+  }
+
+  const block = modelOutputBlocks(payload).find(
+    item => item.type === "image" && typeof item.data === "string" && String(item.data).length > 0,
+  );
   if (!block) return null;
+
   return {
     base64: String(block.data),
-    mimeType: typeof block.mime_type === "string" && String(block.mime_type).startsWith("image/") ? String(block.mime_type) : "image/png",
+    mimeType:
+      typeof block.mime_type === "string" && String(block.mime_type).startsWith("image/")
+        ? String(block.mime_type)
+        : "image/png",
   };
 }
 
