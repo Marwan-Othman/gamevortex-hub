@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
@@ -36,15 +37,36 @@ export async function POST(request: NextRequest) {
   const appOrigin = process.env.APP_ORIGIN?.trim();
   if (!appOrigin) return NextResponse.json({ error: "APP_ORIGIN_NOT_CONFIGURED" }, { status: 503 });
 
-  const deposit = await db.walletDeposit.create({
-    data: {
-      userId: user.id,
-      amountCents: parsed.data.amountCents,
-      currency: "USD",
-      provider: provider.name,
-      status: "PENDING",
-      idempotencyKey,
-    },
+  const deposit = await db.$transaction(async (transaction) => {
+    const created = await transaction.walletDeposit.create({
+      data: {
+        userId: user.id,
+        amountCents: parsed.data.amountCents,
+        currency: "USD",
+        provider: provider.name,
+        status: "PENDING",
+        idempotencyKey,
+      },
+    });
+
+    const wallet = await transaction.wallet.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, balance: 0, pendingBalance: 0 },
+      update: {},
+    });
+
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
+    );
+
+    await transaction.wallet.update({
+      where: { id: wallet.id },
+      data: {
+        pendingBalance: { increment: new Prisma.Decimal(parsed.data.amountCents).div(100) },
+      },
+    });
+
+    return created;
   });
 
   try {
@@ -67,7 +89,35 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, deposit: updated, checkoutUrl: payment.checkoutUrl || null, status: payment.status }, { status: 201 });
   } catch (error) {
-    await db.walletDeposit.update({ where: { id: deposit.id }, data: { status: "FAILED" } }).catch(() => undefined);
+    await db.$transaction(async (transaction) => {
+      const current = await transaction.walletDeposit.findUnique({
+        where: { id: deposit.id },
+        select: { id: true, userId: true, amountCents: true, status: true },
+      });
+      if (!current || current.status !== "PENDING") return;
+
+      const wallet = await transaction.wallet.findUnique({
+        where: { userId: current.userId },
+      });
+      if (wallet) {
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
+        );
+        await transaction.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            pendingBalance: {
+              decrement: new Prisma.Decimal(current.amountCents).div(100),
+            },
+          },
+        });
+      }
+
+      await transaction.walletDeposit.update({
+        where: { id: current.id },
+        data: { status: "FAILED" },
+      });
+    }).catch(() => undefined);
     return NextResponse.json({ error: error instanceof Error ? error.message : "DEPOSIT_CREATE_FAILED" }, { status: 502 });
   }
 }
