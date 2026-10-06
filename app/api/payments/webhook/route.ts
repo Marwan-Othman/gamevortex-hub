@@ -768,8 +768,11 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       });
 
       const amount = new Prisma.Decimal(event.amountCents).div(100);
-      if (lockedWallet.balance.lt(amount)) throw new Error("INSUFFICIENT_WALLET_BALANCE_FOR_REFUND");
 
+      // A provider refund is a real liability reversal. The user may already
+      // have spent the deposited funds, so the ledger must still record the
+      // full debit instead of silently leaving the wallet over-credited.
+      // Future wallet spending must reject a negative available balance.
       const idempotencyKey = `wallet-refund:${deposit.id}:${event.provider}:${event.paymentId}`;
       const existing = await transaction.walletTransaction.findUnique({ where: { idempotencyKey } });
       if (!existing) {
