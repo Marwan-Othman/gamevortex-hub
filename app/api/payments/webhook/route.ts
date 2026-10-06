@@ -1409,10 +1409,10 @@ export async function POST(request: NextRequest) {
           await transaction.entitlement.updateMany({
             where: {
               userId: order.userId,
-              gameId: {
+              orderItemId: {
                 in: order.items.map(
                   (item: WebhookOrder["items"][number]) =>
-                    item.product.gameId,
+                    item.id,
                 ),
               },
             },
