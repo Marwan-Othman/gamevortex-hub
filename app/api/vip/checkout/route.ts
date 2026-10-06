@@ -643,6 +643,7 @@ export async function POST(
             buildReturnUrl(
               created.subscription.id,
             ),
+          idempotencyKey: `vip-payment:${created.subscription.id}`,
         });
     } catch (error) {
       /*
