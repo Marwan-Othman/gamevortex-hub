@@ -3002,3 +3002,14 @@
     transition: none;
   }
    }
+
+/* Luxury Fusion v5 — owner/admin control center */
+.shell { background: radial-gradient(760px 480px at 90% 0%, rgba(246,202,99,.08), transparent 64%), radial-gradient(700px 460px at 0% 15%, rgba(168,85,247,.15), transparent 64%), #04050b; }
+.sidebar { background: linear-gradient(180deg, rgba(12,16,38,.98), rgba(4,6,15,.99)); border-inline-end-color: rgba(168,85,247,.28); }
+.sidebarBrand { padding-bottom: 20px; }
+.sidebarOwner { background: linear-gradient(135deg, rgba(168,85,247,.16), rgba(37,217,255,.05)); border-color: rgba(168,85,247,.28); }
+.navLink { min-height: 42px; border: 1px solid transparent; border-radius: 13px; }
+.navLink:hover { background: rgba(168,85,247,.12); }
+.navLink.active { background: linear-gradient(135deg, rgba(168,85,247,.24), rgba(37,217,255,.07)); border-color: rgba(168,85,247,.46); box-shadow: 0 10px 28px rgba(60,25,130,.18); }
+.mainArea { background: transparent; }
+@media (max-width: 900px) { .sidebar { min-width: 100%; width: 100%; height: auto; position: relative; border-inline-end: 0; border-bottom: 1px solid rgba(168,85,247,.25); } .layout { display: block; } .mainArea { width: 100%; max-width: 100%; } }

@@ -65,3 +65,15 @@
 .planButton{border-color:rgba(139,61,255,.55);background:rgba(139,61,255,.08)}
 .planButton:hover:not(:disabled){background:#8b3dff;color:#fff;box-shadow:0 0 0 1px rgba(139,61,255,.3),0 0 28px rgba(139,61,255,.22)}
 .priceBlock{color:#ffd45a}
+
+/* Luxury Fusion v5 — VIP premium surface */
+.page { width: min(1240px, calc(100% - 32px)); padding-block: clamp(24px, 4vw, 56px); gap: 40px; }
+.hero { padding: clamp(28px, 5vw, 64px); border-radius: 28px; background: radial-gradient(520px 280px at 78% 35%, rgba(168,85,247,.28), transparent 68%), radial-gradient(360px 240px at 15% 100%, rgba(246,202,99,.16), transparent 68%), linear-gradient(145deg, rgba(16,20,46,.94), rgba(6,8,18,.98)); border-color: rgba(246,202,99,.36); box-shadow: 0 28px 90px rgba(0,0,0,.52); }
+.heroTitle { font-weight: 900; letter-spacing: -.04em; }
+.primaryButton { min-height: 48px; border-radius: 999px; background: linear-gradient(135deg, #ffe994, #f6ca63 48%, #d89f28); box-shadow: 0 0 0 1px rgba(246,202,99,.28), 0 14px 36px rgba(246,202,99,.16); }
+.accountCard, .whyCard, .benefit, .ownerCard, .planCard { border-radius: 20px; background: linear-gradient(145deg, rgba(15,20,47,.90), rgba(6,9,20,.97)); box-shadow: 0 20px 70px rgba(0,0,0,.42); }
+.planCard { border-block-start-width: 4px; }
+.planCard:hover { transform: translateY(-6px); }
+.planButton { min-height: 44px; border-radius: 999px; }
+.priceBlock { color: #ffe08a; text-shadow: 0 0 22px rgba(246,202,99,.18); }
+@media (max-width: 640px) { .page { width: calc(100% - 16px); gap: 28px; } .hero { padding: 24px 18px; } .heroTitle { font-size: clamp(38px, 13vw, 62px); } }

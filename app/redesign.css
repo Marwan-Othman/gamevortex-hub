@@ -2444,3 +2444,68 @@ img, video, canvas, svg { max-width: 100%; }
 @media (prefers-reduced-transparency: reduce) {
   .hero, .card, .stat, .glass, .panel, .gv-header, .gv-bottom-nav { backdrop-filter: none !important; }
 }
+
+/* =====================================================================
+   GameVortex Luxury Fusion v5 — inner pages and feature surfaces
+   ===================================================================== */
+.wrap { padding-block: clamp(22px, 4vw, 44px) !important; }
+.wrap > .hero:first-child, .wrap > .glass.hero:first-child { margin-bottom: 24px; }
+.section-head, .sectionHead { min-height: 42px; padding-block: 6px; border-bottom: 1px solid rgba(168,85,247,.16); }
+.section-head h1, .section-head h2, .sectionHead h1, .sectionHead h2 { letter-spacing: -.02em; }
+.eyebrow { color: var(--ref-cyan) !important; font-size: 11px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+
+.store-shell { align-items: start; gap: 22px !important; }
+.store-shell > .side-panel { padding: 22px !important; border-color: rgba(255,212,90,.24) !important; background: linear-gradient(160deg, rgba(25,20,44,.92), rgba(7,9,20,.96)) !important; }
+.store-shell > .side-panel h2, .store-shell > .side-panel h3 { color: var(--ref-gold); }
+.store-shell .filter-list a { border: 1px solid transparent; transition: background .22s ease, border-color .22s ease, color .22s ease; }
+.store-shell .filter-list a:hover { color: #fff; background: rgba(168,85,247,.14); border-color: rgba(168,85,247,.30); }
+.product, .order-card, .checkout-card { min-height: 100%; padding: 20px !important; display: grid; gap: 12px; }
+.product h2, .product h3 { line-height: 1.25; }
+.product .product-meta { margin-top: auto; }
+.product-price, .fromPrice, .denomPrice { text-shadow: 0 0 18px rgba(255,212,90,.18); }
+.brandGrid, .denomGrid { gap: 14px !important; }
+.brandTile, .denomTile { background: linear-gradient(145deg, rgba(16,21,47,.86), rgba(7,9,20,.96)) !important; border-color: rgba(168,85,247,.25) !important; }
+.brandTile:hover, .denomTile:hover { border-color: rgba(255,212,90,.55) !important; box-shadow: var(--ref-gold-glow) !important; }
+
+.filters { padding: 14px; border: 1px solid rgba(168,85,247,.20); border-radius: var(--ref-radius); background: rgba(8,11,27,.64); }
+.filter-row { align-items: center; }
+.filter-row .input { flex-basis: 220px; }
+.game-card, .apps-grid > *, .wallpaper-grid > * { overflow: hidden; background: linear-gradient(145deg, rgba(15,20,47,.90), rgba(6,9,20,.97)) !important; }
+.game-card img, .game-card .cover, .wallpaper-grid img { transition: transform .35s ease, filter .35s ease; }
+.game-card:hover img, .game-card:hover .cover, .wallpaper-grid > *:hover img { transform: scale(1.035); filter: saturate(1.08) contrast(1.04); }
+.game-card .card-top { gap: 8px; }
+.gameRating, .rating, .stars { color: var(--ref-gold) !important; }
+.game-detail { align-items: stretch; padding: clamp(18px, 3vw, 30px) !important; }
+.detail-cover { border: 1px solid rgba(168,85,247,.35); box-shadow: 0 24px 70px rgba(0,0,0,.48), 0 0 28px rgba(168,85,247,.14); }
+.wallpaper-detail-media { border-radius: var(--ref-radius) !important; border: 1px solid rgba(39,215,255,.26); box-shadow: 0 22px 70px rgba(0,0,0,.45); }
+.platform-list { gap: 8px !important; flex-wrap: wrap; }
+.platform-chip { min-height: 34px; display: inline-flex; align-items: center; }
+
+.orb { background: radial-gradient(circle at 35% 30%, rgba(39,215,255,.32), rgba(168,85,247,.20) 42%, rgba(7,9,20,.94) 74%) !important; border-color: rgba(39,215,255,.36) !important; box-shadow: 0 0 36px rgba(39,215,255,.16); }
+.stat-row, .stats { gap: 12px !important; }
+.stat, .stats > .stat { background: linear-gradient(145deg, rgba(17,23,52,.84), rgba(7,10,24,.96)) !important; }
+.progress-track { background: rgba(255,255,255,.08) !important; }
+.progress-fill { background: linear-gradient(90deg, var(--ref-purple), var(--ref-cyan), var(--ref-gold)) !important; }
+.referral-table { overflow: hidden; border: 1px solid rgba(168,85,247,.18); border-radius: 14px; }
+.referral-table th { background: rgba(168,85,247,.10); }
+.tabs { padding: 5px; border: 1px solid rgba(168,85,247,.18); border-radius: 999px; background: rgba(7,10,24,.62); }
+.tabs > * { border-radius: 999px; }
+
+.chatMessage, .message, .aiMessage { border: 1px solid rgba(168,85,247,.20) !important; background: linear-gradient(145deg, rgba(16,21,47,.86), rgba(7,9,20,.94)) !important; border-radius: 18px !important; }
+.glitch-loader, .loadingCard { min-height: 42vh; }
+.notifications-container { filter: drop-shadow(0 16px 32px rgba(0,0,0,.42)); }
+.success, .alert-success, .formSuccess { background: rgba(11,18,29,.94) !important; border-color: rgba(39,215,255,.28) !important; }
+.alert-error, .formError { background: rgba(37,8,25,.74) !important; }
+.gv-footer, footer, .site-footer, .footer { background: linear-gradient(180deg, rgba(5,8,20,.20), rgba(3,4,11,.92)) !important; }
+.gv-footer a, footer a, .site-footer a, .footer a { color: #b9c4df; }
+.gv-footer a:hover, footer a:hover, .site-footer a:hover, .footer a:hover { color: var(--ref-cyan); }
+
+@media (min-width: 1100px) { .product-grid, .game-grid, .apps-grid, .wallpaper-grid, .gift-grid, .cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .wrap { padding-block: 18px !important; }
+  .section-head, .sectionHead { margin-top: 24px; }
+  .filters { padding: 10px; }
+  .filter-row .input, .filter-row .btn { flex: 1 1 100%; width: 100%; }
+  .product, .order-card, .checkout-card { padding: 16px !important; }
+  .referral-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
