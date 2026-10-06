@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/prisma";
-import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
-import { getAiCost } from "@/lib/ai-media/costs";
+import { consumeAiCredit, refundAiCredit } from "@/lib/ai/credits";
+import { getAiCost } from "@/lib/ai/costs";
 import { buildGameVortexSiteContext } from "@/lib/gamevortex-ai/site-context";
 import { finishAiUsage, startAiUsage } from "@/lib/gamevortex-ai/usage-ledger";
 import { getVipAccess } from "@/lib/vip";
