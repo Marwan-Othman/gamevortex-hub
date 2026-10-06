@@ -50,8 +50,8 @@ export async function executeChat(options: {
   const requestId = randomUUID();
   const history = conversation.messages
     .filter(message => message.role === "user" || message.role === "assistant")
-    .map(message => ({ role: message.role as "user" | "assistant", content: message.content }))
-    .slice(-MAX_HISTORY);
+    .slice(-MAX_HISTORY)
+    .map(message => ({ role: message.role as "user" | "assistant", content: message.content }));
 
   const siteContext = await buildGameVortexSiteContext(options.userId, prompt);
   const systemInstruction = [
