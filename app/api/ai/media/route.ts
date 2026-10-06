@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         kind,
         provider: "GEMINI",
-        model: kind === "VIDEO" ? (process.env.GEMINI_VIDEO_MODEL || "veo-3.1-generate-preview") : (process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"),
+        model: kind === "VIDEO" ? (process.env.GEMINI_VIDEO_MODEL || "gemini-omni-1.1-flash") : (process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"),
         prompt: prompt,
         status: "PROCESSING",
         conversationId,
