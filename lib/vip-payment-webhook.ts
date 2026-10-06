@@ -631,7 +631,7 @@ export async function processVipPaymentWebhook(
   }
 
   if (
-    input.currency &&
+    !input.currency ||
     input.currency.toUpperCase() !==
       subscription.plan.currency.toUpperCase()
   ) {
