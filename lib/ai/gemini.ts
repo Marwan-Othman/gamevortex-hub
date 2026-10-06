@@ -124,10 +124,14 @@ export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
     input: [history, "User: " + input.prompt].filter(Boolean).join("\n\n"),
     system_instruction: input.systemInstruction || undefined,
     generation_config: { max_output_tokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048), temperature: 0.7, thinking_level: process.env.GEMINI_THINKING_LEVEL?.trim() || "low" },
+    ...(input.previousInteractionId ? { previous_interaction_id: input.previousInteractionId } : {}),
   }, input.signal);
   const answer = textFromPayload(result.payload);
   if (!answer) throw new AiProviderError({ provider: "gemini", code: "EMPTY_RESPONSE", failoverable: true });
-  return { provider: "gemini", model, answer, providerRequestId: result.requestId || randomUUID(), latencyMs: Date.now() - started };
+  const interactionId = result.payload && typeof result.payload === "object" && typeof (result.payload as { id?: unknown }).id === "string"
+    ? String((result.payload as { id: string }).id)
+    : undefined;
+  return { provider: "gemini", model, answer, providerRequestId: result.requestId || randomUUID(), providerInteractionId: interactionId, latencyMs: Date.now() - started };
 }
 
 export async function geminiImage(input: AiImageInput): Promise<AiImageResult> {
