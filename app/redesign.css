@@ -2621,3 +2621,273 @@ pre, .codeBlock, .markdown { max-width: 100%; overflow-x: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+
+
+/* =====================================================================
+   GameVortex — Final route surfaces pass
+   Visual-only layer: no data, API, auth, trading, or business logic changes.
+   ===================================================================== */
+
+/* Catalog / store */
+.platform-list,
+.filter-row,
+.store-shell,
+.tabs,
+.section-head {
+  position: relative;
+}
+.platform-list,
+.filter-row {
+  padding: 12px;
+  border: 1px solid var(--gv-line);
+  border-radius: 18px;
+  background: rgba(9, 10, 22, .68);
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+}
+.filter-row {
+  display: grid;
+  gap: 10px;
+}
+.platform-chip {
+  border-color: var(--gv-line) !important;
+  background: rgba(18, 16, 30, .78) !important;
+  color: var(--gv-text) !important;
+}
+.platform-chip.active,
+.platform-chip:hover {
+  border-color: var(--gv-purple) !important;
+  box-shadow: var(--gv-glow) !important;
+  background: rgba(139,92,246,.14) !important;
+}
+.product,
+.store-shell .side-panel {
+  overflow: hidden;
+  border-radius: 20px;
+}
+.store-shell {
+  gap: 18px;
+}
+.store-shell .side-panel {
+  position: sticky;
+  top: 92px;
+  align-self: start;
+}
+.product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.product-price {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+
+/* Wallet */
+.gv-wallet-grid {
+  align-items: stretch;
+}
+.gv-wallet-balance {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 220px;
+  background:
+    radial-gradient(500px 220px at 80% 20%, rgba(139,92,246,.18), transparent 70%),
+    linear-gradient(145deg, rgba(18,16,30,.95), rgba(7,8,16,.96)) !important;
+}
+.gv-wallet-amount {
+  margin: 14px 0 4px;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  line-height: 1;
+  color: #fff !important;
+}
+.gv-wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gv-wallet-actions .btn {
+  flex: 1 1 82px;
+}
+
+/* Library / profile-style hubs */
+.notification-unread {
+  border-color: rgba(85,217,255,.28) !important;
+  box-shadow: 0 0 0 1px rgba(85,217,255,.08), 0 18px 60px rgba(0,0,0,.34) !important;
+}
+.cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Support */
+.gv-support-shell,
+.support-shell {
+  display: grid;
+  grid-template-columns: minmax(230px, .78fr) minmax(0, 1.6fr);
+  gap: 18px;
+}
+.gv-support-shell > section,
+.support-shell > section,
+.wrap form {
+  border: 1px solid var(--gv-line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(17,15,25,.86), rgba(7,8,14,.94));
+  box-shadow: var(--gv-shadow);
+}
+.wrap form {
+  padding: 16px;
+}
+.wrap form label {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: #d8d4e3;
+  font-weight: 600;
+}
+.wrap form input,
+.wrap form textarea,
+.wrap form select {
+  width: 100%;
+}
+.wrap form button:not(.btn) {
+  border: 1px solid var(--gv-line-purple);
+  border-radius: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #fff;
+  font-weight: 800;
+}
+
+/* AI workspace */
+.aiHub {
+  min-height: min(820px, calc(100dvh - 120px));
+  border: 1px solid var(--gv-line-purple) !important;
+  border-radius: 24px !important;
+  overflow: hidden;
+  background:
+    radial-gradient(700px 380px at 80% 0%, rgba(139,92,246,.13), transparent 68%),
+    linear-gradient(145deg, rgba(14,13,24,.97), rgba(5,6,12,.98)) !important;
+}
+.aiHub .chatPanel {
+  min-width: 0;
+}
+.aiHub .composer textarea {
+  min-height: 52px;
+}
+.aiHub button {
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.aiHub button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* Authentication remains a distinct focused experience but inherits the brand */
+[class*="auth-module_page"] {
+  min-height: 100dvh;
+}
+[class*="auth-module_card"],
+[class*="auth-module_cardWrap"] {
+  border-color: rgba(139,92,246,.25) !important;
+  box-shadow: 0 30px 100px rgba(0,0,0,.52), 0 0 40px rgba(139,92,246,.08) !important;
+}
+[class*="auth-module_brandText"] strong {
+  color: #fff !important;
+}
+[class*="auth-module_langSwitch"] button[aria-pressed="true"] {
+  border-color: var(--gv-gold) !important;
+  color: var(--gv-gold) !important;
+}
+
+/* Owner Control Center / Trading */
+.adminMain {
+  min-width: 0;
+}
+[class*="statGrid"],
+[class*="overviewGrid"],
+[class*="indicatorRow"],
+[class*="actionGrid"] {
+  min-width: 0;
+}
+[class*="statTile"],
+[class*="overviewTile"],
+[class*="indicatorTile"],
+[class*="actionBtn"],
+[class*="chartPanel"],
+[class*="panel"] {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+[class*="actionBtn"]:hover {
+  transform: translateY(-2px);
+}
+[class*="mobileAdminNav"] {
+  border-color: var(--gv-line-purple) !important;
+  background: linear-gradient(145deg, rgba(16,14,29,.96), rgba(6,7,15,.98)) !important;
+  box-shadow: var(--gv-shadow) !important;
+}
+[class*="mobileAdminLink"] {
+  border-color: var(--gv-line) !important;
+  background: rgba(255,255,255,.025) !important;
+}
+[class*="mobileAdminLinkActive"] {
+  border-color: var(--gv-line-purple) !important;
+  background: rgba(139,92,246,.14) !important;
+}
+
+/* Tables / long records */
+.tableWrap,
+.gv-wallet-table,
+[class*="table"] {
+  scrollbar-width: thin;
+}
+.gv-wallet-table th {
+  white-space: nowrap;
+}
+.gv-wallet-table td {
+  color: #d8d5e1;
+}
+
+/* Touch / small screens */
+@media (max-width: 760px) {
+  .store-shell,
+  .gv-support-shell,
+  .support-shell {
+    grid-template-columns: 1fr !important;
+  }
+  .store-shell .side-panel {
+    position: static;
+  }
+  .filter-row {
+    grid-template-columns: 1fr !important;
+  }
+  .gv-wallet-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .gv-wallet-actions .btn {
+    flex-basis: calc(33.333% - 8px);
+  }
+  .aiHub {
+    min-height: calc(100dvh - 150px);
+    border-radius: 18px !important;
+  }
+  .section-head {
+    gap: 10px;
+  }
+}
+@media (max-width: 480px) {
+  .gv-wallet-actions .btn {
+    flex-basis: calc(50% - 8px);
+  }
+  .product-price {
+    font-size: 1.15rem;
+  }
+}
