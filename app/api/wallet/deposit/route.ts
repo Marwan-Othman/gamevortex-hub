@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   amountCents: z.number().int().min(100).max(1_000_000),
-  currency: z.string().trim().length(3).default("USD"),
+  // Wallet.balance is a single USD-denominated balance. Do not allow mixed currencies.  currency: z.literal("USD").default("USD"),
   returnUrl: z.string().url(),
   idempotencyKey: z.string().trim().min(1).max(255).optional(),
 });
