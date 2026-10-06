@@ -87,9 +87,7 @@ export async function buildGameVortexSiteContext(
   const terms =
     termsFromPrompt(prompt);
 
-  const wantsSiteContext =
-    terms.length > 0 ||
-    containsAny(prompt, [
+  const wantsSiteContext = containsAny(prompt, [
       "gamevortex",
       "جيم فورتكس",
       "الموقع",
