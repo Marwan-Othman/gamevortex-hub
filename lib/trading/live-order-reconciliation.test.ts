@@ -52,6 +52,45 @@ describe("live order reconciliation", () => {
     });
   });
 
+  it("keeps a partial fill in PARTIALLY_FILLED and never upgrades it to FILLED", () => {
+    expect(
+      reconcileLiveOrderObservation(
+        intent,
+        observation({
+          status: "PARTIALLY_FILLED",
+          executedQty: "0.00020",
+          cumulativeQuoteQty: "11.90",
+        }),
+      ),
+    ).toEqual({
+      status: "MATCHED",
+      nextState: "PARTIALLY_FILLED",
+      clientOrderId: "gv-live-abc123",
+      providerOrderId: "987654321",
+      providerStatus: "PARTIALLY_FILLED",
+    });
+  });
+
+  it("maps provider rejection to REJECTED without treating it as a fill", () => {
+    expect(
+      reconcileLiveOrderObservation(
+        intent,
+        observation({
+          status: "REJECTED",
+          executedQty: "0",
+          cumulativeQuoteQty: "0",
+          averageFillPrice: null,
+        }),
+      ),
+    ).toEqual({
+      status: "MATCHED",
+      nextState: "REJECTED",
+      clientOrderId: "gv-live-abc123",
+      providerOrderId: "987654321",
+      providerStatus: "REJECTED",
+    });
+  });
+
   it("fails closed on identity drift", () => {
     const result = reconcileLiveOrderObservation(
       intent,
