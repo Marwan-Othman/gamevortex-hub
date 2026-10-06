@@ -767,7 +767,15 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
         const before = lockedWallet.balance;
         const amount = new Prisma.Decimal(event.amountCents).div(100);
         const after = before.add(amount);
-        await transaction.wallet.update({ where: { id: wallet.id }, data: { balance: after } });
+        await transaction.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: after,
+            pendingBalance: {
+              decrement: amount,
+            },
+          },
+        });
         await transaction.walletTransaction.create({
           data: {
             userId: deposit.userId,
@@ -801,7 +809,31 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
     if (event.status === "REFUNDED") {
       if (deposit.status === "REFUNDED") return true;
       if (deposit.status !== "COMPLETED") {
-        await transaction.walletDeposit.update({ where: { id: deposit.id }, data: { status: "REFUNDED" } });
+        if (deposit.status === "PENDING") {
+          const pendingWallet = await transaction.wallet.findUnique({
+            where: { userId: deposit.userId },
+          });
+
+          if (pendingWallet) {
+            await transaction.$queryRaw(
+              Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${pendingWallet.id} FOR UPDATE`,
+            );
+
+            await transaction.wallet.update({
+              where: { id: pendingWallet.id },
+              data: {
+                pendingBalance: {
+                  decrement: new Prisma.Decimal(deposit.amountCents).div(100),
+                },
+              },
+            });
+          }
+        }
+
+        await transaction.walletDeposit.update({
+          where: { id: deposit.id },
+          data: { status: "REFUNDED" },
+        });
         return true;
       }
 
@@ -849,7 +881,31 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       return true;
     }
 
-    await transaction.walletDeposit.update({ where: { id: deposit.id }, data: { status: "FAILED" } });
+    if (deposit.status === "PENDING") {
+      const pendingWallet = await transaction.wallet.findUnique({
+        where: { userId: deposit.userId },
+      });
+
+      if (pendingWallet) {
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${pendingWallet.id} FOR UPDATE`,
+        );
+
+        await transaction.wallet.update({
+          where: { id: pendingWallet.id },
+          data: {
+            pendingBalance: {
+              decrement: new Prisma.Decimal(deposit.amountCents).div(100),
+            },
+          },
+        });
+      }
+    }
+
+    await transaction.walletDeposit.update({
+      where: { id: deposit.id },
+      data: { status: "FAILED" },
+    });
     return true;
   });
 }
