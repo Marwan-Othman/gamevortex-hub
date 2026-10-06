@@ -1,0 +1,1 @@
+ALTER TABLE "GameVortexAiConversation" ADD COLUMN "providerInteractionId" VARCHAR(200);
