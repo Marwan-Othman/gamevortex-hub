@@ -44,8 +44,6 @@ export default function WalletClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents: cents,
-          currency: "USD",
-          returnUrl: `${window.location.origin}/payment/return?target=wallet&reference=__DEPOSIT_ID__`,
         }),
       });
       const data = await response.json();
