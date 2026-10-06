@@ -2509,3 +2509,56 @@ img, video, canvas, svg { max-width: 100%; }
   .product, .order-card, .checkout-card { padding: 16px !important; }
   .referral-table { display: block; overflow-x: auto; white-space: nowrap; }
 }
+
+/* =====================================================================
+   GameVortex Luxury Fusion v6 — utility, account and content pages
+   ===================================================================== */
+
+/* Library and account dashboards */
+.gv-app-main .tabs[role="tablist"] { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.gv-app-main .tabs[role="tablist"] .btn { flex: 0 0 auto; }
+.notification-unread { border-color: rgba(37,217,255,.42) !important; box-shadow: var(--ref-cyan-glow) !important; }
+.gv-wallet-grid { align-items: stretch; gap: 16px !important; }
+.gv-wallet-balance { background: radial-gradient(420px 220px at 75% 25%, rgba(168,85,247,.28), transparent 70%), linear-gradient(145deg, rgba(16,21,47,.94), rgba(6,9,20,.98)) !important; border-color: rgba(37,217,255,.28) !important; }
+.gv-wallet-amount { color: #ffe08a !important; font-size: clamp(34px, 6vw, 58px); letter-spacing: -.04em; text-shadow: 0 0 28px rgba(255,212,90,.20); }
+.gv-wallet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gv-wallet-amounts .btn { flex: 1 1 72px; }
+.gv-wallet-table { overflow: hidden; border-radius: 16px; }
+.gv-wallet-table tr:hover td { background: rgba(37,217,255,.045) !important; }
+
+/* Payment return / status pages */
+.gv-payment-state { width: min(680px, calc(100% - 24px)); min-height: 62vh; margin: 0 auto; display: grid; place-items: center; padding-block: 44px; }
+.gv-payment-card { width: 100%; padding: clamp(28px, 6vw, 54px); text-align: center; border: 1px solid rgba(168,85,247,.36); border-radius: 28px; background: radial-gradient(360px 240px at 50% 0%, rgba(168,85,247,.20), transparent 68%), linear-gradient(145deg, rgba(15,20,47,.94), rgba(6,9,20,.98)); box-shadow: 0 28px 90px rgba(0,0,0,.56); }
+.gv-payment-orb { width: 92px; height: 92px; margin: 0 auto 20px; display: grid; place-items: center; border-radius: 50%; font-size: 40px; background: linear-gradient(135deg, rgba(255,212,90,.22), rgba(168,85,247,.25)); border: 1px solid rgba(255,212,90,.38); box-shadow: var(--ref-gold-glow); }
+
+/* Legal and long-form information */
+.gv-legal-card { max-width: 920px; margin-inline: auto; padding: clamp(22px, 5vw, 48px) !important; line-height: 2; }
+.gv-legal-card h2, .gv-legal-card h3 { margin-top: 30px; color: #e3d0ff !important; }
+.gv-legal-card ul, .gv-legal-card ol { padding-inline-start: 1.4em; }
+.gv-legal-card a { color: var(--ref-cyan); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Quran / reading surfaces */
+.quranHero, .quran-card, .quranPage .card { background: radial-gradient(520px 240px at 70% 10%, rgba(37,217,255,.12), transparent 68%), linear-gradient(145deg, rgba(14,24,44,.94), rgba(6,10,21,.98)) !important; }
+.quranPage, [class*="quran"] { line-height: 2; }
+.quranPage .card:hover { border-color: rgba(37,217,255,.42) !important; box-shadow: var(--ref-cyan-glow) !important; }
+
+/* API, support and operational screens */
+.api-access, .apiPage, .supportPage { min-width: 0; }
+.supportPage .card, .apiPage .card { border-color: rgba(37,217,255,.20) !important; }
+.supportPage textarea { min-height: 150px; resize: vertical; }
+.codeBlock, pre, code { border-radius: 14px; background: #050814 !important; border: 1px solid rgba(37,217,255,.16); }
+pre { padding: 16px; overflow-x: auto; }
+
+/* Draws, rewards and event cards */
+.draw-actions, .actions { gap: 10px !important; }
+.draw-actions .btn, .actions .btn { flex: 0 0 auto; }
+.card [data-status="OPEN"], .badge[data-status="OPEN"] { color: #8df2c4 !important; border-color: rgba(85,230,165,.32) !important; background: rgba(85,230,165,.08) !important; }
+
+@media (max-width: 700px) {
+  .gv-wallet-grid { grid-template-columns: 1fr !important; }
+  .gv-wallet-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .gv-payment-state { min-height: 52vh; padding-block: 24px; }
+  .gv-payment-card { padding: 28px 18px; border-radius: 20px; }
+  .gv-legal-card { padding: 22px 18px !important; line-height: 1.9; }
+  .gv-app-main .tabs[role="tablist"] .btn { flex: 1 1 140px; }
+}
