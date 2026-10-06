@@ -206,7 +206,6 @@ model User {
 
   conversations             Conversation[]
   gameVortexAiConversations GameVortexAiConversation[]
-  aiMediaJobs               AiMediaJob[]
   aiMediaCreditBalance      AiCreditBalance?
   aiCreditLedger            AiCreditLedger[]
   aiUsageLedger             AiUsageLedger[]
@@ -281,7 +280,6 @@ model GameVortexAiConversation {
 
   user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  GameVortexAiMessage[]
-  mediaJobs AiMediaJob[]
 
   @@index([userId, updatedAt])
 }
@@ -1717,53 +1715,11 @@ model TradingControl {
   updatedAt DateTime @updatedAt
 }
 
-enum AiMediaKind {
-  IMAGE
-  VIDEO
-}
-
-enum AiMediaJobStatus {
-  QUEUED
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum AiMediaProvider {
-  INTERNAL
-  GEMINI
-}
-
 enum AiCreditKind {
   CHAT
   IMAGE
   VIDEO
   GVC
-}
-
-model AiMediaJob {
-  id             String                    @id @default(cuid())
-  userId         String
-  kind           AiMediaKind
-  provider       AiMediaProvider
-  providerTaskId String?                   @unique
-  providerFileId String?
-  model          String?
-  prompt         String
-  status         AiMediaJobStatus          @default(QUEUED)
-  resultUrl      String?
-  errorCode      String?
-  errorMessage   String?
-  conversationId String?
-  idempotencyKey String                    @unique
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversation   GameVortexAiConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([userId, status, createdAt])
-  @@index([conversationId, createdAt])
 }
 
 model AiCreditBalance {
