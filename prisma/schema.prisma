@@ -274,7 +274,8 @@ model GameVortexAiConversation {
   id                 String   @id @default(cuid())
   userId             String
   title              String   @default("New conversation") @db.VarChar(100)
-  systemInstructions String?  @db.VarChar(2000)
+  systemInstructions  String?  @db.VarChar(2000)
+  providerInteractionId String? @db.VarChar(200)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
