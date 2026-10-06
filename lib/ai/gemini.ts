@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { AiProviderError, type AiChatInput, type AiChatResult, type AiImageInput, type AiImageResult } from "@/lib/ai/types";
+import { AiProviderError, type AiChatInput, type AiChatResult } from "@/lib/ai/types";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_CHAT_MODEL = "gemini-3.6-flash";
-const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
 const TIMEOUT_MS = 90_000;
 
 function getKey() {
@@ -76,45 +75,6 @@ function textFromPayload(payload: unknown) {
     .trim();
 }
 
-function imageFromPayload(payload: unknown) {
-  if (payload && typeof payload === "object") {
-    const outputImage = (payload as {
-      output_image?: {
-        data?: unknown;
-        mime_type?: unknown;
-        mimeType?: unknown;
-      };
-    }).output_image;
-
-    if (outputImage && typeof outputImage.data === "string" && outputImage.data.length > 0) {
-      const rawMime =
-        typeof outputImage.mime_type === "string"
-          ? outputImage.mime_type
-          : typeof outputImage.mimeType === "string"
-            ? outputImage.mimeType
-            : "";
-
-      return {
-        base64: outputImage.data,
-        mimeType: rawMime.startsWith("image/") ? rawMime : "image/png",
-      };
-    }
-  }
-
-  const block = modelOutputBlocks(payload).find(
-    item => item.type === "image" && typeof item.data === "string" && String(item.data).length > 0,
-  );
-  if (!block) return null;
-
-  return {
-    base64: String(block.data),
-    mimeType:
-      typeof block.mime_type === "string" && String(block.mime_type).startsWith("image/")
-        ? String(block.mime_type)
-        : "image/png",
-  };
-}
-
 export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
   const started = Date.now();
   const model = getModel("GEMINI_CHAT_MODEL", DEFAULT_CHAT_MODEL);
@@ -132,28 +92,6 @@ export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
     ? String((result.payload as { id: string }).id)
     : undefined;
   return { provider: "gemini", model, answer, providerRequestId: result.requestId || randomUUID(), providerInteractionId: interactionId, latencyMs: Date.now() - started };
-}
-
-export async function geminiImage(input: AiImageInput): Promise<AiImageResult> {
-  const started = Date.now();
-  const model = getModel("GEMINI_IMAGE_MODEL", DEFAULT_IMAGE_MODEL);
-  const imageSize = input.imageSize || (process.env.GEMINI_IMAGE_SIZE as "512" | "1K" | "2K" | "4K" | undefined) || "1K";
-  const imageInput = input.inputImage
-    ? [{ type: "text", text: input.prompt }, { type: "image", mime_type: input.inputImage.mimeType, data: input.inputImage.base64 }]
-    : input.prompt;
-
-  const result = await request({
-    model,
-    input: imageInput,
-    response_format: {
-      type: "image",
-      aspect_ratio: input.aspectRatio || "1:1",
-      image_size: imageSize,
-    },
-  }, input.signal);
-  const image = imageFromPayload(result.payload);
-  if (!image) throw new AiProviderError({ provider: "gemini", code: "IMAGE_NOT_RETURNED", failoverable: true });
-  return { provider: "gemini", model, ...image, providerRequestId: result.requestId || randomUUID(), latencyMs: Date.now() - started };
 }
 
 export async function geminiHealth() {
