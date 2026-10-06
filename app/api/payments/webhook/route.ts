@@ -1143,11 +1143,17 @@ export async function POST(request: NextRequest) {
          * Successful payments must exactly match the order total.
          */
         if (
-          event.status === "SUCCEEDED" &&
+          (event.status === "SUCCEEDED" ||
+            event.status === "REFUNDED") &&
           event.amountCents !== order.totalCents
         ) {
+          // Store refunds are currently modeled as full-order refunds.
+          // Partial provider refunds must never trigger full entitlement,
+          // owner-revenue, or points reversal.
           throw new Error(
-            "PAYMENT_AMOUNT_MISMATCH",
+            event.status === "REFUNDED"
+              ? "PARTIAL_REFUND_NOT_SUPPORTED"
+              : "PAYMENT_AMOUNT_MISMATCH",
           );
         }
 
