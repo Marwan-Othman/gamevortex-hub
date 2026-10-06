@@ -59,14 +59,53 @@ export async function GET(
           userId: user.id,
         },
 
-        include: {
+        select: {
+          id: true,
+          status: true,
+          subtotalCents: true,
+          totalCents: true,
+          currency: true,
+          paymentStatus: true,
+          paymentProvider: true,
+          providerOrderId: true,
+          createdAt: true,
+          updatedAt: true,
           items: {
-            include: {
-              product: true,
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+              unitPriceCents: true,
+              product: {
+                select: {
+                  id: true,
+                  sku: true,
+                  title: true,
+                  description: true,
+                  priceCents: true,
+                  currency: true,
+                  kind: true,
+                  deliveryType: true,
+                  region: true,
+                  country: true,
+                  denominationCents: true,
+                  redemptionInstructions: true,
+                },
+              },
             },
           },
-
-          payments: true,
+          payments: {
+            select: {
+              id: true,
+              provider: true,
+              status: true,
+              amountCents: true,
+              currency: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: "asc" },
+          },
         },
 
         orderBy: {
