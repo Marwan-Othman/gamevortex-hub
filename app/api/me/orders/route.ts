@@ -13,6 +13,7 @@ import {
   guardRead,
 } from "@/lib/api";
 import { calculateProductRewardPoints, creditPointsInTransaction } from "@/lib/points";
+import { applyVipPointsMultiplier, getVipPointsMultiplierInTransaction } from "@/lib/vip";
 
 export const dynamic = "force-dynamic";
 
@@ -507,7 +508,7 @@ export async function POST(
               });
             }
 
-            const rewardPoints = calculateProductRewardPoints(created.items.map((item) => {
+            const baseRewardPoints = calculateProductRewardPoints(created.items.map((item) => {
               const product = productsById.get(item.productId);
               if (!product) throw new Error("PRODUCT_NOT_FOUND");
               return {
@@ -517,6 +518,10 @@ export async function POST(
                 rewardPoints: product.rewardPoints,
               };
             }));
+            const vipMultiplier = await getVipPointsMultiplierInTransaction(transaction, user.id);
+            const rewardPoints = baseRewardPoints > 0
+              ? applyVipPointsMultiplier(baseRewardPoints, vipMultiplier)
+              : 0;
             await transaction.order.update({
               where: { id: created.id },
               data: { status: "COMPLETED", paymentStatus: "NOT_REQUIRED", paymentProvider: "FREE" },
