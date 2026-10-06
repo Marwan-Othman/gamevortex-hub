@@ -61,6 +61,7 @@ export async function attemptEmergencyExit(input: {
     });
 
     if (!placed.accepted || placed.status === "REJECTED") throw new Error("EMERGENCY_SELL_REJECTED");
+    if (placed.status !== "FILLED") throw new Error("EMERGENCY_SELL_NOT_CONFIRMED");
     return {
       status: "SOLD",
       clientOrderId,
