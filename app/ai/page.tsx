@@ -3,7 +3,7 @@ import { getOptionalUser } from "@/lib/auth";
 import AiHubClient from "@/components/ai/AiHubClient";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "GameVortex AI", description: "مركز GameVortex للذكاء الاصطناعي للدردشة والصور والفيديو والأدوات." };
+export const metadata = { title: "GameVortex AI", description: "محادثة GameVortex AI." };
 
 export default async function AiPage() {
   const user = await getOptionalUser();
