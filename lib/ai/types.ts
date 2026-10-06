@@ -1,5 +1,5 @@
 export type AiProvider = "gemini" | "manus";
-export type AiOperation = "CHAT" | "IMAGE" | "VIDEO";
+export type AiOperation = "CHAT";
 export type AiProviderHealth = "ACTIVE" | "DEGRADED" | "RATE_LIMITED" | "QUOTA_EXCEEDED" | "OFFLINE";
 
 export type AiChatMessage = { role: "user" | "assistant"; content: string };
@@ -17,23 +17,6 @@ export type AiChatResult = {
   answer: string;
   providerRequestId?: string;
   providerInteractionId?: string;
-  latencyMs: number;
-};
-
-export type AiImageInput = {
-  prompt: string;
-  aspectRatio?: string;
-  imageSize?: "512" | "1K" | "2K" | "4K";
-  inputImage?: { base64: string; mimeType: string };
-  signal?: AbortSignal;
-};
-
-export type AiImageResult = {
-  provider: AiProvider;
-  model: string;
-  base64: string;
-  mimeType: string;
-  providerRequestId?: string;
   latencyMs: number;
 };
 
