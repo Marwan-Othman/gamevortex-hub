@@ -1729,6 +1729,7 @@ enum AiMediaJobStatus {
 
 enum AiMediaProvider {
   INTERNAL
+  GEMINI
 }
 
 enum AiCreditKind {
