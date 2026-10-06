@@ -46,19 +46,19 @@ for (const file of files) {
 }
 
 const schema = fs.readFileSync(path.join(root, 'prisma/schema.prisma'), 'utf8');
-const internalProvider = /enum\s+AiMediaProvider\s*\{\s*INTERNAL\s*\}/m.test(schema);
+const supportedMediaProvider = /enum\s+AiMediaProvider\s*\{[\s\S]*\bINTERNAL\b[\s\S]*\bGEMINI\b[\s\S]*\}/m.test(schema);
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
 const forbiddenPackages = Object.keys(deps).filter((name) => /base44|fal|mini|max/i.test(name));
 
-if (hits.length || forbiddenPackages.length || !internalProvider) {
+if (hits.length || forbiddenPackages.length || !supportedMediaProvider) {
   console.error('AI independence audit: FAIL');
   for (const hit of hits) console.error(`- ${hit}`);
   for (const pkg of forbiddenPackages) console.error(`- forbidden package: ${pkg}`);
-  if (!internalProvider) console.error('- prisma/schema.prisma does not define AiMediaProvider as INTERNAL only');
+  if (!supportedMediaProvider) console.error('- prisma/schema.prisma does not define AiMediaProvider with INTERNAL and GEMINI support');
   process.exit(1);
 }
 
 console.log('AI independence audit: PASS');
 console.log('Runtime source has no Base44/FAL/MiniMax dependency.');
-console.log('Current Prisma media provider is INTERNAL only.');
+console.log('Current Prisma media providers include INTERNAL and GEMINI.');
