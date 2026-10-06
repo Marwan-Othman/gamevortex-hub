@@ -7,6 +7,11 @@ import { getVipAccess } from "@/lib/vip";
 import { consumeAiCredit, refundAiCredit } from "@/lib/ai-media/credits";
 import { getImageCost } from "@/lib/ai-media/costs";
 import { generateImage } from "@/lib/ai-media/providers";
+import {
+  finishAiUsage,
+  startAiUsage,
+  updateAiUsage,
+} from "@/lib/gamevortex-ai/usage-ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -341,13 +346,23 @@ export async function POST(req: NextRequest) {
 
   await consumeAiCredit(user.id, "IMAGE", idempotencyKey, creditAmount);
 
+  let usageId: string | undefined;
   let job;
   try {
+    const usage = await startAiUsage({
+      userId: user.id,
+      provider: "gemini",
+      operation: `IMAGE_${operation}`,
+      idempotencyKey,
+      gvcReserved: creditAmount,
+    });
+    usageId = usage.usage.id;
+
     job = await db.aiMediaJob.create({
       data: {
         userId: user.id,
         kind: "IMAGE",
-        provider: "INTERNAL",
+        provider: "GEMINI",
         model:
           process.env.GEMINI_IMAGE_MODEL?.trim() ||
           "gemini-3.1-flash-image",
@@ -357,8 +372,22 @@ export async function POST(req: NextRequest) {
         idempotencyKey,
       },
     });
+
+    await updateAiUsage(usageId, user.id, {
+      status: "PROCESSING",
+      requestId: undefined,
+      startedAt: new Date(),
+    });
   } catch (error) {
     await refundAiCredit(user.id, "IMAGE", idempotencyKey, creditAmount).catch(() => undefined);
+    if (usageId) {
+      await finishAiUsage(usageId, user.id, {
+        status: "FAILED",
+        gvcUsed: 0,
+        gvcRefunded: creditAmount,
+        errorCode: "AI_MEDIA_JOB_CREATE_FAILED",
+      }).catch(() => undefined);
+    }
     throw error;
   }
 
@@ -413,6 +442,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await finishAiUsage(usageId!, user.id, {
+      status: "COMPLETED",
+      gvcUsed: creditAmount,
+      gvcRefunded: 0,
+      providerCost: null,
+    });
+
     const completed =
       await db.aiMediaJob.update({
         where: {
@@ -450,6 +486,13 @@ export async function POST(req: NextRequest) {
     await refundAiCredit(user.id, "IMAGE", idempotencyKey, creditAmount).catch(() => undefined);
     const code =
       serializeError(error);
+
+    await finishAiUsage(usageId!, user.id, {
+      status: "FAILED",
+      gvcUsed: 0,
+      gvcRefunded: creditAmount,
+      errorCode: code,
+    }).catch(() => undefined);
 
     console.error(
       "GameVortex AI image generation failed:",
