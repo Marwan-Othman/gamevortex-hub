@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   amountCents: z.number().int().min(100).max(1_000_000),
-  // Wallet.balance is a single USD-denominated balance. Do not allow mixed currencies.  currency: z.literal("USD").default("USD"),
-  returnUrl: z.string().url(),
+  // Wallet.balance is a single USD-denominated balance.
+  // Currency is fixed server-side; the browser cannot choose it.
   idempotencyKey: z.string().trim().min(1).max(255).optional(),
 });
 
@@ -33,11 +33,14 @@ export async function POST(request: NextRequest) {
   const provider = new ConfiguredPaymentProvider();
   if (!provider.name) return NextResponse.json({ error: "PAYMENT_PROVIDER_NOT_CONFIGURED" }, { status: 503 });
 
+  const appOrigin = process.env.APP_ORIGIN?.trim();
+  if (!appOrigin) return NextResponse.json({ error: "APP_ORIGIN_NOT_CONFIGURED" }, { status: 503 });
+
   const deposit = await db.walletDeposit.create({
     data: {
       userId: user.id,
       amountCents: parsed.data.amountCents,
-      currency: parsed.data.currency.toUpperCase(),
+      currency: "USD",
       provider: provider.name,
       status: "PENDING",
       idempotencyKey,
@@ -45,15 +48,15 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const returnUrl = parsed.data.returnUrl.includes("__DEPOSIT_ID__")
-      ? parsed.data.returnUrl.replace("__DEPOSIT_ID__", encodeURIComponent(deposit.id))
-      : parsed.data.returnUrl;
+    const returnUrl = new URL("/payment/return", appOrigin);
+    returnUrl.searchParams.set("target", "wallet");
+    returnUrl.searchParams.set("reference", deposit.id);
 
     const payment = await provider.createPayment({
       orderId: deposit.id,
       amountCents: deposit.amountCents,
       currency: deposit.currency,
-      returnUrl,
+      returnUrl: returnUrl.toString(),
     });
 
     const updated = await db.walletDeposit.update({
