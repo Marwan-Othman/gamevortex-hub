@@ -5,6 +5,8 @@ import { ManusApiClient, type ManusMessage } from "@/lib/gamevortex-ai/manus-cli
 export type CreateChatStreamResult = {
   response: Response;
   replaceMessageId?: string;
+  requestId: string;
+  taskId: string;
 };
 
 const MAX_HISTORY_MESSAGES = 100;
@@ -210,5 +212,7 @@ export async function createChatStream(
   return {
     response,
     replaceMessageId,
+    requestId: task.requestId,
+    taskId: task.taskId,
   };
 }
