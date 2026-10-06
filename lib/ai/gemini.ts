@@ -30,13 +30,13 @@ function classify(status: number, body: unknown): AiProviderError {
   return new AiProviderError({ provider: "gemini", code: "PROVIDER_ERROR", status });
 }
 
-async function request(path: string, body: unknown, signal?: AbortSignal) {
+async function request(body: unknown, signal?: AbortSignal) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
   try {
-    const response = await fetch(BASE_URL + path, {
+    const response = await fetch(BASE_URL + "/interactions", {
       method: "POST",
       signal: controller.signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": getKey() },
@@ -55,56 +55,45 @@ async function request(path: string, body: unknown, signal?: AbortSignal) {
   }
 }
 
+function modelOutputBlocks(payload: unknown) {
+  if (!payload || typeof payload !== "object") return [];
+  const steps = (payload as { steps?: unknown }).steps;
+  if (!Array.isArray(steps)) return [];
+  return steps
+    .filter(step => step && typeof step === "object" && (step as { type?: unknown }).type === "model_output")
+    .flatMap(step => {
+      const content = (step as { content?: unknown }).content;
+      return Array.isArray(content) ? content : [];
+    })
+    .filter(block => block && typeof block === "object") as Array<Record<string, unknown>>;
+}
+
 function textFromPayload(payload: unknown) {
-  if (!payload || typeof payload !== "object") return "";
-  const candidates = (payload as { candidates?: unknown }).candidates;
-  if (!Array.isArray(candidates)) return "";
-  const output: string[] = [];
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object") continue;
-    const content = (candidate as { content?: unknown }).content;
-    if (!content || typeof content !== "object") continue;
-    const parts = (content as { parts?: unknown }).parts;
-    if (!Array.isArray(parts)) continue;
-    for (const part of parts) {
-      if (part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string") output.push((part as { text: string }).text);
-    }
-  }
-  return output.join("").trim();
+  return modelOutputBlocks(payload)
+    .filter(block => block.type === "text" && typeof block.text === "string")
+    .map(block => String(block.text))
+    .join("")
+    .trim();
 }
 
 function imageFromPayload(payload: unknown) {
-  if (!payload || typeof payload !== "object") return null;
-  const candidates = (payload as { candidates?: unknown }).candidates;
-  if (!Array.isArray(candidates)) return null;
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object") continue;
-    const content = (candidate as { content?: unknown }).content;
-    if (!content || typeof content !== "object") continue;
-    const parts = (content as { parts?: unknown }).parts;
-    if (!Array.isArray(parts)) continue;
-    for (const part of parts) {
-      const data = part && typeof part === "object" ? (part as { inlineData?: { data?: unknown; mimeType?: unknown } }).inlineData : undefined;
-      if (typeof data?.data === "string" && data.data) {
-        return { base64: data.data, mimeType: typeof data.mimeType === "string" && data.mimeType.startsWith("image/") ? data.mimeType : "image/png" };
-      }
-    }
-  }
-  return null;
+  const block = modelOutputBlocks(payload).find(item => item.type === "image" && typeof item.data === "string");
+  if (!block) return null;
+  return {
+    base64: String(block.data),
+    mimeType: typeof block.mime_type === "string" && String(block.mime_type).startsWith("image/") ? String(block.mime_type) : "image/png",
+  };
 }
 
 export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
   const started = Date.now();
   const model = getModel("GEMINI_CHAT_MODEL", DEFAULT_CHAT_MODEL);
-  const contents = (input.history || []).map(message => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
-  contents.push({ role: "user", parts: [{ text: input.prompt }] });
-  const result = await request("/models/" + encodeURIComponent(model) + ":generateContent", {
-    systemInstruction: input.systemInstruction ? { parts: [{ text: input.systemInstruction }] } : undefined,
-    contents,
-    generationConfig: { maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048), temperature: 0.7 },
+  const history = (input.history || []).map(message => (message.role === "assistant" ? "GameVortex AI: " : "User: ") + message.content).join("\n\n");
+  const result = await request({
+    model,
+    input: [history, "User: " + input.prompt].filter(Boolean).join("\n\n"),
+    system_instruction: input.systemInstruction || undefined,
+    generation_config: { max_output_tokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048), temperature: 0.7 },
   }, input.signal);
   const answer = textFromPayload(result.payload);
   if (!answer) throw new AiProviderError({ provider: "gemini", code: "EMPTY_RESPONSE", failoverable: true });
@@ -114,12 +103,19 @@ export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
 export async function geminiImage(input: AiImageInput): Promise<AiImageResult> {
   const started = Date.now();
   const model = getModel("GEMINI_IMAGE_MODEL", DEFAULT_IMAGE_MODEL);
-  const parts = [];
-  if (input.inputImage) parts.push({ inlineData: { mimeType: input.inputImage.mimeType, data: input.inputImage.base64 } });
-  parts.push({ text: input.inputImage ? "Edit the provided image according to this instruction: " + input.prompt : input.prompt });
-  const result = await request("/models/" + encodeURIComponent(model) + ":generateContent", {
-    contents: [{ parts }],
-    response_format: { type: "image", aspect_ratio: input.aspectRatio || "1:1", image_size: input.imageSize || (process.env.GEMINI_IMAGE_SIZE as "512" | "1K" | "2K" | "4K" | undefined) || "1K" },
+  const imageSize = input.imageSize || (process.env.GEMINI_IMAGE_SIZE as "512" | "1K" | "2K" | "4K" | undefined) || "1K";
+  const imageInput = input.inputImage
+    ? [{ type: "text", text: input.prompt }, { type: "image", mime_type: input.inputImage.mimeType, data: input.inputImage.base64 }]
+    : input.prompt;
+
+  const result = await request({
+    model,
+    input: imageInput,
+    response_format: {
+      type: "image",
+      aspect_ratio: input.aspectRatio || "1:1",
+      image_size: imageSize,
+    },
   }, input.signal);
   const image = imageFromPayload(result.payload);
   if (!image) throw new AiProviderError({ provider: "gemini", code: "IMAGE_NOT_RETURNED", failoverable: true });
