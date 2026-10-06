@@ -1023,6 +1023,15 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // A signed payment event must also match the order currency.
+        // Amounts alone are insufficient because the same cents value can
+        // represent different currencies.
+        const orderCurrency = order.currency.toUpperCase();
+        const eventCurrency = event.currency?.toUpperCase();
+        if (!eventCurrency || eventCurrency !== orderCurrency) {
+          throw new Error("PAYMENT_CURRENCY_MISMATCH");
+        }
+
         const existing =
           await transaction.payment.findUnique({
             where: {
