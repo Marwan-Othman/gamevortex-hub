@@ -35,20 +35,40 @@ export async function startAiUsage(input: AiUsageStartInput) {
     return { usage: existing, alreadyApplied: true };
   }
 
-  const usage = await db.aiUsageLedger.create({
-    data: {
-      userId: input.userId,
-      provider,
-      operation,
-      requestId: input.requestId?.trim() || null,
-      taskId: input.taskId?.trim() || null,
-      gvcReserved,
-      idempotencyKey: input.idempotencyKey,
-      status: AiUsageStatus.QUEUED,
-    },
-  });
+  try {
+    const usage = await db.aiUsageLedger.create({
+      data: {
+        userId: input.userId,
+        provider,
+        operation,
+        requestId: input.requestId?.trim() || null,
+        taskId: input.taskId?.trim() || null,
+        gvcReserved,
+        idempotencyKey: input.idempotencyKey,
+        status: AiUsageStatus.QUEUED,
+      },
+    });
 
-  return { usage, alreadyApplied: false };
+    return { usage, alreadyApplied: false };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const concurrent = await db.aiUsageLedger.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+
+      if (concurrent) {
+        if (concurrent.userId !== input.userId) {
+          throw new Error('AI_USAGE_IDEMPOTENCY_OWNERSHIP_MISMATCH');
+        }
+        return { usage: concurrent, alreadyApplied: true };
+      }
+    }
+
+    throw error;
+  }
 }
 
 export async function updateAiUsage(
