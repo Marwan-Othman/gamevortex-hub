@@ -20,7 +20,6 @@ export default function AiHubClient() {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [mediaUrl, setMediaUrl] = useState("");
-  const [mediaKind, setMediaKind] = useState<"IMAGE" | "VIDEO">("IMAGE");
   const [file, setFile] = useState<File | null>(null);
   const [usage, setUsage] = useState<{ balance: number | null; unlimited: boolean; vip: { isVip: boolean; planCode: string; expiresAt: string | null }; recent: Array<{ provider: string; operation: string; status: string; gvcUsed: number; gvcRefunded: number }> } | null>(null);
 
@@ -93,7 +92,7 @@ export default function AiHubClient() {
     setMediaUrl("");
     try {
       const form = new FormData();
-      form.set("kind", mediaKind);
+      form.set("kind", mode === "VIDEO" ? "VIDEO" : "IMAGE");
       form.set("prompt", text);
       form.set("conversationId", conversationId);
       form.set("idempotencyKey", crypto.randomUUID());
@@ -161,7 +160,7 @@ export default function AiHubClient() {
                 <textarea value={prompt} onChange={event => setPrompt(event.target.value)} placeholder={mode === "IMAGE" ? "صف الصورة أو التعديل المطلوب..." : "صف الفيديو المطلوب..."} style={{ width: "100%", minHeight: 150, borderRadius: 12, padding: 14, background: "#09090b", color: "#fff", border: "1px solid #3f3f46" }} />
                 <input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => setFile(event.target.files?.[0] || null)} style={{ marginTop: 14 }} />
                 <button disabled={busy || !prompt.trim()} style={{ marginTop: 14, border: 0, borderRadius: 10, padding: "11px 18px", cursor: "pointer" }}>{busy ? "جاري الإنشاء..." : "إنشاء"}</button>
-                {mediaUrl && <div style={{ marginTop: 20 }}>{mediaKind === "VIDEO" ? <video controls src={mediaUrl} style={{ maxWidth: "100%", borderRadius: 14 }} /> : <img src={mediaUrl} alt="Generated" style={{ maxWidth: "100%", borderRadius: 14 }} />}<div><a href={mediaUrl} download style={{ display: "inline-block", marginTop: 10 }}>حفظ النتيجة</a></div></div>}
+                {mediaUrl && <div style={{ marginTop: 20 }}>{mode === "VIDEO" ? <video controls src={mediaUrl} style={{ maxWidth: "100%", borderRadius: 14 }} /> : <img src={mediaUrl} alt="Generated" style={{ maxWidth: "100%", borderRadius: 14 }} />}<div><a href={mediaUrl} download style={{ display: "inline-block", marginTop: 10 }}>حفظ النتيجة</a></div></div>}
               </form>
             )}
 
