@@ -124,11 +124,19 @@ export async function geminiImage(input: AiImageInput): Promise<AiImageResult> {
 
 export async function geminiHealth() {
   try {
-    await geminiChat({ prompt: "Return only OK.", systemInstruction: "Health check." });
-    return "ACTIVE" as const;
-  } catch (error) {
-    if (error instanceof AiProviderError && error.code === "RATE_LIMITED") return "RATE_LIMITED" as const;
-    if (error instanceof AiProviderError && (error.code === "QUOTA_EXCEEDED" || error.code === "BILLING_REQUIRED")) return "QUOTA_EXCEEDED" as const;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    const response = await fetch(BASE_URL + "/models/" + encodeURIComponent(getModel("GEMINI_CHAT_MODEL", DEFAULT_CHAT_MODEL)), {
+      method: "GET",
+      signal: controller.signal,
+      headers: { "x-goog-api-key": getKey() },
+    });
+    clearTimeout(timer);
+    if (response.ok) return "ACTIVE" as const;
+    if (response.status === 429) return "RATE_LIMITED" as const;
+    if (response.status === 402) return "QUOTA_EXCEEDED" as const;
+    return "OFFLINE" as const;
+  } catch {
     return "OFFLINE" as const;
   }
 }
