@@ -83,7 +83,7 @@ export async function executeChat(options: {
         throw error;
       }
     }
-    const { result, attempts } = await runChatWithFailover({ prompt, history, systemInstruction });
+    const { result, attempts } = await runChatWithFailover({ prompt, history, systemInstruction, previousInteractionId: conversation.providerInteractionId || undefined });
     for (const attempt of attempts) {
       const usage = await startAiUsage({
         userId: options.userId,
@@ -100,6 +100,11 @@ export async function executeChat(options: {
         errorCode: attempt.error?.code || null,
       });
     }
+
+    await db.gameVortexAiConversation.update({
+      where: { id: conversation.id },
+      data: { providerInteractionId: result.provider === "gemini" ? (result.providerInteractionId || null) : null },
+    });
 
     const existingAssistant = await db.gameVortexAiMessage.findFirst({
       where: { conversationId: options.conversationId, role: "assistant", idempotencyKey: options.idempotencyKey + ":assistant" },
