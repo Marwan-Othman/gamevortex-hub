@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       amountCents: deposit.amountCents,
       currency: deposit.currency,
       returnUrl: returnUrl.toString(),
+      idempotencyKey: `wallet-deposit-payment:${deposit.id}`,
     });
 
     const updated = await db.walletDeposit.update({
