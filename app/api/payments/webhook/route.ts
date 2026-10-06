@@ -713,7 +713,14 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       throw new Error("PAYMENT_CURRENCY_MISMATCH");
     }
 
-    if (deposit.providerPaymentId && deposit.providerPaymentId !== event.paymentId) {
+    // Success events use the payment/order identifier created at checkout.
+    // Refund events may legitimately carry a different provider transaction
+    // identifier (for example a Stripe charge/refund identifier).
+    if (
+      event.status === "SUCCEEDED" &&
+      deposit.providerPaymentId &&
+      deposit.providerPaymentId !== event.paymentId
+    ) {
       throw new Error("PAYMENT_ID_MISMATCH");
     }
 
