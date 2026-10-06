@@ -7,6 +7,7 @@ export type AiChatInput = {
   prompt: string;
   history?: AiChatMessage[];
   systemInstruction?: string;
+  previousInteractionId?: string;
   signal?: AbortSignal;
 };
 
@@ -15,6 +16,7 @@ export type AiChatResult = {
   model: string;
   answer: string;
   providerRequestId?: string;
+  providerInteractionId?: string;
   latencyMs: number;
 };
 
