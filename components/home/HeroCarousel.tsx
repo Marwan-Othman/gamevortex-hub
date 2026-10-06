@@ -37,6 +37,7 @@ export default function HeroCarousel({
 }: Props) {
   const locale = useLocale();
   const english = locale === "en";
+
   const t = (ar: string, en: string) => (english ? en : ar);
 
   const formatCount = (value: number) =>
@@ -44,51 +45,15 @@ export default function HeroCarousel({
       ? `${value.toLocaleString("en-US")}+`
       : String(value);
 
-  const portals = [
-    {
-      href: "/games?platform=pc",
-      kicker: "PC",
-      titleAr: "ألعاب PC",
-      titleEn: "PC Games",
-      textAr: "عالم الحاسوب",
-      textEn: "Desktop gaming",
-      icon: "▣",
-    },
-    {
-      href: "/games?platform=android",
-      kicker: "MOBILE",
-      titleAr: "ألعاب الموبايل",
-      titleEn: "Mobile Games",
-      textAr: "العب أينما كنت",
-      textEn: "Play anywhere",
-      icon: "▯",
-    },
-    {
-      href: "/apps",
-      kicker: "APPS",
-      titleAr: "التطبيقات",
-      titleEn: "Apps",
-      textAr: "أدوات وتطبيقات رقمية",
-      textEn: "Digital tools & apps",
-      icon: "✦",
-    },
-    {
-      href: "/gift-cards",
-      kicker: "GIFTS",
-      titleAr: "بطاقات الهدايا",
-      titleEn: "Gift Cards",
-      textAr: "رصيد ومنتجات رقمية",
-      textEn: "Credits & digital goods",
-      icon: "◇",
-    },
-  ];
-
   return (
     <div
       className={styles.heroGrid}
       dir={english ? "ltr" : "rtl"}
       lang={locale}
     >
+      {/* =========================================================
+          MAIN HERO
+          ========================================================= */}
       <section
         className={styles.hero}
         aria-label="GameVortex"
@@ -99,96 +64,281 @@ export default function HeroCarousel({
           } as React.CSSProperties
         }
       >
-        <div className={styles.heroArtwork} aria-hidden="true" />
-        <div className={styles.heroOverlay} aria-hidden="true" />
+        <div
+          className={styles.heroArtwork}
+          aria-hidden="true"
+        />
+
+        <div
+          className={styles.heroOverlay}
+          aria-hidden="true"
+        />
 
         <div className={styles.heroContent}>
           <span className={styles.heroEyebrow}>
-            {t("مرحبًا بك في GAMEVORTEX", "WELCOME TO GAMEVORTEX")}
+            {t(
+              "مرحبًا بك في GAMEVORTEX",
+              "WELCOME TO GAMEVORTEX"
+            )}
           </span>
 
-          <h1 className={styles.heroTitle}>GameVortex Hub</h1>
+          <h1 className={styles.heroTitle}>
+            GAMEVORTEX
+          </h1>
 
           <p className={styles.heroTag}>
-            {t("عالم كامل من الألعاب بين يديك", "A whole gaming world in your hands")}
+            {t(
+              "العب بلا حدود",
+              "PLAY BEYOND LIMITS"
+            )}
           </p>
 
           <p className={styles.heroLead}>
             {t(
-              "اكتشف الألعاب، التطبيقات، بطاقات الهدايا، VIP وأدوات الذكاء الاصطناعي داخل تجربة واحدة مصممة حول اللاعب.",
-              "Discover games, apps, gift cards, VIP and AI tools inside one player-first experience."
+              "اكتشف، العب، واستكشف عالم الألعاب المتكامل. ألعاب، تطبيقات، بطاقات هدايا، أدوات ذكاء اصطناعي وأكثر.",
+              "Discover, play, and explore the ultimate gaming universe. Games, apps, gift cards, AI tools and more."
             )}
           </p>
 
           <div className={styles.heroActions}>
-            <Link href="/games" className={styles.heroCta}>
-              {t("استكشف الألعاب", "Explore Games")}
+            <Link
+              href="/games"
+              className={styles.heroCta}
+            >
+              {t(
+                "استكشف الألعاب",
+                "Explore Games"
+              )}
+
               <Arrow />
             </Link>
 
-            <Link href="/ai" className={styles.heroGhost}>
-              {t("جرّب GameVortex AI", "Try GameVortex AI")}
+            <Link
+              href="/auth/register"
+              className={styles.heroGhost}
+            >
+              {t(
+                "انضم الآن",
+                "Join Now"
+              )}
             </Link>
           </div>
         </div>
 
+        {/* =======================================================
+            HERO STATS
+            ======================================================= */}
         <div className={styles.heroStats}>
           <div className={styles.heroStat}>
-            <StatIcon>🎮</StatIcon>
+            <StatIcon>
+              🎮
+            </StatIcon>
+
             <span>
-              <b>{formatCount(gamesCount)}</b>
-              <small>{t("ألعاب", "Games")}</small>
+              <b>
+                {formatCount(gamesCount)}
+              </b>
+
+              <small>
+                {t(
+                  "ألعاب",
+                  "Games"
+                )}
+              </small>
             </span>
           </div>
 
           <div className={styles.heroStat}>
-            <StatIcon>▦</StatIcon>
+            <StatIcon>
+              ▦
+            </StatIcon>
+
             <span>
-              <b>{formatCount(appsCount)}</b>
-              <small>{t("تطبيقات", "Apps")}</small>
+              <b>
+                {formatCount(appsCount)}
+              </b>
+
+              <small>
+                {t(
+                  "تطبيقات",
+                  "Apps"
+                )}
+              </small>
             </span>
           </div>
 
           <div className={styles.heroStat}>
-            <StatIcon>✦</StatIcon>
+            <StatIcon>
+              ✦
+            </StatIcon>
+
             <span>
-              <b>{t("منتجات رقمية", "Digital Products")}</b>
-              <small>{t("متجر GameVortex", "GameVortex Store")}</small>
+              <b>
+                {t(
+                  "منتجات رقمية",
+                  "Digital Products"
+                )}
+              </b>
+
+              <small>
+                {t(
+                  "متجر GameVortex",
+                  "GameVortex Store"
+                )}
+              </small>
             </span>
           </div>
 
           <div className={styles.heroStat}>
-            <StatIcon>♛</StatIcon>
+            <StatIcon>
+              ♛
+            </StatIcon>
+
             <span>
-              <b>VIP</b>
-              <small>{t("مزايا حصرية", "Exclusive Benefits")}</small>
+              <b>
+                VIP
+              </b>
+
+              <small>
+                {t(
+                  "مزايا حصرية",
+                  "Exclusive Benefits"
+                )}
+              </small>
             </span>
           </div>
 
           <div className={styles.heroStat}>
-            <StatIcon>✧</StatIcon>
+            <StatIcon>
+              ✧
+            </StatIcon>
+
             <span>
-              <b>{t("أدوات AI", "AI Tools")}</b>
-              <small>{t("مدعومة بالذكاء الاصطناعي", "Powered by AI")}</small>
+              <b>
+                {t(
+                  "أدوات AI",
+                  "AI Tools"
+                )}
+              </b>
+
+              <small>
+                {t(
+                  "مدعومة بالذكاء الاصطناعي",
+                  "Powered by AI"
+                )}
+              </small>
             </span>
           </div>
         </div>
       </section>
 
-      <div className={styles.sideCol} aria-label={t("بوابات GameVortex", "GameVortex gateways")}>
-        {portals.map((portal) => (
-          <Link key={portal.href} href={portal.href} className={styles.sideCard}>
-            <div className={styles.sideCardContent}>
-              <span className={styles.sideKicker}>{portal.icon} {portal.kicker}</span>
-              <h3>{english ? portal.titleEn : portal.titleAr}</h3>
-              <p>{english ? portal.textEn : portal.textAr}</p>
-              <span className={styles.sideBtn}>
-                {t("استكشف", "Explore")}
-                <Arrow />
-              </span>
-            </div>
-          </Link>
-        ))}
+      {/* =========================================================
+          SIDE BANNERS
+          ========================================================= */}
+      <div className={styles.sideCol}>
+
+        {/* =======================================================
+            VIP BANNER
+            ======================================================= */}
+        <Link
+          href="/vip"
+          className={`${styles.sideCard} ${styles.sideVip}`}
+          aria-label={t(
+            "عرض باقات GameVortex VIP",
+            "View GameVortex VIP Plans"
+          )}
+          style={
+            {
+              backgroundImage:
+                "url('/images/home/vip-banner.png')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            } as React.CSSProperties
+          }
+        >
+          <div className={styles.sideCardContent}>
+            <span className={styles.sideKicker}>
+              GAMEVORTEX VIP
+            </span>
+
+            <h3>
+              {t(
+                "GameVortex VIP",
+                "GameVortex VIP"
+              )}{" "}
+              ♛
+            </h3>
+
+            <p>
+              {t(
+                "مكافآت حصرية • نقاط أعلى • رصيد AI • عروض خاصة",
+                "Exclusive rewards • Higher points • AI credits • Special offers"
+              )}
+            </p>
+
+            <span className={styles.sideBtn}>
+              {t(
+                "عرض باقات VIP",
+                "View VIP Plans"
+              )}
+
+              <Arrow />
+            </span>
+          </div>
+        </Link>
+
+        {/* =======================================================
+            AI BANNER
+            ======================================================= */}
+        <Link
+          href="/ai"
+          className={`${styles.sideCard} ${styles.sideAi}`}
+          aria-label={t(
+            "ابدأ مع GameVortex AI",
+            "Start with GameVortex AI"
+          )}
+          style={
+            {
+              backgroundImage:
+                "url('/images/home/ai-banner.png')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            } as React.CSSProperties
+          }
+        >
+          <div className={styles.sideCardContent}>
+            <span className={styles.sideKicker}>
+              GAMEVORTEX AI
+            </span>
+
+            <h3>
+              {t(
+                "GameVortex AI",
+                "GameVortex AI"
+              )}{" "}
+              ✧
+            </h3>
+
+            <p>
+              {t(
+                "محادثة • صور • فيديو • أدوات ألعاب",
+                "Chat • Image • Video • Game Tools"
+              )}
+            </p>
+
+            <span className={styles.sideBtn}>
+              {t(
+                "ابدأ مع AI",
+                "Start with AI"
+              )}
+
+              <Arrow />
+            </span>
+          </div>
+        </Link>
+
       </div>
     </div>
   );
