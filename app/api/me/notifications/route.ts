@@ -1,6 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { guardMutation, guardRead } from "@/lib/api";
-export async function GET(request: NextRequest) { const blocked = await guardRead(request, "notifications:read"); if (blocked) return blocked; try { const u=await requireUser(); return NextResponse.json(await db.notification.findMany({ where:{userId:u.id}, orderBy:{createdAt:"desc"}, take:50 })); } catch(e){ return NextResponse.json({error:e instanceof Error?e.message:"UNAUTHORIZED"},{status:401}); } }
-export async function PATCH(request: NextRequest) { const blocked=await guardMutation(request,"notifications:write",30); if(blocked)return blocked; try { const u=await requireUser(); const body=await request.json(); const id=String(body.id||""); if(id){ await db.notification.updateMany({where:{id,userId:u.id},data:{readAt:new Date()}}); } else { await db.notification.updateMany({where:{userId:u.id,readAt:null},data:{readAt:new Date()}}); } return NextResponse.json({ok:true}); } catch(e){ return NextResponse.json({error:e instanceof Error?e.message:"FAILED"},{status:400}); } }
+
+const patchSchema = z.object({
+  id: z.string().trim().min(1).max(100).optional(),
+});
+
+export async function GET(request: NextRequest) {
+  const blocked = await guardRead(request, "notifications:read");
+  if (blocked) return blocked;
+
+  try {
+    const user = await requireUser();
+    const notifications = await db.notification.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return NextResponse.json(notifications, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "UNAUTHORIZED" },
+      { status: 401 },
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const blocked = await guardMutation(request, "notifications:write", 30);
+  if (blocked) return blocked;
+
+  try {
+    const user = await requireUser();
+    const parsed = patchSchema.safeParse(await request.json().catch(() => ({})));
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: "INVALID_REQUEST" }, { status: 400 });
+    }
+
+    const readAt = new Date();
+
+    if (parsed.data.id) {
+      const result = await db.notification.updateMany({
+        where: { id: parsed.data.id, userId: user.id, readAt: null },
+        data: { readAt },
+      });
+
+      return NextResponse.json({ ok: true, updated: result.count });
+    }
+
+    const result = await db.notification.updateMany({
+      where: { userId: user.id, readAt: null },
+      data: { readAt },
+    });
+
+    return NextResponse.json({ ok: true, updated: result.count });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "NOTIFICATIONS_UPDATE_FAILED";
+    return NextResponse.json(
+      { error: message },
+      { status: message === "UNAUTHORIZED" ? 401 : 400 },
+    );
+  }
+}
