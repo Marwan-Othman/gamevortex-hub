@@ -13,6 +13,7 @@ import { rateLimitAsync, clientKey } from "@/lib/security";
 import { logSystemError } from "@/lib/observability";
 import { processVipPaymentWebhook } from "@/lib/vip-payment-webhook";
 import { calculateProductRewardPoints, creditPointsInTransaction, reversePointsInTransaction } from "@/lib/points";
+import { applyVipPointsMultiplier, getVipPointsMultiplierInTransaction } from "@/lib/vip";
 
 export const runtime = "nodejs";
 
@@ -360,13 +361,15 @@ async function rewardBuyerPoints(
     quantity: item.quantity,
     rewardPoints: item.product.rewardPoints,
   }));
-  const points = calculateProductRewardPoints(order.items.map((item) => ({
+  const basePoints = calculateProductRewardPoints(order.items.map((item) => ({
     quantity: item.quantity,
     unitPriceCents: item.unitPriceCents,
     currency: order.currency,
     rewardPoints: item.product.rewardPoints,
   })));
-  if (points <= 0) return;
+  if (basePoints <= 0) return;
+  const vipMultiplier = await getVipPointsMultiplierInTransaction(transaction, order.userId);
+  const points = applyVipPointsMultiplier(basePoints, vipMultiplier);
   await creditPointsInTransaction(transaction, {
     userId: order.userId,
     amount: points,
