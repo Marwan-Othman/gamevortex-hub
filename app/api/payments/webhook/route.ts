@@ -701,10 +701,20 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
         update: {},
       });
 
+      // Serialize concurrent balance changes for this wallet. Without a row lock,
+      // two signed webhooks can both read the same balance and lose one update.
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
+      );
+
+      const lockedWallet = await transaction.wallet.findUniqueOrThrow({
+        where: { id: wallet.id },
+      });
+
       const idempotencyKey = `wallet-deposit:${deposit.id}:${event.provider}:${event.paymentId}`;
       const existing = await transaction.walletTransaction.findUnique({ where: { idempotencyKey } });
       if (!existing) {
-        const before = wallet.balance;
+        const before = lockedWallet.balance;
         const amount = new Prisma.Decimal(event.amountCents).div(100);
         const after = before.add(amount);
         await transaction.wallet.update({ where: { id: wallet.id }, data: { balance: after } });
@@ -747,13 +757,23 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
 
       const wallet = await transaction.wallet.findUnique({ where: { userId: deposit.userId } });
       if (!wallet) throw new Error("WALLET_NOT_FOUND");
+
+      // Serialize the refund against concurrent deposits/purchases/refunds.
+      await transaction.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
+      );
+
+      const lockedWallet = await transaction.wallet.findUniqueOrThrow({
+        where: { id: wallet.id },
+      });
+
       const amount = new Prisma.Decimal(event.amountCents).div(100);
-      if (wallet.balance.lt(amount)) throw new Error("INSUFFICIENT_WALLET_BALANCE_FOR_REFUND");
+      if (lockedWallet.balance.lt(amount)) throw new Error("INSUFFICIENT_WALLET_BALANCE_FOR_REFUND");
 
       const idempotencyKey = `wallet-refund:${deposit.id}:${event.provider}:${event.paymentId}`;
       const existing = await transaction.walletTransaction.findUnique({ where: { idempotencyKey } });
       if (!existing) {
-        const before = wallet.balance;
+        const before = lockedWallet.balance;
         const after = before.sub(amount);
         await transaction.wallet.update({ where: { id: wallet.id }, data: { balance: after } });
         await transaction.walletTransaction.create({
