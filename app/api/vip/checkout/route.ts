@@ -520,6 +520,33 @@ export async function POST(
     const created =
       await db.$transaction(
         async (tx) => {
+          // Re-check inside a serializable transaction so two concurrent
+          // checkout requests cannot both pass the earlier availability check.
+          const concurrentActiveSubscription =
+            await tx.vipSubscription.findFirst({
+              where: {
+                userId: user.id,
+                status: VipSubscriptionStatus.ACTIVE,
+                OR: [
+                  { expiresAt: null },
+                  { expiresAt: { gt: new Date() } },
+                ],
+              },
+              select: {
+                id: true,
+                plan: {
+                  select: {
+                    code: true,
+                  },
+                },
+                expiresAt: true,
+              },
+            });
+
+          if (concurrentActiveSubscription) {
+            throw new Error("VIP_ALREADY_ACTIVE");
+          }
+
           const subscription =
             await tx.vipSubscription.create({
               data: {
@@ -615,6 +642,9 @@ export async function POST(
             subscription,
             purchase,
           };
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         },
       );
 
