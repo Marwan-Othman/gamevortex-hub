@@ -380,6 +380,16 @@ async function refundVipPayment(
       }
 
       if (
+        !input.currency ||
+        input.currency.toUpperCase() !==
+          subscription.plan.currency.toUpperCase()
+      ) {
+        throw new Error(
+          "VIP_REFUND_CURRENCY_MISMATCH",
+        );
+      }
+
+      if (
         subscription.purchase &&
         subscription.purchase.status ===
           PaymentStatus.REFUNDED
