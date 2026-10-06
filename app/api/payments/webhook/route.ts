@@ -781,6 +781,65 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
   });
 }
 
+async function refundApiAccessOwnerRevenue(
+  transaction: Prisma.TransactionClient,
+  purchase: {
+    id: string;
+    currency: string;
+    providerPaymentId: string | null;
+  },
+  provider: string,
+  refundPaymentId: string,
+) {
+  const refundIdempotencyKey =
+    `refund-api-access-revenue:${purchase.id}:${provider}:${refundPaymentId}`;
+
+  const existingRefund =
+    await transaction.ownerLedger.findUnique({
+      where: { idempotencyKey: refundIdempotencyKey },
+      select: { id: true },
+    });
+
+  if (existingRefund) return;
+
+  if (!purchase.providerPaymentId) return;
+
+  const saleLedger =
+    await transaction.ownerLedger.findUnique({
+      where: {
+        idempotencyKey:
+          `api-access-revenue:${purchase.id}:${provider}:${purchase.providerPaymentId}`,
+      },
+      select: {
+        id: true,
+        walletId: true,
+        usdAmount: true,
+      },
+    });
+
+  if (!saleLedger) return;
+
+  await transaction.ownerLedger.create({
+    data: {
+      walletId: saleLedger.walletId,
+      type: LedgerType.REFUND,
+      points: 0,
+      usdAmount: saleLedger.usdAmount
+        ? saleLedger.usdAmount.neg()
+        : null,
+      currency: purchase.currency,
+      provider,
+      providerTransactionId: refundPaymentId,
+      idempotencyKey: refundIdempotencyKey,
+      metadata: {
+        apiAccessPurchaseId: purchase.id,
+        source: "API_ACCESS_REFUND",
+        originalLedgerId: saleLedger.id,
+      },
+    },
+  });
+}
+
 async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
   await db.$transaction(async (transaction) => {
     const purchase = await transaction.apiAccessPurchase.findUnique({ where: { id: event.orderId } });
@@ -830,9 +889,22 @@ async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
     }
 
     if (event.status === "REFUNDED") {
+      if (purchase.status === "REFUNDED") return;
+
+      await refundApiAccessOwnerRevenue(
+        transaction,
+        purchase,
+        event.provider,
+        event.paymentId,
+      );
+
       await transaction.apiAccessPurchase.update({
         where: { id: purchase.id },
-        data: { status: "REFUNDED", provider: event.provider, providerPaymentId: event.paymentId },
+        data: {
+          status: "REFUNDED",
+          provider: event.provider,
+          providerPaymentId: purchase.providerPaymentId || event.paymentId,
+        },
       });
       return;
     }
