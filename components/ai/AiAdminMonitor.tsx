@@ -30,7 +30,7 @@ export default function AiAdminMonitor() {
         {error && <p>{error}</p>}
         {data && <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-            {[["Gemini", data.health.gemini], ["Manus", data.health.manus]].map(([name, health]) => <section key={String(name)} style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>{name}</strong><div style={{ marginTop: 10 }}>{(health as Health).status}</div></section>)}
+            {([{ name: "Gemini", health: data.health.gemini }, { name: "Manus", health: data.health.manus }]).map(item => <section key={item.name} style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>{item.name}</strong><div style={{ marginTop: 10 }}>{item.health.status}</div></section>)}
             <section style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>Requests</strong><div style={{ marginTop: 10 }}>{data.requests.total}</div></section>
             <section style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>Fallbacks</strong><div style={{ marginTop: 10 }}>{data.fallbackCount}</div></section>
           </div>
