@@ -5,6 +5,7 @@ export type PaymentCreateInput = {
   amountCents: number;
   currency: string;
   returnUrl: string;
+  idempotencyKey?: string;
 };
 
 export type PaymentCreateResult = {
@@ -98,6 +99,7 @@ function validateReturnUrl(returnUrl: string): string {
 async function stripeRequest(
   path: string,
   body: URLSearchParams,
+  idempotencyKey?: string,
 ) {
   const key = process.env.STRIPE_SECRET_KEY;
 
@@ -113,6 +115,9 @@ async function stripeRequest(
         Authorization: `Bearer ${key}`,
         "Content-Type":
           "application/x-www-form-urlencoded",
+        ...(idempotencyKey
+          ? { "Idempotency-Key": idempotencyKey }
+          : {}),
       },
       body,
       cache: "no-store",
@@ -248,6 +253,7 @@ function buildPayPalErrorMessage(
 async function paypalRequest(
   path: string,
   body: unknown,
+  idempotencyKey?: string,
 ) {
   const token =
     await paypalAccessToken();
@@ -260,6 +266,9 @@ async function paypalRequest(
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(idempotencyKey
+          ? { "PayPal-Request-Id": idempotencyKey }
+          : {}),
       },
       body: JSON.stringify(body),
       cache: "no-store",
@@ -350,6 +359,7 @@ export class ConfiguredPaymentProvider
         await stripeRequest(
           "checkout/sessions",
           body,
+          input.idempotencyKey,
         );
 
       if (
@@ -404,6 +414,7 @@ export class ConfiguredPaymentProvider
                 "PAY_NOW",
             },
           },
+          input.idempotencyKey,
         );
 
       const links =
@@ -479,6 +490,7 @@ export class ConfiguredPaymentProvider
                 input.amountCents,
               currency,
               returnUrl,
+              idempotencyKey: input.idempotencyKey,
             }),
             cache: "no-store",
           },
