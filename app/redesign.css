@@ -2562,3 +2562,62 @@ pre { padding: 16px; overflow-x: auto; }
   .gv-legal-card { padding: 22px 18px !important; line-height: 1.9; }
   .gv-app-main .tabs[role="tablist"] .btn { flex: 1 1 140px; }
 }
+
+/* =====================================================================
+   GameVortex Luxury Fusion v8 — final all-pages consistency pass
+   ===================================================================== */
+
+/* Stable page rhythm for every route */
+main.wrap, main.page, main[class*="page"], .gv-app-main > main { isolation: isolate; }
+main.wrap > section, main.page > section { min-width: 0; }
+main.wrap > .hero, main.wrap > .glass.hero, main.page > .hero { margin-bottom: 20px; }
+main.wrap h1, main.page h1 { font-size: clamp(30px, 5vw, 58px); line-height: 1.08; }
+main.wrap h2, main.page h2 { line-height: 1.18; }
+main.wrap p, main.page p { overflow-wrap: anywhere; }
+
+/* All interactive controls share one premium language */
+a, button { -webkit-tap-highlight-color: transparent; }
+a:not(.btn):not(.gv-nav-link):not(.gv-drawer-link):not(.gv-bottom-nav a) { text-underline-offset: 3px; }
+button:disabled, .btn:disabled { filter: saturate(.35); }
+::selection { color: #fff; background: rgba(168,85,247,.58); }
+
+/* Media safety and consistent image presentation */
+main img { max-width: 100%; }
+main video { max-width: 100%; border-radius: var(--ref-radius); }
+.cover, .detail-cover, .wallpaper-detail-media, [class*="cover"] { object-fit: cover; }
+
+/* Dense sections never overflow the viewport */
+.tableWrap, .table-container, .dataTable, .gv-wallet-table, .referral-table { max-width: 100%; overflow-x: auto; }
+pre, .codeBlock, .markdown { max-width: 100%; overflow-x: auto; }
+.grid > *, .feature-grid > *, .stats > *, .heroGrid > *, .store-shell > * { min-width: 0; }
+
+/* Shared loading, empty and error states */
+.empty, .emptyState, .emptyGames, .loadingCard, .glitch-loader, .errorBox {
+  border-radius: var(--ref-radius) !important;
+  border: 1px dashed rgba(168,85,247,.30) !important;
+  background: linear-gradient(145deg, rgba(15,20,47,.68), rgba(6,9,20,.84)) !important;
+}
+
+/* Touch-safe mobile layout for every page */
+@media (max-width: 700px) {
+  main.wrap h1, main.page h1 { font-size: clamp(28px, 9vw, 42px); }
+  main.wrap h2, main.page h2 { font-size: clamp(20px, 6vw, 30px); }
+  main.wrap > .hero, main.wrap > .glass.hero, main.page > .hero { margin-bottom: 14px; }
+  .actions, .heroActions, .draw-actions, .action-row, .hero-actions { gap: 8px !important; }
+  .actions > .btn, .heroActions > *, .draw-actions > .btn, .action-row > * { min-width: 0; }
+  .section-head, .sectionHead { gap: 8px; }
+  .section-head a, .sectionHead a { white-space: normal; }
+  .gv-app-main table { min-width: 560px; }
+  .gv-app-main .tableWrap, .gv-app-main .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 390px) {
+  .gv-brand-name { font-size: 16px !important; }
+  .gv-mobile-tabs a { padding-inline: 7px !important; font-size: 11px !important; }
+  .gv-bottom-nav a { font-size: 10px !important; }
+}
+
+/* Keyboard and reduced-motion quality */
+:where(a, button, input, select, textarea):focus-visible { outline: 2px solid var(--ref-cyan) !important; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
+}
