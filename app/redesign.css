@@ -2621,3 +2621,453 @@ pre, .codeBlock, .markdown { max-width: 100%; overflow-x: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+
+
+
+/* =====================================================================
+   GAMEVORTEX — PRISM FUSION / GLASS SYSTEM v1
+   Visual direction: Obsidian + full-spectrum aurora + luxury gold.
+   Design-only override layer. No application logic or routes changed.
+   ===================================================================== */
+
+:root{
+  --fusion-bg:#03040a;
+  --fusion-surface:rgba(11,13,28,.72);
+  --fusion-surface-strong:rgba(14,16,36,.90);
+  --fusion-white:#f8f7ff;
+  --fusion-muted:#9ba0bd;
+  --fusion-gold:#ffd45a;
+  --fusion-gold-2:#ffb52e;
+  --fusion-violet:#9b5cff;
+  --fusion-cyan:#26e7ff;
+  --fusion-blue:#4d7cff;
+  --fusion-pink:#ff4fd8;
+  --fusion-orange:#ff8a3d;
+  --fusion-green:#45f0a5;
+  --fusion-border:rgba(255,255,255,.10);
+  --fusion-border-hot:rgba(155,92,255,.42);
+  --fusion-radius:22px;
+  --fusion-radius-sm:14px;
+  --fusion-shadow:0 26px 80px rgba(0,0,0,.48);
+  --fusion-glass:blur(20px) saturate(145%);
+}
+
+/* ---------- spectrum background ---------- */
+html,body{
+  background:#03040a!important;
+}
+body{
+  position:relative;
+  background:
+    radial-gradient(900px 620px at 4% -8%,rgba(155,92,255,.24),transparent 62%),
+    radial-gradient(820px 560px at 96% 3%,rgba(38,231,255,.14),transparent 62%),
+    radial-gradient(760px 520px at 92% 62%,rgba(255,79,216,.11),transparent 64%),
+    radial-gradient(720px 500px at 8% 82%,rgba(69,240,165,.07),transparent 64%),
+    radial-gradient(620px 420px at 52% 105%,rgba(255,138,61,.09),transparent 66%),
+    linear-gradient(145deg,#020308 0%,#070817 45%,#04040b 100%)!important;
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:-25%;
+  z-index:-2;
+  pointer-events:none;
+  background:
+    conic-gradient(from 210deg at 50% 50%,
+      rgba(155,92,255,.08),
+      rgba(38,231,255,.06),
+      rgba(69,240,165,.05),
+      rgba(255,138,61,.05),
+      rgba(255,79,216,.06),
+      rgba(155,92,255,.08));
+  filter:blur(90px);
+  animation:gvFusionDrift 22s ease-in-out infinite alternate;
+}
+@keyframes gvFusionDrift{
+  0%{transform:translate3d(-2%,-1%,0) rotate(0deg) scale(1)}
+  50%{transform:translate3d(2%,1%,0) rotate(8deg) scale(1.04)}
+  100%{transform:translate3d(-1%,2%,0) rotate(-6deg) scale(1.02)}
+}
+
+/* ---------- universal glass ---------- */
+.card,.glass,.panel,.section,.stat,.product,.sideCard,
+.accountCard,.whyCard,.benefit,.noticeCard,.formCard,
+.ownerCard,.chartPanel,.mediaCard,.overviewTile,.statTile,
+.indicatorTile,.alertTile,.actionBtn{
+  background:
+    linear-gradient(135deg,rgba(18,20,43,.78),rgba(7,9,21,.86))!important;
+  border:1px solid var(--fusion-border)!important;
+  box-shadow:
+    var(--fusion-shadow),
+    inset 0 1px rgba(255,255,255,.055),
+    inset 0 -1px rgba(0,0,0,.35)!important;
+  backdrop-filter:var(--fusion-glass)!important;
+  -webkit-backdrop-filter:var(--fusion-glass)!important;
+}
+.card,.glass,.panel,.section,.stat,.product,.sideCard,
+.accountCard,.whyCard,.benefit,.noticeCard,.formCard,
+.ownerCard,.chartPanel{
+  border-radius:var(--fusion-radius)!important;
+}
+.card:hover,.glass:hover,.panel:hover,.product:hover,.sideCard:hover,
+.actionBtn:hover,.mediaCard:hover{
+  border-color:var(--fusion-border-hot)!important;
+  box-shadow:
+    0 0 0 1px rgba(155,92,255,.10),
+    0 26px 80px rgba(0,0,0,.54),
+    0 0 42px rgba(155,92,255,.10),
+    inset 0 1px rgba(255,255,255,.06)!important;
+}
+
+/* ---------- premium spectrum edge ---------- */
+.hero,.heroGrid .hero,.vipWide,.wallpaperWide,.dealCard{
+  position:relative;
+  isolation:isolate;
+}
+.hero::before,.heroGrid .hero::before,.vipWide::before,
+.wallpaperWide::before,.dealCard::before{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  z-index:-1;
+  border-radius:inherit;
+  padding:1px;
+  background:linear-gradient(120deg,
+    rgba(255,212,90,.55),
+    rgba(155,92,255,.62),
+    rgba(38,231,255,.48),
+    rgba(255,79,216,.45),
+    rgba(69,240,165,.35),
+    rgba(255,138,61,.42),
+    rgba(255,212,90,.55));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  opacity:.72;
+}
+
+/* ---------- headings ---------- */
+h1,h2,h3,h4{
+  color:var(--fusion-white)!important;
+}
+.heroTitle,.hero h1,.heroTag,
+.sectionHead h2,.sectionTitle,.sec-title{
+  text-shadow:0 0 34px rgba(155,92,255,.16);
+}
+.heroTitle,.hero h1{
+  background:linear-gradient(100deg,
+    #fff 0%,
+    #d9d3ff 25%,
+    #b978ff 46%,
+    #26e7ff 66%,
+    #ffd45a 84%,
+    #ff8adf 100%)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+}
+.heroTag{
+  background:linear-gradient(90deg,
+    #26e7ff,#4d7cff,#b95cff,#ff4fd8,#ffd45a)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+}
+
+/* ---------- buttons ---------- */
+.btn,.primaryButton,.submitBtn,.heroCta,.dealBtn,.vipBtn,
+.promoBtn,.planButton,.actionBtn{
+  border-radius:13px!important;
+  font-weight:800!important;
+}
+.btn,.primaryButton,.submitBtn,.heroCta,.vipBtn,.dealBtn{
+  background:
+    linear-gradient(115deg,
+      #ffe78d 0%,
+      #ffd45a 20%,
+      #ff9f3f 38%,
+      #ff4fd8 56%,
+      #9b5cff 74%,
+      #26e7ff 100%)!important;
+  background-size:220% 100%!important;
+  color:#140d08!important;
+  border:1px solid rgba(255,255,255,.20)!important;
+  box-shadow:
+    0 14px 36px rgba(155,92,255,.18),
+    0 10px 28px rgba(255,212,90,.16)!important;
+  animation:gvGradientMove 7s ease-in-out infinite;
+}
+@keyframes gvGradientMove{
+  0%,100%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+}
+.btn:hover,.primaryButton:hover,.submitBtn:hover,.heroCta:hover,
+.vipBtn:hover,.dealBtn:hover{
+  transform:translateY(-3px)!important;
+  filter:saturate(1.12) brightness(1.04)!important;
+}
+.btn.secondary,.heroGhost,.secondaryButton{
+  background:rgba(10,12,28,.72)!important;
+  color:#fff!important;
+  border:1px solid rgba(155,92,255,.42)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05)!important;
+}
+.btn.secondary:hover,.heroGhost:hover,.secondaryButton:hover{
+  border-color:rgba(38,231,255,.55)!important;
+  box-shadow:0 0 30px rgba(38,231,255,.10)!important;
+}
+
+/* ---------- badges / chips ---------- */
+.badge,.pill,.chip,.tag,.statusBadge,.platformBadge{
+  background:
+    linear-gradient(120deg,rgba(155,92,255,.16),rgba(38,231,255,.08),rgba(255,212,90,.07))!important;
+  border:1px solid rgba(155,92,255,.32)!important;
+  color:#eeeaff!important;
+  backdrop-filter:blur(12px)!important;
+}
+
+/* ---------- inputs ---------- */
+.input,input,select,textarea,.inputRow,.composer textarea{
+  background:rgba(5,7,18,.72)!important;
+  color:#fff!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:var(--fusion-radius-sm)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.025)!important;
+}
+.input:focus,input:focus,select:focus,textarea:focus,
+.inputRow:focus-within{
+  border-color:rgba(38,231,255,.48)!important;
+  box-shadow:
+    0 0 0 3px rgba(38,231,255,.08),
+    0 0 30px rgba(155,92,255,.10)!important;
+}
+input::placeholder,textarea::placeholder{color:#68708f!important}
+
+/* ---------- homepage categories ---------- */
+.pillRow{gap:10px!important}
+.pill{
+  position:relative;
+  overflow:hidden;
+  min-height:88px!important;
+  border-radius:17px!important;
+  background:
+    linear-gradient(145deg,rgba(17,20,43,.88),rgba(7,9,20,.94))!important;
+}
+.pill::after{
+  content:"";
+  position:absolute;
+  inset:auto -25% -60% -25%;
+  height:90px;
+  background:radial-gradient(circle,rgba(155,92,255,.22),transparent 68%);
+  pointer-events:none;
+}
+.pill:nth-child(3n+1) svg{color:var(--fusion-violet)!important}
+.pill:nth-child(3n+2) svg{color:var(--fusion-cyan)!important}
+.pill:nth-child(3n+3) svg{color:var(--fusion-gold)!important}
+.pill:nth-child(4n) svg{color:var(--fusion-pink)!important}
+.pillActive{
+  border-color:rgba(255,212,90,.54)!important;
+  box-shadow:0 0 28px rgba(255,212,90,.11)!important;
+}
+.pillGold{
+  border-color:rgba(255,138,61,.52)!important;
+}
+
+/* ---------- game cards ---------- */
+.gameCard,.game-card{
+  position:relative;
+  background:
+    linear-gradient(145deg,rgba(16,19,42,.94),rgba(5,7,17,.98))!important;
+  border-color:rgba(155,92,255,.22)!important;
+}
+.gameCard::after,.game-card::after{
+  content:"";
+  position:absolute;
+  left:10%;
+  right:10%;
+  bottom:0;
+  height:2px;
+  background:linear-gradient(90deg,
+    transparent,var(--fusion-violet),var(--fusion-cyan),
+    var(--fusion-gold),transparent);
+  opacity:.35;
+  pointer-events:none;
+}
+.gameCard:nth-child(4n+1):hover,.game-card:nth-child(4n+1):hover{
+  border-color:rgba(38,231,255,.52)!important;
+  box-shadow:0 0 32px rgba(38,231,255,.12)!important;
+}
+.gameCard:nth-child(4n+2):hover,.game-card:nth-child(4n+2):hover{
+  border-color:rgba(255,79,216,.52)!important;
+  box-shadow:0 0 32px rgba(255,79,216,.10)!important;
+}
+.gameCard:nth-child(4n+3):hover,.game-card:nth-child(4n+3):hover{
+  border-color:rgba(69,240,165,.48)!important;
+  box-shadow:0 0 32px rgba(69,240,165,.10)!important;
+}
+.gameCard:nth-child(4n):hover,.game-card:nth-child(4n):hover{
+  border-color:rgba(255,212,90,.52)!important;
+  box-shadow:0 0 32px rgba(255,212,90,.11)!important;
+}
+.gameRating,.rating,.price,.product-price,.priceBlock{
+  color:var(--fusion-gold)!important;
+}
+.vortexScore{color:var(--fusion-cyan)!important}
+
+/* ---------- homepage promo cards ---------- */
+.promoCard{
+  border-color:rgba(155,92,255,.30)!important;
+  box-shadow:0 24px 65px rgba(0,0,0,.42)!important;
+}
+.promoCard:nth-child(1){border-color:rgba(38,231,255,.30)!important}
+.promoCard:nth-child(2){border-color:rgba(255,212,90,.34)!important}
+.promoCard:nth-child(3){border-color:rgba(255,79,216,.30)!important}
+.promoCard:hover{
+  border-color:rgba(255,255,255,.35)!important;
+}
+
+/* ---------- wallpaper / VIP / deals ---------- */
+.wallpaperWide{
+  background:
+    radial-gradient(480px 240px at 12% 50%,rgba(38,231,255,.18),transparent 70%),
+    radial-gradient(500px 260px at 52% 20%,rgba(255,79,216,.13),transparent 72%),
+    radial-gradient(500px 280px at 88% 70%,rgba(155,92,255,.22),transparent 70%),
+    linear-gradient(135deg,#07101a,#11071a 55%,#07060d)!important;
+}
+.wallpaperWideBtn{
+  background:linear-gradient(110deg,#26e7ff,#4d7cff,#9b5cff,#ff4fd8,#ffd45a)!important;
+  color:#100a12!important;
+}
+.vipWide{
+  background:
+    radial-gradient(520px 260px at 84% 45%,rgba(255,212,90,.20),transparent 70%),
+    radial-gradient(520px 300px at 45% 0%,rgba(255,79,216,.14),transparent 72%),
+    radial-gradient(520px 300px at 10% 100%,rgba(38,231,255,.10),transparent 72%),
+    linear-gradient(145deg,#160f19,#07070d)!important;
+}
+.dealCard{
+  background:
+    radial-gradient(420px 280px at 88% 35%,rgba(255,79,216,.20),transparent 68%),
+    radial-gradient(340px 220px at 18% 90%,rgba(38,231,255,.12),transparent 68%),
+    linear-gradient(145deg,#151027,#06070e)!important;
+}
+
+/* ---------- admin shell ---------- */
+[class*="shell"]{
+  background:
+    radial-gradient(700px 420px at 92% 0%,rgba(255,212,90,.10),transparent 62%),
+    radial-gradient(700px 480px at 2% 15%,rgba(155,92,255,.16),transparent 62%),
+    radial-gradient(560px 420px at 70% 95%,rgba(38,231,255,.06),transparent 65%),
+    #03040a!important;
+}
+[class*="sidebar"]{
+  background:
+    linear-gradient(180deg,rgba(14,13,31,.96),rgba(3,4,10,.98))!important;
+  border-color:rgba(155,92,255,.24)!important;
+  box-shadow:20px 0 70px rgba(0,0,0,.28)!important;
+}
+[class*="topbar"]{
+  background:rgba(4,5,12,.74)!important;
+  border-bottom-color:rgba(155,92,255,.22)!important;
+  backdrop-filter:blur(22px)!important;
+}
+[class*="navLink"]{
+  border:1px solid transparent!important;
+  border-radius:13px!important;
+}
+[class*="navLink"]:hover{
+  background:linear-gradient(100deg,rgba(155,92,255,.16),rgba(38,231,255,.05))!important;
+  border-color:rgba(155,92,255,.20)!important;
+}
+[class*="navLink"][class*="active"]{
+  background:linear-gradient(100deg,rgba(155,92,255,.22),rgba(255,212,90,.07))!important;
+  border-color:rgba(255,212,90,.22)!important;
+  box-shadow:0 0 26px rgba(155,92,255,.10)!important;
+}
+[class*="panel"],[class*="ownerCard"],[class*="statTile"],
+[class*="overviewTile"],[class*="indicatorTile"],[class*="mediaCard"],
+[class*="actionBtn"],[class*="chartPanel"]{
+  border-color:rgba(255,255,255,.09)!important;
+}
+[class*="overviewTile"]:nth-child(6n+1){box-shadow:inset 0 2px rgba(155,92,255,.65),var(--fusion-shadow)!important}
+[class*="overviewTile"]:nth-child(6n+2){box-shadow:inset 0 2px rgba(38,231,255,.65),var(--fusion-shadow)!important}
+[class*="overviewTile"]:nth-child(6n+3){box-shadow:inset 0 2px rgba(69,240,165,.65),var(--fusion-shadow)!important}
+[class*="overviewTile"]:nth-child(6n+4){box-shadow:inset 0 2px rgba(255,212,90,.70),var(--fusion-shadow)!important}
+[class*="overviewTile"]:nth-child(6n+5){box-shadow:inset 0 2px rgba(255,79,216,.65),var(--fusion-shadow)!important}
+[class*="overviewTile"]:nth-child(6n){box-shadow:inset 0 2px rgba(255,138,61,.65),var(--fusion-shadow)!important}
+[class*="tradingBtn"]{
+  background:
+    linear-gradient(115deg,#ffd45a,#ff8a3d,#ff4fd8,#9b5cff,#26e7ff)!important;
+  color:#130b0b!important;
+}
+
+/* ---------- tables / rows ---------- */
+table{border-collapse:separate!important;border-spacing:0 6px!important}
+th{
+  color:#d8d4ef!important;
+  background:rgba(155,92,255,.08)!important;
+}
+td,th{border-color:rgba(255,255,255,.07)!important}
+tbody tr{
+  background:rgba(10,12,27,.60)!important;
+}
+tbody tr:hover td{
+  background:rgba(155,92,255,.06)!important;
+}
+
+/* ---------- AI / chat ---------- */
+.aiHub .sidebar,.aiHub .chatPanel{
+  background:linear-gradient(145deg,rgba(14,16,37,.90),rgba(5,7,17,.95))!important;
+  border-color:rgba(155,92,255,.25)!important;
+}
+.aiHub .userMessage{
+  background:linear-gradient(120deg,rgba(155,92,255,.60),rgba(255,79,216,.24),rgba(38,231,255,.14))!important;
+}
+.aiHub .aiMessage{
+  background:rgba(255,255,255,.035)!important;
+  border-color:rgba(38,231,255,.12)!important;
+}
+
+/* ---------- footer / mobile nav ---------- */
+.gv-footer{
+  background:
+    linear-gradient(180deg,transparent,rgba(3,4,10,.94))!important;
+  border-top-color:rgba(155,92,255,.20)!important;
+}
+.gv-footer strong{color:var(--fusion-gold)!important}
+.gv-bottom-nav{
+  background:rgba(7,9,20,.84)!important;
+  border-color:rgba(155,92,255,.28)!important;
+  box-shadow:0 20px 60px rgba(0,0,0,.58),0 0 30px rgba(155,92,255,.10)!important;
+  backdrop-filter:blur(22px) saturate(150%)!important;
+}
+.gv-bottom-nav a.active{color:var(--fusion-gold)!important}
+
+/* ---------- responsive ---------- */
+@media (max-width:999px){
+  .wrap{width:min(100% - 18px,var(--wrap))!important}
+  .heroGrid{width:calc(100% - 18px)!important}
+  .hero,.heroGrid .hero{border-radius:22px!important}
+  .card,.panel,.section,.sideCard,.ownerCard{border-radius:18px!important}
+}
+@media (max-width:699px){
+  body{
+    background:
+      radial-gradient(520px 360px at 0% 0%,rgba(155,92,255,.20),transparent 65%),
+      radial-gradient(500px 340px at 100% 22%,rgba(38,231,255,.10),transparent 68%),
+      radial-gradient(500px 360px at 50% 100%,rgba(255,79,216,.08),transparent 68%),
+      #03040a!important;
+  }
+  .heroTitle,.hero h1{font-size:clamp(36px,11vw,58px)!important}
+  .heroTag{font-size:clamp(20px,7vw,32px)!important}
+  .pill{min-height:76px!important}
+  .gameCard,.game-card{border-radius:15px!important}
+  .gv-bottom-nav{border-radius:18px!important}
+}
+@media (prefers-reduced-motion:reduce){
+  body::before,.btn,.primaryButton,.submitBtn,.heroCta,.vipBtn,.dealBtn{
+    animation:none!important;
+  }
+}
