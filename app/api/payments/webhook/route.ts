@@ -967,7 +967,6 @@ async function refundApiAccessOwnerRevenue(
     });
 
   if (existingRefund) return;
-
   if (!purchase.providerPaymentId) return;
 
   const saleLedger =
@@ -985,14 +984,30 @@ async function refundApiAccessOwnerRevenue(
 
   if (!saleLedger) return;
 
+  const refundUsd =
+    saleLedger.usdAmount ?? new Prisma.Decimal(0);
+
+  const debited =
+    await transaction.ownerWallet.updateMany({
+      where: {
+        id: saleLedger.walletId,
+        availableUsd: { gte: refundUsd },
+      },
+      data: {
+        availableUsd: { decrement: refundUsd },
+      },
+    });
+
+  if (debited.count !== 1) {
+    throw new Error("OWNER_USD_BALANCE_INSUFFICIENT_FOR_REFUND");
+  }
+
   await transaction.ownerLedger.create({
     data: {
       walletId: saleLedger.walletId,
       type: LedgerType.REFUND,
       points: 0,
-      usdAmount: saleLedger.usdAmount
-        ? saleLedger.usdAmount.neg()
-        : null,
+      usdAmount: refundUsd.neg(),
       currency: purchase.currency,
       provider,
       providerTransactionId: refundPaymentId,
