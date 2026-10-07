@@ -235,7 +235,10 @@ export async function POST(
         return NextResponse.json({ error: "PAYMENT_AMOUNT_INVALID" }, { status: 400 });
       }
 
-      await provider.capturePayment(body.paymentId);
+      await provider.capturePayment(
+        body.paymentId,
+        `paypal-capture:${body.referenceId}:${body.paymentId}`,
+      );
       return NextResponse.json({ ok: true, provider: "paypal", paymentId: body.paymentId });
     }
 
@@ -257,7 +260,10 @@ export async function POST(
       if (apiAccessPurchase.amountCents !== 1000) {
         return NextResponse.json({ error: "PAYMENT_AMOUNT_MISMATCH" }, { status: 400 });
       }
-      await provider.capturePayment(body.paymentId);
+      await provider.capturePayment(
+        body.paymentId,
+        `paypal-capture:${body.referenceId}:${body.paymentId}`,
+      );
       return NextResponse.json({ ok: true, provider: "paypal", paymentId: body.paymentId });
     }
 
