@@ -712,6 +712,20 @@ async function refundOwnerPoints(
 
 async function processWalletDepositWebhook(event: NormalizedEvent) {
   return db.$transaction(async (transaction) => {
+    const depositExists = await transaction.walletDeposit.findUnique({
+      where: { id: event.orderId },
+      select: { id: true },
+    });
+
+    if (!depositExists) return false;
+
+    // Serialize all provider events for this deposit before reading its status.
+    // This prevents concurrent duplicate webhooks from both observing PENDING
+    // and creating duplicate balance changes or notifications.
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "WalletDeposit" WHERE "id" = ${event.orderId} FOR UPDATE`,
+    );
+
     const deposit = await transaction.walletDeposit.findUnique({
       where: { id: event.orderId },
     });
