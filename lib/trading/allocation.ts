@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "../prisma";
 import { OWNER_POINTS_PER_USD } from "../owner-points";
-import { allocationPoints, validateAllocationUsd } from "./money";
+import { validateAllocationUsd } from "./money";
 
 type Tx = Prisma.TransactionClient;
 
@@ -22,7 +22,7 @@ async function lockedAccount(tx: Tx, ownerId: string) {
 }
 
 /**
- * Owner Wallet (points) -> Trading Balance (USD).
+ * Owner Wallet (USD cash) -> Trading Balance (USD).
  * Idempotent on `idempotencyKey`; the same key with different data is rejected.
  */
 export async function createAllocation(input: {
@@ -31,13 +31,12 @@ export async function createAllocation(input: {
   idempotencyKey: string;
 }) {
   const amountUsd = validateAllocationUsd(input.amountUsd);
-  const points = allocationPoints(amountUsd, OWNER_POINTS_PER_USD);
   const key = input.idempotencyKey;
 
   return db.$transaction(async (tx) => {
     // The wallet row is normally created by the first payment credit. Creating
-    // it here is harmless (0 points) and gives the owner the accurate
-    // INSUFFICIENT_POINTS error instead of "wallet not found".
+    // it here is harmless (0 balance) and gives the owner the accurate
+    // INSUFFICIENT_USD_BALANCE error instead of "wallet not found".
     const wallet = await tx.ownerWallet.upsert({
       where: { ownerId: input.ownerId },
       update: {},
@@ -64,19 +63,19 @@ export async function createAllocation(input: {
       return { allocation: racedExisting, replayed: true };
     }
 
-    // Atomic guard: fails if another request already spent these points.
+    // Atomic guard: cash cannot be allocated twice, even under concurrency.
     const debited = await tx.ownerWallet.updateMany({
-      where: { id: wallet.id, availablePoints: { gte: points } },
-      data: { availablePoints: { decrement: points } },
+      where: { id: wallet.id, availableUsd: { gte: new Prisma.Decimal(amountUsd) } },
+      data: { availableUsd: { decrement: new Prisma.Decimal(amountUsd) } },
     });
-    if (debited.count !== 1) throw new Error("INSUFFICIENT_POINTS");
+    if (debited.count !== 1) throw new Error("INSUFFICIENT_USD_BALANCE");
 
     const allocation = await tx.tradingAllocation.create({
       data: {
         accountId: account.id,
         sourceWalletId: wallet.id,
         amountUsd,
-        points,
+        points: 0,
         conversionRate: OWNER_POINTS_PER_USD,
         idempotencyKey: key,
       },
@@ -91,8 +90,9 @@ export async function createAllocation(input: {
       data: {
         walletId: wallet.id,
         type: "TRADING_ALLOCATED",
-        points: -points,
+        points: 0,
         usdAmount: amountUsd,
+        currency: "USD",
         conversionRate: OWNER_POINTS_PER_USD,
         idempotencyKey: `${key}:owner`,
         metadata: { allocationId: allocation.id },
@@ -108,7 +108,7 @@ export async function createAllocation(input: {
         balanceBeforeUsd: before,
         balanceAfterUsd: after,
         idempotencyKey: `${key}:trading`,
-        metadata: { sourceWalletId: wallet.id, points },
+        metadata: { sourceWalletId: wallet.id, fundingSource: "OWNER_WALLET_USD" },
       },
     });
 
@@ -127,8 +127,7 @@ export async function createAllocation(input: {
 }
 
 /**
- * Trading Balance (USD) -> Owner Wallet (points). Returns the unused capital.
- * Uses the points stored on the allocation, so the return is exactly what was taken.
+ * Trading Balance (USD) -> Owner Wallet (USD). Returns the unused capital.
  * An allocation linked to a trade can't be released (double-spend protection).
  */
 export async function releaseAllocation(input: { ownerId: string; allocationId: string }) {
@@ -161,15 +160,16 @@ export async function releaseAllocation(input: { ownerId: string; allocationId: 
 
     await tx.ownerWallet.update({
       where: { id: allocation.sourceWalletId },
-      data: { availablePoints: { increment: allocation.points } },
+      data: { availableUsd: { increment: new Prisma.Decimal(allocation.amountUsd) } },
     });
 
     await tx.ownerLedger.create({
       data: {
         walletId: allocation.sourceWalletId,
         type: "TRADING_RETURNED",
-        points: allocation.points,
+        points: 0,
         usdAmount: allocation.amountUsd,
+        currency: "USD",
         conversionRate: allocation.conversionRate,
         idempotencyKey: `${allocation.idempotencyKey}:owner-return`,
         metadata: { allocationId: allocation.id },
@@ -185,7 +185,7 @@ export async function releaseAllocation(input: { ownerId: string; allocationId: 
         balanceBeforeUsd: before,
         balanceAfterUsd: after,
         idempotencyKey: `${allocation.idempotencyKey}:trading-return`,
-        metadata: { points: allocation.points },
+        metadata: { fundingSource: "OWNER_WALLET_USD" },
       },
     });
 
@@ -220,7 +220,7 @@ export async function getTradingSummary(ownerId: string) {
   return {
     walletAvailablePoints: wallet?.availablePoints ?? 0,
     pointsPerUsd: OWNER_POINTS_PER_USD,
-    walletAvailableUsd: wallet ? Number((wallet.availablePoints / OWNER_POINTS_PER_USD).toFixed(2)) : 0,
+    walletAvailableUsd: wallet ? wallet.availableUsd.toString() : "0",
     tradingBalanceUsd: account ? account.balanceUsd.toString() : "0",
     allocations: allocations.map((a) => ({
       id: a.id,
