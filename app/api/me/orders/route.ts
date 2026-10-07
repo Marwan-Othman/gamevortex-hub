@@ -612,8 +612,6 @@ export async function POST(
         Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      // A concurrent request may have won the unique idempotency race.
-      // Keep this handler scope-safe; the client can retry with the same key.
       return NextResponse.json(
         { error: "ORDER_ALREADY_EXISTS" },
         { status: 409 },
