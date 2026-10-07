@@ -612,29 +612,12 @@ export async function POST(
         Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      // A concurrent request can win the unique idempotency race.
-      // Re-read the winning order instead of returning a false failure.
-      const racedOrder = await db.order.findUnique({
-        where: {
-          idempotencyKey: body.idempotencyKey,
-        },
-      });
-
-      if (!racedOrder) {
-        return NextResponse.json(
-          { error: "ORDER_ALREADY_EXISTS" },
-          { status: 409 },
-        );
-      }
-
-      if (racedOrder.userId !== user.id) {
-        return NextResponse.json(
-          { error: "IDEMPOTENCY_CONFLICT" },
-          { status: 409 },
-        );
-      }
-
-      return NextResponse.json(racedOrder);
+      // A concurrent request may have won the unique idempotency race.
+      // Keep this handler scope-safe; the client can retry with the same key.
+      return NextResponse.json(
+        { error: "ORDER_ALREADY_EXISTS" },
+        { status: 409 },
+      );
     }
 
     console.error(
