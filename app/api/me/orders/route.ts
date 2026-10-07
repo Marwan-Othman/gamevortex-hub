@@ -612,15 +612,29 @@ export async function POST(
         Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      return NextResponse.json(
-        {
-          error:
-            "ORDER_ALREADY_EXISTS",
+      // A concurrent request can win the unique idempotency race.
+      // Re-read the winning order instead of returning a false failure.
+      const racedOrder = await db.order.findUnique({
+        where: {
+          idempotencyKey: body.idempotencyKey,
         },
-        {
-          status: 409,
-        },
-      );
+      });
+
+      if (!racedOrder) {
+        return NextResponse.json(
+          { error: "ORDER_ALREADY_EXISTS" },
+          { status: 409 },
+        );
+      }
+
+      if (racedOrder.userId !== user.id) {
+        return NextResponse.json(
+          { error: "IDEMPOTENCY_CONFLICT" },
+          { status: 409 },
+        );
+      }
+
+      return NextResponse.json(racedOrder);
     }
 
     console.error(
