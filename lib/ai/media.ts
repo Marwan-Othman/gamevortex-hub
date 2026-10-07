@@ -39,7 +39,13 @@ async function request(path: string, init: RequestInit, signal?: AbortSignal) {
           : status >= 500
             ? "UNAVAILABLE"
             : "PROVIDER_ERROR";
-      throw new AiProviderError({ provider: "gemini", code, status, retryable: status === 429 || status >= 500, failoverable: status === 401 || status === 403 || status === 429 || status >= 500 });
+      throw new AiProviderError({
+        provider: "gemini",
+        code,
+        status,
+        retryable: status === 429 || status >= 500,
+        failoverable: status === 401 || status === 403 || status === 429 || status >= 500,
+      });
     }
     return body as Record<string, unknown>;
   } catch (error) {
@@ -81,6 +87,23 @@ function inputParts(prompt: string, imageData?: string) {
   ];
 }
 
+function videoInstance(prompt: string, imageData?: string) {
+  if (!imageData) return { prompt };
+
+  const match = imageData.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
+  if (!match) throw new Error("INVALID_IMAGE_INPUT");
+
+  return {
+    prompt,
+    image: {
+      inlineData: {
+        mimeType: match[1],
+        data: match[2],
+      },
+    },
+  };
+}
+
 export async function generateImage(input: {
   prompt: string;
   imageData?: string;
@@ -117,27 +140,53 @@ export async function startVideo(input: {
   resolution?: string;
   signal?: AbortSignal;
 }) {
-  const payload = await request("/interactions", {
+  const model = process.env.GEMINI_VIDEO_MODEL?.trim() || "veo-3.1-generate-preview";
+  const parameters: Record<string, string | number> = {
+    aspectRatio: input.aspectRatio || process.env.GEMINI_VIDEO_ASPECT_RATIO?.trim() || "16:9",
+    resolution: input.resolution || process.env.GEMINI_VIDEO_RESOLUTION?.trim() || "720p",
+    numberOfVideos: 1,
+  };
+
+  const payload = await request("/models/" + encodeURIComponent(model) + ":predictLongRunning", {
     method: "POST",
     body: JSON.stringify({
-      model: process.env.GEMINI_VIDEO_MODEL?.trim() || "gemini-omni-1.1-flash",
-      input: inputParts(input.prompt, input.imageData),
-      response_format: {
-        type: "video",
-        delivery: "uri",
-        aspect_ratio: input.aspectRatio || process.env.GEMINI_VIDEO_ASPECT_RATIO?.trim() || "16:9",
-        resolution: input.resolution || process.env.GEMINI_VIDEO_RESOLUTION?.trim() || "720p",
-      },
+      instances: [videoInstance(input.prompt, input.imageData)],
+      parameters,
     }),
   }, input.signal);
 
-  const id = typeof payload.id === "string" ? payload.id : "";
-  const block = modelOutput(payload, "video");
-  const fileUri = typeof block?.uri === "string" ? block.uri : "";
-  if (!id || !fileUri) {
+  const operationName = typeof payload.name === "string" ? payload.name : "";
+  if (!operationName) {
     throw new AiProviderError({ provider: "gemini", code: "INVALID_MEDIA_RESPONSE", failoverable: true });
   }
-  return { interactionId: id, fileUri };
+
+  return { interactionId: operationName, model };
+}
+
+export async function getVideoOperation(operationName: string, signal?: AbortSignal) {
+  if (!operationName || operationName.length > 512 || /[\r\n]/.test(operationName)) {
+    throw new AiProviderError({ provider: "gemini", code: "INVALID_MEDIA_RESPONSE" });
+  }
+  return request("/" + operationName.replace(/^\/+/, ""), { method: "GET" }, signal);
+}
+
+export function getCompletedVideoUri(payload: unknown) {
+  if (!payload || typeof payload !== "object") return "";
+  const response = (payload as { response?: unknown }).response;
+  if (!response || typeof response !== "object") return "";
+
+  const generateVideoResponse = (response as { generateVideoResponse?: unknown }).generateVideoResponse;
+  if (!generateVideoResponse || typeof generateVideoResponse !== "object") return "";
+
+  const generatedSamples = (generateVideoResponse as { generatedSamples?: unknown }).generatedSamples;
+  if (!Array.isArray(generatedSamples) || !generatedSamples[0] || typeof generatedSamples[0] !== "object") return "";
+
+  const video = (generatedSamples[0] as { video?: unknown }).video;
+  if (!video || typeof video !== "object") return "";
+
+  return typeof (video as { uri?: unknown }).uri === "string"
+    ? (video as { uri: string }).uri
+    : "";
 }
 
 export async function getInteraction(interactionId: string, signal?: AbortSignal) {
@@ -158,13 +207,29 @@ export async function downloadFile(fileUri: string, signal?: AbortSignal) {
 
   try {
     const url = new URL(fileUri);
-    url.searchParams.set("key", getKey());
-    const response = await fetch(url, { signal: controller.signal, headers: { Accept: "*/*" } });
-    if (!response.ok || !response.body) throw new AiProviderError({ provider: "gemini", code: "MEDIA_DOWNLOAD_FAILED", status: response.status, retryable: response.status >= 500, failoverable: response.status >= 500 });
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: "*/*",
+        "x-goog-api-key": getKey(),
+      },
+      redirect: "follow",
+    });
+    if (!response.ok || !response.body) {
+      throw new AiProviderError({
+        provider: "gemini",
+        code: "MEDIA_DOWNLOAD_FAILED",
+        status: response.status,
+        retryable: response.status >= 500,
+        failoverable: response.status >= 500,
+      });
+    }
     return { body: response.body, contentType: response.headers.get("content-type") || "video/mp4" };
   } catch (error) {
     if (error instanceof AiProviderError) throw error;
-    if (controller.signal.aborted) throw new AiProviderError({ provider: "gemini", code: "TIMEOUT", retryable: true, failoverable: true });
+    if (controller.signal.aborted) {
+      throw new AiProviderError({ provider: "gemini", code: "TIMEOUT", retryable: true, failoverable: true });
+    }
     throw new AiProviderError({ provider: "gemini", code: "MEDIA_DOWNLOAD_FAILED", retryable: true, failoverable: true });
   } finally {
     clearTimeout(timer);
