@@ -340,7 +340,14 @@ export async function POST(
             amountCents: existingPurchase.subscription.plan.priceCents,
             currency: existingPurchase.subscription.plan.currency,
             returnUrl: buildReturnUrl(existingPurchase.subscriptionId),
-            idempotencyKey: `vip-payment:${existingPurchase.subscriptionId}`,
+            idempotencyKey: `vip-payment:${
+              typeof existingPurchase.metadata === "object" &&
+              existingPurchase.metadata &&
+              !Array.isArray(existingPurchase.metadata) &&
+              typeof existingPurchase.metadata.checkoutIdempotencyKey === "string"
+                ? existingPurchase.metadata.checkoutIdempotencyKey
+                : existingPurchase.subscriptionId
+            }`,
           });
           const recoveredCheckoutUrl = safeCheckoutUrl(recoveredPayment.checkoutUrl);
           await db.$transaction(async (tx) => {
@@ -763,6 +770,9 @@ export async function POST(
 
                     failedAt:
                       new Date().toISOString(),
+
+                    renewalFromSubscriptionId:
+                      renewalFromSubscriptionId,
                   },
                   body.idempotencyKey,
                 ),
@@ -848,6 +858,9 @@ export async function POST(
 
                       createdAt:
                         new Date().toISOString(),
+
+                      renewalFromSubscriptionId:
+                        renewalFromSubscriptionId,
                     },
                     body.idempotencyKey,
                   ),
