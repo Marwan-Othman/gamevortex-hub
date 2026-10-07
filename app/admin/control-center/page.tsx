@@ -4,6 +4,7 @@ import { requireOwner } from "@/lib/auth";
 import AdminShell from "@/components/admin/AdminShell";
 import { calculateOwnerCashSummary } from "@/lib/owner-points";
 import WalletOrderRefunds from "@/components/admin/WalletOrderRefunds";
+import OwnerCashReconciliation from "@/components/admin/OwnerCashReconciliation";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -180,6 +181,11 @@ export default async function OwnerControlCenter() {
           <div className={styles.indicatorTile}><strong>${ownerCash.pendingOutUsd.toFixed(2)}</strong><span>السحوبات المعلقة</span></div>
         </div>
       </section>
+
+      <OwnerCashReconciliation
+        availableUsd={Number(ownerWallet?.availableUsd ?? 0).toFixed(2)}
+        historicalAvailableUsd={ownerCash.cashAvailableUsd.toFixed(2)}
+      />
 
       <WalletOrderRefunds
         orders={recentWalletOrders.map((order) => ({
