@@ -54,48 +54,43 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const blocked = await guardMutation(request, "admin:trading:approvals", 10);
   if (blocked) return blocked;
+
   let ownerId: string | undefined;
   try {
-    const owner = await requireTradingOwner(); ownerId = owner.id;
-    let body: unknown;
-    try { body = await request.json(); } catch { throw new Error("INVALID_JSON"); }
-    const raw = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-    const opportunityId = typeof raw.opportunityId === "string" ? raw.opportunityId.trim() : "";
-    const strategyVersion = typeof raw.strategyVersion === "string" ? raw.strategyVersion.trim() : undefined;
-    const shariahStatus = raw.shariahStatus;
-    const amountUsd = typeof raw.amountUsd === "string" || typeof raw.amountUsd === "number" ? raw.amountUsd : undefined;
-    const executionSnapshot = raw.executionSnapshot;
-    if (!opportunityId) throw new Error("OPPORTUNITY_ID_REQUIRED");
-    if (shariahStatus !== "APPROVED") throw new Error("SHARIAH_APPROVAL_REQUIRED");
-    if (amountUsd === undefined) throw new Error("INVALID_APPROVAL_AMOUNT");
-    if (!executionSnapshot || typeof executionSnapshot !== "object" || Array.isArray(executionSnapshot)) throw new Error("INVALID_EXECUTION_SNAPSHOT");
+    const owner = await requireTradingOwner();
+    ownerId = owner.id;
 
-    const ttlSeconds = raw.ttlSeconds === undefined ? DEFAULT_TTL_SECONDS : Number(raw.ttlSeconds);
-    if (!Number.isInteger(ttlSeconds) || ttlSeconds < 30 || ttlSeconds > MAX_TTL_SECONDS) throw new Error("INVALID_APPROVAL_TTL");
-    const riskSnapshot = raw.riskSnapshot;
-    if (riskSnapshot !== undefined && (riskSnapshot === null || typeof riskSnapshot !== "object" || Array.isArray(riskSnapshot))) throw new Error("INVALID_RISK_SNAPSHOT");
-
-    const { approval, token } = await createOwnerApproval({
-      ownerId: owner.id,
-      opportunityId,
-      amountUsd,
-      shariahStatus: "APPROVED",
-      strategyVersion,
-      riskSnapshot: riskSnapshot as Prisma.JsonObject | undefined,
-      executionSnapshot: executionSnapshot as unknown as OwnerExecutionSnapshot,
-      ttlSeconds,
+    /*
+     * Raw client-created approvals are deliberately disabled.
+     *
+     * An approval is a security boundary: its Shariah decision, risk
+     * snapshot, market snapshot and funding checks must be produced by the
+     * server-side trading pipeline. Accepting those snapshots from the
+     * browser would allow a caller to manufacture an APPROVED opportunity.
+     *
+     * The supported flow is:
+     *   /live/prepare -> /approvals/:id/consume -> /live/execute
+     * or the server-side paper-opportunity pipeline.
+     */
+    await db.auditLog.create({
+      data: {
+        actorUserId: owner.id,
+        action: "TRADING_RAW_APPROVAL_CREATION_BLOCKED",
+        entityType: "TradingApproval",
+        metadata: {
+          reason: "CLIENT_SUPPLIED_APPROVAL_SNAPSHOTS_NOT_ALLOWED",
+        },
+      },
     });
-    return NextResponse.json({ ok: true, approval: serializeApproval(approval), token: token.token }, { status: 201 });
+
+    return NextResponse.json(
+      { error: "RAW_APPROVAL_CREATION_DISABLED" },
+      { status: 410 },
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
-    if (message === "FORBIDDEN") return tradingForbidden();
-    const status = tradingErrorStatus(message);
-    if (status) return NextResponse.json({ error: message }, { status });
-    const localStatus: Record<string, number> = {
-      INVALID_JSON: 400, OPPORTUNITY_ID_REQUIRED: 400, SHARIAH_APPROVAL_REQUIRED: 409,
-      INVALID_APPROVAL_TTL: 400, INVALID_RISK_SNAPSHOT: 400, INVALID_APPROVAL_AMOUNT: 400, INVALID_EXECUTION_SNAPSHOT: 400,
-    };
-    if (localStatus[message]) return NextResponse.json({ error: message }, { status: localStatus[message] });
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return tradingForbidden();
+    }
     await logSystemError("admin:trading:approvals:post", error, { userId: ownerId });
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
   }
