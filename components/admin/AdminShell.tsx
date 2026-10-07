@@ -36,6 +36,11 @@ const NAV_SECTIONS: NavSection[] = [
         icon: <IconGames />,
       },
       {
+        label: "Downloader",
+        href: "/admin/downloader",
+        icon: <IconGames />,
+      },
+      {
         label: "التطبيقات",
         icon: <IconApps />,
         soon: true,
