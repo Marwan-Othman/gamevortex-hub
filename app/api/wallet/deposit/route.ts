@@ -67,6 +67,12 @@ export async function POST(request: NextRequest) {
     });
 
     return created;
+  }).catch(async (error) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const concurrent = await db.walletDeposit.findUnique({ where: { idempotencyKey } });
+      if (concurrent && concurrent.userId === user.id) return concurrent;
+    }
+    throw error;
   });
 
   let providerPaymentCreated = false;
