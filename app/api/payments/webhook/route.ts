@@ -1067,12 +1067,19 @@ async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
       const idempotencyKey = `api-access-revenue:${purchase.id}:${event.provider}:${event.paymentId}`;
       const existing = await transaction.ownerLedger.findUnique({ where: { idempotencyKey }, select: { id: true } });
       if (!existing) {
+        const usdAmount = new Prisma.Decimal(purchase.amountCents).div(100);
+
+        await transaction.ownerWallet.update({
+          where: { id: wallet.id },
+          data: { availableUsd: { increment: usdAmount } },
+        });
+
         await transaction.ownerLedger.create({
           data: {
             walletId: wallet.id,
             type: LedgerType.CREDIT_REVENUE,
             points: 0,
-            usdAmount: new Prisma.Decimal(purchase.amountCents).div(100),
+            usdAmount,
             currency: purchase.currency,
             provider: event.provider,
             providerTransactionId: event.paymentId,
