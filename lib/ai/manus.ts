@@ -5,7 +5,7 @@ function getBaseUrl() {
   return (process.env.MANUS_API_BASE_URL?.trim() || "https://api.manus.ai").replace(/\/$/, "");
 }
 const REQUEST_TIMEOUT_MS = 30_000;
-const POLL_INTERVAL_MS = 1_500;
+const POLL_INTERVAL_MS = 1_000;
 const MAX_POLL_MS = 240_000;
 
 function getKey() {
@@ -64,8 +64,15 @@ async function createTask(content: string, signal?: AbortSignal) {
 
 async function sleep(ms: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    const abort = () => { clearTimeout(timer); reject(new AiProviderError({ provider: "manus", code: "CANCELLED" })); };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      reject(new AiProviderError({ provider: "manus", code: "CANCELLED" }));
+    };
     signal?.addEventListener("abort", abort, { once: true });
   });
 }
