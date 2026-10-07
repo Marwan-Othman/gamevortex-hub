@@ -3071,3 +3071,360 @@ tbody tr:hover td{
     animation:none!important;
   }
 }
+
+
+/* =====================================================================
+   GAMEVORTEX — PRISM FUSION v2 / COMMERCE + ACCOUNT PASS
+   Design-only: games, apps, marketplace, gift cards, wallet, VIP, AI,
+   support and transactional states. No business logic changed.
+   ===================================================================== */
+
+/* ---------- catalog pages ---------- */
+main.wrap > .filters,
+main.wrap > form.filters,
+.filters.glass,
+.store-shell,
+.gv-wallet-grid {
+  position: relative;
+}
+
+.filters {
+  padding: 16px !important;
+  border-color: rgba(155,92,255,.24) !important;
+}
+
+.filter-row {
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.platform-list,
+.game-platform-list,
+.tabs {
+  gap: 8px !important;
+}
+
+.platform-chip,
+.game-platform,
+.regionChip {
+  border: 1px solid rgba(155,92,255,.24) !important;
+  background: rgba(8,10,24,.72) !important;
+  color: #d9dcf2 !important;
+  transition: .18s ease !important;
+}
+
+.platform-chip:hover,
+.game-platform:hover,
+.regionChip:hover {
+  border-color: rgba(38,231,255,.48) !important;
+  background: rgba(38,231,255,.07) !important;
+  transform: translateY(-1px);
+}
+
+.platform-chip.active {
+  border-color: rgba(255,212,90,.55) !important;
+  color: #ffe58b !important;
+  background: linear-gradient(120deg,rgba(155,92,255,.20),rgba(255,212,90,.08)) !important;
+  box-shadow: 0 0 22px rgba(255,212,90,.08) !important;
+}
+
+/* game detail */
+.game-detail {
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-columns: minmax(240px, 360px) minmax(0,1fr) !important;
+  gap: 28px !important;
+  align-items: center !important;
+}
+
+.detail-cover {
+  width: 100% !important;
+  max-height: 520px !important;
+  object-fit: cover !important;
+  border-radius: 20px !important;
+  box-shadow: 0 28px 70px rgba(0,0,0,.48) !important;
+}
+
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px !important;
+  margin: 18px 0 !important;
+}
+
+.stat-row > span {
+  padding: 8px 11px !important;
+  border-radius: 999px !important;
+  background: rgba(155,92,255,.08) !important;
+  border: 1px solid rgba(155,92,255,.18) !important;
+  color: #cfd3e8 !important;
+}
+
+/* app hub */
+main.wrap .orb {
+  background: conic-gradient(from 35deg,#26e7ff,#4d7cff,#9b5cff,#ff4fd8,#ffd45a,#26e7ff) !important;
+  box-shadow: 0 0 34px rgba(155,92,255,.16) !important;
+}
+
+/* ---------- marketplace ---------- */
+.store-shell {
+  display: grid !important;
+  grid-template-columns: minmax(230px,290px) minmax(0,1fr) !important;
+  gap: 18px !important;
+}
+
+.side-panel {
+  position: sticky !important;
+  top: 92px !important;
+  align-self: start !important;
+  padding: 20px !important;
+}
+
+.side-panel hr {
+  border: 0 !important;
+  border-top: 1px solid rgba(255,255,255,.08) !important;
+  margin: 18px 0 !important;
+}
+
+.product {
+  overflow: hidden !important;
+}
+
+.product-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 7px !important;
+}
+
+.product-price {
+  font-size: clamp(22px,4vw,30px) !important;
+  font-weight: 900 !important;
+  margin: 18px 0 8px !important;
+  background: linear-gradient(90deg,#ffd45a,#ff9f3f,#fff) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+/* ---------- gift-card commerce ---------- */
+.brandTile {
+  background:
+    radial-gradient(180px 140px at 88% 5%,rgba(155,92,255,.13),transparent 72%),
+    linear-gradient(145deg,rgba(15,20,47,.90),rgba(5,7,18,.97)) !important;
+}
+
+.denomTile {
+  background: rgba(8,10,24,.74) !important;
+  transition: transform .18s ease,border-color .18s ease,box-shadow .18s ease !important;
+}
+
+.denomTile:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(38,231,255,.42) !important;
+  box-shadow: 0 18px 42px rgba(0,0,0,.30) !important;
+}
+
+/* ---------- wallet ---------- */
+.gv-wallet-grid {
+  grid-template-columns: minmax(0,.78fr) minmax(0,1.22fr) !important;
+}
+
+.gv-wallet-balance {
+  min-height: 250px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.gv-wallet-balance::after {
+  content: "";
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  inset-inline-end: -120px;
+  top: -120px;
+  border-radius: 50%;
+  background: radial-gradient(circle,rgba(38,231,255,.20),transparent 68%);
+  pointer-events: none;
+}
+
+.gv-wallet-amount {
+  font-size: clamp(34px,6vw,62px) !important;
+  line-height: 1 !important;
+  margin: 16px 0 8px !important;
+  background: linear-gradient(100deg,#fff,#d9d3ff 35%,#26e7ff 70%,#ffd45a) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+.gv-wallet-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.gv-wallet-amounts .btn {
+  flex: 1 1 72px !important;
+  min-width: 62px !important;
+}
+
+.gv-wallet-table {
+  min-width: 620px !important;
+}
+
+.gv-wallet-table td,
+.gv-wallet-table th {
+  padding: 12px !important;
+}
+
+/* ---------- VIP ---------- */
+[class*="plansSection"],
+[class*="accountCard"],
+[class*="benefits"],
+[class*="benefit"],
+[class*="loadingCard"],
+[class*="errorBox"] {
+  position: relative;
+}
+
+[class*="hero"] [class*="heroContent"] {
+  position: relative;
+  z-index: 2;
+}
+
+[class*="planCard"] {
+  background:
+    linear-gradient(145deg,rgba(18,20,43,.90),rgba(6,8,19,.97)) !important;
+  border-color: rgba(155,92,255,.24) !important;
+  overflow: hidden !important;
+}
+
+[class*="planCard"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg,transparent 20%,rgba(255,255,255,.035),transparent 80%);
+  transform: translateX(-100%);
+  transition: transform .6s ease;
+  pointer-events: none;
+}
+
+[class*="planCard"]:hover::before {
+  transform: translateX(100%);
+}
+
+[class*="primaryButton"],
+[class*="planButton"] {
+  min-height: 44px !important;
+}
+
+/* ---------- AI hub / media studio ---------- */
+.aiHub {
+  min-height: calc(100vh - 120px) !important;
+}
+
+.aiHub .sidebar {
+  border-radius: 20px !important;
+}
+
+.aiHub .chatPanel {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+}
+
+.aiHub .composer {
+  background: rgba(5,7,18,.82) !important;
+  border-top: 1px solid rgba(155,92,255,.18) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.aiHub .composer textarea {
+  min-height: 52px !important;
+}
+
+.aiHub .userMessage,
+.aiHub .aiMessage {
+  border-radius: 18px !important;
+  box-shadow: 0 12px 34px rgba(0,0,0,.18) !important;
+}
+
+[class*="mediaStudio"],
+[class*="mediaCard"],
+[class*="toolCard"] {
+  border-radius: 20px !important;
+}
+
+[class*="mediaStudio"] button,
+[class*="mediaCard"] button {
+  min-height: 42px !important;
+}
+
+/* ---------- support / transactional states ---------- */
+[class*="ticket"],
+[class*="support"],
+[class*="order"],
+[class*="payment"],
+[class*="checkout"],
+[class*="resultCard"] {
+  border-radius: 18px !important;
+}
+
+[class*="success"],
+[data-status="SUCCESS"],
+[data-status="PAID"] {
+  border-color: rgba(69,240,165,.34) !important;
+}
+
+[class*="error"],
+[data-status="FAILED"],
+[data-status="ERROR"] {
+  border-color: rgba(255,79,216,.34) !important;
+}
+
+[class*="pending"],
+[data-status="PENDING"] {
+  border-color: rgba(255,212,90,.32) !important;
+}
+
+/* ---------- mobile commerce ---------- */
+@media (max-width: 900px) {
+  .game-detail,
+  .store-shell,
+  .gv-wallet-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .side-panel {
+    position: static !important;
+  }
+
+  .detail-cover {
+    max-height: 380px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .filter-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .filter-row .btn {
+    width: 100% !important;
+  }
+
+  .game-detail {
+    gap: 18px !important;
+    padding: 16px !important;
+  }
+
+  .detail-cover {
+    max-height: 300px !important;
+  }
+
+  .gv-wallet-actions .btn {
+    flex-basis: calc(33.333% - 8px) !important;
+  }
+}
