@@ -364,6 +364,13 @@ export async function POST(
                     checkoutUrl: recoveredCheckoutUrl ?? null,
                     providerStatus: recoveredPayment.status,
                     recoveredAt: new Date().toISOString(),
+                    renewalFromSubscriptionId:
+                      typeof existingPurchase.metadata === "object" &&
+                      existingPurchase.metadata &&
+                      !Array.isArray(existingPurchase.metadata) &&
+                      typeof existingPurchase.metadata.renewalFromSubscriptionId === "string"
+                        ? existingPurchase.metadata.renewalFromSubscriptionId
+                        : null,
                   },
                   body.idempotencyKey,
                 ),
