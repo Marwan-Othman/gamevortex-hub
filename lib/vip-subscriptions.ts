@@ -223,7 +223,6 @@ async function notifyVipActivation(
         planCode:
           plan.code,
         subscriptionId,
-          subscriptionId,
         expiration:
           expirationText,
       },
