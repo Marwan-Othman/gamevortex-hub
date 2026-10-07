@@ -469,6 +469,11 @@ async function recordOwnerRevenue(
     order.totalCents,
   ).div(100);
 
+  await transaction.ownerWallet.update({
+    where: { id: wallet.id },
+    data: { availableUsd: { increment: usdAmount } },
+  });
+
   await transaction.ownerLedger.create({
     data: {
       walletId: wallet.id,
