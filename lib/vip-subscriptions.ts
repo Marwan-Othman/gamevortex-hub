@@ -28,6 +28,7 @@ type RenewVipInput = {
   amountCents: number;
   currency?: string;
   providerEventId?: string;
+  renewalFromSubscriptionId?: string;
   metadata?: Prisma.InputJsonValue;
 };
 
@@ -551,6 +552,12 @@ export async function renewVipSubscription(
     input.subscriptionId,
   );
 
+  if (input.renewalFromSubscriptionId) {
+    validateSubscriptionId(
+      input.renewalFromSubscriptionId,
+    );
+  }
+
   validateProvider(
     input.provider,
   );
@@ -632,18 +639,81 @@ export async function renewVipSubscription(
         };
       }
 
-      const baseDate =
-        subscription.expiresAt &&
-        subscription.expiresAt > now
-          ? subscription.expiresAt
-          : now;
+      let renewalSource:
+        | {
+            id: string;
+            userId: string;
+            plan: { code: string };
+            expiresAt: Date | null;
+          }
+        | null = null;
 
-      const expiresAt =
+      if (input.renewalFromSubscriptionId) {
+        renewalSource =
+          await tx.vipSubscription.findUnique({
+            where: {
+              id:
+                input.renewalFromSubscriptionId,
+            },
+            select: {
+              id: true,
+              userId: true,
+              plan: {
+                select: {
+                  code: true,
+                },
+              },
+              expiresAt: true,
+            },
+          });
+
+        if (!renewalSource) {
+          throw new Error(
+            "VIP_RENEWAL_SOURCE_NOT_FOUND",
+          );
+        }
+
+        if (
+          renewalSource.userId !==
+          subscription.userId
+        ) {
+          throw new Error(
+            "VIP_RENEWAL_SOURCE_MISMATCH",
+          );
+        }
+
+        if (
+          renewalSource.id ===
+          subscription.id
+        ) {
+          throw new Error(
+            "VIP_RENEWAL_SOURCE_INVALID",
+          );
+        }
+      }
+
+      const remainingMs =
+        renewalSource?.expiresAt &&
+        renewalSource.expiresAt > now
+          ? renewalSource.expiresAt.getTime() -
+            now.getTime()
+          : 0;
+
+      const baseExpiry =
         calculateExpiry(
-          baseDate,
+          now,
           subscription.plan
             .durationMonths,
         );
+
+      const expiresAt =
+        baseExpiry &&
+        remainingMs > 0
+          ? new Date(
+              baseExpiry.getTime() +
+                remainingMs,
+            )
+          : baseExpiry;
 
       const updated =
         await tx.vipSubscription.update({
@@ -656,7 +726,6 @@ export async function renewVipSubscription(
               VipSubscriptionStatus.ACTIVE,
 
             startedAt:
-              subscription.startedAt ??
               now,
 
             expiresAt,
@@ -681,6 +750,47 @@ export async function renewVipSubscription(
         subscription.plan.gvcGrant,
         `vip:renewal:${subscription.id}:${input.paymentId}`,
       );
+
+      if (renewalSource) {
+        await tx.vipSubscription.update({
+          where: {
+            id:
+              renewalSource.id,
+          },
+          data: {
+            status:
+              VipSubscriptionStatus.CANCELED,
+          },
+        });
+
+        await createSubscriptionEvent(
+          tx,
+          {
+            subscriptionId:
+              renewalSource.id,
+
+            type:
+              renewalSource.plan.code ===
+              subscription.plan.code
+                ? VipSubscriptionEventType.RENEWED
+                : VipSubscriptionEventType.UPGRADED,
+
+            metadata: {
+              replacementSubscriptionId:
+                subscription.id,
+
+              paymentId:
+                input.paymentId,
+
+              newPlanCode:
+                subscription.plan.code,
+
+              remainingTimePreservedMs:
+                remainingMs,
+            },
+          },
+        );
+      }
 
       await tx.vipPurchase.updateMany({
         where: {
@@ -747,7 +857,11 @@ export async function renewVipSubscription(
             subscription.id,
 
           type:
-            VipSubscriptionEventType.RENEWED,
+            renewalSource &&
+            renewalSource.plan.code !==
+              subscription.plan.code
+              ? VipSubscriptionEventType.UPGRADED
+              : VipSubscriptionEventType.RENEWED,
 
           provider:
             input.provider,
@@ -759,6 +873,9 @@ export async function renewVipSubscription(
             expiresAt:
               expiresAt?.toISOString() ??
               null,
+
+            renewalFromSubscriptionId:
+              renewalSource?.id ?? null,
           },
         },
       );
@@ -769,13 +886,25 @@ export async function renewVipSubscription(
             subscription.userId,
 
           type:
-            "VIP_RENEWED",
+            renewalSource &&
+            renewalSource.plan.code !==
+              subscription.plan.code
+              ? "VIP_UPGRADED"
+              : "VIP_RENEWED",
 
           title:
-            "تم تجديد VIP",
+            renewalSource &&
+            renewalSource.plan.code !==
+              subscription.plan.code
+              ? "تمت ترقية VIP"
+              : "تم تجديد VIP",
 
           body:
-            `تم تجديد ${subscription.plan.nameAr} بنجاح.`,
+            renewalSource &&
+            renewalSource.plan.code !==
+              subscription.plan.code
+              ? `تمت ترقية VIP إلى ${subscription.plan.nameAr} مع الحفاظ على المدة المتبقية.`
+              : `تم تجديد ${subscription.plan.nameAr} بنجاح.`,
 
           metadata: {
             planCode:
