@@ -290,25 +290,8 @@ export async function POST(
         },
       });
 
-    if (activeSubscription) {
-      return NextResponse.json(
-        {
-          error:
-            "VIP_ALREADY_ACTIVE",
-          subscription: {
-            id:
-              activeSubscription.id,
-            planCode:
-              activeSubscription.plan.code,
-            expiresAt:
-              activeSubscription.expiresAt,
-          },
-        },
-        {
-          status: 409,
-        },
-      );
-    }
+    const renewalFromSubscriptionId =
+      activeSubscription?.id ?? null;
 
     /*
      * Idempotency lookup.
@@ -599,8 +582,20 @@ export async function POST(
               },
             });
 
-          if (concurrentActiveSubscription) {
+          if (
+            concurrentActiveSubscription &&
+            !renewalFromSubscriptionId
+          ) {
             throw new Error("VIP_ALREADY_ACTIVE");
+          }
+
+          if (
+            renewalFromSubscriptionId &&
+            concurrentActiveSubscription &&
+            concurrentActiveSubscription.id !==
+              renewalFromSubscriptionId
+          ) {
+            throw new Error("VIP_CHECKOUT_CONFLICT_RETRY");
           }
 
           const subscription =
@@ -635,6 +630,9 @@ export async function POST(
 
                 requestedAt:
                   new Date().toISOString(),
+
+                renewalFromSubscriptionId:
+                  renewalFromSubscriptionId,
               },
               body.idempotencyKey,
             );
@@ -690,6 +688,9 @@ export async function POST(
 
                 checkoutIdempotencyKey:
                   body.idempotencyKey,
+
+                renewalFromSubscriptionId:
+                  renewalFromSubscriptionId,
               },
             },
           });
@@ -729,7 +730,7 @@ export async function POST(
             buildReturnUrl(
               created.subscription.id,
             ),
-          idempotencyKey: `vip-payment:${created.subscription.id}`,
+          idempotencyKey: `vip-payment:${body.idempotencyKey}`,
         });
     } catch (error) {
       /*
@@ -951,6 +952,7 @@ export async function POST(
         "VIP_PLAN_NOT_PURCHASABLE",
         "VIP_PLAN_NOT_FOUND",
         "VIP_ALREADY_ACTIVE",
+        "VIP_CHECKOUT_CONFLICT_RETRY",
         "VIP_CHECKOUT_ALREADY_STARTED",
         "PAYMENT_PROVIDER_NOT_CONFIGURED",
         "APP_ORIGIN_NOT_CONFIGURED",
