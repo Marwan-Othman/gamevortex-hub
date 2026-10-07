@@ -329,6 +329,13 @@ export async function POST(
       });
 
     if (existingPurchase) {
+      const storedMetadata =
+        existingPurchase.metadata &&
+        typeof existingPurchase.metadata === "object" &&
+        !Array.isArray(existingPurchase.metadata)
+          ? (existingPurchase.metadata as Record<string, unknown>)
+          : null;
+
       if (
         (existingPurchase.status === PaymentStatus.CREATED ||
           existingPurchase.status === PaymentStatus.REQUIRES_ACTION) &&
@@ -341,11 +348,8 @@ export async function POST(
             currency: existingPurchase.subscription.plan.currency,
             returnUrl: buildReturnUrl(existingPurchase.subscriptionId),
             idempotencyKey: `vip-payment:${
-              typeof existingPurchase.metadata === "object" &&
-              existingPurchase.metadata &&
-              !Array.isArray(existingPurchase.metadata) &&
-              typeof existingPurchase.metadata.checkoutIdempotencyKey === "string"
-                ? existingPurchase.metadata.checkoutIdempotencyKey
+              typeof storedMetadata?.checkoutIdempotencyKey === "string"
+                ? storedMetadata.checkoutIdempotencyKey
                 : existingPurchase.subscriptionId
             }`,
           });
@@ -365,11 +369,8 @@ export async function POST(
                     providerStatus: recoveredPayment.status,
                     recoveredAt: new Date().toISOString(),
                     renewalFromSubscriptionId:
-                      typeof existingPurchase.metadata === "object" &&
-                      existingPurchase.metadata &&
-                      !Array.isArray(existingPurchase.metadata) &&
-                      typeof existingPurchase.metadata.renewalFromSubscriptionId === "string"
-                        ? existingPurchase.metadata.renewalFromSubscriptionId
+                      typeof storedMetadata?.renewalFromSubscriptionId === "string"
+                        ? storedMetadata.renewalFromSubscriptionId
                         : null,
                   },
                   body.idempotencyKey,
