@@ -145,7 +145,7 @@ export async function getInteraction(interactionId: string, signal?: AbortSignal
 }
 
 export async function getFileState(fileUri: string, signal?: AbortSignal) {
-  const match = fileUri.match(/\\/files\\/([^/:?]+)/);
+  const match = fileUri.match(/\/files\/([^/:?]+)/);
   if (!match) throw new Error("INVALID_FILE_URI");
   return request("/files/" + encodeURIComponent(match[1]), { method: "GET" }, signal);
 }
