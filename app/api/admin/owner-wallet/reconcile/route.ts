@@ -30,13 +30,14 @@ export async function POST(request: NextRequest) {
       const wallet = await tx.ownerWallet.findUnique({ where: { ownerId: owner.id } });
       if (!wallet) throw new Error("OWNER_WALLET_NOT_FOUND");
       const current = new Prisma.Decimal(wallet.availableUsd.toString());
-      if (!current.equals(expected)) throw new Error("OWNER_CASH_BALANCE_CHANGED");
       const ledgerKey = "owner-usd-reconcile:" + body.idempotencyKey;
       const existing = await tx.ownerLedger.findUnique({ where: { idempotencyKey: ledgerKey } });
       if (existing) {
-        if (existing.walletId !== wallet.id || existing.usdAmount?.toString() !== delta.toString()) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
-        return { existing, before: current, after: current.add(delta), replayed: true };
+        const existingDelta = existing.usdAmount === null ? null : new Prisma.Decimal(existing.usdAmount.toString());
+        if (existing.walletId !== wallet.id || existingDelta === null || !existingDelta.equals(delta)) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+        return { existing, before: current, after: current, replayed: true };
       }
+      if (!current.equals(expected)) throw new Error("OWNER_CASH_BALANCE_CHANGED");
       const after = current.add(delta);
       if (after.isNegative()) throw new Error("OWNER_CASH_BALANCE_CANNOT_BE_NEGATIVE");
       const updated = await tx.ownerWallet.updateMany({ where: { id: wallet.id, availableUsd: current }, data: { availableUsd: after } });
