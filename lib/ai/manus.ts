@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { AiProviderError, type AiChatInput, type AiChatResult } from "@/lib/ai/types";
 
-const BASE_URL = "https://api.manus.ai";
+function getBaseUrl() {
+  return (process.env.MANUS_API_BASE_URL?.trim() || "https://api.manus.ai").replace(/\/$/, "");
+}
 const REQUEST_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_500;
 const MAX_POLL_MS = 240_000;
@@ -19,7 +21,7 @@ async function request(path: string, init: RequestInit, signal?: AbortSignal) {
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
   try {
-    const response = await fetch(BASE_URL + path, {
+    const response = await fetch(getBaseUrl() + path, {
       ...init,
       signal: controller.signal,
       headers: { Accept: "application/json", "Content-Type": "application/json", "x-manus-api-key": getKey(), "X-Request-Id": randomUUID(), ...(init.headers || {}) },
