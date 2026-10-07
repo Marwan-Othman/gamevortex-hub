@@ -10,6 +10,7 @@ import { AiProviderError } from "@/lib/ai/types";
 
 const MAX_PROMPT = 6000;
 const MAX_HISTORY = 12;
+const STALE_REQUEST_MS = 6 * 60 * 1000;
 
 export async function executeChat(options: {
   userId: string;
@@ -33,7 +34,7 @@ export async function executeChat(options: {
 
   const duplicate = await db.gameVortexAiMessage.findFirst({
     where: { conversationId: options.conversationId, idempotencyKey: options.idempotencyKey },
-    select: { id: true },
+    select: { id: true, createdAt: true },
   });
   if (duplicate) {
     const assistant = await db.gameVortexAiMessage.findFirst({
@@ -41,7 +42,14 @@ export async function executeChat(options: {
       select: { content: true },
     });
     if (assistant) return { answer: assistant.content, provider: "cached", model: "cached", requestId: options.idempotencyKey, latencyMs: 0 };
-    throw new Error("AI_REQUEST_IN_PROGRESS");
+
+    if (Date.now() - duplicate.createdAt.getTime() < STALE_REQUEST_MS) {
+      throw new Error("AI_REQUEST_IN_PROGRESS");
+    }
+
+    await db.gameVortexAiMessage.delete({
+      where: { id: duplicate.id },
+    }).catch(() => undefined);
   }
 
   const owner = vip.isOwner;
