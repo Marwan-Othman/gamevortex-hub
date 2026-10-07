@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOptionalUser } from "@/lib/auth";
+import { guardRead } from "@/lib/api";
 import { refundAiCredit } from "@/lib/ai/credits";
 import { createMediaToken, readMediaToken } from "@/lib/ai/media-token";
 import { getCompletedVideoUri, getVideoOperation } from "@/lib/ai/media";
@@ -8,6 +9,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const blocked = await guardRead(request, "ai:video-status", 30);
+  if (blocked) return blocked;
+
   const user = await getOptionalUser();
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
