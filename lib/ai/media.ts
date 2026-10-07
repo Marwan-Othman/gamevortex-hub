@@ -73,7 +73,7 @@ function modelOutput(payload: unknown, type: "image" | "video") {
 
 function inputParts(prompt: string, imageData?: string) {
   if (!imageData) return prompt;
-  const match = imageData.match(/^data:(image\\/(?:png|jpeg|webp));base64,(.+)$/);
+  const match = imageData.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
   if (!match) throw new Error("INVALID_IMAGE_INPUT");
   return [
     { type: "text", text: prompt },
