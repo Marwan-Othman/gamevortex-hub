@@ -14,7 +14,14 @@ export const maxDuration = 300;
 
 function safeError(error: unknown) {
   const code = error instanceof Error ? error.message : "";
-  const known = new Set(["UNAUTHORIZED", "AI_VIP_REQUIRED", "AI_CREDITS_EXHAUSTED", "INVALID_REQUEST", "INVALID_IMAGE_INPUT", "AI_SERVICE_UNAVAILABLE"]);
+  const known = new Set([
+    "UNAUTHORIZED",
+    "AI_VIP_REQUIRED",
+    "AI_CREDITS_EXHAUSTED",
+    "INVALID_REQUEST",
+    "INVALID_IMAGE_INPUT",
+    "AI_SERVICE_UNAVAILABLE",
+  ]);
   return known.has(code) ? code : "AI_SERVICE_UNAVAILABLE";
 }
 
@@ -32,8 +39,12 @@ export async function POST(request: NextRequest) {
   const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : undefined;
   const resolution = typeof body?.resolution === "string" ? body.resolution : undefined;
 
-  if (!prompt || prompt.length > 4000) return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 400 });
-  if (imageData && imageData.length > 4_000_000) return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 413 });
+  if (!prompt || prompt.length > 4000) {
+    return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 400 });
+  }
+  if (imageData && imageData.length > 4_000_000) {
+    return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 413 });
+  }
 
   const vip = await getVipAccess(user.id);
   if (!vip.isVip) return NextResponse.json({ error: "AI_VIP_REQUIRED", requestId }, { status: 403 });
@@ -53,7 +64,6 @@ export async function POST(request: NextRequest) {
     const token = createMediaToken({
       sub: user.id,
       interactionId: result.interactionId,
-      fileUri: result.fileUri,
       kind: "VIDEO",
       creditKey,
       creditAmount: cost,
@@ -61,12 +71,24 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      data: { status: "processing", token, requestId, provider: "gemini", model: process.env.GEMINI_VIDEO_MODEL?.trim() || "gemini-omni-1.1-flash" },
+      data: {
+        status: "processing",
+        token,
+        requestId,
+        provider: "gemini",
+        model: result.model,
+      },
     });
   } catch (error) {
     if (reserved) await refundAiCredit(user.id, "VIDEO", creditKey, cost).catch(() => undefined);
     const code = safeError(error);
-    const status = code === "AI_CREDITS_EXHAUSTED" ? 402 : code === "AI_VIP_REQUIRED" ? 403 : code === "INVALID_REQUEST" || code === "INVALID_IMAGE_INPUT" ? 400 : 503;
+    const status = code === "AI_CREDITS_EXHAUSTED"
+      ? 402
+      : code === "AI_VIP_REQUIRED"
+        ? 403
+        : code === "INVALID_REQUEST" || code === "INVALID_IMAGE_INPUT"
+          ? 400
+          : 503;
     console.error(JSON.stringify({ event: "ai_video_failure", requestId, code }));
     return NextResponse.json({ error: code, requestId }, { status });
   }
