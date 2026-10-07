@@ -181,6 +181,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "SOURCE_FILE_TOO_LARGE" }, { status: 413 });
     }
 
+    const responseBody = response.body;
+    if (!responseBody) {
+      throw new Error("SOURCE_BODY_EMPTY");
+    }
+
     const contentType = (response.headers.get("content-type") || "application/octet-stream")
       .split(";", 1)[0]
       .trim()
@@ -197,7 +202,7 @@ export async function POST(request: NextRequest) {
     }
 
     let bytesSeen = 0;
-    const limitedStream = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    const limitedStream = responseBody.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
         bytesSeen += chunk.byteLength;
         if (bytesSeen > MAX_IMPORT_BYTES) {
