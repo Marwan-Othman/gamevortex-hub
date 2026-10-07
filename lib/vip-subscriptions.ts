@@ -845,7 +845,7 @@ export async function renewVipSubscription(
               subscription.plan.code,
 
             renewalBase:
-              baseDate.toISOString(),
+              now.toISOString(),
           },
         },
       );
