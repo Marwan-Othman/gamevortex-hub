@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       fileUri: result.fileUri,
       kind: "VIDEO",
       creditKey,
+      creditAmount: cost,
       ttlSeconds: 6 * 60 * 60,
     });
 
