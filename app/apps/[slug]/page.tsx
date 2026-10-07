@@ -121,11 +121,15 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
           </div>
 
           <div className="action-row" style={{ marginTop: 18 }}>
-            {app.officialUrl && (
-              <a className="btn" href={app.officialUrl} target="_blank" rel="noreferrer">المصدر الرسمي</a>
+            {app.downloadSource && (
+              <a className="btn" href={`/download/app/${app.slug}`}>
+                تحميل التطبيق
+              </a>
             )}
-            {app.downloadSource && app.downloadSource !== app.officialUrl && (
-              <a className="btn secondary" href={app.downloadSource} target="_blank" rel="noreferrer">فتح المصدر</a>
+            {app.officialUrl && (
+              <a className="btn secondary" href={app.officialUrl} target="_blank" rel="noreferrer">
+                المصدر الرسمي
+              </a>
             )}
           </div>
         </div>
