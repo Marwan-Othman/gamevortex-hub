@@ -46,7 +46,7 @@ export default async function TradingPage() {
       <section className={styles.statGrid}>
         <div className={styles.statTile}>
           <strong>${summary.walletAvailableUsd}</strong>
-          <span className={styles.label}>رصيد المحفظة المتاح ({summary.walletAvailablePoints} نقطة)</span>
+          <span className={styles.label}>النقد USD المتاح فعليًا · نقاط المالك: {summary.walletAvailablePoints}</span>
         </div>
         <div className={styles.statTile}>
           <strong>${summary.tradingBalanceUsd}</strong>
