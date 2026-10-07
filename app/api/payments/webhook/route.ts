@@ -856,14 +856,22 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
               Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${pendingWallet.id} FOR UPDATE`,
             );
 
-            await transaction.wallet.update({
-              where: { id: pendingWallet.id },
+            const pendingAmount = new Prisma.Decimal(deposit.amountCents).div(100);
+            const released = await transaction.wallet.updateMany({
+              where: {
+                id: pendingWallet.id,
+                pendingBalance: { gte: pendingAmount },
+              },
               data: {
                 pendingBalance: {
-                  decrement: new Prisma.Decimal(deposit.amountCents).div(100),
+                  decrement: pendingAmount,
                 },
               },
             });
+
+            if (released.count !== 1) {
+              throw new Error("WALLET_PENDING_BALANCE_MISMATCH");
+            }
           }
         }
 
