@@ -84,7 +84,7 @@ async function poll(taskId: string, signal?: AbortSignal) {
     const task = detail.task && typeof detail.task === "object" ? detail.task as { status?: string; has_running_background_jobs?: boolean } : {};
     if (task.status === "error") throw new AiProviderError({ provider: "manus", code: "TASK_FAILED", failoverable: true });
     if (task.status === "waiting") throw new AiProviderError({ provider: "manus", code: "TASK_WAITING", failoverable: false });
-    if (task.status === "stopped" && task.has_running_background_jobs !== true) {
+    if (task.status === "stopped" && task.has_running_background_jobs === false) {
       const result = await request("/v2/task.listMessages?task_id=" + encodeURIComponent(taskId) + "&order=desc&limit=100", { method: "GET" }, signal);
       const messages = Array.isArray(result.messages) ? result.messages : [];
       for (const item of messages) {
