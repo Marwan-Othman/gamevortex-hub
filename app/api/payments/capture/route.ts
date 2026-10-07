@@ -196,6 +196,7 @@ export async function POST(
 
       await provider.capturePayment(
         body.paymentId,
+        `paypal-capture:${body.referenceId}:${body.paymentId}`,
       );
 
       return NextResponse.json({
