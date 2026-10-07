@@ -283,9 +283,18 @@ export default async function GameDetails({
             </span>
           </div>
 
-          {game.officialUrl && (
+          {game.downloadSource && (
             <a
               className="btn"
+              href={`/download/game/${game.slug}`}
+            >
+              تحميل اللعبة
+            </a>
+          )}
+
+          {game.officialUrl && (
+            <a
+              className="btn secondary"
               href={game.officialUrl}
               target="_blank"
               rel="noreferrer"
