@@ -46,18 +46,25 @@ export async function releaseUnfilledLiveAllocation(input: {
     const beforeBalance = lockedAccount.balanceUsd;
     const afterBalance = beforeBalance.sub(new Prisma.Decimal(allocation.amountUsd));
     await tx.tradingAccount.update({ where: { id: lockedAccount.id }, data: { balanceUsd: afterBalance } });
-    await tx.ownerWallet.update({ where: { id: wallet.id }, data: { availablePoints: { increment: allocation.points } } });
+
+    // Allocations are now funded from the Owner Wallet's native USD cash balance.
+    // A no-fill release must return that exact USD amount to cash, never convert it to points.
+    await tx.ownerWallet.update({
+      where: { id: wallet.id },
+      data: { availableUsd: { increment: new Prisma.Decimal(allocation.amountUsd) } },
+    });
 
     const baseKey = `live-unfilled-release:${order.id}`;
     await tx.ownerLedger.create({
       data: {
         walletId: wallet.id,
         type: "TRADING_RETURNED",
-        points: allocation.points,
+        points: 0,
         usdAmount: allocation.amountUsd,
+        currency: "USD",
         conversionRate: OWNER_POINTS_PER_USD,
         idempotencyKey: `${baseKey}:owner`,
-        metadata: { liveOrderId: order.id, allocationId: allocation.id, reason: "NO_FILL" },
+        metadata: { liveOrderId: order.id, allocationId: allocation.id, reason: "NO_FILL", returnedUsd: String(allocation.amountUsd) },
       },
     });
 
@@ -81,7 +88,7 @@ export async function releaseUnfilledLiveAllocation(input: {
         "settlementStatus" = 'SETTLED',
         "walletSettledAt" = CURRENT_TIMESTAMP,
         "settledUsd" = ${allocation.amountUsd}::numeric,
-        "settledPoints" = ${allocation.points},
+        "settledPoints" = 0,
         "settlementRoundingUsd" = 0::numeric,
         "settlementError" = NULL,
         "version" = "version" + 1
@@ -97,7 +104,7 @@ export async function releaseUnfilledLiveAllocation(input: {
         action: "TRADING_LIVE_UNFILLED_ALLOCATION_RELEASED",
         entityType: "TradingLiveOrder",
         entityId: order.id,
-        metadata: { allocationId: allocation.id, amountUsd: allocation.amountUsd, points: allocation.points },
+        metadata: { allocationId: allocation.id, amountUsd: allocation.amountUsd, points: 0, returnedUsd: String(allocation.amountUsd) },
       },
     });
 
