@@ -118,7 +118,7 @@ export async function createAllocation(input: {
         action: "TRADING_ALLOCATION_CREATED",
         entityType: "TradingAllocation",
         entityId: allocation.id,
-        metadata: { amountUsd, points, conversionRate: OWNER_POINTS_PER_USD },
+        metadata: { amountUsd, points: 0, conversionRate: OWNER_POINTS_PER_USD },
       },
     });
 
