@@ -346,6 +346,62 @@ export async function POST(
       });
 
     if (existingPurchase) {
+      if (
+        (existingPurchase.status === PaymentStatus.CREATED ||
+          existingPurchase.status === PaymentStatus.REQUIRES_ACTION) &&
+        existingPurchase.providerPaymentId.startsWith("pending_vip_")
+      ) {
+        try {
+          const recoveredPayment = await provider.createPayment({
+            orderId: existingPurchase.subscriptionId,
+            amountCents: existingPurchase.subscription.plan.priceCents,
+            currency: existingPurchase.subscription.plan.currency,
+            returnUrl: buildReturnUrl(existingPurchase.subscriptionId),
+            idempotencyKey: `vip-payment:${existingPurchase.subscriptionId}`,
+          });
+          const recoveredCheckoutUrl = safeCheckoutUrl(recoveredPayment.checkoutUrl);
+          await db.$transaction(async (tx) => {
+            await tx.vipPurchase.update({
+              where: { id: existingPurchase.id },
+              data: {
+                providerPaymentId: recoveredPayment.paymentId,
+                status:
+                  recoveredPayment.status === "CREATED"
+                    ? PaymentStatus.CREATED
+                    : PaymentStatus.REQUIRES_ACTION,
+                metadata: metadataWithCheckoutKey(
+                  {
+                    checkoutUrl: recoveredCheckoutUrl ?? null,
+                    providerStatus: recoveredPayment.status,
+                    recoveredAt: new Date().toISOString(),
+                  },
+                  body.idempotencyKey,
+                ),
+              },
+            });
+            await tx.vipSubscription.update({
+              where: { id: existingPurchase.subscriptionId },
+              data: {
+                provider: recoveredPayment.provider,
+                paymentId: recoveredPayment.paymentId,
+              },
+            });
+          });
+          return NextResponse.json({
+            provider: recoveredPayment.provider,
+            paymentId: recoveredPayment.paymentId,
+            checkoutUrl: recoveredCheckoutUrl,
+            status: recoveredPayment.status,
+            subscriptionId: existingPurchase.subscriptionId,
+            planCode: existingPurchase.subscription.plan.code,
+            reused: true,
+            recovered: true,
+          });
+        } catch {
+          // Keep the purchase pending so a later retry can safely reuse the provider idempotency key.
+        }
+      }
+
       const existingMetadata =
         existingPurchase.metadata &&
         typeof existingPurchase.metadata ===
