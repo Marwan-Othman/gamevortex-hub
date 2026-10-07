@@ -9,6 +9,7 @@ import { db } from "@/lib/prisma";
 
 import {
   activateVipSubscription,
+  renewVipSubscription,
 } from "@/lib/vip-subscriptions";
 
 export type VipPaymentWebhookInput = {
@@ -91,6 +92,19 @@ function mergeMetadata(
     ...jsonObject(existing),
     ...additional,
   };
+}
+
+
+function renewalSourceIdFromMetadata(
+  metadata: unknown,
+): string | undefined {
+  const value =
+    jsonObject(metadata)
+      .renewalFromSubscriptionId;
+
+  return typeof value === "string"
+    ? value
+    : undefined;
 }
 
 async function createEvent(
@@ -699,6 +713,51 @@ export async function processVipPaymentWebhook(
     );
   }
 
+  const renewalFromSubscriptionId =
+    renewalSourceIdFromMetadata(
+      subscription.purchase?.metadata,
+    );
+
+  const webhookMetadata = {
+    webhookStatus:
+      input.status,
+
+    webhookProcessedAt:
+      new Date().toISOString(),
+
+    raw:
+      jsonObject(
+        input.raw,
+      ),
+  };
+
+  if (renewalFromSubscriptionId) {
+    return renewVipSubscription({
+      subscriptionId:
+        input.subscriptionId,
+
+      provider:
+        input.provider,
+
+      paymentId:
+        input.paymentId,
+
+      amountCents:
+        input.amountCents,
+
+      currency:
+        input.currency,
+
+      providerEventId:
+        input.providerEventId,
+
+      renewalFromSubscriptionId,
+
+      metadata:
+        webhookMetadata,
+    });
+  }
+
   return activateVipSubscription({
     subscriptionId:
       input.subscriptionId,
@@ -719,17 +778,6 @@ export async function processVipPaymentWebhook(
       input.providerEventId,
 
     metadata:
-      {
-        webhookStatus:
-          input.status,
-
-        webhookProcessedAt:
-          new Date().toISOString(),
-
-        raw:
-          jsonObject(
-            input.raw,
-          ),
-      },
+      webhookMetadata,
   });
 }
