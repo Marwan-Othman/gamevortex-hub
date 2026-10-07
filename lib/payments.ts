@@ -30,6 +30,7 @@ export interface PaymentProvider {
 
   capturePayment(
     paymentId: string,
+    idempotencyKey?: string,
   ): Promise<{
     provider: string;
     paymentId: string;
@@ -542,6 +543,7 @@ export class ConfiguredPaymentProvider
 
   async capturePayment(
     paymentId: string,
+    idempotencyKey?: string,
   ): Promise<{
     provider: string;
     paymentId: string;
@@ -570,6 +572,7 @@ export class ConfiguredPaymentProvider
           paymentId,
         )}/capture`,
         {},
+        idempotencyKey,
       );
 
     if (
