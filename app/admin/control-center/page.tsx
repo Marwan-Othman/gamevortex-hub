@@ -50,7 +50,7 @@ export default async function OwnerControlCenter() {
     db.game.count({ where: { gamePlatforms: { some: { platform: { in: ["ANDROID", "IOS"] } } }, published: true } }),
     db.ownerWallet.findUnique({
       where: { ownerId: owner.id },
-      select: { id: true, availablePoints: true, pendingPoints: true },
+      select: { id: true, availablePoints: true, pendingPoints: true, availableUsd: true },
     }),
     db.withdrawalRequest.groupBy({
       by: ["status"],
@@ -162,7 +162,8 @@ export default async function OwnerControlCenter() {
         <div className={styles.indicatorRow}>
           <div className={styles.indicatorTile}><strong>{ownerWallet?.availablePoints ?? 0}</strong><span>نقاط المالك المتاحة</span></div>
           <div className={styles.indicatorTile}><strong>{ownerWallet?.pendingPoints ?? 0}</strong><span>نقاط المالك المعلقة</span></div>
-          <div className={styles.indicatorTile}><strong>${ownerCash.cashAvailableUsd.toFixed(2)}</strong><span>الرصيد النقدي الحقيقي المتاح</span></div>
+          <div className={styles.indicatorTile}><strong>${Number(ownerWallet?.availableUsd ?? 0).toFixed(2)}</strong><span>الرصيد النقدي USD المتاح فعليًا</span></div>
+          <div className={styles.indicatorTile}><strong>${ownerCash.cashAvailableUsd.toFixed(2)}</strong><span>صافي الإيرادات التاريخي غير المسوّى</span></div>
           <div className={styles.indicatorTile}><strong>${ownerCash.pointsBalanceUsd.toFixed(2)}</strong><span>قيمة نقاط المالك بالدولار</span></div>
           <Link href="/profile/gamer" className={styles.indicatorTile}><strong>→</strong><span>ملف الحساب</span></Link>
         </div>
