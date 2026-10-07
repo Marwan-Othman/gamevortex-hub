@@ -234,7 +234,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           allocationId: allocation.id,
           returnedUsd: calculation.returnedUsd.toString(),
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
-          roundingUsd: calculation.roundingUsd.toString(),
+          roundingUsd: "0",
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
         },
@@ -288,7 +288,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         metadata: {
           allocationId: allocation.id,
           returnedUsd: calculation.returnedUsd.toString(),
-          settledUsd: calculation.settledUsd.toString(),
+          settledUsd: calculation.returnedUsd.toString(),
           fundingSource: "OWNER_WALLET_USD",
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
