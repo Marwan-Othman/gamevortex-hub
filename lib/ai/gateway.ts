@@ -74,6 +74,8 @@ export async function executeChat(options: {
     throw error;
   }
 
+  let providerSucceeded = false;
+
   try {
     if (!owner) {
       try {
@@ -83,7 +85,15 @@ export async function executeChat(options: {
         throw error;
       }
     }
-    const { result, attempts } = await runChatWithFailover({ prompt, history, systemInstruction, previousInteractionId: conversation.providerInteractionId || undefined });
+
+    const { result, attempts } = await runChatWithFailover({
+      prompt,
+      history,
+      systemInstruction,
+      previousInteractionId: conversation.providerInteractionId || undefined,
+    });
+    providerSucceeded = true;
+
     for (const attempt of attempts) {
       const usage = await startAiUsage({
         userId: options.userId,
@@ -125,8 +135,11 @@ export async function executeChat(options: {
 
     return { answer: result.answer, provider: result.provider, model: result.model, requestId, latencyMs: result.latencyMs };
   } catch (error) {
-    if (!owner) await refundAiCredit(options.userId, "CHAT", options.idempotencyKey, creditAmount).catch(() => undefined);
+    if (!owner && !providerSucceeded) {
+      await refundAiCredit(options.userId, "CHAT", options.idempotencyKey, creditAmount).catch(() => undefined);
+    }
     if (error instanceof AiProviderError) throw error;
+    if (providerSucceeded) throw error;
     throw new Error("AI_SERVICE_UNAVAILABLE");
   }
 }
