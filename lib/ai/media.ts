@@ -6,7 +6,7 @@ const REQUEST_TIMEOUT_MS = 300_000;
 function getKey() {
   const value = process.env.GEMINI_API_KEY?.trim();
   if (!value) throw new AiProviderError({ provider: "gemini", code: "NOT_CONFIGURED" });
-  if (value.length > 4096 || /[\\r\\n]/.test(value)) {
+  if (value.length > 4096 || /[\r\n]/.test(value)) {
     throw new AiProviderError({ provider: "gemini", code: "CONFIGURATION_INVALID" });
   }
   return value;
