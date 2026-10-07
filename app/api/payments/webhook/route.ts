@@ -7,7 +7,10 @@ import {
   ProductKind,
 } from "@prisma/client";
 import { db } from "@/lib/prisma";
-import { ConfiguredPaymentProvider } from "@/lib/payments";
+import {
+  ConfiguredPaymentProvider,
+  resolveStripePaymentIntentReference,
+} from "@/lib/payments";
 import { qualifyReferralOnFirstOrder } from "@/lib/referrals";
 import { rateLimitAsync, clientKey } from "@/lib/security";
 import { logSystemError } from "@/lib/observability";
@@ -76,7 +79,10 @@ function normalizeStripe(raw: any): NormalizedEvent | null {
 
   const orderId = String(object?.metadata?.orderId || "");
 
-  if (!orderId) {
+  // Stripe charge.refunded events identify the Charge, while the local
+  // payment row normally stores the Checkout Session ID. The order/reference
+  // is carried by the PaymentIntent metadata configured at checkout.
+  if (!orderId && status !== "REFUNDED") {
     return null;
   }
 
@@ -96,6 +102,10 @@ function normalizeStripe(raw: any): NormalizedEvent | null {
     currency: object.currency
       ? String(object.currency).toUpperCase()
       : undefined,
+    providerOrderId:
+      typeof object?.payment_intent === "string"
+        ? object.payment_intent
+        : undefined,
     raw,
   };
 }
@@ -1129,7 +1139,7 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = JSON.parse(rawBody);
 
-    const event =
+    let event =
       provider.name === "stripe"
         ? normalizeStripe(parsed)
         : provider.name === "paypal"
@@ -1137,7 +1147,28 @@ export async function POST(request: NextRequest) {
           : normalizeGeneric(parsed);
 
     if (
+      event &&
+      provider.name === "stripe" &&
+      event.status === "REFUNDED" &&
+      !event.orderId &&
+      event.providerOrderId
+    ) {
+      const resolvedReference =
+        await resolveStripePaymentIntentReference(
+          event.providerOrderId,
+        );
+
+      if (resolvedReference) {
+        event = {
+          ...event,
+          orderId: resolvedReference,
+        };
+      }
+    }
+
+    if (
       !event ||
+      !event.orderId ||
       !Number.isInteger(event.amountCents) ||
       event.amountCents < 0
     ) {
