@@ -3,7 +3,6 @@ import { getOptionalUser } from "@/lib/auth";
 import { refundAiCredit } from "@/lib/ai/credits";
 import { getFileState } from "@/lib/ai/media";
 import { readMediaToken } from "@/lib/ai/media-token";
-import { getAiCost } from "@/lib/ai/costs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,8 +22,7 @@ export async function GET(request: NextRequest) {
     const state = typeof statePayload.state === "string" ? statePayload.state : "PROCESSING";
 
     if (state === "FAILED") {
-      const cost = getAiCost("VIDEO_COST");
-      await refundAiCredit(user.id, "VIDEO", data.creditKey, cost).catch(() => undefined);
+      await refundAiCredit(user.id, "VIDEO", data.creditKey, data.creditAmount).catch(() => undefined);
       return NextResponse.json({ data: { status: "failed" } }, { status: 200 });
     }
 
