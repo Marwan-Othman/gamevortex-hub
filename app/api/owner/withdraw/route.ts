@@ -24,6 +24,13 @@ export async function POST(req: NextRequest) {
     const owner = await requireOwner();
     ownerId = owner.id;
 
+    if (process.env.OWNER_WITHDRAWAL_ENABLED !== "true") {
+      return NextResponse.json(
+        { error: "OWNER_WITHDRAWAL_DISABLED" },
+        { status: 503 },
+      );
+    }
+
     let body: unknown;
 
     try {
