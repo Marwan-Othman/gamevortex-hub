@@ -543,7 +543,7 @@ export async function POST(
               await transaction.entitlement.upsert({
                 where: { userId_gameId: { userId: user.id, gameId: product.gameId } },
                 create: { userId: user.id, gameId: product.gameId, orderItemId: item.id },
-                update: { revokedAt: null, orderItemId: item.id },
+                update: { revokedAt: null },
               });
             }
 
