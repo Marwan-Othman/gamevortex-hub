@@ -1543,10 +1543,26 @@ export async function POST(request: NextRequest) {
         ? error.message
         : "WEBHOOK_PROCESSING_FAILED";
 
+    // Fulfillment/accounting failures are retryable. Returning 4xx here can
+    // cause providers to stop retrying a signed payment event even though the
+    // database transaction was rolled back and the order still needs fulfillment.
+    const retryableMessages = new Set([
+      "OUT_OF_STOCK",
+      "DIGITAL_KEYS_OUT_OF_STOCK",
+      "DIGITAL_KEY_ALREADY_CLAIMED",
+      "OWNER_USD_BALANCE_INSUFFICIENT_FOR_REFUND",
+      "OWNER_ACCOUNT_NOT_FOUND",
+      "OWNER_WALLET_NOT_FOUND",
+      "WALLET_NOT_FOUND",
+      "API_ACCESS_PURCHASE_NOT_FOUND",
+    ]);
+
     const status =
       message === "ORDER_NOT_FOUND"
         ? 404
-        : 400;
+        : retryableMessages.has(message)
+          ? 503
+          : 400;
 
     await logSystemError(
       "payments:webhook",
