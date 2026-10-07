@@ -618,12 +618,24 @@ export async function processVipPaymentWebhook(
       },
       include: {
         plan: true,
+        purchase: true,
       },
     });
 
   if (!subscription) {
     throw new Error(
       "VIP_SUBSCRIPTION_NOT_FOUND",
+    );
+  }
+
+  if (
+    subscription.purchase &&
+    subscription.purchase.providerPaymentId.startsWith("pending_vip_") === false &&
+    subscription.purchase.providerPaymentId !== input.paymentId &&
+    subscription.purchase.status !== PaymentStatus.SUCCEEDED
+  ) {
+    throw new Error(
+      "VIP_PAYMENT_ID_MISMATCH",
     );
   }
 
