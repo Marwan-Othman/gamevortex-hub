@@ -562,27 +562,23 @@ async function refundOwnerRevenue(
 
   const existingRefund =
     await transaction.ownerLedger.findUnique({
-      where: {
-        idempotencyKey: refundIdempotencyKey,
-      },
+      where: { idempotencyKey: refundIdempotencyKey },
     });
 
-  if (existingRefund) {
-    return;
-  }
+  if (existingRefund) return;
 
   const originalPayment =
     await transaction.payment.findFirst({
       where: {
         orderId: order.id,
         provider,
-        status: "SUCCEEDED",
+        status: { in: ["SUCCEEDED", "REFUNDED"] },
       },
       orderBy: { createdAt: "asc" },
       select: { providerPaymentId: true },
     });
 
-  if (!originalPayment) return;
+  if (!originalPayment?.providerPaymentId) return;
 
   const saleLedger =
     await transaction.ownerLedger.findUnique({
@@ -592,19 +588,33 @@ async function refundOwnerRevenue(
       },
     });
 
-  if (!saleLedger) {
-    return;
-  }
+  if (!saleLedger) return;
 
   const wallet =
     await transaction.ownerWallet.findUnique({
-      where: {
-        id: saleLedger.walletId,
-      },
+      where: { id: saleLedger.walletId },
     });
 
   if (!wallet) {
     throw new Error("OWNER_WALLET_NOT_FOUND");
+  }
+
+  const refundUsd =
+    saleLedger.usdAmount ?? new Prisma.Decimal(0);
+
+  const debited =
+    await transaction.ownerWallet.updateMany({
+      where: {
+        id: wallet.id,
+        availableUsd: { gte: refundUsd },
+      },
+      data: {
+        availableUsd: { decrement: refundUsd },
+      },
+    });
+
+  if (debited.count !== 1) {
+    throw new Error("OWNER_USD_BALANCE_INSUFFICIENT_FOR_REFUND");
   }
 
   await transaction.ownerLedger.create({
@@ -612,9 +622,7 @@ async function refundOwnerRevenue(
       walletId: wallet.id,
       type: LedgerType.REFUND,
       points: 0,
-      usdAmount: saleLedger.usdAmount
-        ? saleLedger.usdAmount.neg()
-        : null,
+      usdAmount: refundUsd.neg(),
       currency: order.currency || "USD",
       provider,
       providerTransactionId: paymentId,
