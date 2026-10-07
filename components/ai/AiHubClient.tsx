@@ -85,6 +85,10 @@ export default function AiHubClient() {
         <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 260px", gap: 16 }}>
           <div style={{ background: "#111113", border: "1px solid #27272a", borderRadius: 18, minHeight: 620, overflow: "hidden" }}>
             <div style={{ display: "flex", flexDirection: "column", minHeight: 620 }}>
+              <nav aria-label="AI tools" style={{ padding: 10, borderBottom: "1px solid #27272a", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <a href="/ai" aria-current="page" style={{ textDecoration: "none", color: "#fff", background: "#27272a", borderRadius: 9, padding: "8px 12px" }}>المحادثة</a>
+                <a href="/ai/wallpapers" style={{ textDecoration: "none", color: "#fff", background: "#18181b", borderRadius: 9, padding: "8px 12px" }}>الصور والفيديو</a>
+              </nav>
               <div style={{ padding: 16, borderBottom: "1px solid #27272a", display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <strong>{activeTitle}</strong>
                 <button onClick={() => void createConversation()} style={{ border: 0, borderRadius: 9, padding: "8px 12px", cursor: "pointer" }}>محادثة جديدة</button>
