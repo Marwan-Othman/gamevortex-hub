@@ -120,7 +120,7 @@ export async function prepareLiveOrder(input: {
   if (input.ackOwnerSpot !== true) throw new Error("LIVE_OWNER_ACK_REQUIRED");
 
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
-
+  // Live wallet funding is intentionally blocked until OwnerWallet has a native USD cash balance.\n  // The current allocation layer is points-backed; enabling exchange orders against it would\n  // create a mismatch between real USD custody and the platform points ledger.\n  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");\n
   const direct = isLiveDirectFundingEnabled();
   if (direct) {
     throw new Error("LIVE_DIRECT_FUNDING_DISABLED");
