@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
-import { OWNER_POINTS_PER_USD } from "@/lib/owner-points";
 import { calculateLiveSpotNetExitProceeds } from "@/lib/trading/live-fee-accounting";
 import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
@@ -49,42 +48,18 @@ export type LiveWalletSettlementResult = {
 
 export type OwnerWalletSettlementCalculation = {
   returnedUsd: Prisma.Decimal;
-  settledUsd: Prisma.Decimal;
-  settledPoints: number;
-  roundingUsd: Prisma.Decimal;
 };
 
 export function calculateOwnerWalletSettlement(
   returnedUsdInput: Prisma.Decimal | string | number,
 ): OwnerWalletSettlementCalculation {
-  const returnedUsd =
-    returnedUsdInput instanceof Prisma.Decimal
-      ? returnedUsdInput
-      : new Prisma.Decimal(returnedUsdInput);
-
+  const returnedUsd = returnedUsdInput instanceof Prisma.Decimal
+    ? returnedUsdInput
+    : new Prisma.Decimal(returnedUsdInput);
   if (!returnedUsd.isFinite() || returnedUsd.lessThan(0)) {
     throw new Error("INVALID_SETTLEMENT_PROCEEDS");
   }
-
-  if (!Number.isSafeInteger(OWNER_POINTS_PER_USD) || OWNER_POINTS_PER_USD <= 0) {
-    throw new Error("INVALID_OWNER_POINTS_RATE");
-  }
-
-  const rawPoints = returnedUsd.mul(OWNER_POINTS_PER_USD).floor();
-  if (!rawPoints.isInteger() || (!rawPoints.isPositive() && !rawPoints.isZero())) {
-    throw new Error("INVALID_SETTLEMENT_POINTS");
-  }
-
-  const settledPoints = rawPoints.toNumber();
-  if (!Number.isSafeInteger(settledPoints) || settledPoints < 0) {
-    throw new Error("SETTLEMENT_POINTS_OVERFLOW");
-  }
-
-  const settledUsd = new Prisma.Decimal(settledPoints).div(OWNER_POINTS_PER_USD);
-  const roundingUsd = returnedUsd.sub(settledUsd);
-  if (roundingUsd.isNegative()) throw new Error("NEGATIVE_SETTLEMENT_ROUNDING");
-
-  return { returnedUsd, settledUsd, settledPoints, roundingUsd };
+  return { returnedUsd };
 }
 
 function assertProviderExitFillMatchesOrder(
@@ -243,16 +218,16 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     if (released.count !== 1) throw new Error("TRADING_ALLOCATION_SETTLEMENT_CONFLICT");
 
     await tx.tradingAccount.update({ where: { id: lockedAccount.id }, data: { balanceUsd: afterBalance } });
-    await tx.ownerWallet.update({ where: { id: wallet.id }, data: { availablePoints: { increment: calculation.settledPoints } } });
+    await tx.ownerWallet.update({ where: { id: wallet.id }, data: { availableUsd: { increment: calculation.returnedUsd } } });
 
     const baseKey = `live-settlement:${order.id}`;
     await tx.ownerLedger.create({
       data: {
         walletId: wallet.id,
         type: "TRADING_RETURNED",
-        points: calculation.settledPoints,
-        usdAmount: calculation.settledUsd,
-        conversionRate: OWNER_POINTS_PER_USD,
+        points: 0,
+        usdAmount: calculation.returnedUsd,
+        currency: "USD",
         idempotencyKey: `${baseKey}:owner`,
         metadata: {
           liveOrderId: order.id,
@@ -279,9 +254,8 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         metadata: {
           liveOrderId: order.id,
           allocationId: allocation.id,
-          settledPoints: calculation.settledPoints,
-          settledUsd: calculation.settledUsd.toString(),
-          roundingUsd: calculation.roundingUsd.toString(),
+          settledUsd: calculation.returnedUsd.toString(),
+          fundingSource: "OWNER_WALLET_USD",
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
@@ -294,9 +268,9 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       SET
         "settlementStatus" = 'SETTLED',
         "walletSettledAt" = CURRENT_TIMESTAMP,
-        "settledUsd" = ${calculation.settledUsd.toString()}::numeric,
-        "settledPoints" = ${calculation.settledPoints},
-        "settlementRoundingUsd" = ${calculation.roundingUsd.toString()}::numeric,
+        "settledUsd" = ${calculation.returnedUsd.toString()}::numeric,
+        "settledPoints" = 0,
+        "settlementRoundingUsd" = 0::numeric,
         "settlementError" = NULL,
         "version" = "version" + 1
       WHERE "id" = ${order.id} AND "status" = 'CLOSED' AND "settlementStatus" = 'EXCHANGE_CLOSED_PENDING_WALLET'
@@ -315,8 +289,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           allocationId: allocation.id,
           returnedUsd: calculation.returnedUsd.toString(),
           settledUsd: calculation.settledUsd.toString(),
-          settledPoints: calculation.settledPoints,
-          roundingUsd: calculation.roundingUsd.toString(),
+          fundingSource: "OWNER_WALLET_USD",
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
@@ -324,6 +297,6 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       },
     });
 
-    return { order: updated, status: "SETTLED", settledUsd: calculation.settledUsd.toString(), settledPoints: calculation.settledPoints, roundingUsd: calculation.roundingUsd.toString(), blockers: [] };
+    return { order: updated, status: "SETTLED", settledUsd: calculation.returnedUsd.toString(), settledPoints: 0, roundingUsd: "0", blockers: [] };
   });
 }
