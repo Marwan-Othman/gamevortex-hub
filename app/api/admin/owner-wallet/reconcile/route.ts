@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
   try {
     const owner = await requireOwner();
     const body = schema.parse(await request.json());
+    const headerIdempotencyKey = request.headers.get("Idempotency-Key")?.trim();
+    if (headerIdempotencyKey && headerIdempotencyKey !== body.idempotencyKey) {
+      return NextResponse.json({ error: "IDEMPOTENCY_KEY_CONFLICT" }, { status: 409 });
+    }
     const delta = new Prisma.Decimal(body.deltaUsd);
     const expected = new Prisma.Decimal(body.expectedBalanceUsd);
     if (!delta.isFinite() || delta.isZero()) return NextResponse.json({ error: "RECONCILIATION_DELTA_REQUIRED" }, { status: 400 });
