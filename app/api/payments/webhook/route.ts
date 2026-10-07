@@ -1324,6 +1324,26 @@ export async function POST(request: NextRequest) {
           });
 
         /*
+         * Payment events can arrive out of order. Once an order has a
+         * terminal successful/refunded state, a late FAILED/SUCCEEDED event
+         * must never move it backwards or reactivate a refunded order.
+         */
+        if (
+          event.status === "FAILED" &&
+          (order.paymentStatus === "SUCCEEDED" ||
+            order.paymentStatus === "REFUNDED")
+        ) {
+          return;
+        }
+
+        if (
+          event.status === "SUCCEEDED" &&
+          order.paymentStatus === "REFUNDED"
+        ) {
+          return;
+        }
+
+        /*
          * A successful payment was already fully processed.
          * Ignore duplicate success webhooks.
          */
@@ -1339,7 +1359,8 @@ export async function POST(request: NextRequest) {
          * Ignore duplicate refund webhooks.
          */
         if (
-          existing?.status === "REFUNDED" &&
+          (existing?.status === "REFUNDED" ||
+            order.paymentStatus === "REFUNDED") &&
           event.status === "REFUNDED"
         ) {
           return;
