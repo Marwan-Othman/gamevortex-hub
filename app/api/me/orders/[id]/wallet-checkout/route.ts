@@ -56,12 +56,17 @@ async function recordOwnerRevenue(tx: Prisma.TransactionClient, order: OrderWith
     create: { ownerId: owner.id, availablePoints: 0, pendingPoints: 0 },
     update: {},
   });
+  const usdAmount = new Prisma.Decimal(order.totalCents).div(100);
+  await tx.ownerWallet.update({
+    where: { id: wallet.id },
+    data: { availableUsd: { increment: usdAmount } },
+  });
   await tx.ownerLedger.create({
     data: {
       walletId: wallet.id,
       type: LedgerType.CREDIT_REVENUE,
       points: 0,
-      usdAmount: new Prisma.Decimal(order.totalCents).div(100),
+      usdAmount,
       currency: order.currency,
       provider: "wallet",
       providerTransactionId: walletTransactionId,
