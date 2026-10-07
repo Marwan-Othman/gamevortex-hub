@@ -146,6 +146,52 @@ async function stripeRequest(
   return data;
 }
 
+export async function resolveStripePaymentIntentReference(
+  paymentIntentId: string,
+): Promise<string | null> {
+  const id = paymentIntentId.trim();
+
+  if (!id) {
+    return null;
+  }
+
+  const key = process.env.STRIPE_SECRET_KEY;
+
+  if (!key) {
+    throw new Error("PAYMENT_PROVIDER_NOT_CONFIGURED");
+  }
+
+  const response = await fetch(
+    `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(id)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${key}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  const data = (await response.json()) as Record<string, unknown>;
+
+  if (!response.ok) {
+    throw new Error("STRIPE_PAYMENT_INTENT_LOOKUP_FAILED");
+  }
+
+  const metadata =
+    data?.metadata &&
+    typeof data.metadata === "object" &&
+    !Array.isArray(data.metadata)
+      ? (data.metadata as Record<string, unknown>)
+      : null;
+
+  const reference = metadata?.orderId;
+
+  return typeof reference === "string" && reference.trim()
+    ? reference.trim()
+    : null;
+}
+
 function paypalBase() {
   return (
     process.env.PAYPAL_ENVIRONMENT ||
