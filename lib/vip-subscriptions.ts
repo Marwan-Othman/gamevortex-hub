@@ -172,6 +172,7 @@ async function createSubscriptionEvent(
 async function notifyVipActivation(
   tx: Prisma.TransactionClient,
   userId: string,
+  subscriptionId: string,
   plan: {
     code: string;
     nameAr: string;
@@ -191,14 +192,11 @@ async function notifyVipActivation(
         type: "VIP_ACTIVATED",
         metadata: {
           path: [
-            "planCode",
+            "subscriptionId",
           ],
           equals:
-            plan.code,
+            subscriptionId,
         },
-      },
-      orderBy: {
-        createdAt: "desc",
       },
       select: {
         id: true,
@@ -224,6 +222,8 @@ async function notifyVipActivation(
       metadata: {
         planCode:
           plan.code,
+        subscriptionId,
+          subscriptionId,
         expiration:
           expirationText,
       },
@@ -505,6 +505,7 @@ export async function activateVipSubscription(
       await notifyVipActivation(
         tx,
         subscription.userId,
+        subscription.id,
         {
           code:
             subscription.plan.code,
