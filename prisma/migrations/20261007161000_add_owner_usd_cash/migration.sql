@@ -1,0 +1,2 @@
+ALTER TABLE "OwnerWallet"
+ADD COLUMN "availableUsd" DECIMAL(18,2) NOT NULL DEFAULT 0;
