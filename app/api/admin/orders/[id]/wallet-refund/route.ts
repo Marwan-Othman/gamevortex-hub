@@ -223,6 +223,13 @@ export async function POST(
         });
 
         if (saleRevenue) {
+          const refundUsd = saleRevenue.usdAmount ?? new Prisma.Decimal(0);
+          const debitedUsd = await tx.ownerWallet.updateMany({
+            where: { id: ownerWallet.id, availableUsd: { gte: refundUsd } },
+            data: { availableUsd: { decrement: refundUsd } },
+          });
+          if (debitedUsd.count !== 1) throw new Error("OWNER_USD_BALANCE_INSUFFICIENT_FOR_REFUND");
+
           await tx.ownerLedger.create({
             data: {
               walletId: saleRevenue.walletId,
