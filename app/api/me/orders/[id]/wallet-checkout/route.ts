@@ -40,7 +40,7 @@ async function deliverGameKeys(tx: Prisma.TransactionClient, order: OrderWithIte
     await tx.entitlement.upsert({
       where: { userId_gameId: { userId: order.userId, gameId: item.product.gameId } },
       create: { userId: order.userId, gameId: item.product.gameId, orderItemId: item.id },
-      update: { revokedAt: null, orderItemId: item.id },
+      update: { revokedAt: null },
     });
   }
 }
