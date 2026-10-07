@@ -3,7 +3,7 @@ import { AiProviderError, type AiChatInput, type AiChatResult } from "@/lib/ai/t
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_CHAT_MODEL = "gemini-3.6-flash";
-const TIMEOUT_MS = 90_000;
+const TIMEOUT_MS = 30_000;
 
 function getKey() {
   const value = process.env.GEMINI_API_KEY?.trim();
