@@ -804,8 +804,11 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
         const before = lockedWallet.balance;
         const amount = new Prisma.Decimal(event.amountCents).div(100);
         const after = before.add(amount);
-        await transaction.wallet.update({
-          where: { id: wallet.id },
+        const settled = await transaction.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            pendingBalance: { gte: amount },
+          },
           data: {
             balance: after,
             pendingBalance: {
@@ -813,6 +816,10 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
             },
           },
         });
+
+        if (settled.count !== 1) {
+          throw new Error("WALLET_PENDING_BALANCE_MISMATCH");
+        }
         await transaction.walletTransaction.create({
           data: {
             userId: deposit.userId,
