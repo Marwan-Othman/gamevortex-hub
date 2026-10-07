@@ -6,6 +6,7 @@ type MediaTokenPayload = {
   fileUri?: string;
   kind: "IMAGE" | "VIDEO";
   creditKey: string;
+  creditAmount: number;
   exp: number;
 };
 
@@ -34,6 +35,7 @@ export function createMediaToken(input: Omit<MediaTokenPayload, "exp"> & { ttlSe
     fileUri: input.fileUri,
     kind: input.kind,
     creditKey: input.creditKey,
+    creditAmount: input.creditAmount,
     exp: Math.floor(Date.now() / 1000) + (input.ttlSeconds ?? 60 * 60),
   }));
   return payload + "." + sign(payload);
@@ -55,6 +57,7 @@ export function readMediaToken(token: string): MediaTokenPayload | null {
       typeof data.interactionId !== "string" ||
       (data.kind !== "IMAGE" && data.kind !== "VIDEO") ||
       typeof data.creditKey !== "string" || !data.creditKey ||
+      typeof data.creditAmount !== "number" || !Number.isSafeInteger(data.creditAmount) || data.creditAmount <= 0 ||
       typeof data.exp !== "number" ||
       data.exp <= Math.floor(Date.now() / 1000)
     ) return null;
