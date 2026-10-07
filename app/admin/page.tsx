@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { db } from "../../lib/prisma";
 import { requireOwner } from "../../lib/auth";
-import { pointsToUsd } from "../../lib/owner-points";
 import AdminShell from "@/components/admin/AdminShell";
 import RevenueLineChart from "@/components/admin/RevenueLineChart";
 import PlatformDonutChart from "@/components/admin/PlatformDonutChart";
@@ -410,8 +409,8 @@ export default async function Admin() {
     withdrawalsPaidAgg._sum.usdAmount || 0
   );
 
-  const ownerProfit = ownerWallet
-    ? pointsToUsd(ownerWallet.availablePoints)
+  const ownerAvailableUsd = ownerWallet
+    ? Number(ownerWallet.availableUsd)
     : 0;
 
   const avgOrderValue =
@@ -553,11 +552,11 @@ export default async function Admin() {
 
               <div>
                 <strong>
-                  ${ownerProfit.toFixed(2)}
+                  ${ownerAvailableUsd.toFixed(2)}
                 </strong>
 
                 <span className={styles.label}>
-                  الأرباح المتاحة
+                  النقد USD المتاح فعليًا
                 </span>
               </div>
             </div>
