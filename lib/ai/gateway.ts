@@ -24,7 +24,7 @@ export async function executeChat(options: {
 
   const conversation = await db.gameVortexAiConversation.findFirst({
     where: { id: options.conversationId, userId: options.userId },
-    include: { messages: { orderBy: { createdAt: "asc" }, take: MAX_HISTORY } },
+    include: { messages: { orderBy: { createdAt: "desc" }, take: MAX_HISTORY } },
   });
   if (!conversation) throw new Error("CONVERSATION_NOT_FOUND");
 
@@ -50,7 +50,7 @@ export async function executeChat(options: {
   const requestId = randomUUID();
   const history = conversation.messages
     .filter(message => message.role === "user" || message.role === "assistant")
-    .slice(-MAX_HISTORY)
+    .reverse()
     .map(message => ({ role: message.role as "user" | "assistant", content: message.content }));
 
   const siteContext = await buildGameVortexSiteContext(options.userId, prompt);
