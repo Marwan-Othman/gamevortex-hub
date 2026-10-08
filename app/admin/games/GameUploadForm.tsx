@@ -112,7 +112,7 @@ export default function GameUploadForm({ categories }: Props) {
     } finally{setBusy(false);}
   }
 
-  return <><BulkGameUploadForm categories={categories} /><section className="glass card" style={{marginBottom:20}}>
+  return (\n    <>\n      <BulkGameUploadForm categories={categories} />\n      <section className="glass card" style={{marginBottom:20}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}>
       <div><span className="badge">OWNER UPLOAD</span><h2 style={{marginBottom:6}}>إضافة لعبة من الهاتف</h2><p className="muted" style={{margin:0}}>اختر ملف اللعبة مباشرة من جهازك. لا تحتاج إلى وضع رابط للعبة.</p></div>
     </div>
