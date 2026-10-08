@@ -28,18 +28,12 @@ export async function GET(
 
   const game = await db.game.findFirst({
     where: { slug, published: true },
-    select: {
-      id: true,
-      titleEn: true,
-      downloadSource: true,
-      sourceStatus: true,
-    },
+    select: { id: true, downloadSource: true, sourceStatus: true },
   });
 
   if (!game?.downloadSource || !isGameVortexBlobUrl(game.downloadSource)) {
     return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
   }
-
   if (!DISTRIBUTABLE_STATUSES.includes(game.sourceStatus)) {
     return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_NOT_DISTRIBUTABLE" }, { status: 403 });
   }
@@ -53,9 +47,9 @@ export async function GET(
   downloadUrl.searchParams.set("download", "1");
 
   return NextResponse.redirect(downloadUrl.toString(), {
-    status: 302,
+    status: 303,
     headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": "no-store, private",
     },
   });
 }
