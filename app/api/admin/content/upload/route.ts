@@ -50,16 +50,16 @@ const CLIENT_ERRORS = new Set([
   "INVALID_UPLOAD_PATH",
   "INVALID_UPLOAD_SIZE",
   "GAME_FILE_TOO_LARGE",
-  "MOD_FILE_TOO_LARGE",
+  "APK_FILE_REQUIRED",
   "COVER_FILE_TOO_LARGE",
   "COVER_TYPE_NOT_SUPPORTED",
   "INVALID_CLIENT_PAYLOAD",
 ]);
 
-type ClientPayload = { kind?: unknown; mimeType?: unknown; size?: unknown };
+type ClientPayload = { kind?: unknown; mimeType?: unknown; size?: unknown; platform?: unknown };
 
 function parseKind(value: unknown): UploadKind | null {
-  return value === "game" || value === "mod" || value === "cover" ? value : null;
+  return value === "game" || value === "cover" ? value : null;
 }
 
 function parseClientPayload(raw: string | null): ClientPayload {
@@ -84,10 +84,10 @@ async function requireSuperAdmin() {
 
 /**
  * Cleanup of orphaned uploads. Only GameVortex upload URLs are accepted, and files already
- * referenced by an existing Game or Mod are never deleted.
+ * referenced by an existing Game, App or Mod are never deleted.
  */
 export async function DELETE(request: NextRequest) {
-  const guard = await guardMutation(request, "admin-game-upload-cleanup", 30);
+  const guard = await guardMutation(request, "admin-content-upload-cleanup", 30);
   if (guard) return guard;
 
   const auth = await requireSuperAdmin();
@@ -109,7 +109,7 @@ export async function DELETE(request: NextRequest) {
     const result = await deleteUnreferencedBlobs(urls);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    console.error("DELETE /api/admin/games/upload cleanup error:", error instanceof Error ? error.message : "UNKNOWN");
+    console.error("DELETE /api/admin/content/upload cleanup error:", error instanceof Error ? error.message : "UNKNOWN");
     return NextResponse.json({ success: false, error: "CLEANUP_FAILED" }, { status: 500 });
   }
 }
@@ -120,7 +120,7 @@ export async function DELETE(request: NextRequest) {
  * and a random suffix would change the downloaded file name.
  */
 export async function POST(request: NextRequest) {
-  const guard = await guardMutation(request, "admin-game-upload", 120);
+  const guard = await guardMutation(request, "admin-content-upload", 120);
   if (guard) return guard;
 
   const auth = await requireSuperAdmin();
@@ -159,7 +159,11 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        if (size > MAX_GAME_FILE_SIZE) throw new Error(kind === "mod" ? "MOD_FILE_TOO_LARGE" : "GAME_FILE_TOO_LARGE");
+        if (size > MAX_GAME_FILE_SIZE) throw new Error("GAME_FILE_TOO_LARGE");
+        // Android content is APK only. The pathname extension is the gate, not the browser MIME type.
+        if (payload.platform === "ANDROID" && !pathname.toLowerCase().endsWith(".apk")) {
+          throw new Error("APK_FILE_REQUIRED");
+        }
         return {
           allowedContentTypes: GAME_CONTENT_TYPES,
           maximumSizeInBytes: MAX_GAME_FILE_SIZE,
@@ -173,7 +177,7 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "UPLOAD_FAILED";
     const status = CLIENT_ERRORS.has(message) ? 400 : message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500;
 
-    console.error("POST /api/admin/games/upload error:", message);
+    console.error("POST /api/admin/content/upload error:", message);
     return NextResponse.json({ success: false, error: "GAME_UPLOAD_FAILED", detail: message }, { status });
   }
 }

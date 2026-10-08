@@ -196,6 +196,7 @@ export default async function GameDetails({
           <span className="badge">
             VORTEX SCORE {score}
           </span>
+          {game.isMod && <span className="badge">MOD</span>}
 
           <h1>{game.titleAr}</h1>
 
@@ -304,6 +305,24 @@ export default async function GameDetails({
           )}
         </div>
       </section>
+
+      {game.screenshots.length > 0 && (
+        <section className="glass card" style={{ marginTop: 16 }}>
+          <h2>صور من داخل اللعبة</h2>
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
+            {game.screenshots.map((src) => (
+              <img
+                key={src}
+                src={src}
+                alt=""
+                loading="lazy"
+                style={{ height: 220, width: "auto", borderRadius: 14, flex: "0 0 auto" }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
 
       {relatedGames.length > 0 && (
         <section>

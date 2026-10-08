@@ -19,22 +19,38 @@ export function canonicalAnyBlobUrl(value: unknown): string | null {
 }
 
 /**
- * Returns the subset of canonical URLs that are already referenced by a Game or a Mod.
+ * Returns the subset of canonical URLs that are already referenced by a Game, an App or a Mod.
  * Stored URLs may carry a `?download=1` query from older uploads, hence the prefix match.
  */
 export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): Promise<Set<string>> {
   const unique = Array.from(new Set(canonicalUrls));
   if (!unique.length) return new Set();
 
-  const [games, mods] = await Promise.all([
+  const [games, apps, mods] = await Promise.all([
     prisma.game.findMany({
       where: {
-        OR: unique.flatMap((url) => [
-          { downloadSource: { startsWith: url } },
-          { coverUrl: { startsWith: url } },
-        ]),
+        OR: [
+          ...unique.flatMap((url) => [
+            { downloadSource: { startsWith: url } },
+            { coverUrl: { startsWith: url } },
+          ]),
+          { screenshots: { hasSome: unique } },
+        ],
       },
-      select: { downloadSource: true, coverUrl: true },
+      select: { downloadSource: true, coverUrl: true, screenshots: true },
+    }),
+    prisma.app.findMany({
+      where: {
+        OR: [
+          ...unique.flatMap((url) => [
+            { downloadSource: { startsWith: url } },
+            { coverUrl: { startsWith: url } },
+            { iconUrl: { startsWith: url } },
+          ]),
+          { screenshots: { hasSome: unique } },
+        ],
+      },
+      select: { downloadSource: true, coverUrl: true, iconUrl: true, screenshots: true },
     }),
     prisma.mod.findMany({
       where: {
@@ -51,6 +67,13 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
   for (const game of games) {
     if (game.downloadSource) stored.push(game.downloadSource);
     if (game.coverUrl) stored.push(game.coverUrl);
+    stored.push(...game.screenshots);
+  }
+  for (const app of apps) {
+    if (app.downloadSource) stored.push(app.downloadSource);
+    if (app.coverUrl) stored.push(app.coverUrl);
+    if (app.iconUrl) stored.push(app.iconUrl);
+    stored.push(...app.screenshots);
   }
   for (const mod of mods) {
     if (mod.downloadUrl) stored.push(mod.downloadUrl);

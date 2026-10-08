@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { guardMutation } from "@/lib/api";
 import { getPlatformEnum, normalizePlatform } from "@/lib/platforms";
-import { ensureCategoryIds } from "@/lib/categories";
-import { canonicalBlobUrl, normalizeUploadSourceStatus } from "@/lib/game-upload-shared";
-import { findReferencedBlobUrls, resolveUploadCategoryIds, safeCleanupBlobs } from "@/lib/game-upload-server";
 
+/**
+ * Read-only list of games for the owner (used by the store product form).
+ * Creating and editing games happens in /admin/content via /api/admin/content.
+ */
 export const dynamic = "force-dynamic";
 
 async function requireSuperAdmin() {
@@ -14,21 +14,6 @@ async function requireSuperAdmin() {
   const user = await getOptionalUser();
   if (!user || user.role !== "SUPER_ADMIN") return null;
   return user;
-}
-
-function normalizePlatforms(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  const result = new Set<"PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB">();
-  for (const item of value) {
-    if (typeof item !== "string") continue;
-    const platform = getPlatformEnum(item);
-    if (platform) result.add(platform);
-  }
-  return Array.from(result);
-}
-
-function normalizeSlug(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
 }
 
 export async function GET(request: NextRequest) {
@@ -62,211 +47,5 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("GET /api/admin/games error:", error);
     return NextResponse.json({ success: false, error: "Failed to load games" }, { status: 500 });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  let uploadedGameUrl: string | null = null;
-  let uploadedCoverUrl: string | null = null;
-  let uploadedModUrl: string | null = null;
-
-  const guard = await guardMutation(request, "admin-game-create", 60);
-  if (guard) return guard;
-
-  try {
-    const user = await requireSuperAdmin();
-    if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-
-    const body: Record<string, unknown> & { mod?: Record<string, unknown> } = await request.json();
-    const {
-      titleAr, titleEn, slug, descriptionAr, descriptionEn, genre, category, platforms,
-      platform, price, priceCents, discount, discountPercent, coverUrl, downloadSource,
-      sourceStatus, published, featured, mod,
-    } = body;
-
-    if (typeof titleAr !== "string" || !titleAr.trim() || typeof titleEn !== "string" || !titleEn.trim() || typeof slug !== "string" || !slug.trim()) {
-      return NextResponse.json({ success: false, error: "titleAr, titleEn and slug are required" }, { status: 400 });
-    }
-
-    const normalizedSlug = normalizeSlug(slug);
-    if (!normalizedSlug) return NextResponse.json({ success: false, error: "Invalid slug" }, { status: 400 });
-
-    const platformValues = normalizePlatforms(Array.isArray(platforms) ? platforms : platform ? [platform] : []);
-    if (!platformValues.length) return NextResponse.json({ success: false, error: "At least one platform is required" }, { status: 400 });
-
-    const gameFileUrl = canonicalBlobUrl(downloadSource, "game");
-    if (!gameFileUrl) {
-      return NextResponse.json({ success: false, error: "A GameVortex Blob game file is required" }, { status: 400 });
-    }
-    uploadedGameUrl = gameFileUrl;
-
-    if (coverUrl !== undefined && coverUrl !== null && coverUrl !== "") {
-      const cover = canonicalBlobUrl(coverUrl, "cover");
-      if (!cover) {
-        return NextResponse.json({ success: false, error: "Cover must be stored in GameVortex Blob" }, { status: 400 });
-      }
-      uploadedCoverUrl = cover;
-    }
-
-    let modInput: {
-      titleAr: string;
-      titleEn: string;
-      descriptionAr: string | null;
-      downloadUrl: string;
-      platform: "PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB";
-      published: boolean;
-    } | null = null;
-
-    if (mod !== undefined && mod !== null) {
-      if (typeof mod !== "object" || Array.isArray(mod)) {
-        return NextResponse.json({ success: false, error: "Invalid Mod data" }, { status: 400 });
-      }
-      const modFileUrl = canonicalBlobUrl(mod.downloadUrl, "mod");
-      if (!modFileUrl) {
-        return NextResponse.json({ success: false, error: "A GameVortex Blob Mod file is required" }, { status: 400 });
-      }
-      const modPlatform = getPlatformEnum(typeof mod.platform === "string" ? mod.platform : "") || platformValues[0];
-      if (!modPlatform) return NextResponse.json({ success: false, error: "Invalid Mod platform" }, { status: 400 });
-
-      const modTitleAr = typeof mod.titleAr === "string" && mod.titleAr.trim() ? mod.titleAr.trim() : `${titleAr.trim()} Mod`;
-      const modTitleEn = typeof mod.titleEn === "string" && mod.titleEn.trim() ? mod.titleEn.trim() : `${titleEn.trim()} Mod`;
-      const modDescription = typeof mod.descriptionAr === "string" && mod.descriptionAr.trim() ? mod.descriptionAr.trim() : null;
-
-      modInput = {
-        titleAr: modTitleAr.slice(0, 160),
-        titleEn: modTitleEn.slice(0, 160),
-        descriptionAr: modDescription ? modDescription.slice(0, 4000) : null,
-        downloadUrl: modFileUrl,
-        platform: modPlatform,
-        published: typeof mod.published === "boolean" ? mod.published : Boolean(published),
-      };
-      uploadedModUrl = modFileUrl;
-    }
-
-    const existing = await prisma.game.findUnique({ where: { slug: normalizedSlug }, select: { id: true } });
-    if (existing) {
-      // Conflict before any write: keep the uploaded files so the owner can fix the slug and retry.
-      uploadedGameUrl = uploadedCoverUrl = uploadedModUrl = null;
-      return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS" }, { status: 409 });
-    }
-
-    // Never re-use (or later delete) a file that another Game/Mod already references.
-    const referenced = await findReferencedBlobUrls(
-      [uploadedGameUrl, uploadedCoverUrl, uploadedModUrl].filter((value): value is string => Boolean(value)),
-    );
-    if (referenced.size) {
-      uploadedGameUrl = uploadedCoverUrl = uploadedModUrl = null;
-      return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_ALREADY_USED" }, { status: 409 });
-    }
-
-    const normalizedSourceStatus = normalizeUploadSourceStatus(sourceStatus);
-    const description =
-      typeof descriptionAr === "string" && descriptionAr.trim()
-        ? descriptionAr.trim()
-        : typeof descriptionEn === "string" && descriptionEn.trim()
-          ? descriptionEn.trim()
-          : null;
-
-    const categoryValues = Array.isArray(body.categoryIds)
-      ? body.categoryIds.filter((value: unknown): value is string => typeof value === "string" && Boolean(value.trim()))
-      : typeof category === "string" && category.trim() ? [category.trim()]
-        : typeof genre === "string" && genre.trim() ? [genre.trim()] : [];
-    const categoryIds = Array.isArray(body.categoryIds)
-      ? await resolveUploadCategoryIds(categoryValues)
-      : await ensureCategoryIds(prisma, categoryValues);
-
-    const normalizedGenre =
-      typeof genre === "string" && genre.trim() ? genre.trim()
-        : typeof category === "string" && category.trim() ? category.trim() : null;
-
-    const normalizedPriceCents =
-      typeof priceCents === "number" && Number.isFinite(priceCents) ? Math.max(0, Math.round(priceCents))
-        : typeof price === "number" && Number.isFinite(price) ? Math.max(0, Math.round(price * 100)) : 0;
-
-    const normalizedDiscountPercent =
-      typeof discountPercent === "number" && Number.isFinite(discountPercent)
-        ? Math.min(100, Math.max(0, Math.round(discountPercent)))
-        : typeof discount === "number" && Number.isFinite(discount)
-          ? Math.min(100, Math.max(0, Math.round(discount))) : 0;
-
-    const result = await prisma.$transaction(async (tx) => {
-      const game = await tx.game.create({
-        data: {
-          titleAr: titleAr.trim(),
-          titleEn: titleEn.trim(),
-          slug: normalizedSlug,
-          description,
-          genre: normalizedGenre,
-          platform: platformValues.join(","),
-          priceCents: normalizedPriceCents,
-          discountPercent: normalizedDiscountPercent,
-          coverUrl: uploadedCoverUrl,
-          officialUrl: null,
-          downloadSource: uploadedGameUrl,
-          sourceStatus: normalizedSourceStatus,
-          published: typeof published === "boolean" ? published : false,
-          featured: typeof featured === "boolean" ? featured : false,
-          gamePlatforms: { create: platformValues.map((item) => ({ platform: item })) },
-          gameCategories: categoryIds.length ? { create: categoryIds.map((categoryId) => ({ categoryId })) } : undefined,
-        },
-        include: { gamePlatforms: true },
-      });
-
-      let createdMod = null;
-      if (modInput) {
-        createdMod = await tx.mod.create({
-          data: {
-            slug: `${normalizedSlug}-mod-${game.id}`,
-            titleAr: modInput.titleAr,
-            titleEn: modInput.titleEn,
-            descriptionAr: modInput.descriptionAr,
-            descriptionEn: null,
-            imageUrl: uploadedCoverUrl,
-            modUrl: null,
-            downloadUrl: modInput.downloadUrl,
-            sourceUrl: null,
-            sourceProvider: "GameVortex Blob",
-            sourceStatus: "LICENSED_FOR_DISTRIBUTION",
-            platform: modInput.platform,
-            gameId: game.id,
-            published: modInput.published,
-            featured: false,
-            sortOrder: 0,
-          },
-        });
-      }
-
-      await tx.auditLog.create({
-        data: {
-          actorUserId: user.id,
-          action: modInput ? "GAME_CREATED_WITH_FILE_AND_MOD_UPLOAD" : "GAME_CREATED_WITH_FILE_UPLOAD",
-          entityType: "Game",
-          entityId: game.id,
-          metadata: {
-            slug: game.slug,
-            published: game.published,
-            sourceStatus: game.sourceStatus,
-            hasCover: Boolean(game.coverUrl),
-            hasMod: Boolean(createdMod),
-            modId: createdMod?.id ?? null,
-          },
-        },
-      });
-
-      return { game, mod: createdMod };
-    });
-
-    return NextResponse.json({ success: true, data: result.game, mod: result.mod }, { status: 201 });
-  } catch (error) {
-    console.error("POST /api/admin/games error:", error instanceof Error ? error.message : "UNKNOWN");
-
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS" }, { status: 409 });
-    }
-
-    // The transaction rolled back: remove only this request's files, never ones already referenced.
-    await safeCleanupBlobs([uploadedGameUrl, uploadedCoverUrl, uploadedModUrl].filter((value): value is string => Boolean(value)));
-
-    return NextResponse.json({ success: false, error: "Failed to create game" }, { status: 500 });
   }
 }

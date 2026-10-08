@@ -453,8 +453,10 @@ model Game {
   discountPercent Int @default(0)
 
   coverUrl       String?
+  screenshots    String[] @default([])
   officialUrl    String?
   downloadSource String?
+  isMod          Boolean  @default(false)
 
   sourceStatus   SourceStatus @default(NEEDS_SOURCE)
   sourceProvider String?
@@ -548,8 +550,10 @@ model App {
   publisher       String?
   iconUrl         String?
   coverUrl        String?
+  screenshots     String[]      @default([])
   officialUrl     String?
   downloadSource  String?
+  isMod           Boolean       @default(false)
   sourceStatus    SourceStatus  @default(NEEDS_SOURCE)
   sourceProvider  String?
   priceCents      Int           @default(0)

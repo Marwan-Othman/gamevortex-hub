@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
+import { normalizeExternalSourceUrl } from "@/lib/content-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,11 @@ function isGameVortexBlobUrl(value: string) {
   }
 }
 
+/** The owner may also save a single external https link (validated again when it was saved). */
+function isDownloadableUrl(value: string) {
+  return isGameVortexBlobUrl(value) || normalizeExternalSourceUrl(value) !== null;
+}
+
 /**
  * Game files can be hundreds of MB. They are NOT proxied through this function:
  * a serverless response is streamed without Content-Length (the browser shows "?" as the
@@ -38,7 +44,7 @@ export async function GET(
     select: { id: true, downloadSource: true, sourceStatus: true },
   });
 
-  if (!game?.downloadSource || !isGameVortexBlobUrl(game.downloadSource)) {
+  if (!game?.downloadSource || !isDownloadableUrl(game.downloadSource)) {
     return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
   }
   if (!DISTRIBUTABLE_STATUSES.includes(game.sourceStatus)) {
@@ -54,7 +60,8 @@ export async function GET(
   // browsers download them anyway, so `?download=1` is not needed. It was dropped because with it
   // the browser showed "?" as the total size; verify Content-Length with: curl -sIL <download url>.
   const downloadUrl = new URL(game.downloadSource);
-  downloadUrl.search = "";
+  // Blob URLs are stored without a query; external links keep theirs (they may be needed by the host).
+  if (isGameVortexBlobUrl(game.downloadSource)) downloadUrl.search = "";
   downloadUrl.hash = "";
 
   return NextResponse.redirect(downloadUrl.toString(), {

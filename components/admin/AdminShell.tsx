@@ -31,19 +31,9 @@ const NAV_SECTIONS: NavSection[] = [
     title: "إدارة المحتوى",
     items: [
       {
-        label: "الألعاب",
-        href: "/admin/games",
+        label: "الألعاب والتطبيقات",
+        href: "/admin/content",
         icon: <IconGames />,
-      },
-      {
-        label: "Downloader",
-        href: "/admin/downloader",
-        icon: <IconGames />,
-      },
-      {
-        label: "التطبيقات",
-        icon: <IconApps />,
-        soon: true,
       },
       {
         label: "الخلفيات",
@@ -454,23 +444,6 @@ function IconGames() {
   );
 }
 
-function IconApps() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
 
 function IconCards() {
   return (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
+import { normalizeExternalSourceUrl } from "@/lib/content-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export async function GET(
     select: { id: true, downloadSource: true, sourceStatus: true },
   });
 
-  if (!app?.downloadSource || !/^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i.test(app.downloadSource)) {
+  if (!app?.downloadSource || !(/^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i.test(app.downloadSource) || normalizeExternalSourceUrl(app.downloadSource) !== null)) {
     return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
   }
 

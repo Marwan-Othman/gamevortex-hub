@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const areas = [
   ["المستخدمون والصلاحيات", "Users & roles", "/admin/users", "إدارة المستخدمين والأدوار والصلاحيات من السيرفر.", "Manage users, roles and permissions."],
   ["VIP", "VIP", "/admin/vip", "الخطط والأسعار والاشتراكات والمكافآت.", "Plans, prices, subscriptions and rewards."],
-  ["الألعاب", "Games", "/admin/games", "إدارة واستيراد ونشر الألعاب.", "Manage, import and publish games."],
+  ["الألعاب والتطبيقات", "Games & apps", "/admin/content", "إضافة وتعديل ونشر الألعاب والتطبيقات.", "Add, edit and publish games and apps."],
   ["المتجر", "Store", "/admin/store", "المنتجات والمخزون والمفاتيح.", "Products, inventory and digital keys."],
   ["مفاتيح API", "API keys", "/admin/api-keys", "إصدار مفاتيح خاصة ومتابعة الاستخدام وإلغاؤها.", "Issue private keys, monitor usage, and revoke access."],
   ["الدعم الفني", "Support", "/admin/support", "متابعة طلبات المستخدمين والرد عليها.", "Review user support tickets and respond."],

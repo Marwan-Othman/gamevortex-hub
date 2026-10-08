@@ -30,7 +30,10 @@ const required = [
   'app/api/reports/route.ts',
   'app/api/admin/moderation/route.ts',
   'app/api/admin/games/route.ts',
-  'app/admin/games/page.tsx',
+  'app/admin/content/page.tsx',
+  'app/api/admin/content/route.ts',
+  'app/api/admin/content/[type]/[id]/route.ts',
+  'app/api/admin/content/upload/route.ts',
   'app/api/auth/register/route.ts',
   'prisma/migrations/20260819090000_v10_hardening/migration.sql',
   'BUILD_INFO_V10.json'

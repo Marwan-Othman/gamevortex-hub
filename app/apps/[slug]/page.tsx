@@ -97,6 +97,7 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
 
         <div>
           <span className="badge">APP</span>
+          {app.isMod && <span className="badge">MOD</span>}
           <h1>{app.nameAr}</h1>
           <p className="muted">{app.nameEn}</p>
 
@@ -134,6 +135,24 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
           </div>
         </div>
       </section>
+
+      {app.screenshots.length > 0 && (
+        <section className="glass card" style={{ marginTop: 16 }}>
+          <h2>صور من داخل التطبيق</h2>
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
+            {app.screenshots.map((src) => (
+              <img
+                key={src}
+                src={src}
+                alt=""
+                loading="lazy"
+                style={{ height: 220, width: "auto", borderRadius: 14, flex: "0 0 auto" }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
 
       {relatedApps.length > 0 && (
         <section>
