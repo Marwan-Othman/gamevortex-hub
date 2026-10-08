@@ -2,7 +2,7 @@ import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { canonicalBlobUrl, type UploadKind } from "@/lib/game-upload-shared";
 
-const KINDS: readonly UploadKind[] = ["game", "mod", "cover"];
+const KINDS: readonly UploadKind[] = ["game", "app", "mod", "cover", "image"];
 
 function blobToken(): { token: string } | Record<string, never> {
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
@@ -26,7 +26,7 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
   const unique = Array.from(new Set(canonicalUrls));
   if (!unique.length) return new Set();
 
-  const [games, mods] = await Promise.all([
+  const [games, apps, mods, images] = await Promise.all([
     prisma.game.findMany({
       where: {
         OR: unique.flatMap((url) => [
@@ -35,6 +35,16 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
         ]),
       },
       select: { downloadSource: true, coverUrl: true },
+    }),
+    prisma.app.findMany({
+      where: {
+        OR: unique.flatMap((url) => [
+          { downloadSource: { startsWith: url } },
+          { coverUrl: { startsWith: url } },
+          { iconUrl: { startsWith: url } },
+        ]),
+      },
+      select: { downloadSource: true, coverUrl: true, iconUrl: true },
     }),
     prisma.mod.findMany({
       where: {
@@ -45,6 +55,10 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
       },
       select: { downloadUrl: true, imageUrl: true },
     }),
+    prisma.contentImage.findMany({
+      where: { url: { in: unique } },
+      select: { url: true },
+    }),
   ]);
 
   const stored: string[] = [];
@@ -52,10 +66,16 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
     if (game.downloadSource) stored.push(game.downloadSource);
     if (game.coverUrl) stored.push(game.coverUrl);
   }
+  for (const app of apps) {
+    if (app.downloadSource) stored.push(app.downloadSource);
+    if (app.coverUrl) stored.push(app.coverUrl);
+    if (app.iconUrl) stored.push(app.iconUrl);
+  }
   for (const mod of mods) {
     if (mod.downloadUrl) stored.push(mod.downloadUrl);
     if (mod.imageUrl) stored.push(mod.imageUrl);
   }
+  for (const image of images) stored.push(image.url);
 
   const referenced = new Set<string>();
   for (const url of unique) {
