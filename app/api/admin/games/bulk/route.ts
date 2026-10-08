@@ -38,6 +38,21 @@ function platforms(value: unknown): GamePlatform[] {
   return Array.from(out);
 }
 
+type PreparedGame = {
+  titleAr: string;
+  titleEn: string;
+  slug: string;
+  platformValues: GamePlatform[];
+  downloadSource: string;
+  description: string | null;
+  priceCents: number;
+  discountPercent: number;
+  categoryValues: string[];
+  sourceStatus: string;
+  published: boolean;
+  featured: boolean;
+};
+
 function sourceStatus(value: unknown) {
   return value === "VERIFIED" || value === "PENDING_REVIEW" || value === "UNPUBLISHED" ||
     value === "NEEDS_SOURCE" || value === "OFFICIAL_SOURCE" || value === "LICENSED_FOR_DISTRIBUTION" ||
@@ -55,7 +70,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "games must contain 1 to 100 items" }, { status: 400 });
     }
 
-    const prepared = body.games.map((item: any, index: number) => {
+    const prepared: PreparedGame[] = body.games.map((item: any, index: number) => {
       const titleAr = typeof item.titleAr === "string" ? item.titleAr.trim() : "";
       const titleEn = typeof item.titleEn === "string" ? item.titleEn.trim() : "";
       const gameSlug = typeof item.slug === "string" ? slug(item.slug) : "";
