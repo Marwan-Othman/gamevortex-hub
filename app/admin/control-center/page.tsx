@@ -115,14 +115,14 @@ export default async function OwnerControlCenter() {
   });
 
   const integrations = [
-    ["RAWG Mobile Catalog", Boolean(process.env.RAWG_API_KEY), "/admin/games"],
+    ["RAWG Mobile Catalog", Boolean(process.env.RAWG_API_KEY), "/admin/content"],
     ["Payments", Boolean(process.env.PAYMENT_PROVIDER || process.env.PAYMENT_PROVIDER_BASE_URL), "/admin/errors"],
     ["Quran Provider", Boolean(process.env.QURAN_PROVIDER_BASE_URL || process.env.QURAN_PROVIDER_API_KEY), "/admin/quran"],
   ] as const;
 
   const modules = [
-    ["الألعاب والكتالوج", "/admin/games", `${publishedGames} منشورة من ${games}`],
-    ["استيراد ألعاب الهاتف", "/admin/games", `${mobileGames} ألعاب Android/iOS منشورة`],
+    ["الألعاب والكتالوج", "/admin/content", `${publishedGames} منشورة من ${games}`],
+    ["استيراد ألعاب الهاتف", "/admin/content", `${mobileGames} ألعاب Android/iOS منشورة`],
     ["المتجر", "/admin/store", `${products} منتج`],
     ["VIP", "/vip", `${vipPlans} خطط نشطة`],
     ["المدفوعات والسحوبات", "/admin/errors", `${orders} طلب · ${withdrawals} سحب`],
