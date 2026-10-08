@@ -58,6 +58,11 @@ enum AuthProvider {
   STEAM
 }
 
+enum ContentVersionType {
+  STANDARD
+  MOD
+}
+
 enum PlatformType {
   PC
   PLAYSTATION
@@ -468,6 +473,8 @@ model Game {
 
   published Boolean @default(false)
   featured  Boolean @default(false)
+  versionType ContentVersionType @default(STANDARD)
+  screenshots Json?
 
   reviews      Review[]
   libraryItems GameLibraryItem[]
