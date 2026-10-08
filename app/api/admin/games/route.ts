@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
           : null;
 
     const categoryValues = Array.isArray(body.categoryIds)
-      ? body.categoryIds.filter((value: unknown): value is string => typeof value === "string" && value.trim())
+      ? body.categoryIds.filter((value: unknown): value is string => typeof value === "string" && Boolean(value.trim()))
       : typeof category === "string" && category.trim() ? [category.trim()]
         : typeof genre === "string" && genre.trim() ? [genre.trim()] : [];
     const categoryIds = await ensureCategoryIds(prisma, categoryValues);
