@@ -623,7 +623,7 @@ export default async function Admin() {
 
           <div className={styles.actionGrid}>
             <Link
-              href="/admin/games"
+              href="/admin/content"
               className={styles.actionBtn}
             >
               <IconGames />
@@ -631,7 +631,7 @@ export default async function Admin() {
             </Link>
 
             <Link
-              href="/admin/apps"
+              href="/admin/content"
               className={styles.actionBtn}
             >
               <IconGames />
@@ -784,7 +784,7 @@ export default async function Admin() {
             <span>أحدث الألعاب المضافة</span>
 
             <Link
-              href="/admin/games"
+              href="/admin/content"
               className={styles.panelLink}
             >
               عرض الكل
