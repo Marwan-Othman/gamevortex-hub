@@ -481,6 +481,7 @@ model Game {
   favorites      FavoriteGame[]
   wishlists      WishlistGame[]
   gameCategories GameCategory[]
+  images         ContentImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -562,6 +563,7 @@ model App {
   featured        Boolean       @default(false)
   appPlatforms    AppPlatform[]
   appCategories   AppCategory[]
+  images          ContentImage[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -2046,4 +2048,21 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
   @@index([authorId, createdAt])
+}
+
+
+model ContentImage {
+  id        String   @id @default(cuid())
+  url       String
+  sortOrder Int      @default(0)
+  gameId    String?
+  appId     String?
+  createdAt DateTime @default(now())
+
+  game Game? @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  app  App?  @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, sortOrder])
+  @@index([appId, sortOrder])
+  @@unique([url])
 }
