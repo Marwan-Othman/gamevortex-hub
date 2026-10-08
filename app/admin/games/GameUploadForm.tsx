@@ -1,31 +1,23 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import BulkGameUploadForm from "./BulkGameUploadForm";
+import {
+  DEFAULT_UPLOAD_SOURCE_STATUS,
+  GAME_BLOB_CONTENT_TYPE,
+  GAME_FILE_ACCEPT,
+  UPLOAD_PLATFORM_OPTIONS,
+  buildBlobPathname,
+  checkGameFile,
+  formatBytes,
+  hasAllowedGameExtension,
+  slugify,
+  type UploadKind,
+} from "@/lib/game-upload-shared";
 
-const GAME_EXTENSIONS = [".apk",".aab",".exe",".msi",".zip",".7z",".rar",".iso",".img",".dmg",".pkg",".appimage",".deb",".tar",".gz",".tgz",".obb"];
-const PLATFORMS = [
-  ["PC","PC"],["ANDROID","Android"],["IOS","iPhone / iPad"],["PLAYSTATION","PlayStation"],
-  ["XBOX","Xbox"],["NINTENDO","Nintendo"],["MAC","macOS"],["LINUX","Linux"],["STEAM_DECK","Steam Deck"],["WEB","Web"],
-] as const;
 type Category = { id: string; nameAr: string; nameEn: string };
 type Props = { categories: Category[] };
-
-function slugify(value: string) {
-  return value.trim().toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
-    .replace(/[^a-z0-9\s-]/g,"").replace(/\s+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"").slice(0,90);
-}
-function formatBytes(value: number) {
-  if (value < 1024) return `${value} B`;
-  const units=["KB","MB","GB","TB"]; let size=value; let index=-1;
-  do { size/=1024; index+=1; } while(size>=1024 && index<units.length-1);
-  return `${size.toFixed(size>=10?0:1)} ${units[index]}`;
-}
-function gameExtension(name: string) {
-  const lower=name.toLowerCase();
-  return GAME_EXTENSIONS.find((extension)=>lower.endsWith(extension)) || "";
-}
 
 export default function GameUploadForm({ categories }: Props) {
   const [titleAr,setTitleAr]=useState(""); const [titleEn,setTitleEn]=useState(""); const [slug,setSlug]=useState("");
@@ -35,23 +27,34 @@ export default function GameUploadForm({ categories }: Props) {
   const [gameFile,setGameFile]=useState<File|null>(null); const [coverFile,setCoverFile]=useState<File|null>(null);
   const [hasMod,setHasMod]=useState(false); const [modFile,setModFile]=useState<File|null>(null);
   const [modTitleAr,setModTitleAr]=useState(""); const [modTitleEn,setModTitleEn]=useState(""); const [modDescription,setModDescription]=useState("");
-  const [progress,setProgress]=useState(0); const [busy,setBusy]=useState(false); const [status,setStatus]=useState<string|null>(null); const [error,setError]=useState<string|null>(null);
+  const [progress,setProgress]=useState(0); const progressRef=useRef({done:0,total:1}); const [busy,setBusy]=useState(false); const [status,setStatus]=useState<string|null>(null); const [error,setError]=useState<string|null>(null);
   const generatedSlug=useMemo(()=>slugify(titleEn||titleAr),[titleEn,titleAr]);
 
   function toggle(value:string,setter:(next:string[])=>void,current:string[]) {
     setter(current.includes(value)?current.filter((item)=>item!==value):[...current,value]);
   }
 
-  async function uploadOne(file:File,kind:"game"|"cover"|"mod") {
-    if((kind==="game" || kind==="mod") && !gameExtension(file.name)) throw new Error(kind==="mod" ? "صيغة ملف الـMod غير مدعومة." : "صيغة ملف اللعبة غير مدعومة.");
-    const safe=file.name.normalize("NFKC").replace(/[^a-zA-Z0-9._-]+/g,"-").replace(/-+/g,"-").slice(-160);
-    const folder=kind==="game"?"games/files":kind==="mod"?"games/mods":"games/covers";
-    const pathname=`${folder}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
-    return upload(pathname,file,{
-      access:"public", handleUploadUrl:"/api/admin/games/upload", multipart:kind!=="cover",
-      clientPayload:JSON.stringify({kind,mimeType:file.type||"application/octet-stream",size:file.size}),
-      onUploadProgress(event){setProgress((current)=>Math.max(current,Math.round(event.percentage)));},
+  async function uploadOne(file:File,kind:UploadKind) {
+    if(kind!=="cover"){
+      const issue=checkGameFile(file);
+      if(issue==="UNSUPPORTED_EXTENSION") throw new Error(kind==="mod" ? "صيغة ملف الـMod غير مدعومة." : "صيغة ملف اللعبة غير مدعومة.");
+      if(issue==="EMPTY_FILE") throw new Error("الملف فارغ.");
+      if(issue==="TOO_LARGE") throw new Error("حجم الملف أكبر من الحد المسموح.");
+    }
+    const isCover=kind==="cover";
+    const mimeType=isCover?(file.type||"application/octet-stream"):GAME_BLOB_CONTENT_TYPE;
+    const blob=await upload(buildBlobPathname(kind,file.name,crypto.randomUUID()),file,{
+      access:"public", handleUploadUrl:"/api/admin/games/upload", multipart:!isCover,
+      ...(isCover?{}:{contentType:GAME_BLOB_CONTENT_TYPE}),
+      clientPayload:JSON.stringify({kind,mimeType,size:file.size}),
+      onUploadProgress(event){
+        const {done,total}=progressRef.current;
+        const value=Math.min(100,Math.round(((done+file.size*event.percentage/100)/total)*100));
+        setProgress((current)=>Math.max(current,value));
+      },
     });
+    progressRef.current.done+=file.size;
+    return blob;
   }
 
   async function submit(event:React.FormEvent<HTMLFormElement>) {
@@ -59,10 +62,12 @@ export default function GameUploadForm({ categories }: Props) {
     const finalSlug=slugify(slug||generatedSlug);
     if(!titleAr.trim()||!titleEn.trim()||!finalSlug) return setError("أدخل اسم اللعبة بالعربية والإنجليزية.");
     if(!gameFile) return setError("اختر ملف اللعبة من الهاتف.");
+    if(!hasAllowedGameExtension(gameFile.name)) return setError("صيغة ملف اللعبة غير مدعومة.");
     if(!platforms.length) return setError("اختر منصة واحدة على الأقل.");
     if(!rightsConfirmed) return setError("يجب تأكيد أن لديك حق توزيع ملف اللعبة.");
     if(hasMod && !modFile) return setError("اختر ملف الـMod أو عطّل خيار إضافة Mod.");
     setBusy(true); setProgress(0);
+    progressRef.current={done:0,total:Math.max(1,gameFile.size+(coverFile?coverFile.size:0)+(hasMod&&modFile?modFile.size:0))};
     let uploadedGameUrl=""; let uploadedCoverUrl=""; let uploadedModUrl="";
 
     try {
@@ -80,26 +85,26 @@ export default function GameUploadForm({ categories }: Props) {
         setStatus("جاري رفع ملف الـMod مباشرة إلى التخزين...");
         const modBlob=await uploadOne(modFile,"mod");
         uploadedModUrl=modBlob.url;
-        modDownloadUrl=modBlob.downloadUrl || modBlob.url;
+        modDownloadUrl=modBlob.url;
       }
       setStatus("جاري إنشاء اللعبة وربط الـMod...");
       const response=await fetch("/api/admin/games",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         titleAr:titleAr.trim(),titleEn:titleEn.trim(),slug:finalSlug,descriptionAr:description.trim()||undefined,
         platforms,categoryIds,price:Number(price||0),discount:Number(discount||0),coverUrl:coverUrl||undefined,
-        downloadSource:gameBlob.downloadUrl || gameBlob.url,sourceStatus:"LICENSED_FOR_DISTRIBUTION",published,featured:false,
+        downloadSource:gameBlob.url,sourceStatus:DEFAULT_UPLOAD_SOURCE_STATUS,published,featured:false,
         mod: hasMod && modFile ? {
           titleAr:(modTitleAr.trim()||`${titleAr.trim()} Mod`),
           titleEn:(modTitleEn.trim()||`${titleEn.trim()} Mod`),
           descriptionAr:modDescription.trim()||undefined,
           downloadUrl:modDownloadUrl,
-          sourceStatus:"LICENSED_FOR_DISTRIBUTION",
+          sourceStatus:DEFAULT_UPLOAD_SOURCE_STATUS,
           published,
           platform:platforms[0],
         } : undefined,
       })});
       const payload=await response.json().catch(()=>null);
       if(!response.ok||!payload?.success) throw new Error(payload?.error||"تعذر حفظ اللعبة.");
-      setStatus("تمت إضافة اللعبة والـMod بنجاح. رابط التحميل يستخدم تنزيل Vercel Blob المباشر.");
+      setStatus("تمت إضافة اللعبة والـMod بنجاح. ");
       setTitleAr("");setTitleEn("");setSlug("");setDescription("");setPlatforms([]);setCategoryIds([]);setPrice("0");setDiscount("0");setPublished(true);setRightsConfirmed(false);setGameFile(null);setCoverFile(null);setHasMod(false);setModFile(null);setModTitleAr("");setModTitleEn("");setModDescription("");setProgress(100);
       for(const id of ["game-file-input","cover-file-input","mod-file-input"]){const input=document.getElementById(id) as HTMLInputElement|null;if(input)input.value="";}
     } catch(err){
@@ -126,16 +131,16 @@ export default function GameUploadForm({ categories }: Props) {
         <label>الرابط الداخلي (Slug)<input value={slug} onChange={(e)=>setSlug(slugify(e.target.value))} placeholder={generatedSlug||"game-name"} required/></label>
         <label>السعر بالدولار<input type="number" min="0" step="0.01" value={price} onChange={(e)=>setPrice(e.target.value)}/></label>
         <label>الخصم %<input type="number" min="0" max="100" step="1" value={discount} onChange={(e)=>setDiscount(e.target.value)}/></label>
-        <label>الفئات<select multiple value={categoryIds} onChange={(e)=>setCategoryIds(Array.from(e.target.selectedOptions,(option)=>option.value))} style={{minHeight:110}}>
-          {categories.map((category)=><option key={category.id} value={category.id}>{category.nameAr} / {category.nameEn}</option>)}
-        </select></label>
+        <div><strong>الفئات</strong><div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
+          {categories.map((category)=><button key={category.id} type="button" aria-pressed={categoryIds.includes(category.id)} className={categoryIds.includes(category.id)?"btn":"btn secondary"} onClick={()=>toggle(category.id,setCategoryIds,categoryIds)}>{category.nameAr}</button>)}
+        </div></div>
       </div>
       <label>الوصف<textarea value={description} onChange={(e)=>setDescription(e.target.value)} rows={4} placeholder="وصف اللعبة..."/></label>
       <div><strong>المنصات</strong><div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-        {PLATFORMS.map(([value,label])=><button key={value} type="button" className={platforms.includes(value)?"btn":"btn secondary"} onClick={()=>toggle(value,setPlatforms,platforms)}>{label}</button>)}
+        {UPLOAD_PLATFORM_OPTIONS.map(([value,label])=><button key={value} type="button" className={platforms.includes(value)?"btn":"btn secondary"} onClick={()=>toggle(value,setPlatforms,platforms)}>{label}</button>)}
       </div></div>
       <div className="grid" style={{gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:12}}>
-        <label>ملف اللعبة *<input id="game-file-input" type="file" accept=".apk,.aab,.exe,.msi,.zip,.7z,.rar,.iso,.img,.dmg,.pkg,.appimage,.deb,.tar,.gz,.tgz,.obb" onChange={(e)=>setGameFile(e.target.files?.[0]||null)} required/>{gameFile&&<small className="muted">{gameFile.name} · {formatBytes(gameFile.size)}</small>}</label>
+        <label>ملف اللعبة *<input id="game-file-input" type="file" accept={GAME_FILE_ACCEPT} onChange={(e)=>setGameFile(e.target.files?.[0]||null)} required/>{gameFile&&<small className="muted">{gameFile.name} · {formatBytes(gameFile.size)}</small>}</label>
         <label>صورة الغلاف (اختياري)<input id="cover-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(e)=>setCoverFile(e.target.files?.[0]||null)}/>{coverFile&&<small className="muted">{coverFile.name} · {formatBytes(coverFile.size)}</small>}</label>
       </div>
       <label style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={hasMod} onChange={(e)=>setHasMod(e.target.checked)}/> إضافة Mod لهذه اللعبة</label>
@@ -146,7 +151,7 @@ export default function GameUploadForm({ categories }: Props) {
           <label>اسم الـMod بالإنجليزية<input value={modTitleEn} onChange={(e)=>setModTitleEn(e.target.value)} placeholder={`${titleEn||"Game"} Mod`}/></label>
         </div>
         <label>وصف الـMod<textarea value={modDescription} onChange={(e)=>setModDescription(e.target.value)} rows={3}/></label>
-        <label>ملف الـMod *<input id="mod-file-input" type="file" accept=".apk,.aab,.exe,.msi,.zip,.7z,.rar,.iso,.img,.dmg,.pkg,.appimage,.deb,.tar,.gz,.tgz,.obb" onChange={(e)=>setModFile(e.target.files?.[0]||null)} required={hasMod}/>{modFile&&<small className="muted">{modFile.name} · {formatBytes(modFile.size)}</small>}</label>
+        <label>ملف الـMod *<input id="mod-file-input" type="file" accept={GAME_FILE_ACCEPT} onChange={(e)=>setModFile(e.target.files?.[0]||null)} required={hasMod}/>{modFile&&<small className="muted">{modFile.name} · {formatBytes(modFile.size)}</small>}</label>
       </div>}
       <label style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={published} onChange={(e)=>setPublished(e.target.checked)}/> نشر اللعبة بعد الحفظ</label>
       <label style={{display:"flex",gap:8,alignItems:"flex-start"}}><input type="checkbox" checked={rightsConfirmed} onChange={(e)=>setRightsConfirmed(e.target.checked)}/> أؤكد أن ملف اللعبة مملوك لي أو لدي ترخيص/حق قانوني لتوزيعه على GameVortex.</label>

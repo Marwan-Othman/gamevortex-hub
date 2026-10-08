@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { del } from "@vercel/blob";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { guardMutation } from "@/lib/api";
 import { getPlatformEnum, normalizePlatform } from "@/lib/platforms";
 import { ensureCategoryIds } from "@/lib/categories";
+import { canonicalBlobUrl, normalizeUploadSourceStatus } from "@/lib/game-upload-shared";
+import { findReferencedBlobUrls, resolveUploadCategoryIds, safeCleanupBlobs } from "@/lib/game-upload-server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,26 +27,6 @@ function normalizePlatforms(value: unknown) {
   return Array.from(result);
 }
 
-function normalizeSourceStatus(value: unknown) {
-  if (
-    value === "VERIFIED" || value === "PENDING_REVIEW" || value === "UNPUBLISHED" ||
-    value === "NEEDS_SOURCE" || value === "OFFICIAL_SOURCE" ||
-    value === "LICENSED_FOR_DISTRIBUTION" || value === "OPEN_SOURCE" ||
-    value === "FREEWARE_REDISTRIBUTABLE"
-  ) return value;
-  return "NEEDS_SOURCE" as const;
-}
-
-function isVercelBlobUrl(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && url.hostname.endsWith(".blob.vercel-storage.com");
-  } catch {
-    return false;
-  }
-}
-
 function normalizeSlug(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
 }
@@ -57,7 +40,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const platformParam = searchParams.get("platform")?.trim() ?? "";
     const platform = normalizePlatform(platformParam);
-    const where: any = {};
+    const where: Prisma.GameWhereInput = {};
 
     if (search) {
       where.OR = [
@@ -66,7 +49,8 @@ export async function GET(request: NextRequest) {
         { slug: { contains: search, mode: "insensitive" } },
       ];
     }
-    if (platform) where.gamePlatforms = { some: { platform: platform.toUpperCase() } };
+    const platformEnum = platform ? getPlatformEnum(platform) : null;
+    if (platformEnum) where.gamePlatforms = { some: { platform: platformEnum } };
 
     const games = await prisma.game.findMany({
       where,
@@ -86,11 +70,14 @@ export async function POST(request: NextRequest) {
   let uploadedCoverUrl: string | null = null;
   let uploadedModUrl: string | null = null;
 
+  const guard = await guardMutation(request, "admin-game-create", 60);
+  if (guard) return guard;
+
   try {
     const user = await requireSuperAdmin();
     if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-    const body = await request.json();
+    const body: Record<string, unknown> & { mod?: Record<string, unknown> } = await request.json();
     const {
       titleAr, titleEn, slug, descriptionAr, descriptionEn, genre, category, platforms,
       platform, price, priceCents, discount, discountPercent, coverUrl, downloadSource,
@@ -107,16 +94,18 @@ export async function POST(request: NextRequest) {
     const platformValues = normalizePlatforms(Array.isArray(platforms) ? platforms : platform ? [platform] : []);
     if (!platformValues.length) return NextResponse.json({ success: false, error: "At least one platform is required" }, { status: 400 });
 
-    if (typeof downloadSource !== "string" || !isVercelBlobUrl(downloadSource)) {
+    const gameFileUrl = canonicalBlobUrl(downloadSource, "game");
+    if (!gameFileUrl) {
       return NextResponse.json({ success: false, error: "A GameVortex Blob game file is required" }, { status: 400 });
     }
-    uploadedGameUrl = downloadSource;
+    uploadedGameUrl = gameFileUrl;
 
     if (coverUrl !== undefined && coverUrl !== null && coverUrl !== "") {
-      if (typeof coverUrl !== "string" || !isVercelBlobUrl(coverUrl)) {
+      const cover = canonicalBlobUrl(coverUrl, "cover");
+      if (!cover) {
         return NextResponse.json({ success: false, error: "Cover must be stored in GameVortex Blob" }, { status: 400 });
       }
-      uploadedCoverUrl = coverUrl;
+      uploadedCoverUrl = cover;
     }
 
     let modInput: {
@@ -132,7 +121,8 @@ export async function POST(request: NextRequest) {
       if (typeof mod !== "object" || Array.isArray(mod)) {
         return NextResponse.json({ success: false, error: "Invalid Mod data" }, { status: 400 });
       }
-      if (typeof mod.downloadUrl !== "string" || !isVercelBlobUrl(mod.downloadUrl)) {
+      const modFileUrl = canonicalBlobUrl(mod.downloadUrl, "mod");
+      if (!modFileUrl) {
         return NextResponse.json({ success: false, error: "A GameVortex Blob Mod file is required" }, { status: 400 });
       }
       const modPlatform = getPlatformEnum(typeof mod.platform === "string" ? mod.platform : "") || platformValues[0];
@@ -146,17 +136,30 @@ export async function POST(request: NextRequest) {
         titleAr: modTitleAr.slice(0, 160),
         titleEn: modTitleEn.slice(0, 160),
         descriptionAr: modDescription ? modDescription.slice(0, 4000) : null,
-        downloadUrl: mod.downloadUrl,
+        downloadUrl: modFileUrl,
         platform: modPlatform,
         published: typeof mod.published === "boolean" ? mod.published : Boolean(published),
       };
-      uploadedModUrl = mod.downloadUrl;
+      uploadedModUrl = modFileUrl;
     }
 
     const existing = await prisma.game.findUnique({ where: { slug: normalizedSlug }, select: { id: true } });
-    if (existing) return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS" }, { status: 409 });
+    if (existing) {
+      // Conflict before any write: keep the uploaded files so the owner can fix the slug and retry.
+      uploadedGameUrl = uploadedCoverUrl = uploadedModUrl = null;
+      return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS" }, { status: 409 });
+    }
 
-    const normalizedSourceStatus = normalizeSourceStatus(sourceStatus);
+    // Never re-use (or later delete) a file that another Game/Mod already references.
+    const referenced = await findReferencedBlobUrls(
+      [uploadedGameUrl, uploadedCoverUrl, uploadedModUrl].filter((value): value is string => Boolean(value)),
+    );
+    if (referenced.size) {
+      uploadedGameUrl = uploadedCoverUrl = uploadedModUrl = null;
+      return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_ALREADY_USED" }, { status: 409 });
+    }
+
+    const normalizedSourceStatus = normalizeUploadSourceStatus(sourceStatus);
     const description =
       typeof descriptionAr === "string" && descriptionAr.trim()
         ? descriptionAr.trim()
@@ -168,7 +171,9 @@ export async function POST(request: NextRequest) {
       ? body.categoryIds.filter((value: unknown): value is string => typeof value === "string" && Boolean(value.trim()))
       : typeof category === "string" && category.trim() ? [category.trim()]
         : typeof genre === "string" && genre.trim() ? [genre.trim()] : [];
-    const categoryIds = await ensureCategoryIds(prisma, categoryValues);
+    const categoryIds = Array.isArray(body.categoryIds)
+      ? await resolveUploadCategoryIds(categoryValues)
+      : await ensureCategoryIds(prisma, categoryValues);
 
     const normalizedGenre =
       typeof genre === "string" && genre.trim() ? genre.trim()
@@ -253,13 +258,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: result.game, mod: result.mod }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/games error:", error);
+    console.error("POST /api/admin/games error:", error instanceof Error ? error.message : "UNKNOWN");
 
-    for (const url of [uploadedGameUrl, uploadedCoverUrl, uploadedModUrl].filter((value): value is string => Boolean(value))) {
-      try { await del(url); } catch (cleanupError) {
-        console.error("Failed to clean up uploaded Blob:", cleanupError);
-      }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS" }, { status: 409 });
     }
+
+    // The transaction rolled back: remove only this request's files, never ones already referenced.
+    await safeCleanupBlobs([uploadedGameUrl, uploadedCoverUrl, uploadedModUrl].filter((value): value is string => Boolean(value)));
 
     return NextResponse.json({ success: false, error: "Failed to create game" }, { status: 500 });
   }
