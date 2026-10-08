@@ -155,5 +155,7 @@ export default function GameUploadForm({ categories }: Props) {
       {error&&<p style={{padding:"10px 12px",borderRadius:10,background:"rgba(239,68,68,.12)"}}>{error}</p>}
       <button className="btn" type="submit" disabled={busy}>{busy?`جاري العمل... ${progress}%`:"رفع ونشر اللعبة"}</button>
     </form>
-  </section></>;
+  </section>
+    </>
+  );
 }
