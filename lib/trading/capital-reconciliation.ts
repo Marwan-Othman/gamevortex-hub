@@ -106,7 +106,10 @@ export async function getTradingCapitalReconciliation(ownerId: string): Promise<
   const internalBalance = account?.balanceUsd ?? decimal("0");
   const activeUsd = decimal(activeAllocations?._sum.amountUsd ?? 0);
   const boundUsd = decimal(boundAllocations?._sum.amountUsd ?? 0);
-  const exposureUsd = decimal(openTrades[0]?.exposure?.toString() ?? "0");
+  const exposureValue = openTrades[0]?.exposure;
+  const exposureUsd = exposureValue === null || exposureValue === undefined
+    ? decimal("0")
+    : decimal(exposureValue.toString());
 
   const base = {
     internal: {
