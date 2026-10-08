@@ -16,6 +16,7 @@ function isPrivateIp(address: string) {
   }
   if (family === 6) {
     const normalized = address.toLowerCase();
+    if (normalized.startsWith("::ffff:")) return isPrivateIp(normalized.slice(7));
     return normalized === "::1" || normalized === "::" || normalized.startsWith("fc") ||
       normalized.startsWith("fd") || normalized.startsWith("fe80:");
   }
