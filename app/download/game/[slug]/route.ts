@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
+import { head } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,18 @@ export async function GET(
     data: { downloadCount: { increment: 1 } },
   });
 
+  // Android DownloadManager needs a reliable total size. Vercel Blob exposes the
+  // authoritative object size through head(), while the GET response may be streamed.
+  let blobSize: number | null = null;
+  try {
+    const metadata = await head(game.downloadSource, {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    blobSize = metadata.size;
+  } catch {
+    // Fall back to the upstream GET headers below if metadata lookup is unavailable.
+  }
+
   const upstreamHeaders = new Headers();
   const range = request.headers.get("range");
   const ifRange = request.headers.get("if-range");
@@ -103,6 +116,9 @@ export async function GET(
   }
 
   const filename = getDownloadFilename(game.downloadSource, `${game.titleEn || slug}.bin`);
+  if (!headers.has("Content-Length") && blobSize !== null) {
+    headers.set("Content-Length", String(blobSize));
+  }
   headers.set("Content-Disposition", contentDisposition(filename));
   headers.set("Cache-Control", "public, max-age=0, must-revalidate");
 
