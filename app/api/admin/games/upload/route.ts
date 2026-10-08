@@ -4,6 +4,7 @@ import { getOptionalUser } from "@/lib/auth";
 import { guardMutation } from "@/lib/api";
 import {
   COVER_CONTENT_TYPES,
+  MAX_IMAGE_FILE_SIZE,
   GAME_BLOB_CONTENT_TYPE,
   GAME_CONTENT_TYPE_BY_EXTENSION,
   MAX_COVER_FILE_SIZE,
@@ -53,13 +54,15 @@ const CLIENT_ERRORS = new Set([
   "MOD_FILE_TOO_LARGE",
   "COVER_FILE_TOO_LARGE",
   "COVER_TYPE_NOT_SUPPORTED",
+  "IMAGE_FILE_TOO_LARGE",
+  "IMAGE_TYPE_NOT_SUPPORTED",
   "INVALID_CLIENT_PAYLOAD",
 ]);
 
 type ClientPayload = { kind?: unknown; mimeType?: unknown; size?: unknown };
 
 function parseKind(value: unknown): UploadKind | null {
-  return value === "game" || value === "mod" || value === "cover" ? value : null;
+  return value === "game" || value === "app" || value === "mod" || value === "cover" || value === "image" ? value : null;
 }
 
 function parseClientPayload(raw: string | null): ClientPayload {
@@ -148,13 +151,14 @@ export async function POST(request: NextRequest) {
         const size = Number(payload.size ?? 0);
         if (!Number.isFinite(size) || size <= 0) throw new Error("INVALID_UPLOAD_SIZE");
 
-        if (kind === "cover") {
-          if (size > MAX_COVER_FILE_SIZE) throw new Error("COVER_FILE_TOO_LARGE");
+        if (kind === "cover" || kind === "image") {
+          const limit = kind === "image" ? MAX_IMAGE_FILE_SIZE : MAX_COVER_FILE_SIZE;
+          if (size > limit) throw new Error(kind === "image" ? "IMAGE_FILE_TOO_LARGE" : "COVER_FILE_TOO_LARGE");
           const mimeType = typeof payload.mimeType === "string" ? payload.mimeType.toLowerCase() : "";
-          if (!(COVER_CONTENT_TYPES as readonly string[]).includes(mimeType)) throw new Error("COVER_TYPE_NOT_SUPPORTED");
+          if (!(COVER_CONTENT_TYPES as readonly string[]).includes(mimeType)) throw new Error(kind === "image" ? "IMAGE_TYPE_NOT_SUPPORTED" : "COVER_TYPE_NOT_SUPPORTED");
           return {
             allowedContentTypes: [...COVER_CONTENT_TYPES],
-            maximumSizeInBytes: MAX_COVER_FILE_SIZE,
+            maximumSizeInBytes: limit,
             addRandomSuffix: false,
           };
         }
