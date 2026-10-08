@@ -3,7 +3,7 @@
  * No server-only imports here: this module is bundled into client components.
  */
 
-export type UploadKind = "game" | "mod" | "cover";
+export type UploadKind = "game" | "app" | "mod" | "cover" | "image";
 
 export type UploadPlatform =
   | "PC"
@@ -44,6 +44,8 @@ export type GameExtension = (typeof GAME_EXTENSIONS)[number];
 export const GAME_FILE_ACCEPT = [...GAME_EXTENSIONS].join(",");
 
 export const COVER_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"] as const;
+export const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif"] as const;
+export const IMAGE_FILE_ACCEPT = IMAGE_EXTENSIONS.join(",");
 
 /**
  * Game/Mod files are always uploaded with this content type. Mobile browsers report
@@ -86,14 +88,17 @@ export function gameContentTypeFor(fileName: string): string {
 
 export const BLOB_FOLDERS: Record<UploadKind, string> = {
   game: "games/files/",
+  app: "apps/files/",
   mod: "games/mods/",
   cover: "games/covers/",
+  image: "content/images/",
 };
 
 export const MAX_GAMES_PER_BATCH = 100;
 export const UPLOAD_CONCURRENCY = 3;
 export const MAX_GAME_FILE_SIZE = 50 * 1024 * 1024 * 1024;
 export const MAX_COVER_FILE_SIZE = 15 * 1024 * 1024;
+export const MAX_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
 
 /** Source statuses that allow public distribution. Mirrors app/download/game/[slug]/route.ts. */
 export const DISTRIBUTABLE_SOURCE_STATUSES = [
@@ -193,6 +198,7 @@ export function isValidBlobPathname(pathname: string, kind: UploadKind): boolean
   if (value.includes("//")) return false;
   if (!value.startsWith(BLOB_FOLDERS[kind])) return false;
   if (kind === "cover") return true;
+  if (kind === "image") return IMAGE_EXTENSIONS.some((extension) => value.toLowerCase().endsWith(extension));
   return hasAllowedGameExtension(value);
 }
 
