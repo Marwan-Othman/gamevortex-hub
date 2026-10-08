@@ -223,7 +223,7 @@ export default async function AdminStore() {
 
             <Link
               className="btn secondary"
-              href="/admin/games"
+              href="/admin/content"
             >
               إدارة الألعاب
             </Link>
