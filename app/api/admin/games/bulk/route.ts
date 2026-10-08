@@ -24,9 +24,11 @@ function slug(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
 }
 
-function platforms(value: unknown) {
+type GamePlatform = "PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB";
+
+function platforms(value: unknown): GamePlatform[] {
   if (!Array.isArray(value)) return [];
-  const out = new Set<"PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB">();
+  const out = new Set<GamePlatform>();
   for (const item of value) {
     if (typeof item === "string") {
       const p = getPlatformEnum(item);
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
             discountPercent: item.discountPercent, coverUrl: null, officialUrl: null,
             downloadSource: item.downloadSource, sourceStatus: item.sourceStatus,
             published: item.published, featured: item.featured,
-            gamePlatforms: { create: item.platformValues.map((platform: string) => ({ platform })) },
+            gamePlatforms: { create: item.platformValues.map((platform: GamePlatform) => ({ platform })) },
             gameCategories: categorySet.size ? { create: Array.from(categorySet).map((categoryId) => ({ categoryId })) } : undefined,
           },
         });
