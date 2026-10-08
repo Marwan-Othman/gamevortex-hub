@@ -58,25 +58,18 @@ export async function GET(
     return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_NOT_DISTRIBUTABLE" }, { status: 403 });
   }
 
-  await db.game.update({
-    where: { id: game.id },
-    data: { downloadCount: { increment: 1 } },
-  });
+  const range = request.headers.get("range");
 
-  // Android DownloadManager needs a reliable total size. Vercel Blob exposes the
-  // authoritative object size through head(), while the GET response may be streamed.
-  let blobSize: number | null = null;
-  try {
-    const metadata = await head(game.downloadSource, {
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+  // Count a download once: resumed/partial requests (Range not starting at byte 0) are not new downloads.
+  const isNewDownload = !range || /^bytes=0-/i.test(range.trim());
+  if (isNewDownload) {
+    await db.game.update({
+      where: { id: game.id },
+      data: { downloadCount: { increment: 1 } },
     });
-    blobSize = metadata.size;
-  } catch {
-    // Fall back to the upstream GET headers below if metadata lookup is unavailable.
   }
 
   const upstreamHeaders = new Headers();
-  const range = request.headers.get("range");
   const ifRange = request.headers.get("if-range");
   const ifNoneMatch = request.headers.get("if-none-match");
   if (range) upstreamHeaders.set("Range", range);
@@ -116,8 +109,17 @@ export async function GET(
   }
 
   const filename = getDownloadFilename(game.downloadSource, `${game.titleEn || slug}.bin`);
-  if (!headers.has("Content-Length") && blobSize !== null) {
-    headers.set("Content-Length", String(blobSize));
+  // Android DownloadManager needs a reliable total size. Only ask Vercel Blob for it
+  // (extra network call) when the upstream response did not already include one.
+  if (!headers.has("Content-Length") && upstream.status === 200) {
+    try {
+      const metadata = await head(game.downloadSource, {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      headers.set("Content-Length", String(metadata.size));
+    } catch {
+      // Size unavailable: stream without Content-Length.
+    }
   }
   headers.set("Content-Disposition", contentDisposition(filename));
   headers.set("Cache-Control", "public, max-age=0, must-revalidate");
