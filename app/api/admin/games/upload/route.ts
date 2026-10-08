@@ -56,13 +56,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as HandleUploadBody;
     const response = await handleUpload({
-      token: process.env.BLOB_READ_WRITE_TOKEN || undefined,
+      ...(process.env.BLOB_READ_WRITE_TOKEN?.trim()
+        ? { token: process.env.BLOB_READ_WRITE_TOKEN.trim() }
+        : {}),
       request,
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const payload = clientPayload
           ? (JSON.parse(clientPayload) as { kind?: string; mimeType?: string; size?: number })
           : {};
+        const user = await getOptionalUser();
+        if (!user) throw new Error("UNAUTHORIZED");
+        if (user.role !== "SUPER_ADMIN") throw new Error("FORBIDDEN");
+
         const kind = payload.kind === "cover" ? "cover" : payload.kind === "game" ? "game" : null;
         if (!kind) throw new Error("INVALID_UPLOAD_KIND");
         if (!validPathname(pathname, kind)) throw new Error("INVALID_UPLOAD_PATH");
@@ -91,7 +97,10 @@ export async function POST(request: NextRequest) {
       "INVALID_UPLOAD_KIND","INVALID_UPLOAD_PATH","INVALID_UPLOAD_SIZE",
       "GAME_FILE_TOO_LARGE","COVER_FILE_TOO_LARGE",
       "COVER_TYPE_NOT_SUPPORTED","GAME_TYPE_NOT_SUPPORTED",
-    ].includes(message) ? 400 : 500;
+    ].includes(message) ? 400
+      : message === "UNAUTHORIZED" ? 401
+      : message === "FORBIDDEN" ? 403
+      : 500;
 
     console.error("POST /api/admin/games/upload error:", message);
     return NextResponse.json({ success: false, error: "GAME_UPLOAD_FAILED", detail: message }, { status });
