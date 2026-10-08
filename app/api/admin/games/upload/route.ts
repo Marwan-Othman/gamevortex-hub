@@ -67,14 +67,14 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const urls = Array.isArray(body?.urls)
-      ? body.urls.filter((value: unknown): value is string => typeof value === "string" && value.trim())
+      ? body.urls.filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
 
     if (urls.length > 2) {
       return NextResponse.json({ success: false, error: "Too many cleanup URLs" }, { status: 400 });
     }
 
-    const safeUrls = urls.filter((value) => isVercelBlobUrl(value));
+    const safeUrls = urls.filter((value: string) => isVercelBlobUrl(value));
     if (safeUrls.length !== urls.length) {
       return NextResponse.json({ success: false, error: "Invalid cleanup URL" }, { status: 400 });
     }
