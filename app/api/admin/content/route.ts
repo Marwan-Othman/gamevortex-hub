@@ -5,6 +5,7 @@ import { requireOwner } from "@/lib/auth";
 import { guardMutation, guardRead } from "@/lib/api";
 import { canonicalContentBlobUrl } from "@/lib/content-upload-shared";
 import { importRemoteApk } from "@/lib/admin-content-import";
+import { safeCleanupBlobs } from "@/lib/game-upload-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,6 +119,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const blocked = await guardMutation(request, "admin-content-create", 20);
   if (blocked) return blocked;
+  let createdDownloadBlobUrl: string | null = null;
   try {
     const owner = await requireOwner();
     const body = await request.json() as Record<string, unknown>;
@@ -134,6 +136,7 @@ export async function POST(request: NextRequest) {
     if (parsed.sourceMode === "URL") {
       const result = await importRemoteApk(remoteUrl);
       downloadSource = result.url;
+      createdDownloadBlobUrl = result.url;
       imported = { finalUrl: result.finalUrl, filename: result.filename, sizeBytes: result.sizeBytes };
     }
 
@@ -173,6 +176,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success:true, data:result }, { status:201 });
   } catch (error) {
+    if (createdDownloadBlobUrl) await safeCleanupBlobs([createdDownloadBlobUrl]);
     const message = error instanceof Error ? error.message : "CONTENT_CREATE_FAILED";
     const status = ["INVALID_CONTENT_DATA","APK_CONTENT_REQUIRES_ANDROID","INVALID_VERSION_TYPE","INVALID_MAIN_IMAGE","INVALID_APK_UPLOAD","APK_URL_REQUIRED","APK_SOURCE_REQUIRED","SOURCE_IS_NOT_APK","SOURCE_FILE_TOO_LARGE"].includes(message) ? 400 : message === "FORBIDDEN" || message === "UNAUTHORIZED" ? 403 : 500;
     return NextResponse.json({ success:false, error:message }, { status });
@@ -182,6 +186,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const blocked = await guardMutation(request, "admin-content-update", 20);
   if (blocked) return blocked;
+  let createdDownloadBlobUrl: string | null = null;
   try {
     const owner = await requireOwner();
     const body = await request.json() as Record<string, unknown>;
@@ -201,6 +206,7 @@ export async function PATCH(request: NextRequest) {
     } else if (parsed.sourceMode === "URL" && body.apkUrl) {
       const result = await importRemoteApk(cleanString(body.apkUrl, 2000));
       downloadSource = result.url;
+      createdDownloadBlobUrl = result.url;
       imported = { finalUrl: result.finalUrl, filename: result.filename, sizeBytes: result.sizeBytes };
     }
     if (!downloadSource) throw new Error("APK_SOURCE_REQUIRED");
@@ -241,6 +247,7 @@ export async function PATCH(request: NextRequest) {
     });
     return NextResponse.json({success:true,data:result});
   } catch(error) {
+    if (createdDownloadBlobUrl) await safeCleanupBlobs([createdDownloadBlobUrl]);
     const message=error instanceof Error?error.message:"CONTENT_UPDATE_FAILED";
     const status=["INVALID_CONTENT_DATA","APK_CONTENT_REQUIRES_ANDROID","INVALID_VERSION_TYPE","INVALID_MAIN_IMAGE","INVALID_APK_UPLOAD","APK_SOURCE_REQUIRED","SOURCE_IS_NOT_APK","SOURCE_FILE_TOO_LARGE"].includes(message)?400:message==="NOT_FOUND"?404:message==="FORBIDDEN"||message==="UNAUTHORIZED"?403:500;
     return NextResponse.json({success:false,error:message},{status});
