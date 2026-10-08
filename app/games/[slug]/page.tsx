@@ -193,9 +193,10 @@ export default async function GameDetails({
         )}
 
         <div>
-          <span className="badge">
-            VORTEX SCORE {score}
-          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span className="badge">VORTEX SCORE {score}</span>
+            <span className="badge">{game.versionType === "MOD" ? "MOD" : "عادي"}</span>
+          </div>
 
           <h1>{game.titleAr}</h1>
 
@@ -304,6 +305,17 @@ export default async function GameDetails({
           )}
         </div>
       </section>
+
+      {Array.isArray(game.screenshots) && game.screenshots.length > 0 && (
+        <section>
+          <h2>الصور التعريفية</h2>
+          <div className="grid">
+            {game.screenshots.filter((url): url is string => typeof url === "string").map((url) => (
+              <img key={url} src={url} alt={game.titleEn} style={{ width: "100%", borderRadius: 12 }} loading="lazy" />
+            ))}
+          </div>
+        </section>
+      )}
 
       {relatedGames.length > 0 && (
         <section>

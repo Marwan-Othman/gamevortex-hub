@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
+import { isVercelBlobHostname } from "@/lib/game-upload-shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,15 @@ export async function GET(
     select: { id: true, downloadSource: true, sourceStatus: true },
   });
 
-  if (!app?.downloadSource || !/^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i.test(app.downloadSource)) {
+  if (!app?.downloadSource) {
+    return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
+  }
+  try {
+    const source = new URL(app.downloadSource);
+    if (source.protocol !== "https:" || !isVercelBlobHostname(source.hostname)) {
+      return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
+    }
+  } catch {
     return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
   }
 
@@ -24,5 +33,8 @@ export async function GET(
 
   await db.app.update({ where: { id: app.id }, data: { downloadCount: { increment: 1 } } });
 
-  return NextResponse.redirect(app.downloadSource, { status: 302 });
+  const downloadUrl = new URL(app.downloadSource);
+  downloadUrl.search = "";
+  downloadUrl.hash = "";
+  return NextResponse.redirect(downloadUrl.toString(), { status: 302, headers: { "Cache-Control": "no-store, private" } });
 }

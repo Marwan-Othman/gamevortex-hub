@@ -31,19 +31,9 @@ const NAV_SECTIONS: NavSection[] = [
     title: "إدارة المحتوى",
     items: [
       {
-        label: "الألعاب",
-        href: "/admin/games",
+        label: "الألعاب والتطبيقات",
+        href: "/admin/content",
         icon: <IconGames />,
-      },
-      {
-        label: "Downloader",
-        href: "/admin/downloader",
-        icon: <IconGames />,
-      },
-      {
-        label: "التطبيقات",
-        icon: <IconApps />,
-        soon: true,
       },
       {
         label: "الخلفيات",

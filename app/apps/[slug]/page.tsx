@@ -96,7 +96,7 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
         </div>
 
         <div>
-          <span className="badge">APP</span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><span className="badge">APP</span><span className="badge">{app.versionType === "MOD" ? "MOD" : "عادي"}</span></div>
           <h1>{app.nameAr}</h1>
           <p className="muted">{app.nameEn}</p>
 
@@ -134,6 +134,17 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
           </div>
         </div>
       </section>
+
+      {Array.isArray(app.screenshots) && app.screenshots.length > 0 && (
+        <section>
+          <h2>الصور التعريفية</h2>
+          <div className="grid">
+            {app.screenshots.filter((url): url is string => typeof url === "string").map((url) => (
+              <img key={url} src={url} alt={app.nameEn} style={{ width: "100%", borderRadius: 12 }} loading="lazy" />
+            ))}
+          </div>
+        </section>
+      )}
 
       {relatedApps.length > 0 && (
         <section>
