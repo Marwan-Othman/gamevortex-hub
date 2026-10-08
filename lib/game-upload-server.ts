@@ -15,6 +15,18 @@ export function canonicalAnyBlobUrl(value: unknown): string | null {
     const canonical = canonicalBlobUrl(value, kind);
     if (canonical) return canonical;
   }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const url = new URL(value.trim());
+      if (url.protocol !== "https:" || !url.hostname.toLowerCase().endsWith(".blob.vercel-storage.com") || url.username || url.password) return null;
+      const pathname = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+      const allowed = pathname.startsWith("content/apk/") || pathname.startsWith("content/images/");
+      const safe = !pathname.includes("..") && !pathname.includes("\\") && !pathname.includes("\0") && !pathname.includes("//");
+      if (allowed && safe) return url.origin + url.pathname;
+    } catch {
+      return null;
+    }
+  }
   return null;
 }
 
