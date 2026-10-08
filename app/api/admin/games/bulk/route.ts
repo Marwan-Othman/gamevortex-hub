@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     const existing = await prisma.game.findMany({ where: { slug: { in: Array.from(slugSet) } }, select: { slug: true } });
-    if (existing.length) return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS:" + existing.map((x) => x.slug).join(",") }, { status: 409 });
+    if (existing.length) return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS:" + existing.map((x: { slug: string }) => x.slug).join(",") }, { status: 409 });
 
     const allCategoryValues = Array.from(new Set(prepared.flatMap((x) => x.categoryValues)));
     const ensuredCategoryIds = await ensureCategoryIds(prisma, allCategoryValues);
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
             discountPercent: item.discountPercent, coverUrl: null, officialUrl: null,
             downloadSource: item.downloadSource, sourceStatus: item.sourceStatus,
             published: item.published, featured: item.featured,
-            gamePlatforms: { create: item.platformValues.map((platform) => ({ platform })) },
+            gamePlatforms: { create: item.platformValues.map((platform: string) => ({ platform })) },
             gameCategories: categorySet.size ? { create: Array.from(categorySet).map((categoryId) => ({ categoryId })) } : undefined,
           },
         });
