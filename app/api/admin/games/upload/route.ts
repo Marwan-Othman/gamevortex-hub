@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { del } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getOptionalUser } from "@/lib/auth";
 import { guardMutation } from "@/lib/api";
@@ -37,12 +38,56 @@ function hasAllowedGameExtension(pathname: string) {
   return GAME_EXTENSIONS.some((extension) => lower.endsWith(extension));
 }
 
+function isVercelBlobUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname.endsWith(".blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 function validPathname(pathname: unknown, kind: "game" | "cover") {
   if (typeof pathname !== "string" || !pathname.trim()) return false;
   const value = pathname.trim();
   if (value.includes("..") || value.includes("\\") || value.includes("\0")) return false;
   if (kind === "game") return value.startsWith("games/files/") && hasAllowedGameExtension(value);
   return value.startsWith("games/covers/");
+}
+
+export async function DELETE(request: NextRequest) {
+  const guard = await guardMutation(request, "admin-game-upload-cleanup", 30);
+  if (guard) return guard;
+
+  const user = await getOptionalUser();
+  if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  if (user.role !== "SUPER_ADMIN") return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+
+  try {
+    const body = await request.json();
+    const urls = Array.isArray(body?.urls)
+      ? body.urls.filter((value: unknown): value is string => typeof value === "string" && value.trim())
+      : [];
+
+    if (urls.length > 2) {
+      return NextResponse.json({ success: false, error: "Too many cleanup URLs" }, { status: 400 });
+    }
+
+    const safeUrls = urls.filter((value) => isVercelBlobUrl(value));
+    if (safeUrls.length !== urls.length) {
+      return NextResponse.json({ success: false, error: "Invalid cleanup URL" }, { status: 400 });
+    }
+
+    if (safeUrls.length) {
+      await del(safeUrls);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/admin/games/upload cleanup error:", error instanceof Error ? error.message : "UNKNOWN");
+    return NextResponse.json({ success: false, error: "CLEANUP_FAILED" }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
