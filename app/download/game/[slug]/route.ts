@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { head } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,34 +20,22 @@ function isGameVortexBlobUrl(value: string) {
   }
 }
 
-function getDownloadFilename(blobUrl: string, fallback: string) {
-  try {
-    const pathname = decodeURIComponent(new URL(blobUrl).pathname);
-    const raw = pathname.split("/").pop() || "";
-    // Current upload path: <timestamp>-<UUID>-<original filename>
-    const match = raw.match(/^\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(.+)$/i);
-    const filename = match?.[1] || raw;
-    return filename || fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function contentDisposition(filename: string) {
-  const safe = filename.replace(/[\\\r\n"]/g, "_").trim() || "download";
-  const ascii = safe.replace(/[^\x20-\x7E]/g, "_");
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
-}
-
+/**
+ * Game files can be hundreds of MB. They are NOT proxied through this function:
+ * a serverless response is streamed without Content-Length (the browser shows "?" as the
+ * total size) and is bound by the function's duration and bandwidth limits.
+ * Instead we validate, count, and redirect to Vercel Blob, which serves the file directly
+ * with Content-Length, Range/resume support and `attachment` disposition (?download=1).
+ */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
 
   const game = await db.game.findFirst({
     where: { slug, published: true },
-    select: { id: true, downloadSource: true, sourceStatus: true, titleEn: true },
+    select: { id: true, downloadSource: true, sourceStatus: true },
   });
 
   if (!game?.downloadSource || !isGameVortexBlobUrl(game.downloadSource)) {
@@ -58,74 +45,16 @@ export async function GET(
     return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_NOT_DISTRIBUTABLE" }, { status: 403 });
   }
 
-  const range = request.headers.get("range");
-
-  // Count a download once: resumed/partial requests (Range not starting at byte 0) are not new downloads.
-  const isNewDownload = !range || /^bytes=0-/i.test(range.trim());
-  if (isNewDownload) {
-    await db.game.update({
-      where: { id: game.id },
-      data: { downloadCount: { increment: 1 } },
-    });
-  }
-
-  const upstreamHeaders = new Headers();
-  const ifRange = request.headers.get("if-range");
-  const ifNoneMatch = request.headers.get("if-none-match");
-  if (range) upstreamHeaders.set("Range", range);
-  if (ifRange) upstreamHeaders.set("If-Range", ifRange);
-  if (ifNoneMatch) upstreamHeaders.set("If-None-Match", ifNoneMatch);
+  await db.game.update({
+    where: { id: game.id },
+    data: { downloadCount: { increment: 1 } },
+  });
 
   const downloadUrl = new URL(game.downloadSource);
   downloadUrl.searchParams.set("download", "1");
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(downloadUrl, {
-      headers: upstreamHeaders,
-      redirect: "follow",
-      cache: "no-store",
-    });
-  } catch {
-    return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_UNREACHABLE" }, { status: 502 });
-  }
-
-  if (!upstream.ok && upstream.status !== 206 && upstream.status !== 304) {
-    return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_UNAVAILABLE" }, { status: 502 });
-  }
-
-  const headers = new Headers();
-  for (const name of [
-    "content-type",
-    "content-length",
-    "content-range",
-    "accept-ranges",
-    "etag",
-    "last-modified",
-    "cache-control",
-  ]) {
-    const value = upstream.headers.get(name);
-    if (value) headers.set(name, value);
-  }
-
-  const filename = getDownloadFilename(game.downloadSource, `${game.titleEn || slug}.bin`);
-  // Android DownloadManager needs a reliable total size. Only ask Vercel Blob for it
-  // (extra network call) when the upstream response did not already include one.
-  if (!headers.has("Content-Length") && upstream.status === 200) {
-    try {
-      const metadata = await head(game.downloadSource, {
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
-      headers.set("Content-Length", String(metadata.size));
-    } catch {
-      // Size unavailable: stream without Content-Length.
-    }
-  }
-  headers.set("Content-Disposition", contentDisposition(filename));
-  headers.set("Cache-Control", "public, max-age=0, must-revalidate");
-
-  return new NextResponse(upstream.body, {
-    status: upstream.status,
-    headers,
+  return NextResponse.redirect(downloadUrl.toString(), {
+    status: 303,
+    headers: { "Cache-Control": "no-store, private" },
   });
 }
