@@ -25,7 +25,7 @@ function isGameVortexBlobUrl(value: string) {
  * a serverless response is streamed without Content-Length (the browser shows "?" as the
  * total size) and is bound by the function's duration and bandwidth limits.
  * Instead we validate, count, and redirect to Vercel Blob, which serves the file directly
- * with Content-Length, Range/resume support and `attachment` disposition (?download=1).
+ * with Content-Length and Range/resume support.
  */
 export async function GET(
   _request: NextRequest,
@@ -50,8 +50,12 @@ export async function GET(
     data: { downloadCount: { increment: 1 } },
   });
 
+  // Plain Blob URL, no query string. Game files are stored as application/octet-stream, so
+  // browsers download them anyway, so `?download=1` is not needed. It was dropped because with it
+  // the browser showed "?" as the total size; verify Content-Length with: curl -sIL <download url>.
   const downloadUrl = new URL(game.downloadSource);
-  downloadUrl.searchParams.set("download", "1");
+  downloadUrl.search = "";
+  downloadUrl.hash = "";
 
   return NextResponse.redirect(downloadUrl.toString(), {
     status: 303,

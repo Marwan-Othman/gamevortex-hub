@@ -77,6 +77,9 @@ describe('game upload helpers', () => {
     const pathname = buildBlobPathname('game', 'My Game (v2).zip', 'uuid');
     expect(isValidBlobPathname(pathname, 'game')).toBe(true);
     expect(safeBlobFileName('../../x.zip')).not.toContain('..');
+    // The unique id is a folder, so the saved file name stays the original one.
+    expect(pathname.split('/').pop()).toBe('My-Game-v2-.zip');
+    expect(buildBlobPathname('game', 'CapCut v19.7.0.apk', 'u').split('/').pop()).toBe('CapCut-v19.7.0.apk');
   });
 
   it('dedupes slugs within a batch and against taken slugs', () => {

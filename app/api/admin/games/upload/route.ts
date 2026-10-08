@@ -111,7 +111,11 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-/** Issues short-lived client-upload tokens. The file itself never passes through this server. */
+/**
+ * Issues short-lived client-upload tokens. The file itself never passes through this server.
+ * addRandomSuffix is off on purpose: the pathname already contains a unique <timestamp>-<id>/ folder,
+ * and a random suffix would change the downloaded file name.
+ */
 export async function POST(request: NextRequest) {
   const guard = await guardMutation(request, "admin-game-upload", 120);
   if (guard) return guard;
@@ -148,7 +152,7 @@ export async function POST(request: NextRequest) {
           return {
             allowedContentTypes: [...COVER_CONTENT_TYPES],
             maximumSizeInBytes: MAX_COVER_FILE_SIZE,
-            addRandomSuffix: true,
+            addRandomSuffix: false,
           };
         }
 
@@ -156,7 +160,7 @@ export async function POST(request: NextRequest) {
         return {
           allowedContentTypes: GAME_CONTENT_TYPES,
           maximumSizeInBytes: MAX_GAME_FILE_SIZE,
-          addRandomSuffix: true,
+          addRandomSuffix: false,
         };
       },
     });

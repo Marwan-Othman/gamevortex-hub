@@ -140,8 +140,13 @@ export function safeBlobFileName(fileName: string): string {
     : "file" + (getGameExtension(fileName) || "");
 }
 
+/**
+ * The unique part lives in its own "folder" (<timestamp>-<id>/) so the Blob basename stays the
+ * clean original file name. Browsers use that basename as the saved file name when the
+ * download URL carries ?download=1.
+ */
 export function buildBlobPathname(kind: UploadKind, fileName: string, uniqueId: string): string {
-  return `${BLOB_FOLDERS[kind]}${Date.now()}-${uniqueId}-${safeBlobFileName(fileName)}`;
+  return `${BLOB_FOLDERS[kind]}${Date.now()}-${uniqueId}/${safeBlobFileName(fileName)}`;
 }
 
 export function isVercelBlobHostname(hostname: string): boolean {
