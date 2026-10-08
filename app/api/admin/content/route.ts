@@ -142,7 +142,8 @@ export async function POST(request: NextRequest) {
 
     if (!downloadSource) throw new Error("APK_SOURCE_REQUIRED");
 
-    const slug = await uniqueSlug(parsed.contentType, body.slug ? cleanString(body.slug, 100) : parsed.name);
+    const contentType: "GAME" | "APP" = parsed.contentType === "GAME" ? "GAME" : "APP";
+    const slug = await uniqueSlug(contentType, body.slug ? cleanString(body.slug, 100) : parsed.name);
     const platform = "ANDROID";
 
     const result = await db.$transaction(async (tx) => {
