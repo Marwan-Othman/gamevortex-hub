@@ -95,7 +95,7 @@ export default function ContentManager({ items, editing }: { items: Item[]; edit
   async function submit(event:React.FormEvent) {
     event.preventDefault(); setError(""); setMessage("");
     if(!name.trim())return setError("أدخل اسم اللعبة أو التطبيق.");
-    if(platform!=="ANDROID")return setError("نظام الإضافة الحالي يعتمد APK، لذلك يجب أن تكون المنصة Android.");
+    setPlatform("ANDROID");
     if(!isEditing&&!apkFile&&!apkUrl.trim())return setError("اختر رفع APK أو ضع رابط APK واحد.");
     if(sourceMode==="UPLOAD"&&apkFile&&!isApkFileName(apkFile.name))return setError("يجب اختيار ملف APK فقط.");
     if(sourceMode==="URL"&&apkUrl.trim()&&!/^https?:\/\//i.test(apkUrl.trim()))return setError("رابط APK يجب أن يبدأ بـ http:// أو https://.");
@@ -166,9 +166,10 @@ export default function ContentManager({ items, editing }: { items: Item[]; edit
           </select>
         </label>
         <label>المنصة
-          <select value={platform} disabled={busy} onChange={e=>setPlatform(e.target.value as Platform)}>
+          <select value="ANDROID" disabled>
             {PLATFORM_OPTIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}
           </select>
+          <small className="muted">APK = Android تلقائيًا.</small>
         </label>
         <label>نوع النسخة
           <select value={versionType} disabled={busy} onChange={e=>setVersionType(e.target.value as VersionType)}>
