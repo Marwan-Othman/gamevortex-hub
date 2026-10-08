@@ -158,7 +158,7 @@ export default function ContentManager({ items, editing }: { items: Item[]; edit
       <p className="muted">صفحة واحدة لإضافة وتعديل الألعاب والتطبيقات. جميع عمليات الإدارة محمية من الخادم لحساب SUPER_ADMIN فقط.</p>
     </section>
 
-    <section className="glass card" style={{display:"grid",gap:16}}>
+    <form onSubmit={submit} className="glass card" style={{display:"grid",gap:16}}>
       <div className="grid" style={{gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
         <label>نوع المحتوى
           <select value={contentType} disabled={isEditing||busy} onChange={e=>setContentType(e.target.value as ContentType)}>
@@ -221,7 +221,7 @@ export default function ContentManager({ items, editing }: { items: Item[]; edit
       {message&&<p role="status" style={{padding:12,borderRadius:10,background:"rgba(34,197,94,.12)"}}>{message}</p>}
       {error&&<p role="alert" style={{padding:12,borderRadius:10,background:"rgba(239,68,68,.12)"}}>{error}</p>}
       <button className="btn" type="submit" disabled={busy}>{busy?"جاري الحفظ...":isEditing?"حفظ التعديلات":"إضافة المحتوى"}</button>
-    </section>
+    </form>
 
     <section className="glass card" style={{marginTop:16}}>
       <h2>المحتوى الموجود</h2>
