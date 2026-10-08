@@ -58,11 +58,20 @@ export default function GameUploadForm({ categories }: Props) {
     if(!platforms.length) return setError("اختر منصة واحدة على الأقل.");
     if(!rightsConfirmed) return setError("يجب تأكيد أن لديك حق توزيع ملف اللعبة.");
     setBusy(true); setProgress(0);
+    let uploadedGameUrl = "";
+    let uploadedCoverUrl = "";
+
     try {
       setStatus("جاري رفع ملف اللعبة مباشرة إلى التخزين...");
       const gameBlob=await uploadOne(gameFile,"game");
+      uploadedGameUrl = gameBlob.url;
       let coverUrl="";
-      if(coverFile){setStatus("جاري رفع صورة الغلاف..."); const coverBlob=await uploadOne(coverFile,"cover"); coverUrl=coverBlob.url;}
+      if(coverFile){
+        setStatus("جاري رفع صورة الغلاف...");
+        const coverBlob=await uploadOne(coverFile,"cover");
+        coverUrl=coverBlob.url;
+        uploadedCoverUrl = coverBlob.url;
+      }
       setStatus("جاري إنشاء اللعبة ونشرها...");
       const response=await fetch("/api/admin/games",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         titleAr:titleAr.trim(),titleEn:titleEn.trim(),slug:finalSlug,descriptionAr:description.trim()||undefined,
@@ -75,7 +84,20 @@ export default function GameUploadForm({ categories }: Props) {
       setTitleAr("");setTitleEn("");setSlug("");setDescription("");setPlatforms([]);setCategoryIds([]);setPrice("0");setDiscount("0");setPublished(true);setRightsConfirmed(false);setGameFile(null);setCoverFile(null);setProgress(100);
       const gameInput=document.getElementById("game-file-input") as HTMLInputElement|null; const coverInput=document.getElementById("cover-file-input") as HTMLInputElement|null;
       if(gameInput) gameInput.value=""; if(coverInput) coverInput.value="";
-    } catch(err){setError(err instanceof Error?err.message:"حدث خطأ أثناء إضافة اللعبة.");}
+    } catch(err){
+      if(uploadedGameUrl || uploadedCoverUrl){
+        try{
+          await fetch("/api/admin/games/upload",{
+            method:"DELETE",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({urls:[uploadedGameUrl,uploadedCoverUrl].filter(Boolean)}),
+          });
+        }catch{
+          // The server-side create route also cleans up after DB failures.
+        }
+      }
+      setError(err instanceof Error?err.message:"حدث خطأ أثناء إضافة اللعبة.");
+    }
     finally{setBusy(false);}
   }
 
