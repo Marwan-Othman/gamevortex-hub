@@ -41,11 +41,11 @@ function validateVersionType(value: unknown) {
 }
 
 function parseCommon(body: Record<string, unknown>) {
-  const contentType = body.contentType === "APP" ? "APP" : body.contentType === "GAME" ? "GAME" : null;
+  const contentType: "APP" | "GAME" | null = body.contentType === "APP" ? "APP" : body.contentType === "GAME" ? "GAME" : null;
   const name = normalizeName(body.name);
   const description = cleanString(body.description, 10000) || null;
   const platform = validatePlatform(body.platform);
-  const versionType = validateVersionType(body.versionType) ?? "STANDARD";
+  const versionType: "STANDARD" | "MOD" = validateVersionType(body.versionType) === "MOD" ? "MOD" : "STANDARD";
   const sourceMode = body.sourceMode === "URL" ? "URL" : body.sourceMode === "UPLOAD" ? "UPLOAD" : null;
   const mainImageUrl = body.mainImageUrl === null ? null : canonicalContentBlobUrl(body.mainImageUrl, "image");
   const screenshots = normalizeScreenshots(body.screenshotUrls);
