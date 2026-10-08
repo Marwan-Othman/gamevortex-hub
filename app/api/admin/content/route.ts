@@ -146,13 +146,13 @@ export async function POST(request: NextRequest) {
     const platform = "ANDROID";
 
     const result = await db.$transaction(async (tx) => {
-      if (safeParsed.contentType === "GAME") {
+      if (parsed.contentType === "GAME") {
         const game = await tx.game.create({
           data: {
-            titleAr: safeParsed.name, titleEn: safeParsed.name, slug, description: safeParsed.description,
+            titleAr: parsed.name, titleEn: parsed.name, slug, description: parsed.description,
             platform, coverUrl: parsed.mainImageUrl, downloadSource, sourceStatus: "LICENSED_FOR_DISTRIBUTION",
             published: true, versionType: parsed.versionType as Prisma.GameCreateInput["versionType"],
-            screenshots: safeParsed.screenshots,
+            screenshots: parsed.screenshots,
             gamePlatforms: { create: [{ platform: "ANDROID" }] },
           },
         });
