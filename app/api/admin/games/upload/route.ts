@@ -61,7 +61,7 @@ export async function DELETE(request: NextRequest) {
       ? body.urls.filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
 
-    if (urls.length > 3) return NextResponse.json({ success: false, error: "Too many cleanup URLs" }, { status: 400 });
+    if (urls.length > 200) return NextResponse.json({ success: false, error: "Too many cleanup URLs" }, { status: 400 });
 
     const safeUrls = urls.filter((value: string) => isVercelBlobUrl(value));
     if (safeUrls.length !== urls.length) return NextResponse.json({ success: false, error: "Invalid cleanup URL" }, { status: 400 });
