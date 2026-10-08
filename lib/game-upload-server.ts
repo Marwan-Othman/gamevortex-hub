@@ -26,25 +26,21 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
   const unique = Array.from(new Set(canonicalUrls));
   if (!unique.length) return new Set();
 
-  const [games, mods] = await Promise.all([
+  const [games, mods, apps, screenshotGames, screenshotApps] = await Promise.all([
     prisma.game.findMany({
-      where: {
-        OR: unique.flatMap((url) => [
-          { downloadSource: { startsWith: url } },
-          { coverUrl: { startsWith: url } },
-        ]),
-      },
+      where: { OR: unique.flatMap((url) => [{ downloadSource: { startsWith: url } }, { coverUrl: { startsWith: url } }]) },
       select: { downloadSource: true, coverUrl: true },
     }),
     prisma.mod.findMany({
-      where: {
-        OR: unique.flatMap((url) => [
-          { downloadUrl: { startsWith: url } },
-          { imageUrl: { startsWith: url } },
-        ]),
-      },
+      where: { OR: unique.flatMap((url) => [{ downloadUrl: { startsWith: url } }, { imageUrl: { startsWith: url } }]) },
       select: { downloadUrl: true, imageUrl: true },
     }),
+    prisma.app.findMany({
+      where: { OR: unique.flatMap((url) => [{ downloadSource: { startsWith: url } }, { coverUrl: { startsWith: url } }, { iconUrl: { startsWith: url } }]) },
+      select: { downloadSource: true, coverUrl: true, iconUrl: true },
+    }),
+    prisma.game.findMany({ where: { screenshots: { not: null } }, select: { screenshots: true } }),
+    prisma.app.findMany({ where: { screenshots: { not: null } }, select: { screenshots: true } }),
   ]);
 
   const stored: string[] = [];
@@ -55,6 +51,16 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
   for (const mod of mods) {
     if (mod.downloadUrl) stored.push(mod.downloadUrl);
     if (mod.imageUrl) stored.push(mod.imageUrl);
+  }
+  for (const app of apps) {
+    if (app.downloadSource) stored.push(app.downloadSource);
+    if (app.coverUrl) stored.push(app.coverUrl);
+    if (app.iconUrl) stored.push(app.iconUrl);
+  }
+  for (const row of [...screenshotGames, ...screenshotApps]) {
+    if (Array.isArray(row.screenshots)) {
+      for (const value of row.screenshots) if (typeof value === "string") stored.push(value);
+    }
   }
 
   const referenced = new Set<string>();
