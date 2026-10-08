@@ -39,8 +39,8 @@ export async function findReferencedBlobUrls(canonicalUrls: readonly string[]): 
       where: { OR: unique.flatMap((url) => [{ downloadSource: { startsWith: url } }, { coverUrl: { startsWith: url } }, { iconUrl: { startsWith: url } }]) },
       select: { downloadSource: true, coverUrl: true, iconUrl: true },
     }),
-    prisma.game.findMany({ where: { screenshots: { not: null } }, select: { screenshots: true } }),
-    prisma.app.findMany({ where: { screenshots: { not: null } }, select: { screenshots: true } }),
+    prisma.game.findMany({ select: { screenshots: true } }),
+    prisma.app.findMany({ select: { screenshots: true } }),
   ]);
 
   const stored: string[] = [];
