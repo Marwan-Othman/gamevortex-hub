@@ -26,13 +26,9 @@ function normalizePlatforms(value: unknown) {
 
 function normalizeSourceStatus(value: unknown) {
   if (
-    value === "VERIFIED" ||
-    value === "PENDING_REVIEW" ||
-    value === "UNPUBLISHED" ||
-    value === "NEEDS_SOURCE" ||
-    value === "OFFICIAL_SOURCE" ||
-    value === "LICENSED_FOR_DISTRIBUTION" ||
-    value === "OPEN_SOURCE" ||
+    value === "VERIFIED" || value === "PENDING_REVIEW" || value === "UNPUBLISHED" ||
+    value === "NEEDS_SOURCE" || value === "OFFICIAL_SOURCE" ||
+    value === "LICENSED_FOR_DISTRIBUTION" || value === "OPEN_SOURCE" ||
     value === "FREEWARE_REDISTRIBUTABLE"
   ) return value;
   return "NEEDS_SOURCE" as const;
@@ -88,6 +84,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   let uploadedGameUrl: string | null = null;
   let uploadedCoverUrl: string | null = null;
+  let uploadedModUrl: string | null = null;
 
   try {
     const user = await requireSuperAdmin();
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest) {
     const {
       titleAr, titleEn, slug, descriptionAr, descriptionEn, genre, category, platforms,
       platform, price, priceCents, discount, discountPercent, coverUrl, downloadSource,
-      sourceStatus, published, featured,
+      sourceStatus, published, featured, mod,
     } = body;
 
     if (typeof titleAr !== "string" || !titleAr.trim() || typeof titleEn !== "string" || !titleEn.trim() || typeof slug !== "string" || !slug.trim()) {
@@ -120,6 +117,40 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Cover must be stored in GameVortex Blob" }, { status: 400 });
       }
       uploadedCoverUrl = coverUrl;
+    }
+
+    let modInput: {
+      titleAr: string;
+      titleEn: string;
+      descriptionAr: string | null;
+      downloadUrl: string;
+      platform: "PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB";
+      published: boolean;
+    } | null = null;
+
+    if (mod !== undefined && mod !== null) {
+      if (typeof mod !== "object" || Array.isArray(mod)) {
+        return NextResponse.json({ success: false, error: "Invalid Mod data" }, { status: 400 });
+      }
+      if (typeof mod.downloadUrl !== "string" || !isVercelBlobUrl(mod.downloadUrl)) {
+        return NextResponse.json({ success: false, error: "A GameVortex Blob Mod file is required" }, { status: 400 });
+      }
+      const modPlatform = getPlatformEnum(typeof mod.platform === "string" ? mod.platform : "") || platformValues[0];
+      if (!modPlatform) return NextResponse.json({ success: false, error: "Invalid Mod platform" }, { status: 400 });
+
+      const modTitleAr = typeof mod.titleAr === "string" && mod.titleAr.trim() ? mod.titleAr.trim() : `${titleAr.trim()} Mod`;
+      const modTitleEn = typeof mod.titleEn === "string" && mod.titleEn.trim() ? mod.titleEn.trim() : `${titleEn.trim()} Mod`;
+      const modDescription = typeof mod.descriptionAr === "string" && mod.descriptionAr.trim() ? mod.descriptionAr.trim() : null;
+
+      modInput = {
+        titleAr: modTitleAr.slice(0, 160),
+        titleEn: modTitleEn.slice(0, 160),
+        descriptionAr: modDescription ? modDescription.slice(0, 4000) : null,
+        downloadUrl: mod.downloadUrl,
+        platform: modPlatform,
+        published: typeof mod.published === "boolean" ? mod.published : Boolean(published),
+      };
+      uploadedModUrl = mod.downloadUrl;
     }
 
     const existing = await prisma.game.findUnique({ where: { slug: normalizedSlug }, select: { id: true } });
@@ -153,55 +184,80 @@ export async function POST(request: NextRequest) {
         : typeof discount === "number" && Number.isFinite(discount)
           ? Math.min(100, Math.max(0, Math.round(discount))) : 0;
 
-    const game = await prisma.game.create({
-      data: {
-        titleAr: titleAr.trim(),
-        titleEn: titleEn.trim(),
-        slug: normalizedSlug,
-        description,
-        genre: normalizedGenre,
-        platform: platformValues.join(","),
-        priceCents: normalizedPriceCents,
-        discountPercent: normalizedDiscountPercent,
-        coverUrl: uploadedCoverUrl,
-        officialUrl: null,
-        downloadSource: uploadedGameUrl,
-        sourceStatus: normalizedSourceStatus,
-        published: typeof published === "boolean" ? published : false,
-        featured: typeof featured === "boolean" ? featured : false,
-        gamePlatforms: { create: platformValues.map((item) => ({ platform: item })) },
-        gameCategories: categoryIds.length ? { create: categoryIds.map((categoryId) => ({ categoryId })) } : undefined,
-      },
-      include: { gamePlatforms: true },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: user.id,
-        action: "GAME_CREATED_WITH_FILE_UPLOAD",
-        entityType: "Game",
-        entityId: game.id,
-        metadata: {
-          slug: game.slug,
-          published: game.published,
-          sourceStatus: game.sourceStatus,
-          hasCover: Boolean(game.coverUrl),
+    const result = await prisma.$transaction(async (tx) => {
+      const game = await tx.game.create({
+        data: {
+          titleAr: titleAr.trim(),
+          titleEn: titleEn.trim(),
+          slug: normalizedSlug,
+          description,
+          genre: normalizedGenre,
+          platform: platformValues.join(","),
+          priceCents: normalizedPriceCents,
+          discountPercent: normalizedDiscountPercent,
+          coverUrl: uploadedCoverUrl,
+          officialUrl: null,
+          downloadSource: uploadedGameUrl,
+          sourceStatus: normalizedSourceStatus,
+          published: typeof published === "boolean" ? published : false,
+          featured: typeof featured === "boolean" ? featured : false,
+          gamePlatforms: { create: platformValues.map((item) => ({ platform: item })) },
+          gameCategories: categoryIds.length ? { create: categoryIds.map((categoryId) => ({ categoryId })) } : undefined,
         },
-      },
+        include: { gamePlatforms: true },
+      });
+
+      let createdMod = null;
+      if (modInput) {
+        createdMod = await tx.mod.create({
+          data: {
+            slug: `${normalizedSlug}-mod-${game.id}`,
+            titleAr: modInput.titleAr,
+            titleEn: modInput.titleEn,
+            descriptionAr: modInput.descriptionAr,
+            descriptionEn: null,
+            imageUrl: uploadedCoverUrl,
+            modUrl: null,
+            downloadUrl: modInput.downloadUrl,
+            sourceUrl: null,
+            sourceProvider: "GameVortex Blob",
+            sourceStatus: "LICENSED_FOR_DISTRIBUTION",
+            platform: modInput.platform,
+            gameId: game.id,
+            published: modInput.published,
+            featured: false,
+            sortOrder: 0,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          action: modInput ? "GAME_CREATED_WITH_FILE_AND_MOD_UPLOAD" : "GAME_CREATED_WITH_FILE_UPLOAD",
+          entityType: "Game",
+          entityId: game.id,
+          metadata: {
+            slug: game.slug,
+            published: game.published,
+            sourceStatus: game.sourceStatus,
+            hasCover: Boolean(game.coverUrl),
+            hasMod: Boolean(createdMod),
+            modId: createdMod?.id ?? null,
+          },
+        },
+      });
+
+      return { game, mod: createdMod };
     });
 
-    return NextResponse.json({ success: true, data: game }, { status: 201 });
+    return NextResponse.json({ success: true, data: result.game, mod: result.mod }, { status: 201 });
   } catch (error) {
     console.error("POST /api/admin/games error:", error);
 
-    if (uploadedGameUrl) {
-      try { await del(uploadedGameUrl); } catch (cleanupError) {
-        console.error("Failed to clean up uploaded game Blob:", cleanupError);
-      }
-    }
-    if (uploadedCoverUrl) {
-      try { await del(uploadedCoverUrl); } catch (cleanupError) {
-        console.error("Failed to clean up uploaded cover Blob:", cleanupError);
+    for (const url of [uploadedGameUrl, uploadedCoverUrl, uploadedModUrl].filter((value): value is string => Boolean(value))) {
+      try { await del(url); } catch (cleanupError) {
+        console.error("Failed to clean up uploaded Blob:", cleanupError);
       }
     }
 
