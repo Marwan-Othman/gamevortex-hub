@@ -91,9 +91,9 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const urls = Array.isArray(body?.urls) ? body.urls.filter((x: unknown): x is string => typeof x === "string" && x.trim()) : [];
+    const urls: string[] = Array.isArray(body?.urls) ? body.urls.filter((x: unknown): x is string => typeof x === "string" && x.trim().length > 0) : [];
     if (urls.length > 100) return NextResponse.json({ success: false, error: "TOO_MANY_URLS" }, { status: 400 });
-    if (urls.some((url) => !canonicalContentBlobUrl(url, "apk") && !canonicalContentBlobUrl(url, "image"))) {
+    if (urls.some((url: string) => !Boolean(canonicalContentBlobUrl(url, "apk")) && !Boolean(canonicalContentBlobUrl(url, "image"))) {
       return NextResponse.json({ success: false, error: "INVALID_CLEANUP_URL" }, { status: 400 });
     }
     const result = await deleteUnreferencedBlobs(urls);
