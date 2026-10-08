@@ -305,6 +305,26 @@ export default async function GameDetails({
         </div>
       </section>
 
+
+      {Array.isArray(game.galleryUrls) && game.galleryUrls.length > 0 && (
+        <section style={{ marginTop: 24 }}>
+          <h2>صور اللعبة</h2>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
+            {game.galleryUrls.map((url, index) => (
+              typeof url === "string" && url ? (
+                <img
+                  key={url}
+                  src={url}
+                  alt={`${game.titleAr} - صورة ${index + 1}`}
+                  loading="lazy"
+                  style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", borderRadius: 14 }}
+                />
+              ) : null
+            ))}
+          </div>
+        </section>
+      )}
+
       {relatedGames.length > 0 && (
         <section>
           <h2>ألعاب ذات صلة</h2>

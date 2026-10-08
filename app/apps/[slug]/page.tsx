@@ -135,6 +135,26 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
         </div>
       </section>
 
+
+      {Array.isArray(app.galleryUrls) && app.galleryUrls.length > 0 && (
+        <section style={{ marginTop: 24 }}>
+          <h2>صور التطبيق</h2>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
+            {app.galleryUrls.map((url, index) => (
+              typeof url === "string" && url ? (
+                <img
+                  key={url}
+                  src={url}
+                  alt={`${app.nameAr} - صورة ${index + 1}`}
+                  loading="lazy"
+                  style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", borderRadius: 14 }}
+                />
+              ) : null
+            ))}
+          </div>
+        </section>
+      )}
+
       {relatedApps.length > 0 && (
         <section>
           <h2>تطبيقات ذات صلة</h2>

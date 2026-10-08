@@ -453,6 +453,7 @@ model Game {
   discountPercent Int @default(0)
 
   coverUrl       String?
+  galleryUrls    Json @default("[]")
   officialUrl    String?
   downloadSource String?
 
@@ -548,6 +549,7 @@ model App {
   publisher       String?
   iconUrl         String?
   coverUrl        String?
+  galleryUrls     Json @default("[]")
   officialUrl     String?
   downloadSource  String?
   sourceStatus    SourceStatus  @default(NEEDS_SOURCE)
