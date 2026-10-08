@@ -12,6 +12,7 @@ import TradingTestnetPanel from "@/components/admin/TradingTestnetPanel";
 import TradingLivePreflightPanel from "@/components/admin/TradingLivePreflightPanel";
 import TradingLiveOrderPanel from "@/components/admin/TradingLiveOrderPanel";
 import TradingAuditPanel from "@/components/admin/TradingAuditPanel";
+import TradingCapitalReconciliation from "@/components/admin/TradingCapitalReconciliation";
 import styles from "../admin.module.css";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,7 @@ export default async function TradingPage() {
       <TradingBacktestPanel />
       <TradingPaperPanel />
       <TradingTestnetPanel />
+      <TradingCapitalReconciliation />
       <TradingLivePreflightPanel />
       <TradingLiveOrderPanel />
       <TradingAuditPanel />
