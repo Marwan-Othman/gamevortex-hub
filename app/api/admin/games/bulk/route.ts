@@ -1,229 +1,132 @@
 import { NextRequest, NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { getPlatformEnum, normalizePlatform } from "@/lib/platforms";
+import { getPlatformEnum } from "@/lib/platforms";
 import { ensureCategoryIds } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
-const MAX_BULK_GAMES = 100;
-
 async function requireSuperAdmin() {
   const { getOptionalUser } = await import("@/lib/auth");
   const user = await getOptionalUser();
-  if (!user || user.role !== "SUPER_ADMIN") return null;
-  return user;
+  return user && user.role === "SUPER_ADMIN" ? user : null;
 }
 
-function normalizePlatforms(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  const result = new Set<"PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB">();
-  for (const item of value) {
-    if (typeof item !== "string") continue;
-    const platform = getPlatformEnum(item);
-    if (platform) result.add(platform);
-  }
-  return Array.from(result);
-}
-
-function normalizeSourceStatus(value: unknown) {
-  if (
-    value === "VERIFIED" || value === "PENDING_REVIEW" || value === "UNPUBLISHED" ||
-    value === "NEEDS_SOURCE" || value === "OFFICIAL_SOURCE" ||
-    value === "LICENSED_FOR_DISTRIBUTION" || value === "OPEN_SOURCE" ||
-    value === "FREEWARE_REDISTRIBUTABLE"
-  ) return value;
-  return "LICENSED_FOR_DISTRIBUTION" as const;
-}
-
-function isVercelBlobUrl(value: unknown) {
+function blobUrl(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return false;
   try {
-    const url = new URL(value);
-    return url.protocol === "https:" && url.hostname.endsWith(".blob.vercel-storage.com");
-  } catch {
-    return false;
+    const u = new URL(value);
+    return u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com");
+  } catch { return false; }
+}
+
+function slug(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
+}
+
+function platforms(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<"PC"|"PLAYSTATION"|"XBOX"|"NINTENDO"|"ANDROID"|"IOS"|"MAC"|"LINUX"|"STEAM_DECK"|"WEB">();
+  for (const item of value) {
+    if (typeof item === "string") {
+      const p = getPlatformEnum(item);
+      if (p) out.add(p);
+    }
   }
+  return Array.from(out);
 }
 
-function normalizeSlug(value: string) {
-  return value.trim().toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 100);
-}
-
-function normalizeNumber(value: unknown, fallback: number) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+function sourceStatus(value: unknown) {
+  return value === "VERIFIED" || value === "PENDING_REVIEW" || value === "UNPUBLISHED" ||
+    value === "NEEDS_SOURCE" || value === "OFFICIAL_SOURCE" || value === "LICENSED_FOR_DISTRIBUTION" ||
+    value === "OPEN_SOURCE" || value === "FREEWARE_REDISTRIBUTABLE" ? value : "LICENSED_FOR_DISTRIBUTION";
 }
 
 export async function POST(request: NextRequest) {
-  let uploadedUrls: string[] = [];
-
+  const uploaded: string[] = [];
   try {
     const user = await requireSuperAdmin();
     if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    if (!Array.isArray(body?.games) || body.games.length < 1 || body.games.length > MAX_BULK_GAMES) {
-      return NextResponse.json({
-        success: false,
-        error: `Bulk upload supports 1 to ${MAX_BULK_GAMES} games per batch`,
-      }, { status: 400 });
+    if (!body || !Array.isArray(body.games) || body.games.length < 1 || body.games.length > 100) {
+      return NextResponse.json({ success: false, error: "games must contain 1 to 100 items" }, { status: 400 });
     }
 
-    const rawGames = body.games as unknown[];
-    const normalizedGames: Array<{
-      titleAr: string;
-      titleEn: string;
-      slug: string;
-      description: string | null;
-      genre: string | null;
-      platforms: ReturnType<typeof normalizePlatforms>;
-      categoryIds: string[];
-      priceCents: number;
-      discountPercent: number;
-      downloadSource: string;
-      sourceStatus: ReturnType<typeof normalizeSourceStatus>;
-      published: boolean;
-      featured: boolean;
-    }> = [];
+    const prepared = body.games.map((item: any, index: number) => {
+      const titleAr = typeof item.titleAr === "string" ? item.titleAr.trim() : "";
+      const titleEn = typeof item.titleEn === "string" ? item.titleEn.trim() : "";
+      const gameSlug = typeof item.slug === "string" ? slug(item.slug) : "";
+      const platformValues = platforms(item.platforms);
+      const downloadSource = typeof item.downloadSource === "string" ? item.downloadSource : "";
+      if (!titleAr || !titleEn || !gameSlug) throw new Error("INVALID_GAME_" + (index + 1));
+      if (!platformValues.length) throw new Error("INVALID_PLATFORM_" + (index + 1));
+      if (!blobUrl(downloadSource)) throw new Error("INVALID_DOWNLOAD_SOURCE_" + (index + 1));
+      uploaded.push(downloadSource);
 
-    const seenSlugs = new Set<string>();
-
-    for (let index = 0; index < rawGames.length; index += 1) {
-      const item = rawGames[index];
-      if (!item || typeof item !== "object" || Array.isArray(item)) {
-        return NextResponse.json({ success: false, error: `Invalid game at position ${index + 1}` }, { status: 400 });
-      }
-
-      const game = item as Record<string, unknown>;
-      if (typeof game.titleAr !== "string" || !game.titleAr.trim() ||
-          typeof game.titleEn !== "string" || !game.titleEn.trim() ||
-          typeof game.slug !== "string" || !game.slug.trim()) {
-        return NextResponse.json({ success: false, error: `Missing title or slug at position ${index + 1}` }, { status: 400 });
-      }
-
-      const slug = normalizeSlug(game.slug);
-      if (!slug) return NextResponse.json({ success: false, error: `Invalid slug at position ${index + 1}` }, { status: 400 });
-      if (seenSlugs.has(slug)) {
-        return NextResponse.json({ success: false, error: `DUPLICATE_SLUG_IN_BATCH: ${slug}` }, { status: 409 });
-      }
-      seenSlugs.add(slug);
-
-      if (typeof game.downloadSource !== "string" || !isVercelBlobUrl(game.downloadSource)) {
-        return NextResponse.json({ success: false, error: `Invalid uploaded file at position ${index + 1}` }, { status: 400 });
-      }
-      uploadedUrls.push(game.downloadSource);
-
-      const platforms = normalizePlatforms(game.platforms);
-      if (!platforms.length) {
-        return NextResponse.json({ success: false, error: `At least one platform is required at position ${index + 1}` }, { status: 400 });
-      }
-
-      const categoryValues = Array.isArray(game.categoryIds)
-        ? game.categoryIds.filter((value: unknown): value is string => typeof value === "string" && Boolean(value.trim()))
+      const priceCents = typeof item.priceCents === "number" && Number.isFinite(item.priceCents)
+        ? Math.max(0, Math.round(item.priceCents))
+        : typeof item.price === "number" && Number.isFinite(item.price) ? Math.max(0, Math.round(item.price * 100)) : 0;
+      const discountPercent = typeof item.discountPercent === "number" && Number.isFinite(item.discountPercent)
+        ? Math.min(100, Math.max(0, Math.round(item.discountPercent)))
+        : typeof item.discount === "number" && Number.isFinite(item.discount) ? Math.min(100, Math.max(0, Math.round(item.discount))) : 0;
+      const categoryValues = Array.isArray(item.categoryIds)
+        ? item.categoryIds.filter((v: unknown): v is string => typeof v === "string" && Boolean(v.trim()))
         : [];
-      const categoryIds = await ensureCategoryIds(prisma, categoryValues);
 
-      const price = Math.max(0, normalizeNumber(game.price, 0));
-      const discount = Math.min(100, Math.max(0, normalizeNumber(game.discount, 0)));
-
-      normalizedGames.push({
-        titleAr: game.titleAr.trim().slice(0, 160),
-        titleEn: game.titleEn.trim().slice(0, 160),
-        slug,
-        description: typeof game.descriptionAr === "string" && game.descriptionAr.trim()
-          ? game.descriptionAr.trim().slice(0, 4000)
-          : null,
-        genre: typeof game.genre === "string" && game.genre.trim() ? game.genre.trim().slice(0, 160) : null,
-        platforms,
-        categoryIds,
-        priceCents: Math.round(price * 100),
-        discountPercent: Math.round(discount),
-        downloadSource: game.downloadSource,
-        sourceStatus: normalizeSourceStatus(game.sourceStatus),
-        published: typeof game.published === "boolean" ? game.published : false,
-        featured: typeof game.featured === "boolean" ? game.featured : false,
-      });
-    }
-
-    const existing = await prisma.game.findMany({
-      where: { slug: { in: normalizedGames.map((game) => game.slug) } },
-      select: { slug: true },
+      return {
+        titleAr, titleEn, slug: gameSlug, platformValues, downloadSource,
+        description: typeof item.descriptionAr === "string" && item.descriptionAr.trim() ? item.descriptionAr.trim()
+          : typeof item.descriptionEn === "string" && item.descriptionEn.trim() ? item.descriptionEn.trim() : null,
+        priceCents, discountPercent, categoryValues,
+        sourceStatus: sourceStatus(item.sourceStatus),
+        published: typeof item.published === "boolean" ? item.published : false,
+        featured: typeof item.featured === "boolean" ? item.featured : false,
+      };
     });
-    if (existing.length) {
-      return NextResponse.json({
-        success: false,
-        error: `SLUG_ALREADY_EXISTS: ${existing.map((game) => game.slug).join(", ")}`,
-      }, { status: 409 });
+
+    const slugSet = new Set<string>();
+    for (const item of prepared) {
+      if (slugSet.has(item.slug)) return NextResponse.json({ success: false, error: "SLUG_DUPLICATE_IN_BATCH:" + item.slug }, { status: 409 });
+      slugSet.add(item.slug);
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const createdGames = [];
+    const existing = await prisma.game.findMany({ where: { slug: { in: Array.from(slugSet) } }, select: { slug: true } });
+    if (existing.length) return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS:" + existing.map((x) => x.slug).join(",") }, { status: 409 });
 
-      for (const item of normalizedGames) {
+    const allCategoryValues = Array.from(new Set(prepared.flatMap((x) => x.categoryValues)));
+    const ensuredCategoryIds = await ensureCategoryIds(prisma, allCategoryValues);
+    const categorySet = new Set(ensuredCategoryIds);
+
+    const games = await prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const item of prepared) {
         const game = await tx.game.create({
           data: {
-            titleAr: item.titleAr,
-            titleEn: item.titleEn,
-            slug: item.slug,
-            description: item.description,
-            genre: item.genre,
-            platform: item.platforms.join(","),
-            priceCents: item.priceCents,
-            discountPercent: item.discountPercent,
-            coverUrl: null,
-            officialUrl: null,
-            downloadSource: item.downloadSource,
-            sourceStatus: item.sourceStatus,
-            published: item.published,
-            featured: item.featured,
-            gamePlatforms: { create: item.platforms.map((platform) => ({ platform })) },
-            gameCategories: item.categoryIds.length
-              ? { create: item.categoryIds.map((categoryId) => ({ categoryId })) }
-              : undefined,
+            titleAr: item.titleAr, titleEn: item.titleEn, slug: item.slug, description: item.description,
+            genre: null, platform: item.platformValues.join(","), priceCents: item.priceCents,
+            discountPercent: item.discountPercent, coverUrl: null, officialUrl: null,
+            downloadSource: item.downloadSource, sourceStatus: item.sourceStatus,
+            published: item.published, featured: item.featured,
+            gamePlatforms: { create: item.platformValues.map((platform) => ({ platform })) },
+            gameCategories: categorySet.size ? { create: Array.from(categorySet).map((categoryId) => ({ categoryId })) } : undefined,
           },
-          include: { gamePlatforms: true },
         });
-
         await tx.auditLog.create({
           data: {
-            actorUserId: user.id,
-            action: "GAME_CREATED_WITH_FILE_UPLOAD",
-            entityType: "Game",
-            entityId: game.id,
-            metadata: {
-              slug: game.slug,
-              published: game.published,
-              sourceStatus: game.sourceStatus,
-              bulkUpload: true,
-              batchSize: normalizedGames.length,
-            },
+            actorUserId: user.id, action: "GAME_CREATED_WITH_FILE_UPLOAD", entityType: "Game", entityId: game.id,
+            metadata: { slug: game.slug, published: game.published, sourceStatus: game.sourceStatus, bulkUpload: true },
           },
         });
-
-        createdGames.push(game);
+        created.push(game);
       }
-
-      return createdGames;
+      return created;
     });
 
-    return NextResponse.json({
-      success: true,
-      count: result.length,
-      data: result,
-    }, { status: 201 });
+    return NextResponse.json({ success: true, count: games.length, data: games }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/games/bulk error:", error instanceof Error ? error.message : "UNKNOWN");
-
-    for (const url of uploadedUrls) {
-      try { await del(url); } catch (cleanupError) {
-        console.error("Failed to clean up bulk uploaded Blob:", cleanupError);
-      }
-    }
-
-    return NextResponse.json({ success: false, error: "Failed to create bulk games" }, { status: 500 });
+    console.error("POST /api/admin/games/bulk error:", error);
+    for (const url of Array.from(new Set(uploaded))) { try { await del(url); } catch {} }
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Failed to create games" }, { status: 500 });
   }
 }
