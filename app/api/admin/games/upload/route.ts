@@ -9,28 +9,18 @@ export const dynamic = "force-dynamic";
 
 const MAX_GAME_FILE_SIZE = 50 * 1024 * 1024 * 1024;
 const MAX_COVER_FILE_SIZE = 15 * 1024 * 1024;
+const MAX_MOD_FILE_SIZE = 50 * 1024 * 1024 * 1024;
 
 const COVER_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 const GAME_TYPES = [
-  "application/octet-stream",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/x-7z-compressed",
-  "application/x-rar-compressed",
-  "application/vnd.android.package-archive",
-  "application/vnd.microsoft.portable-executable",
-  "application/x-msdownload",
-  "application/x-apple-diskimage",
-  "application/x-iso9660-image",
-  "application/x-deb",
-  "application/gzip",
-  "application/x-gzip",
-  "application/x-tar",
+  "application/octet-stream","application/zip","application/x-zip-compressed","application/x-7z-compressed",
+  "application/x-rar-compressed","application/vnd.android.package-archive","application/vnd.microsoft.portable-executable",
+  "application/x-msdownload","application/x-apple-diskimage","application/x-iso9660-image","application/x-deb",
+  "application/gzip","application/x-gzip","application/x-tar",
 ];
 
 const GAME_EXTENSIONS = [
-  ".apk",".aab",".exe",".msi",".zip",".7z",".rar",".iso",".img",".dmg",
-  ".pkg",".appimage",".deb",".tar",".gz",".tgz",".tar.gz",
+  ".apk",".aab",".exe",".msi",".zip",".7z",".rar",".iso",".img",".dmg",".pkg",".appimage",".deb",".tar",".gz",".tgz",".tar.gz",".obb",
 ];
 
 function hasAllowedGameExtension(pathname: string) {
@@ -48,11 +38,12 @@ function isVercelBlobUrl(value: unknown) {
   }
 }
 
-function validPathname(pathname: unknown, kind: "game" | "cover") {
+function validPathname(pathname: unknown, kind: "game" | "cover" | "mod") {
   if (typeof pathname !== "string" || !pathname.trim()) return false;
   const value = pathname.trim();
   if (value.includes("..") || value.includes("\\") || value.includes("\0")) return false;
   if (kind === "game") return value.startsWith("games/files/") && hasAllowedGameExtension(value);
+  if (kind === "mod") return value.startsWith("games/mods/") && hasAllowedGameExtension(value);
   return value.startsWith("games/covers/");
 }
 
@@ -70,19 +61,12 @@ export async function DELETE(request: NextRequest) {
       ? body.urls.filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
 
-    if (urls.length > 2) {
-      return NextResponse.json({ success: false, error: "Too many cleanup URLs" }, { status: 400 });
-    }
+    if (urls.length > 3) return NextResponse.json({ success: false, error: "Too many cleanup URLs" }, { status: 400 });
 
     const safeUrls = urls.filter((value: string) => isVercelBlobUrl(value));
-    if (safeUrls.length !== urls.length) {
-      return NextResponse.json({ success: false, error: "Invalid cleanup URL" }, { status: 400 });
-    }
+    if (safeUrls.length !== urls.length) return NextResponse.json({ success: false, error: "Invalid cleanup URL" }, { status: 400 });
 
-    if (safeUrls.length) {
-      await del(safeUrls);
-    }
-
+    if (safeUrls.length) await del(safeUrls);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/games/upload cleanup error:", error instanceof Error ? error.message : "UNKNOWN");
@@ -101,9 +85,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as HandleUploadBody;
     const response = await handleUpload({
-      ...(process.env.BLOB_READ_WRITE_TOKEN?.trim()
-        ? { token: process.env.BLOB_READ_WRITE_TOKEN.trim() }
-        : {}),
+      ...(process.env.BLOB_READ_WRITE_TOKEN?.trim() ? { token: process.env.BLOB_READ_WRITE_TOKEN.trim() } : {}),
       request,
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
@@ -114,22 +96,23 @@ export async function POST(request: NextRequest) {
         if (!user) throw new Error("UNAUTHORIZED");
         if (user.role !== "SUPER_ADMIN") throw new Error("FORBIDDEN");
 
-        const kind = payload.kind === "cover" ? "cover" : payload.kind === "game" ? "game" : null;
+        const kind = payload.kind === "cover" ? "cover" : payload.kind === "mod" ? "mod" : payload.kind === "game" ? "game" : null;
         if (!kind) throw new Error("INVALID_UPLOAD_KIND");
         if (!validPathname(pathname, kind)) throw new Error("INVALID_UPLOAD_PATH");
 
         const size = Number(payload.size || 0);
         if (!Number.isFinite(size) || size <= 0) throw new Error("INVALID_UPLOAD_SIZE");
         if (kind === "game" && size > MAX_GAME_FILE_SIZE) throw new Error("GAME_FILE_TOO_LARGE");
+        if (kind === "mod" && size > MAX_MOD_FILE_SIZE) throw new Error("MOD_FILE_TOO_LARGE");
         if (kind === "cover" && size > MAX_COVER_FILE_SIZE) throw new Error("COVER_FILE_TOO_LARGE");
 
         const mimeType = typeof payload.mimeType === "string" ? payload.mimeType.toLowerCase() : "";
         if (kind === "cover" && !COVER_TYPES.includes(mimeType)) throw new Error("COVER_TYPE_NOT_SUPPORTED");
-        if (kind === "game" && !GAME_TYPES.includes(mimeType) && mimeType !== "") throw new Error("GAME_TYPE_NOT_SUPPORTED");
+        if ((kind === "game" || kind === "mod") && !GAME_TYPES.includes(mimeType) && mimeType !== "") throw new Error("GAME_TYPE_NOT_SUPPORTED");
 
         return {
           allowedContentTypes: kind === "cover" ? COVER_TYPES : GAME_TYPES,
-          maximumSizeInBytes: kind === "cover" ? MAX_COVER_FILE_SIZE : MAX_GAME_FILE_SIZE,
+          maximumSizeInBytes: kind === "cover" ? MAX_COVER_FILE_SIZE : kind === "game" ? MAX_GAME_FILE_SIZE : MAX_MOD_FILE_SIZE,
           addRandomSuffix: true,
         };
       },
@@ -139,13 +122,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "UPLOAD_FAILED";
     const status = [
-      "INVALID_UPLOAD_KIND","INVALID_UPLOAD_PATH","INVALID_UPLOAD_SIZE",
-      "GAME_FILE_TOO_LARGE","COVER_FILE_TOO_LARGE",
-      "COVER_TYPE_NOT_SUPPORTED","GAME_TYPE_NOT_SUPPORTED",
-    ].includes(message) ? 400
-      : message === "UNAUTHORIZED" ? 401
-      : message === "FORBIDDEN" ? 403
-      : 500;
+      "INVALID_UPLOAD_KIND","INVALID_UPLOAD_PATH","INVALID_UPLOAD_SIZE","GAME_FILE_TOO_LARGE","MOD_FILE_TOO_LARGE",
+      "COVER_FILE_TOO_LARGE","COVER_TYPE_NOT_SUPPORTED","GAME_TYPE_NOT_SUPPORTED",
+    ].includes(message) ? 400 : message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500;
 
     console.error("POST /api/admin/games/upload error:", message);
     return NextResponse.json({ success: false, error: "GAME_UPLOAD_FAILED", detail: message }, { status });
