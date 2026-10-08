@@ -20,15 +20,34 @@ function isGameVortexBlobUrl(value: string) {
   }
 }
 
+function getDownloadFilename(blobUrl: string, fallback: string) {
+  try {
+    const pathname = decodeURIComponent(new URL(blobUrl).pathname);
+    const raw = pathname.split("/").pop() || "";
+    // Current upload path: <timestamp>-<UUID>-<original filename>
+    const match = raw.match(/^\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(.+)$/i);
+    const filename = match?.[1] || raw;
+    return filename || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function contentDisposition(filename: string) {
+  const safe = filename.replace(/[\\\r\n"]/g, "_").trim() || "download";
+  const ascii = safe.replace(/[^\x20-\x7E]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
 
   const game = await db.game.findFirst({
     where: { slug, published: true },
-    select: { id: true, downloadSource: true, sourceStatus: true },
+    select: { id: true, downloadSource: true, sourceStatus: true, titleEn: true },
   });
 
   if (!game?.downloadSource || !isGameVortexBlobUrl(game.downloadSource)) {
@@ -43,13 +62,52 @@ export async function GET(
     data: { downloadCount: { increment: 1 } },
   });
 
+  const upstreamHeaders = new Headers();
+  const range = request.headers.get("range");
+  const ifRange = request.headers.get("if-range");
+  const ifNoneMatch = request.headers.get("if-none-match");
+  if (range) upstreamHeaders.set("Range", range);
+  if (ifRange) upstreamHeaders.set("If-Range", ifRange);
+  if (ifNoneMatch) upstreamHeaders.set("If-None-Match", ifNoneMatch);
+
   const downloadUrl = new URL(game.downloadSource);
   downloadUrl.searchParams.set("download", "1");
 
-  return NextResponse.redirect(downloadUrl.toString(), {
-    status: 303,
-    headers: {
-      "Cache-Control": "no-store, private",
-    },
+  let upstream: Response;
+  try {
+    upstream = await fetch(downloadUrl, {
+      headers: upstreamHeaders,
+      redirect: "follow",
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_UNREACHABLE" }, { status: 502 });
+  }
+
+  if (!upstream.ok && upstream.status !== 206 && upstream.status !== 304) {
+    return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_UNAVAILABLE" }, { status: 502 });
+  }
+
+  const headers = new Headers();
+  for (const name of [
+    "content-type",
+    "content-length",
+    "content-range",
+    "accept-ranges",
+    "etag",
+    "last-modified",
+    "cache-control",
+  ]) {
+    const value = upstream.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+
+  const filename = getDownloadFilename(game.downloadSource, `${game.titleEn || slug}.bin`);
+  headers.set("Content-Disposition", contentDisposition(filename));
+  headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+
+  return new NextResponse(upstream.body, {
+    status: upstream.status,
+    headers,
   });
 }
