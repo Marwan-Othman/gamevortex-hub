@@ -5,6 +5,7 @@ import { guardMutation } from "@/lib/api";
 import {
   COVER_CONTENT_TYPES,
   GAME_BLOB_CONTENT_TYPE,
+  GAME_CONTENT_TYPE_BY_EXTENSION,
   MAX_COVER_FILE_SIZE,
   MAX_GAME_FILE_SIZE,
   isValidBlobPathname,
@@ -16,12 +17,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Game/Mod files are pinned to application/octet-stream by the client, but we also accept the
- * MIME types mobile browsers commonly report, so a browser quirk never blocks a valid upload.
+ * Game/Mod files are uploaded with the content type the client derives from the file extension
+ * (see gameContentTypeFor), and we also accept the MIME types mobile browsers commonly report,
+ * so a browser quirk never blocks a valid upload.
  * The real gate is the pathname extension, enforced in onBeforeGenerateToken.
  */
-const GAME_CONTENT_TYPES = [
+const GAME_CONTENT_TYPES = Array.from(new Set([
   GAME_BLOB_CONTENT_TYPE,
+  ...Object.values(GAME_CONTENT_TYPE_BY_EXTENSION),
   "application/zip",
   "application/x-zip-compressed",
   "application/x-7z-compressed",
@@ -40,7 +43,7 @@ const GAME_CONTENT_TYPES = [
   "application/gzip",
   "application/x-gzip",
   "application/x-tar",
-];
+]));
 
 const CLIENT_ERRORS = new Set([
   "INVALID_UPLOAD_KIND",

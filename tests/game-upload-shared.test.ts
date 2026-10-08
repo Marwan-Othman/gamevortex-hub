@@ -4,6 +4,9 @@ import {
   canonicalBlobUrl,
   checkGameFile,
   dedupeSlugs,
+  GAME_CONTENT_TYPE_BY_EXTENSION,
+  GAME_EXTENSIONS,
+  gameContentTypeFor,
   getGameExtension,
   isValidBlobPathname,
   normalizeUploadSourceStatus,
@@ -86,5 +89,18 @@ describe('game upload helpers', () => {
     expect(dedupeSlugs(['game', 'game', 'other'])).toEqual(['game', 'game-2', 'other']);
     expect(dedupeSlugs(['game'], new Set(['game']))).toEqual(['game-2']);
     expect(dedupeSlugs([''])).toEqual(['game-1']);
+  });
+
+  it('serves packages with their real content type, not octet-stream', () => {
+    expect(gameContentTypeFor('Mob-control-v3.23.3.apk')).toBe('application/vnd.android.package-archive');
+    expect(gameContentTypeFor('x.ZIP')).toBe('application/zip');
+    expect(gameContentTypeFor('x.tar.gz')).toBe('application/gzip');
+    expect(gameContentTypeFor('x.unknown')).toBe('application/octet-stream');
+  });
+
+  it('has a content type for every allowed extension', () => {
+    for (const extension of GAME_EXTENSIONS) {
+      expect(typeof GAME_CONTENT_TYPE_BY_EXTENSION[extension]).toBe('string');
+    }
   });
 });

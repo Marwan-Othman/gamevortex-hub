@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import BulkGameUploadForm from "./BulkGameUploadForm";
 import {
   DEFAULT_UPLOAD_SOURCE_STATUS,
-  GAME_BLOB_CONTENT_TYPE,
+  gameContentTypeFor,
   GAME_FILE_ACCEPT,
   UPLOAD_PLATFORM_OPTIONS,
   buildBlobPathname,
@@ -42,10 +42,10 @@ export default function GameUploadForm({ categories }: Props) {
       if(issue==="TOO_LARGE") throw new Error("حجم الملف أكبر من الحد المسموح.");
     }
     const isCover=kind==="cover";
-    const mimeType=isCover?(file.type||"application/octet-stream"):GAME_BLOB_CONTENT_TYPE;
+    const mimeType=isCover?(file.type||"application/octet-stream"):gameContentTypeFor(file.name);
     const blob=await upload(buildBlobPathname(kind,file.name,crypto.randomUUID()),file,{
       access:"public", handleUploadUrl:"/api/admin/games/upload", multipart:!isCover,
-      ...(isCover?{}:{contentType:GAME_BLOB_CONTENT_TYPE}),
+      ...(isCover?{}:{contentType:mimeType}),
       clientPayload:JSON.stringify({kind,mimeType,size:file.size}),
       onUploadProgress(event){
         const {done,total}=progressRef.current;

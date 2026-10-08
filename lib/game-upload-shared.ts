@@ -52,6 +52,38 @@ export const COVER_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "im
  */
 export const GAME_BLOB_CONTENT_TYPE = "application/octet-stream";
 
+/**
+ * Real content type per extension, chosen by us (never trusted from the browser).
+ * Vercel Blob's CDN compresses `application/octet-stream` on the fly for browsers that send
+ * Accept-Encoding; the compressed response has no Content-Length, so Chrome shows "?" as the
+ * total size. Specific archive/package types are served as-is, with Content-Length.
+ */
+export const GAME_CONTENT_TYPE_BY_EXTENSION: Record<GameExtension, string> = {
+  ".tar.gz": "application/gzip",
+  ".tgz": "application/gzip",
+  ".gz": "application/gzip",
+  ".tar": "application/x-tar",
+  ".appimage": GAME_BLOB_CONTENT_TYPE,
+  ".apk": "application/vnd.android.package-archive",
+  ".aab": GAME_BLOB_CONTENT_TYPE,
+  ".obb": GAME_BLOB_CONTENT_TYPE,
+  ".exe": "application/vnd.microsoft.portable-executable",
+  ".msi": "application/x-msi",
+  ".zip": "application/zip",
+  ".7z": "application/x-7z-compressed",
+  ".rar": "application/vnd.rar",
+  ".iso": "application/x-iso9660-image",
+  ".img": GAME_BLOB_CONTENT_TYPE,
+  ".dmg": "application/x-apple-diskimage",
+  ".pkg": "application/x-newton-compatible-pkg",
+  ".deb": "application/vnd.debian.binary-package",
+};
+
+export function gameContentTypeFor(fileName: string): string {
+  const extension = getGameExtension(fileName);
+  return extension ? GAME_CONTENT_TYPE_BY_EXTENSION[extension] : GAME_BLOB_CONTENT_TYPE;
+}
+
 export const BLOB_FOLDERS: Record<UploadKind, string> = {
   game: "games/files/",
   mod: "games/mods/",

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_UPLOAD_SOURCE_STATUS,
-  GAME_BLOB_CONTENT_TYPE,
+  gameContentTypeFor,
   GAME_FILE_ACCEPT,
   MAX_GAMES_PER_BATCH,
   UPLOAD_CONCURRENCY,
@@ -214,8 +214,8 @@ export default function BulkGameUploadForm({ categories }: Props) {
         access: "public",
         handleUploadUrl: "/api/admin/games/upload",
         multipart: true,
-        contentType: GAME_BLOB_CONTENT_TYPE,
-        clientPayload: JSON.stringify({ kind: "game", mimeType: GAME_BLOB_CONTENT_TYPE, size: item.file.size }),
+        contentType: gameContentTypeFor(item.file.name),
+        clientPayload: JSON.stringify({ kind: "game", mimeType: gameContentTypeFor(item.file.name), size: item.file.size }),
         onUploadProgress(event) {
           const value = Math.max(0, Math.min(99, Math.floor(event.percentage)));
           if (value === lastPercent) return; // avoid re-rendering 100 rows on every chunk
