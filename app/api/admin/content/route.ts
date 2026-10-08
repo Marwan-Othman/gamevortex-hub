@@ -146,13 +146,13 @@ export async function POST(request: NextRequest) {
     const platform = "ANDROID";
 
     const result = await db.$transaction(async (tx) => {
-      if (parsed.contentType === "GAME") {
+      if (safeParsed.contentType === "GAME") {
         const game = await tx.game.create({
           data: {
-            titleAr: parsed.name, titleEn: parsed.name, slug, description: parsed.description,
+            titleAr: safeParsed.name, titleEn: safeParsed.name, slug, description: safeParsed.description,
             platform, coverUrl: parsed.mainImageUrl, downloadSource, sourceStatus: "LICENSED_FOR_DISTRIBUTION",
             published: true, versionType: parsed.versionType as Prisma.GameCreateInput["versionType"],
-            screenshots: parsed.screenshots,
+            screenshots: safeParsed.screenshots,
             gamePlatforms: { create: [{ platform: "ANDROID" }] },
           },
         });
@@ -192,11 +192,20 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json() as Record<string, unknown>;
     const id = cleanString(body.id, 100);
     if (!id) return NextResponse.json({ success:false, error:"CONTENT_ID_REQUIRED" }, { status:400 });
-    const parsed = parseCommon(body);
 
     const existing = await getRecord(id);
     if (!existing) return NextResponse.json({ success:false, error:"NOT_FOUND" }, { status:404 });
-    if (existing.contentType !== parsed.contentType) return NextResponse.json({ success:false, error:"CONTENT_TYPE_CANNOT_CHANGE" }, { status:400 });
+
+    const unchangedExistingImage = typeof body.mainImageUrl === "string" &&
+      body.mainImageUrl === existing.mainImageUrl &&
+      Boolean(existing.mainImageUrl) &&
+      !canonicalContentBlobUrl(existing.mainImageUrl, "image");
+
+    const parseBody = unchangedExistingImage ? { ...body, mainImageUrl: null } : body;
+    const parsed = parseCommon(parseBody);
+    const safeParsed = unchangedExistingImage ? { ...parsed, mainImageUrl: existing.mainImageUrl } : parsed;
+
+    if (existing.contentType !== safeParsed.contentType) return NextResponse.json({ success:false, error:"CONTENT_TYPE_CANNOT_CHANGE" }, { status:400 });
 
     let downloadSource = existing.downloadSource;
     let imported: { finalUrl: string; filename: string; sizeBytes: number } | null = null;
@@ -218,25 +227,25 @@ export async function PATCH(request: NextRequest) {
           where: { id },
           data: {
             titleAr: parsed.name, titleEn: parsed.name, slug, description: parsed.description,
-            platform: "ANDROID", coverUrl: parsed.mainImageUrl, downloadSource,
+            platform: "ANDROID", coverUrl: safeParsed.mainImageUrl, downloadSource,
             sourceStatus: "LICENSED_FOR_DISTRIBUTION", published: true,
-            versionType: parsed.versionType as Prisma.GameUpdateInput["versionType"],
+            versionType: safeParsed.versionType as Prisma.GameUpdateInput["versionType"],
             screenshots: parsed.screenshots,
           },
         });
         await tx.gamePlatform.deleteMany({ where: { gameId:id } });
         await tx.gamePlatform.create({ data:{ gameId:id, platform:"ANDROID" } });
-        await tx.auditLog.create({ data:{ actorUserId:owner.id, action:"CONTENT_UPDATED", entityType:"Game", entityId:id, metadata:{ versionType:parsed.versionType, imported } } });
+        await tx.auditLog.create({ data:{ actorUserId:owner.id, action:"CONTENT_UPDATED", entityType:"Game", entityId:id, metadata:{ versionType:safeParsed.versionType, imported } } });
         return { id:game.id, contentType:"GAME" as const };
       }
 
       const app = await tx.app.update({
         where:{id},
         data:{
-          nameAr:parsed.name, nameEn:parsed.name, slug, descriptionAr:parsed.description,
-          coverUrl:parsed.mainImageUrl, iconUrl:parsed.mainImageUrl, downloadSource,
+          nameAr:safeParsed.name, nameEn:safeParsed.name, slug, descriptionAr:safeParsed.description,
+          coverUrl:safeParsed.mainImageUrl, iconUrl:safeParsed.mainImageUrl, downloadSource,
           sourceStatus:"LICENSED_FOR_DISTRIBUTION", published:true,
-          versionType:parsed.versionType as Prisma.AppUpdateInput["versionType"],
+          versionType:safeParsed.versionType as Prisma.AppUpdateInput["versionType"],
           screenshots:parsed.screenshots,
         },
       });
