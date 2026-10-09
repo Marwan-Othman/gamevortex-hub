@@ -34,24 +34,9 @@ if (process.env.DATABASE_URL) {
 if (production && (!process.env.GEMINI_API_KEY || !process.env.MANUS_API_KEY)) errors.push('GEMINI_API_KEY and MANUS_API_KEY are required in production.');
 const exposedSecretNames = Object.keys(process.env).filter((key) => /^NEXT_PUBLIC_.*(KEY|SECRET|TOKEN|PASSWORD)/i.test(key));
 if (exposedSecretNames.length) errors.push('Secrets must not use NEXT_PUBLIC_: ' + exposedSecretNames.join(', '));
-/* legacy runtime variables are ignored by the application and should be removed from deployment settings. */
-if (process.env.GAMEVORTEX_AI_RUNTIME_URL || process.env.GAMEVORTEX_AI_RUNTIME_TOKEN || process.env.GAMEVORTEX_AI_MODEL) errors.push('Legacy GameVortex AI runtime variables are no longer supported.');
-/*
-  try {
-    const url = new URL(process.env.GAMEVORTEX_AI_RUNTIME_URL);
-    const local = ['localhost', '127.0.0.1', '::1', '[::1]', 'ollama'].includes(url.hostname.toLowerCase());
-    if (!['http:', 'https:'].includes(url.protocol) || (production && !local && url.protocol !== 'https:')) errors.push('GAMEVORTEX_AI_RUNTIME_URL must use HTTPS for remote runtimes.');
-    if (url.username || url.password || url.search || url.hash) errors.push('GAMEVORTEX_AI_RUNTIME_URL must not contain credentials, query, or hash.');
-    if (!local && !process.env.GAMEVORTEX_AI_RUNTIME_TOKEN) errors.push('GAMEVORTEX_AI_RUNTIME_TOKEN is required for a remote GameVortex AI gateway.');
-  } catch { errors.push('GAMEVORTEX_AI_RUNTIME_URL must be a valid URL.'); }
-}
-if (false) {
-  errors.push('GAMEVORTEX_AI_RUNTIME_TOKEN must be a non-placeholder secret of at least 64 characters.');
-}
-if (false) {
-  errors.push('GAMEVORTEX_AI_MODEL must be a valid model identifier of at most 128 characters.');
-}
-*/
+/* Retired self-hosted runtime settings must stay unset. Bracket access keeps them out of the required env contract. */
+const retiredAiRuntimeKeys = ["GAMEVORTEX_AI_RUNTIME_URL", "GAMEVORTEX_AI_RUNTIME_TOKEN", "GAMEVORTEX_AI_MODEL"];
+if (retiredAiRuntimeKeys.some((key) => process.env[key])) errors.push("Legacy GameVortex AI runtime variables are no longer supported.");
 if (process.env.OWNER_WITHDRAWAL_ENABLED === 'true') {
   if (!process.env.OWNER_EXTERNAL_WALLET_ADDRESS) errors.push('OWNER_EXTERNAL_WALLET_ADDRESS is required when owner withdrawals are enabled.');
   if (!process.env.PAYOUT_PROVIDER || !process.env.PAYOUT_PROVIDER_BASE_URL || !process.env.PAYOUT_PROVIDER_SECRET) errors.push('PAYOUT_PROVIDER, PAYOUT_PROVIDER_BASE_URL and PAYOUT_PROVIDER_SECRET are required when owner withdrawals are enabled.');

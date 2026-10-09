@@ -9,7 +9,7 @@ const required = [
 ];
 const missing=required.filter(f=>!fs.existsSync(path.join(process.cwd(),f)));
 if(missing.length){console.error("Final content audit: FAIL");missing.forEach(x=>console.error("MISSING",x));process.exit(1)}
-const schema=fs.readFileSync("prisma/schema.prisma","utf8");
+const schema=fs.readFileSync("prisma/schema.prisma","utf8").replace(/\s+/g," ");
 for(const token of ["model App {","model AppPlatform {","model AppCategory {","appPlatforms AppPlatform[]","appCategories AppCategory[]"]){if(!schema.includes(token)){console.error("Final content audit: FAIL missing schema token",token);process.exit(1)}}
 const migration=fs.readFileSync("prisma/migrations/20260926200000_add_apps_system/migration.sql","utf8");
 for(const token of ['CREATE TABLE "App"','CREATE TABLE "AppPlatform"','CREATE TABLE "AppCategory"']){if(!migration.includes(token)){console.error("Final content audit: FAIL missing migration token",token);process.exit(1)}}

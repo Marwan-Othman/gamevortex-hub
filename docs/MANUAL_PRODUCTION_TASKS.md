@@ -17,11 +17,11 @@
 
 ## B. GameVortex AI
 
-- [ ] Run an Ollama-compatible local model runtime on infrastructure you control.
-- [ ] Run the authenticated self-hosted AI gateway; set `GAMEVORTEX_AI_RUNTIME_URL`, `GAMEVORTEX_AI_MODEL`, and `GAMEVORTEX_AI_RUNTIME_TOKEN` as server-only Vercel variables. Remote production runtimes require HTTPS and the gateway token. See `self-hosted-ai/README.md`.
-- [ ] Ensure private network access or HTTPS, and apply the GameVortex AI Prisma migration.
-- [ ] Verify Arabic/English streamed chat, cancellation and ownership scoping against the live runtime.
-- [ ] On Vercel, connect to your own private inference server; do not try to run model weights inside a standard web function.
+- [ ] Set server-only `GEMINI_API_KEY` and `MANUS_API_KEY`. Both are required by production env validation. Chat uses Gemini with Manus failover.
+- [ ] Optional chat controls: `GEMINI_MAX_OUTPUT_TOKENS` (default 2048) and `GEMINI_THINKING_LEVEL` (default `low`).
+- [ ] Do not set retired variables `GAMEVORTEX_AI_RUNTIME_URL`, `GAMEVORTEX_AI_RUNTIME_TOKEN`, or `GAMEVORTEX_AI_MODEL`. Environment validation rejects them.
+- [ ] Image and video routes call Gemini when `GEMINI_API_KEY` is set. The old `AiMediaJob` persistence tables were removed and are not the current storage path.
+- [ ] Verify Arabic/English chat, cancellation, credit refunds on failure, and that one user cannot open another user's conversation.
 
 ## C. تسجيل الدخول الاجتماعي
 

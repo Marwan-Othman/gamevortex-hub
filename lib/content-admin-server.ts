@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { PlatformType } from "@prisma/client";
+import type { PlatformType, SourceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
 import {
@@ -146,7 +146,7 @@ export function parseContentInput(
   };
 }
 
-export function sourceStatusFor(source: SourceInput) {
+export function sourceStatusFor(source: SourceInput): SourceStatus {
   return source.kind === "none" ? "NEEDS_SOURCE" : DEFAULT_UPLOAD_SOURCE_STATUS;
 }
 
