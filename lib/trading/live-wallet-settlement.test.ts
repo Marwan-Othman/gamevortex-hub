@@ -18,6 +18,18 @@ describe("calculateOwnerWalletSettlement", () => {
     expect(result.returnedUsd.toString()).toBe("0.01");
   });
 
+  it("rounds sub-cent proceeds explicitly and records the exact rounding delta", () => {
+    const result = calculateOwnerWalletSettlement(new Prisma.Decimal("100.001"));
+    expect(result.returnedUsd.toString()).toBe("100");
+    expect(result.roundingUsd.toString()).toBe("0.001");
+  });
+
+  it("uses half-up cent rounding and records when the credited amount rounds up", () => {
+    const result = calculateOwnerWalletSettlement(new Prisma.Decimal("100.005"));
+    expect(result.returnedUsd.toString()).toBe("100.01");
+    expect(result.roundingUsd.toString()).toBe("-0.005");
+  });
+
   it("rejects non-finite exchange proceeds", () => {
     for (const value of ["NaN", "Infinity", "-Infinity"]) {
       expect(() => calculateOwnerWalletSettlement(new Prisma.Decimal(value))).toThrow(
