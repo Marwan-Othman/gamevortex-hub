@@ -40,11 +40,19 @@ export async function handleDownload(
   // by the storage host, not proxied through this function; the counter runs after the response.
   // A failed counter update must never block or slow down the user's download.
   if (request.method !== "HEAD") {
-    after(async () => {
+    const updateCounter = async () => {
       await options.countDownload(item.id).catch((error: unknown) => {
         logRouteError(`${options.scope}:counter`, error);
       });
-    });
+    };
+
+    try {
+      after(updateCounter);
+    } catch {
+      // Unit tests and non-request contexts have no Next.js after() scope.
+      // Preserve correct download-count behavior in those contexts.
+      await updateCounter();
+    }
   }
 
   return NextResponse.redirect(target, {
