@@ -34,12 +34,32 @@ describe("live failure drills", () => {
       adapter: {
         placeEmergencyMarketSell: async (request) => {
           sold = request.quantity;
-          return { accepted: true, clientOrderId: request.clientOrderId, status: "FILLED" };
+          return { accepted: true, clientOrderId: request.clientOrderId, status: "FILLED", executedQty: 9.99, cumulativeQuoteQty: 999 };
         },
       },
     });
     expect(outcome.status).toBe("SOLD");
     expect(sold).toBe("9.99");
+  });
+
+  it("does not report SOLD when the exchange omits fill quantities", async () => {
+    const outcome = await attemptEmergencyExit({
+      symbol: "SOLUSDT",
+      entryClientOrderId: "gv-live-missing-fill",
+      quantity: "9.99",
+      adapter: {
+        placeEmergencyMarketSell: async () => ({
+          accepted: true,
+          clientOrderId: "gv-es-missing-fill",
+          status: "FILLED",
+        }),
+      },
+    });
+
+    expect(outcome.status).toBe("FAILED");
+    if (outcome.status === "FAILED") {
+      expect(outcome.reason).toBe("EMERGENCY_SELL_FILL_DETAILS_REQUIRED");
+    }
   });
 
   it("protection failure + emergency sell timeout: reported as FAILED so manual review is forced", async () => {
