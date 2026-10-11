@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { guardRead, internalError, logRouteError } from "@/lib/api";
 import { isDistributableStatus, resolveDownloadUrl } from "@/lib/downloads";
 
@@ -36,10 +36,14 @@ export async function handleDownload(
     return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_NOT_DISTRIBUTABLE" }, { status: 403 });
   }
 
+  // Return the redirect without waiting for a database write. Large files are served directly
+  // by the storage host, not proxied through this function; the counter runs after the response.
+  // A failed counter update must never block or slow down the user's download.
   if (request.method !== "HEAD") {
-    // A failed counter update must never block the download itself.
-    await options.countDownload(item.id).catch((error: unknown) => {
-      logRouteError(`${options.scope}:counter`, error);
+    after(async () => {
+      await options.countDownload(item.id).catch((error: unknown) => {
+        logRouteError(`${options.scope}:counter`, error);
+      });
     });
   }
 
