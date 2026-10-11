@@ -32,6 +32,8 @@ describe("reconcileLiveSpotFees", () => {
       exitExecutedQty: "0.00999",
       exitQuoteQty: "109.89",
       exitFees: [{ commission: "0.00001", commissionAsset: "BTC" }],
+      entryBaseAssetFeeQuoteValues: ["0.1"],
+      exitBaseAssetFeeQuoteValues: ["0.11"],
     });
 
     expect(result.entryBaseCommission.toString()).toBe("0.00001");
@@ -39,6 +41,19 @@ describe("reconcileLiveSpotFees", () => {
     expect(result.netEntryQuoteCost.toString()).toBe("100.1");
     expect(result.netExitQuoteProceeds.toString()).toBe("109.78");
     expect(result.netRealizedPnlUsd.toString()).toBe("9.68");
+  });
+
+  it("requires exact per-fill quote values for base-asset commissions in entry and exit reconciliation", () => {
+    expect(() => reconcileLiveSpotFees({
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      entryExecutedQty: "0.01",
+      entryQuoteQty: "100",
+      entryFees: [{ commission: "0.00001", commissionAsset: "BTC" }],
+      exitExecutedQty: "0.00999",
+      exitQuoteQty: "109.89",
+      exitFees: [],
+    })).toThrow("BASE_ASSET_FEE_QUOTE_CONVERSION_REQUIRED");
   });
 
   it("requires an exact quote conversion for a third-asset commission", () => {
