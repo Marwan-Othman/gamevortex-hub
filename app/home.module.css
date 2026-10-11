@@ -2162,3 +2162,52 @@ transition: none;
     box-sizing: border-box;
   }
 }
+
+
+/* Targeted fix for narrow mobile viewport and Arabic titles */
+@media (max-width: 767px) {
+  .sectionHead {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+  }
+  .sectionHead h2 {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(15px, 4.3vw, 19px);
+    line-height: 1.4;
+    writing-mode: horizontal-tb;
+    word-break: normal;
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+  .sectionHead h2 svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+  .sectionHead > a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .split,
+  .split > *,
+  .split .section {
+    min-width: 0;
+    width: 100%;
+  }
+  .split {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
