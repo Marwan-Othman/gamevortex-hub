@@ -1,46 +1,48 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">GameVortex Hub</title>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#050a1c"/>
-      <stop offset=".52" stop-color="#100b2b"/>
-      <stop offset="1" stop-color="#020714"/>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#030817"/>
+      <stop offset=".52" stop-color="#10103a"/>
+      <stop offset="1" stop-color="#07051b"/>
     </linearGradient>
-    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#22e7ff"/>
-      <stop offset=".48" stop-color="#7c4dff"/>
-      <stop offset="1" stop-color="#f34cff"/>
+    <linearGradient id="cyanViolet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22eaff"/>
+      <stop offset=".48" stop-color="#596dff"/>
+      <stop offset="1" stop-color="#f044ff"/>
     </linearGradient>
-    <radialGradient id="core">
-      <stop offset="0" stop-color="#07142d"/>
-      <stop offset=".72" stop-color="#0b0b22"/>
-      <stop offset="1" stop-color="#161039"/>
+    <radialGradient id="center">
+      <stop offset="0" stop-color="#172b66"/>
+      <stop offset="1" stop-color="#08091d"/>
     </radialGradient>
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feGaussianBlur stdDeviation="6" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <clipPath id="round"><rect width="512" height="512" rx="112"/></clipPath>
   </defs>
   <g clip-path="url(#round)">
-    <rect width="512" height="512" fill="url(#bg)"/>
-    <circle cx="256" cy="245" r="188" fill="none" stroke="#17234a" stroke-width="2"/>
-    <circle cx="256" cy="245" r="160" fill="none" stroke="url(#neon)" stroke-width="13" opacity=".22"/>
-    <g fill="none" stroke="url(#neon)" stroke-linecap="round" filter="url(#glow)">
-      <ellipse cx="256" cy="245" rx="174" ry="104" stroke-width="13" transform="rotate(-42 256 245)"/>
-      <ellipse cx="256" cy="245" rx="174" ry="104" stroke-width="13" transform="rotate(42 256 245)" opacity=".86"/>
-      <circle cx="256" cy="245" r="111" stroke-width="11" stroke-dasharray="176 32 72 32"/>
+    <rect width="512" height="512" fill="url(#background)"/>
+    <g fill="#fff" opacity=".72">
+      <circle cx="74" cy="111" r="2"/><circle cx="430" cy="95" r="2.5"/>
+      <circle cx="402" cy="370" r="2"/><circle cx="102" cy="397" r="2"/>
+      <circle cx="252" cy="58" r="2"/><circle cx="455" cy="244" r="1.8"/>
+      <circle cx="57" cy="277" r="1.5"/><circle cx="332" cy="444" r="2"/>
     </g>
-    <circle cx="256" cy="245" r="83" fill="url(#core)" stroke="#253c72" stroke-width="3"/>
-    <g fill="none" stroke="#f3fbff" stroke-linecap="round" stroke-linejoin="round" stroke-width="14">
-      <path d="M199 232h-10c-17 0-29 12-33 31l-8 37c-3 15 13 24 25 14l29-24h108l29 24c12 10 28 1 25-14l-8-37c-4-19-16-31-33-31h-10"/>
-      <path d="M204 250v32M188 266h32"/>
+    <circle cx="256" cy="238" r="190" fill="none" stroke="#1a2b66" stroke-width="2"/>
+    <g fill="none" stroke="url(#cyanViolet)" stroke-linecap="round" filter="url(#glow)">
+      <ellipse cx="256" cy="238" rx="178" ry="104" stroke-width="15" transform="rotate(-38 256 238)"/>
+      <ellipse cx="256" cy="238" rx="178" ry="104" stroke-width="12" transform="rotate(38 256 238)" opacity=".86"/>
+      <circle cx="256" cy="238" r="132" stroke-width="8" stroke-dasharray="38 22 78 22 30 22"/>
     </g>
-    <g fill="#22e7ff">
-      <circle cx="309" cy="259" r="8"/>
-      <circle cx="332" cy="276" r="8"/>
+    <circle cx="256" cy="238" r="91" fill="url(#center)" stroke="url(#cyanViolet)" stroke-width="5"/>
+    <g filter="url(#glow)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M216 217h-17c-21 0-34 15-39 39l-8 39c-3 16 14 25 27 14l31-26h92l31 26c13 11 30 2 27-14l-8-39c-5-24-18-39-39-39h-17" fill="#090d25" stroke="#effaff" stroke-width="12"/>
+      <path d="M205 232v36M187 250h36" fill="none" stroke="#28eaff" stroke-width="12"/>
+      <circle cx="305" cy="240" r="8" fill="#23eaff"/>
+      <circle cx="330" cy="260" r="8" fill="#f04dff"/>
     </g>
-    <path d="M256 52v35M256 403v42M64 245h33M415 245h33" stroke="url(#neon)" stroke-width="7" stroke-linecap="round" opacity=".8"/>
-    <circle cx="256" cy="245" r="7" fill="#fff"/>
+    <path d="M256 42v42M256 392v43M43 238h42M427 238h42" stroke="url(#cyanViolet)" stroke-width="7" stroke-linecap="round" filter="url(#glow)"/>
+    <path d="M256 111l8 16 17 8-17 8-8 17-8-17-17-8 17-8z" fill="#fff" opacity=".85"/>
   </g>
 </svg>
