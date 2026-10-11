@@ -93,6 +93,7 @@ describe("reconcileLiveSpotFees", () => {
         entryExecutedQty: "0.01",
         entryQuoteQty: "100",
         entryFees: [{ commission: "0.0002", commissionAsset: "BTC" }],
+        entryBaseAssetFeeQuoteValues: ["2"],
         exitExecutedQty: "0.01",
         exitQuoteQty: "110",
         exitFees: [],
