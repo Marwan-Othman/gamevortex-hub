@@ -62,12 +62,22 @@ export async function attemptEmergencyExit(input: {
 
     if (!placed.accepted || placed.status === "REJECTED") throw new Error("EMERGENCY_SELL_REJECTED");
     if (placed.status !== "FILLED") throw new Error("EMERGENCY_SELL_NOT_CONFIRMED");
+    if (
+      typeof placed.executedQty !== "number" ||
+      !Number.isFinite(placed.executedQty) ||
+      placed.executedQty <= 0 ||
+      typeof placed.cumulativeQuoteQty !== "number" ||
+      !Number.isFinite(placed.cumulativeQuoteQty) ||
+      placed.cumulativeQuoteQty <= 0
+    ) {
+      throw new Error("EMERGENCY_SELL_FILL_DETAILS_REQUIRED");
+    }
     return {
       status: "SOLD",
       clientOrderId,
       providerOrderId: placed.providerOrderId ?? null,
-      executedQty: placed.executedQty ?? null,
-      cumulativeQuoteQty: placed.cumulativeQuoteQty ?? null,
+      executedQty: placed.executedQty,
+      cumulativeQuoteQty: placed.cumulativeQuoteQty,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : "EMERGENCY_SELL_FAILED";
