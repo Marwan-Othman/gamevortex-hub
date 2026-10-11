@@ -147,11 +147,10 @@ export async function prepareLiveOrder(input: {
   if (!direct) {
     if (!Number.isInteger(amountUsd)) throw new Error("LIVE_WALLET_MODE_REQUIRES_WHOLE_USD");
     const account = await db.tradingAccount.findUnique({ where: { ownerId: input.ownerId } });
-    const allocations = account
-      ? await db.tradingAllocation.count({
-          where: { accountId: account.id, status: "ACTIVE", relatedTradeId: null, amountUsd },
-        })
-      : 0;
+    if (!account) throw new Error("TRADING_ACCOUNT_REQUIRED");
+    const allocations = await db.tradingAllocation.count({
+      where: { accountId: account.id, status: "ACTIVE", relatedTradeId: null, amountUsd },
+    });
     if (allocations === 0) throw new Error("TRADING_ALLOCATION_REQUIRED");
   }
 
@@ -161,7 +160,8 @@ export async function prepareLiveOrder(input: {
 
   // 4. Risk Manager, with the snapshot computed from the live-order table.
   const riskConfig = await getRiskConfig(input.ownerId);
-  if (!riskConfig || !riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
+  if (riskConfig === null || riskConfig === undefined) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
+  if (!riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
   const riskSnapshot = buildLiveRiskSnapshot(await loadOrdersForRisk(input.ownerId), {
     symbol,
     requestedAmountUsd: amountUsd,
