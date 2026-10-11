@@ -13,6 +13,8 @@ Body: `{ "approvalId": "...", "opportunityId": "...", "confirm": "EXECUTE LIVE O
 
 The Shariah Guard is a software enforcement layer, not a religious ruling. **Owner self-review is not enough to authorize real-money trading.** The stored `ShariahPolicy` row must satisfy all of these conditions before the guard can return `APPROVED`:
 
+Separately, the manual live-order preparation endpoint currently fails closed with `LIVE_TRADING_ACCOUNTING_NOT_READY` after the feature-flag check. This is intentional: USD-wallet migration, custody reconciliation, and production accounting/reconciliation have not been verified end to end. Do not remove this gate or set the live flag to get around it.
+
 - `status = ACTIVE`
 - `reviewedAt` is set only after a real review has occurred
 - `source = QUALIFIED_ISLAMIC_FINANCE_SCHOLAR_REVIEW`
@@ -55,14 +57,8 @@ These are persistence/state tests, not full end-to-end proof of live execution. 
 - Verification of capital custody and production reconciliation.
 - Lawful availability of Binance Spot for the account and deployment location. Do not bypass restricted-location responses.
 
-## Direct funding mode (owner trades own Binance balance)
+## Direct funding mode — disabled pending separate review
 
-By default a live order needs an ACTIVE Owner Wallet allocation with exactly the order amount, and the result is credited back to the wallet ledger.
+The code intentionally rejects direct funding with `LIVE_DIRECT_FUNDING_DISABLED`. Do not set `GAMEVORTEX_LIVE_DIRECT_FUNDING=true` to bypass the accounting readiness gate. The production path remains blocked until wallet accounting, capital custody/reconciliation, exit settlement, and end-to-end failure handling have been verified. Any future direct-funding implementation must be separately reviewed and tested; the previous description of direct funding as an available mode should not be treated as proof that it is operational.
 
-Setting `GAMEVORTEX_LIVE_DIRECT_FUNDING=true` switches to direct funding:
-
-- no allocation is bound, and no wallet/ledger/trading-account row is changed;
-- when the protected exit has closed on Binance the order is marked `SETTLED` and a `TRADING_LIVE_DIRECT_SETTLED` audit row records the realized P/L;
-- all other gates are unchanged: Shariah, Risk Manager, emergency stop / circuit breaker, per-trade owner approval, typed `EXECUTE LIVE ORDER`, Binance preflight, slippage guard, minimum notional, protective OCO.
-
-The admin "Live Order" panel (`/admin/trading`) uses `POST /api/admin/trading/live/prepare` (checks + short-lived approval, never sends an order), then the existing approval-consume and `/live/execute` routes. `GET/POST /api/admin/trading/live/orders` lists orders and refreshes one in monitor mode.
+The admin "Live Order" panel (`/admin/trading`) uses `POST /api/admin/trading/live/prepare` (checks + short-lived approval, never sends an order), then the existing approval-consume and `/live/execute` routes. Preparation currently stops at the accounting readiness gate and does not create an approval. `GET/POST /api/admin/trading/live/orders` lists orders and refreshes one in monitor mode.
