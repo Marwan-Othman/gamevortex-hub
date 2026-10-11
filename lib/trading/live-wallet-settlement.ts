@@ -271,6 +271,22 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_PROVIDER_ORDER_CHANGED"] };
     }
 
+    // The provider fills and net proceeds were calculated before acquiring this
+    // row lock. Recheck every persisted exit quantity used in that calculation
+    // so a concurrent order update cannot settle stale proceeds against newer
+    // execution data.
+    if (
+      !order.exitExecutedQty ||
+      !order.exitCumulativeQuoteQty ||
+      !inputOrder.exitExecutedQty ||
+      !inputOrder.exitCumulativeQuoteQty ||
+      order.exitExecutedQty.sub(inputOrder.exitExecutedQty).abs().greaterThan(QUANTITY_TOLERANCE) ||
+      order.exitCumulativeQuoteQty.sub(inputOrder.exitCumulativeQuoteQty).abs().greaterThan(QUANTITY_TOLERANCE)
+    ) {
+      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_EXIT_EXECUTION_DATA_CHANGED");
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_EXECUTION_DATA_CHANGED"] };
+    }
+
     const allocation = await tx.tradingAllocation.findFirst({ where: { relatedTradeId: order.id, status: "ACTIVE" } });
     if (!allocation) {
       const blocked = await blockSettlement(tx, order.id, "TRADING_ALLOCATION_NOT_BOUND");
