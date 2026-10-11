@@ -120,16 +120,15 @@ describe("calculateLiveSpotNetExitProceeds", () => {
       exitQuoteQty: "200",
       exitFees: [
         { commission: "0.01", commissionAsset: "BTC" },
-        { commission: "0.01", commissionAsset: "BTC" },
+        { commission: "0.02", commissionAsset: "BTC" },
       ],
-      // Fill prices are 100 and 300; fee quote values are 1 and 3.
-      // The blended order price would incorrectly value the fees at 4 total
-      // only coincidentally here, so use unequal fee quantities to distinguish.
-      baseAssetFeeQuoteValues: ["1", "3"],
+      // Fill prices are 100 and 300; fee quote values are 1 and 6.
+      // The blended order price would value the fees at 6, not 7.
+      baseAssetFeeQuoteValues: ["1", "6"],
     });
 
-    expect(result.baseAssetFeeQuoteValue.toString()).toBe("4");
-    expect(result.netExitQuoteProceeds.toString()).toBe("196");
+    expect(result.baseAssetFeeQuoteValue.toString()).toBe("7");
+    expect(result.netExitQuoteProceeds.toString()).toBe("193");
   });
 
   it("requires exact per-fill quote values for base-asset exit fees", () => {
