@@ -36,10 +36,10 @@ const STRATEGY_VERSION = "owner-manual-v1";
 /**
  * Keep all new live approvals blocked until wallet/capital accounting,
  * custody reconciliation, and the complete production settlement path are
- * independently verified. The explicit void return type keeps TypeScript
- * checking the downstream path while runtime execution still always throws.
+ * independently verified. Keep the return type void so TypeScript continues
+ * checking the legacy preflight path below; runtime execution still always throws.
  */
-function assertLiveAccountingReady(): never {
+function assertLiveAccountingReady(): void {
   throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
 }
 
