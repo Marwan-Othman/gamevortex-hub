@@ -36,6 +36,19 @@ describe("getBinanceLivePreflight", () => {
     ]);
   });
 
+  it("does not claim the live flag is disabled when credentials are missing but the flag is enabled", async () => {
+    delete process.env.BINANCE_LIVE_API_KEY;
+    delete process.env.BINANCE_LIVE_API_PRIVATE_KEY;
+    delete process.env.BINANCE_LIVE_API_SECRET;
+    process.env.GAMEVORTEX_LIVE_TRADING_ENABLED = "true";
+
+    const result = await getBinanceLivePreflight();
+
+    expect(result.readyForLiveExecution).toBe(false);
+    expect(result.checks.liveFlagEnabled).toBe(true);
+    expect(result.blockers).toEqual(["BINANCE_LIVE_API_CREDENTIALS_REQUIRED"]);
+  });
+
   it("surfaces Binance restricted-location responses as a safe blocker", async () => {
     process.env.BINANCE_LIVE_API_KEY = "test-key";
     process.env.BINANCE_LIVE_API_PRIVATE_KEY = makeEd25519PrivateKeyPem();
