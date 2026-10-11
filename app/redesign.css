@@ -2160,7 +2160,8 @@ button, input, select, textarea { max-width: 100%; }
   }
 
   .game-card h2, .game-card h3, .card h2, .card h3 {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
   }
 
   /* Admin wallpaper queue and bulk controls */
@@ -2573,7 +2574,7 @@ main.wrap > section, main.page > section { min-width: 0; }
 main.wrap > .hero, main.wrap > .glass.hero, main.page > .hero { margin-bottom: 20px; }
 main.wrap h1, main.page h1 { font-size: clamp(30px, 5vw, 58px); line-height: 1.08; }
 main.wrap h2, main.page h2 { line-height: 1.18; }
-main.wrap p, main.page p { overflow-wrap: anywhere; }
+main.wrap p, main.page p { overflow-wrap: break-word; word-break: normal; }
 
 /* All interactive controls share one premium language */
 a, button { -webkit-tap-highlight-color: transparent; }
