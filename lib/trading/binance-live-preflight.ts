@@ -167,7 +167,10 @@ export async function getBinanceLivePreflight(fetcher: Fetcher = fetch): Promise
       endpoint: BASE_URL,
       checks: baseChecks,
       readyForLiveExecution: false,
-      blockers: ["BINANCE_LIVE_API_CREDENTIALS_REQUIRED", "GAMEVORTEX_LIVE_TRADING_DISABLED"],
+      blockers: [
+        "BINANCE_LIVE_API_CREDENTIALS_REQUIRED",
+        ...(!liveFlagEnabled ? ["GAMEVORTEX_LIVE_TRADING_DISABLED"] : []),
+      ],
     };
   }
 
