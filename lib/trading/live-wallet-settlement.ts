@@ -188,11 +188,12 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         `);
         const current = lockedRows[0];
         if (!current) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
-        if (current.settlementStatus === "SETTLED") return current;
-        // Reject cross-owner access without mutating another owner's order.
+        // Authorize before reading or returning settlement details, including
+        // the already-settled fast path.
         if (current.ownerId !== input.ownerId) {
           throw new Error("SETTLEMENT_OWNER_MISMATCH");
         }
+        if (current.settlementStatus === "SETTLED") return current;
         if (current.status === "CLOSED" && current.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
           return blockSettlement(tx, current.id, blocker);
         }
