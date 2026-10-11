@@ -38,6 +38,19 @@ type SettlementTradeFillProvider = {
 
 const QUANTITY_TOLERANCE = new Prisma.Decimal("0.000000000001");
 
+/** Compare the persisted exit execution snapshot against the snapshot used to
+ * fetch fills and calculate net proceeds. Missing or changed values fail closed. */
+export function exitExecutionDataMatches(
+  current: { exitExecutedQty: Prisma.Decimal | null; exitCumulativeQuoteQty: Prisma.Decimal | null },
+  expected: { exitExecutedQty: Prisma.Decimal | null; exitCumulativeQuoteQty: Prisma.Decimal | null },
+): boolean {
+  if (!current.exitExecutedQty || !current.exitCumulativeQuoteQty || !expected.exitExecutedQty || !expected.exitCumulativeQuoteQty) {
+    return false;
+  }
+  return current.exitExecutedQty.sub(expected.exitExecutedQty).abs().lessThanOrEqualTo(QUANTITY_TOLERANCE)
+    && current.exitCumulativeQuoteQty.sub(expected.exitCumulativeQuoteQty).abs().lessThanOrEqualTo(QUANTITY_TOLERANCE);
+}
+
 export type LiveWalletSettlementResult = {
   order: LiveOrderRow;
   status: LiveWalletSettlementStatus;
@@ -275,14 +288,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     // row lock. Recheck every persisted exit quantity used in that calculation
     // so a concurrent order update cannot settle stale proceeds against newer
     // execution data.
-    if (
-      !order.exitExecutedQty ||
-      !order.exitCumulativeQuoteQty ||
-      !inputOrder.exitExecutedQty ||
-      !inputOrder.exitCumulativeQuoteQty ||
-      order.exitExecutedQty.sub(inputOrder.exitExecutedQty).abs().greaterThan(QUANTITY_TOLERANCE) ||
-      order.exitCumulativeQuoteQty.sub(inputOrder.exitCumulativeQuoteQty).abs().greaterThan(QUANTITY_TOLERANCE)
-    ) {
+    if (!exitExecutionDataMatches(order, inputOrder)) {
       const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_EXIT_EXECUTION_DATA_CHANGED");
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_EXECUTION_DATA_CHANGED"] };
     }
