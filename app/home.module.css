@@ -41,7 +41,9 @@ color: var(--ink);
 
 .sectionHead h2 svg {
 color: var(--purple-400);
-flex: none;
+width: 22px;
+height: 22px;
+flex: 0 0 22px;
 }
 
 .sectionHead a {
