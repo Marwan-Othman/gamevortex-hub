@@ -388,6 +388,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
+          roundingUsd: calculation.roundingUsd.toString(),
         },
       },
     });
