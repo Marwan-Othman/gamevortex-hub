@@ -69,7 +69,11 @@ function assertProviderExitFillMatchesOrder(
   if (fills.symbol.trim().toUpperCase() !== order.symbol.trim().toUpperCase()) {
     throw new Error("SETTLEMENT_EXIT_SYMBOL_MISMATCH");
   }
-  if (!fills.baseAsset.trim() || !fills.quoteAsset.trim()) {
+  if (
+    !fills.baseAsset.trim() ||
+    !fills.quoteAsset.trim() ||
+    fills.baseAsset.trim().toUpperCase() === fills.quoteAsset.trim().toUpperCase()
+  ) {
     throw new Error("SETTLEMENT_EXIT_ASSET_INFO_REQUIRED");
   }
   if (!fills.fills.length) throw new Error("SETTLEMENT_EXIT_FILLS_REQUIRED");
