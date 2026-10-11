@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
-import { calculateOwnerWalletSettlement } from "./live-wallet-settlement";
+import { calculateOwnerWalletSettlement, exitExecutionDataMatches } from "./live-wallet-settlement";
 
 describe("calculateOwnerWalletSettlement", () => {
   it("returns exact USD proceeds without point conversion or rounding", () => {
@@ -30,5 +30,45 @@ describe("calculateOwnerWalletSettlement", () => {
     expect(() => calculateOwnerWalletSettlement(new Prisma.Decimal("-1"))).toThrow(
       "INVALID_SETTLEMENT_PROCEEDS",
     );
+  });
+});
+
+describe("exitExecutionDataMatches", () => {
+  const dec = (value: string) => new Prisma.Decimal(value);
+
+  it("accepts an unchanged persisted exit execution snapshot", () => {
+    expect(exitExecutionDataMatches(
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+    )).toBe(true);
+  });
+
+  it("accepts only differences within the documented quantity tolerance", () => {
+    expect(exitExecutionDataMatches(
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+      { exitExecutedQty: dec("1.2500000000005"), exitCumulativeQuoteQty: dec("125.5000000000005") },
+    )).toBe(true);
+    expect(exitExecutionDataMatches(
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+      { exitExecutedQty: dec("1.250000000002"), exitCumulativeQuoteQty: dec("125.50") },
+    )).toBe(false);
+  });
+
+  it("rejects changed quote proceeds even when executed quantity is unchanged", () => {
+    expect(exitExecutionDataMatches(
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.51") },
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+    )).toBe(false);
+  });
+
+  it("fails closed when either snapshot is missing execution data", () => {
+    expect(exitExecutionDataMatches(
+      { exitExecutedQty: null, exitCumulativeQuoteQty: dec("125.50") },
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+    )).toBe(false);
+    expect(exitExecutionDataMatches(
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: dec("125.50") },
+      { exitExecutedQty: dec("1.25"), exitCumulativeQuoteQty: null },
+    )).toBe(false);
   });
 });
