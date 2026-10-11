@@ -97,12 +97,13 @@ export const PAPER_SIMULATION_SHARIAH_POLICY: ShariahPolicy = {
 };
 
 /**
- * Live policy for SPOT digital-asset trading, reviewed by the ACCOUNT OWNER
- * personally (not by a scholar). Company-style debt/interest ratios do not
- * exist for spot digital assets, so ratio screening is skipped for them.
- * Margin, futures and unverified ownership/settlement are still blocked.
- * It stays fail-closed: orders are impossible until a ShariahPolicy row with
- * this exact version is inserted as ACTIVE with reviewedAt set.
+ * Live policy for SPOT digital-asset trading. A qualified Islamic-finance
+ * scholar must review and approve the policy before it can authorize real
+ * orders. Owner self-review is never sufficient. Company-style debt/interest
+ * ratios do not exist for spot digital assets, so ratio screening is skipped
+ * for that asset type. This policy remains fail-closed until its database row
+ * is ACTIVE, has reviewedAt set, and records the explicit qualified-review
+ * provenance marker required below.
  */
 export const OWNER_SPOT_POLICY: ShariahPolicy = {
   ...DEFAULT_SHARIAH_POLICY,
@@ -217,16 +218,22 @@ export function assertShariahApproved(decision: ShariahDecision): void {
   }
 }
 
+/** Exact marker recorded only after qualified Islamic-finance review. */
+export const QUALIFIED_SHARIAH_REVIEW_SOURCE = "QUALIFIED_ISLAMIC_FINANCE_SCHOLAR_REVIEW";
+
 /** State of the stored policy row (ShariahPolicy) that a decision was made under. */
 export type PolicyReviewState = {
   status: "ACTIVE" | "INACTIVE";
   reviewedAt: Date | string | null;
+  source?: string | null;
 };
 
 /**
- * Review gate: a policy that is not ACTIVE and reviewed by a qualified
- * specialist can never produce APPROVED. APPROVED is downgraded to REVIEW;
- * REVIEW and REJECTED are unchanged. Missing policy state also fails closed.
+ * Review gate: ACTIVE + reviewedAt alone is not sufficient. The policy must
+ * explicitly record qualified Islamic-finance scholar review. An owner
+ * self-review or missing/unrecognized provenance is downgraded to REVIEW.
+ * This is a software guard, not independent verification of the reviewer's
+ * identity or credentials; those must be validated outside the application.
  */
 export function applyPolicyReviewGate(
   decision: ShariahDecision,
@@ -234,12 +241,22 @@ export function applyPolicyReviewGate(
 ): ShariahDecision {
   if (decision.status !== "APPROVED") return decision;
 
-  const reviewed = !!policyState && policyState.status === "ACTIVE" && !!policyState.reviewedAt;
-  if (reviewed) return decision;
+  const activeAndDated = !!policyState && policyState.status === "ACTIVE" && !!policyState.reviewedAt;
+  if (!activeAndDated) {
+    return {
+      ...decision,
+      status: "REVIEW",
+      reasons: [...decision.reasons, "POLICY_NOT_REVIEWED_OR_NOT_ACTIVE"],
+    };
+  }
 
-  return {
-    ...decision,
-    status: "REVIEW",
-    reasons: [...decision.reasons, "POLICY_NOT_REVIEWED_OR_NOT_ACTIVE"],
-  };
+  if (policyState.source !== QUALIFIED_SHARIAH_REVIEW_SOURCE) {
+    return {
+      ...decision,
+      status: "REVIEW",
+      reasons: [...decision.reasons, "POLICY_QUALIFIED_REVIEW_REQUIRED"],
+    };
+  }
+
+  return decision;
 }
