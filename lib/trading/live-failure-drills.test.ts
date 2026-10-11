@@ -34,7 +34,7 @@ describe("live failure drills", () => {
       adapter: {
         placeEmergencyMarketSell: async (request) => {
           sold = request.quantity;
-          return { accepted: true, clientOrderId: request.clientOrderId, status: "FILLED", executedQty: 9.99, cumulativeQuoteQty: 999 };
+          return { accepted: true, clientOrderId: request.clientOrderId, providerOrderId: "drill-1", status: "FILLED", executedQty: 9.99, cumulativeQuoteQty: 999 };
         },
       },
     });
@@ -48,9 +48,10 @@ describe("live failure drills", () => {
       entryClientOrderId: "gv-live-missing-fill",
       quantity: "9.99",
       adapter: {
-        placeEmergencyMarketSell: async () => ({
+        placeEmergencyMarketSell: async (request) => ({
           accepted: true,
-          clientOrderId: "gv-es-missing-fill",
+          clientOrderId: request.clientOrderId,
+          providerOrderId: "drill-missing-fill",
           status: "FILLED",
         }),
       },
