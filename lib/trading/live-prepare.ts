@@ -121,7 +121,10 @@ export async function prepareLiveOrder(input: {
   if (input.ackOwnerSpot !== true) throw new Error("LIVE_OWNER_ACK_REQUIRED");
 
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
-  // Keep live execution fail-closed until the migrated USD wallet has been reconciled\n  // and the full production accounting/reconciliation path has been verified.\n  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");\n
+  // Keep live execution fail-closed until the migrated USD wallet has been reconciled
+  // and the full production accounting/reconciliation path has been verified.
+  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+
   const direct = isLiveDirectFundingEnabled();
   if (direct) {
     throw new Error("LIVE_DIRECT_FUNDING_DISABLED");
