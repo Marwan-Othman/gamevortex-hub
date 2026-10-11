@@ -96,6 +96,29 @@ describe.skipIf(!enabled)("live order database failure drills", () => {
     expect(stored?.status).toBe("INTENT_CREATED");
   });
 
+  it("recovers an ambiguous submit timeout only through provider reconciliation", async () => {
+    const { input } = await makeFixture();
+    const created = await createLiveOrderIntent(input);
+
+    const submitting = await transitionLiveOrderState(created.id, "INTENT_CREATED", "SUBMITTING");
+    expect(submitting.status).toBe("SUBMITTING");
+
+    // A timeout after submission is ambiguous: never assume rejection or resubmit a BUY.
+    const unknown = await transitionLiveOrderState(created.id, "SUBMITTING", "UNKNOWN", "SIMULATED_TIMEOUT_AFTER_SUBMIT");
+    expect(unknown.status).toBe("UNKNOWN");
+
+    const monitorable = await listMonitorableLiveOrders(50);
+    expect(monitorable.some((order) => order.id === created.id)).toBe(true);
+
+    // Only an explicit provider observation can resolve UNKNOWN back to a known state.
+    const reconciled = await transitionLiveOrderState(created.id, "UNKNOWN", "SUBMITTED");
+    expect(reconciled.status).toBe("SUBMITTED");
+
+    const stored = await getLiveOrderByIdempotencyKey(input.idempotencyKey);
+    expect(stored?.status).toBe("SUBMITTED");
+    expect(stored?.clientOrderId).toBe(created.clientOrderId);
+  });
+
   it("a stale state transition loses the race without overwriting the persisted state", async () => {
     const { input } = await makeFixture();
     const created = await createLiveOrderIntent(input);
