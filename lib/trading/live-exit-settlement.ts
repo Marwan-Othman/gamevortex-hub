@@ -262,11 +262,15 @@ export async function reconcileProtectedExitSettlement(input: {
       adapter.getProtectedExitLegStatus({ symbol: order.symbol, clientOrderId: order.stopLossOrderId }),
       adapter.getProtectedExitLegStatus({ symbol: order.symbol, clientOrderId: order.takeProfitOrderId }),
     ]);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 300) : "PROTECTED_EXIT_STATUS_UNKNOWN";
-    const blocked = await markBlocked(order.id, `PROTECTED_EXIT_STATUS_UNKNOWN:${reason}`);
+  } catch {
+    // A failed status lookup does not prove that either exchange exit leg
+    // failed. Preserve the PROTECTED state and allow the next monitor pass to
+    // retry reconciliation; the caller still receives BLOCKED and trips the
+    // circuit breaker for operator visibility. Persisting PROTECTION_FAILED
+    // here would misclassify a transient network/auth/provider error as an
+    // exchange protection failure and prevent normal retry semantics.
     return {
-      order: blocked,
+      order,
       status: "BLOCKED",
       exitPrice: null,
       realizedPnlUsd: null,
