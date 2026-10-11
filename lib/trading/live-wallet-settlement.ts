@@ -159,16 +159,61 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
 
     assertProviderExitFillMatchesOrder(inputOrder, fills);
 
-    const feeSettlement = calculateLiveSpotNetExitProceeds({
-      baseAsset: fills.baseAsset,
-      quoteAsset: fills.quoteAsset,
-      exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
-      exitQuoteQty: inputOrder.exitCumulativeQuoteQty!.toString(),
-      exitFees: fills.fills.map((fill) => ({
-        commission: fill.commission,
-        commissionAsset: fill.commissionAsset,
-      })),
-    });
+    let feeSettlement: ReturnType<typeof calculateLiveSpotNetExitProceeds>;
+    try {
+      feeSettlement = calculateLiveSpotNetExitProceeds({
+        baseAsset: fills.baseAsset,
+        quoteAsset: fills.quoteAsset,
+        exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
+        exitQuoteQty: inputOrder.exitCumulativeQuoteQty!.toString(),
+        exitFees: fills.fills.map((fill) => ({
+          commission: fill.commission,
+          commissionAsset: fill.commissionAsset,
+        })),
+      });
+    } catch (error) {
+      // This specific error is deterministic: the exchange charged a third
+      // asset, but no exact quote valuation is available. Persist a fail-closed
+      // state so the closed order is visible to operators instead of silently
+      // remaining pending. Provider/network errors are outside this catch and
+      // remain retryable.
+      if (!(error instanceof Error) || error.message !== "THIRD_ASSET_FEE_CONVERSION_REQUIRED") {
+        throw error;
+      }
+      const blocker = "THIRD_ASSET_FEE_CONVERSION_REQUIRED";
+      const blockedOrder = await db.$transaction(async (tx) => {
+        const lockedRows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
+          SELECT * FROM "TradingLiveOrder" WHERE "id" = ${input.order.id} FOR UPDATE
+        `);
+        const current = lockedRows[0];
+        if (!current) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
+        if (current.ownerId !== input.ownerId) {
+          return blockSettlement(tx, current.id, "SETTLEMENT_OWNER_MISMATCH");
+        }
+        if (current.status === "CLOSED" && current.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
+          return blockSettlement(tx, current.id, blocker);
+        }
+        return current;
+      });
+      if (blockedOrder.settlementStatus === "SETTLED") {
+        return {
+          order: blockedOrder,
+          status: "ALREADY_SETTLED",
+          settledUsd: blockedOrder.settledUsd?.toString() ?? null,
+          settledPoints: blockedOrder.settledPoints ?? null,
+          roundingUsd: blockedOrder.settlementRoundingUsd?.toString() ?? null,
+          blockers: [],
+        };
+      }
+      return {
+        order: blockedOrder,
+        status: blockedOrder.settlementStatus === "BLOCKED" ? "BLOCKED" : "ALREADY_SETTLED",
+        settledUsd: null,
+        settledPoints: null,
+        roundingUsd: null,
+        blockers: blockedOrder.settlementStatus === "BLOCKED" ? [blocker] : [],
+      };
+    }
 
     netExitProceeds = feeSettlement.netExitQuoteProceeds;
   }
