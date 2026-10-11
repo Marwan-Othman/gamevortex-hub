@@ -43,10 +43,14 @@ If the OCO request timed out but actually reached Binance, the coins are locked 
 
 The exit-settlement check "exit quantity covers entry quantity" compares against the same net sellable quantity. Previously, a BUY fee charged in the base asset could make a correct exit look like an unsettled position.
 
-## Still manual / not covered
+## Database-backed drills and remaining gaps
 
+The GitHub Actions workflow runs opt-in PostgreSQL state drills against its isolated CI database (`GAMEVORTEX_TRADING_DB_DRILLS=true`). They cover concurrent idempotent intent creation, immutable amount on retry, ensuring `INTENT_CREATED` orders are not exposed to the live monitor, and rejecting stale state transitions. The flag is not set in Vercel, so application builds never write test rows into a deployment database.
+
+These are persistence/state tests, not full end-to-end proof of live execution. Still manual / not covered:
+
+- Full executor-level failure drills spanning approval consumption, exchange responses, DB state, protection/OCO, emergency exit, and final settlement.
 - Emergency-exit wallet accounting.
-- Executor-level failure drills that need a database.
 - Qualified review of the Shariah policy and the provenance evidence above.
 - Verification of capital custody and production reconciliation.
 - Lawful availability of Binance Spot for the account and deployment location. Do not bypass restricted-location responses.
