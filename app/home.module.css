@@ -2055,3 +2055,40 @@ transition: none;
 .coverGlow { opacity: .42; }
 .sideVip, .sideAi { border-radius: 24px; }
 @media (max-width: 700px) { .page { padding-top: 12px; } .heroGrid { width: calc(100% - 16px); } .heroContent { width: 100%; padding: 28px 22px 150px; } .heroStats { grid-template-columns: repeat(2, 1fr); inset-inline: 14px; bottom: 14px; } .heroStat:nth-child(5) { display: none; } .hscroll { gap: 10px; } }
+
+
+/* Mobile regression fix: keep section headings from collapsing when the
+   game row shares a grid with the store card. */
+.sectionHead {
+  min-width: 0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.sectionHead h2 {
+  flex: 1 1 220px;
+  min-width: 0;
+  width: auto;
+  writing-mode: horizontal-tb;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.35;
+}
+.sectionHead > a {
+  flex: 0 0 auto;
+}
+.split,
+.split > * {
+  min-width: 0;
+}
+.split .section {
+  width: 100%;
+}
+@media (max-width: 699px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .sectionHead h2 {
+    flex-basis: 180px;
+    font-size: 18px;
+  }
+}
