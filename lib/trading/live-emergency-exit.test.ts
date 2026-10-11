@@ -76,6 +76,27 @@ describe("attemptEmergencyExit", () => {
     });
   });
 
+  it("does not report SOLD if the exchange claims more was sold than requested", async () => {
+    const outcome = await attemptEmergencyExit({
+      ...base,
+      adapter: {
+        placeEmergencyMarketSell: async (request) => ({
+          accepted: true,
+          clientOrderId: request.clientOrderId,
+          providerOrderId: "79",
+          status: "FILLED",
+          executedQty: 10,
+          cumulativeQuoteQty: 1001,
+        }),
+      },
+    });
+    expect(outcome).toEqual({
+      status: "FAILED",
+      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),
+      reason: "EMERGENCY_SELL_EXECUTED_QTY_EXCEEDS_REQUESTED",
+    });
+  });
+
   it("reports FAILED when the adapter cannot sell or the quantity is invalid", async () => {
     expect((await attemptEmergencyExit({ ...base, adapter: {} })).status).toBe("FAILED");
     for (const quantity of ["0", "-1", "1e-7", ""]) {
