@@ -28,6 +28,10 @@ export type LiveFeeAccountingInput = {
   exitFees: readonly LiveTradeFee[];
   /** Exact quote-asset value for third-asset commissions, when available. */
   thirdAssetFeeQuoteValues?: readonly string[];
+  /** Exact quote value per entry fill charging a base-asset commission. */
+  entryBaseAssetFeeQuoteValues?: readonly string[];
+  /** Exact quote value per exit fill charging a base-asset commission. */
+  exitBaseAssetFeeQuoteValues?: readonly string[];
 };
 
 export type LiveFeeAccountingResult = {
@@ -200,10 +204,14 @@ export function reconcileLiveSpotFees(input: LiveFeeAccountingInput): LiveFeeAcc
     thirdAssetCount,
   );
 
-  const entryAverageFillPrice = entryQuote.div(entryQty);
-  const exitAverageFillPrice = exitQuote.div(exitQty);
-  const entryBaseFeeQuoteValue = entry.base.mul(entryAverageFillPrice);
-  const exitBaseFeeQuoteValue = exit.base.mul(exitAverageFillPrice);
+  const entryBaseFeeQuoteValue = resolveBaseAssetFeeQuoteValue(
+    input.entryBaseAssetFeeQuoteValues,
+    entry.baseCount,
+  );
+  const exitBaseFeeQuoteValue = resolveBaseAssetFeeQuoteValue(
+    input.exitBaseAssetFeeQuoteValues,
+    exit.baseCount,
+  );
 
   const entryNetBaseQty = entryQty.sub(entry.base);
   if (entryNetBaseQty.lessThanOrEqualTo(0)) throw new Error("ENTRY_BASE_QTY_CONSUMED_BY_FEES");
