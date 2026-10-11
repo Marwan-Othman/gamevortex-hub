@@ -33,6 +33,16 @@ import {
 const APPROVAL_TTL_SECONDS = 240;
 const STRATEGY_VERSION = "owner-manual-v1";
 
+/**
+ * Keep all new live approvals blocked until wallet/capital accounting,
+ * custody reconciliation, and the complete production settlement path are
+ * independently verified. The explicit void return type keeps TypeScript
+ * checking the downstream path while runtime execution still always throws.
+ */
+function assertLiveAccountingReady(): void {
+  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+}
+
 export type PreparedLiveOrder = {
   approvalId: string;
   opportunityId: string;
@@ -121,9 +131,7 @@ export async function prepareLiveOrder(input: {
   if (input.ackOwnerSpot !== true) throw new Error("LIVE_OWNER_ACK_REQUIRED");
 
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
-  // Keep live execution fail-closed until the migrated USD wallet has been reconciled
-  // and the full production accounting/reconciliation path has been verified.
-  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+  assertLiveAccountingReady();
 
   const direct = isLiveDirectFundingEnabled();
   if (direct) {
