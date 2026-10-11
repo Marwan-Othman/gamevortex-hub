@@ -72,6 +72,10 @@ export async function attemptEmergencyExit(input: {
     ) {
       throw new Error("EMERGENCY_SELL_FILL_DETAILS_REQUIRED");
     }
+    const requestedQty = Number(input.quantity);
+    if (!Number.isFinite(requestedQty) || placed.executedQty > requestedQty) {
+      throw new Error("EMERGENCY_SELL_EXECUTED_QTY_EXCEEDS_REQUESTED");
+    }
     return {
       status: "SOLD",
       clientOrderId,
