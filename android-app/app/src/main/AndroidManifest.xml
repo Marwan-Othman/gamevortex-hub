@@ -5,6 +5,8 @@
 
     <application
         android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:label="GameVortex Hub"
         android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
