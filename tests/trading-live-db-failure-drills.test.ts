@@ -34,7 +34,7 @@ function assertIsolatedTradingDrillDatabase(): void {
     throw new Error("TRADING_DB_DRILLS_DATABASE_URL_INVALID");
   }
 
-  const databaseName = databaseUrl.pathname.replace(/^\\//, "");
+  const databaseName = databaseUrl.pathname.slice(1);
   const schema = databaseUrl.searchParams.get("schema");
 
   if (
