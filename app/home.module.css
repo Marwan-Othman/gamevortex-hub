@@ -2092,3 +2092,71 @@ transition: none;
     font-size: 18px;
   }
 }
+
+
+/* Final mobile layout pass: stack the trending row and store banner as
+   full-width blocks, and keep Arabic section titles on one readable line. */
+@media (max-width: 699px) {
+  .split {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    width: calc(100% - 18px);
+    margin-inline: auto;
+  }
+
+  .split > .section,
+  .split .section {
+    display: block;
+    flex: 0 0 auto;
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .split .sectionHead {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 12px;
+  }
+
+  .split .sectionHead h2 {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    font-size: clamp(16px, 4.5vw, 19px);
+    line-height: 1.4;
+  }
+
+  .split .sectionHead h2 svg {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .split .sectionHead > a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .split .dealCard {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
