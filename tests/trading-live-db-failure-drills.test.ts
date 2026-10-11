@@ -15,6 +15,47 @@ import {
  * a deployment build must never create or mutate rows in a connected database.
  */
 const enabled = process.env.GAMEVORTEX_TRADING_DB_DRILLS === "true";
+
+/**
+ * The opt-in flag is not sufficient authorization to write test fixtures.
+ * Permit database-backed drills only against the dedicated local CI database.
+ * This check runs at module load, before any fixture or cleanup can write.
+ */
+function assertIsolatedTradingDrillDatabase(): void {
+  const connectionString = process.env.DATABASE_URL?.trim();
+  if (!connectionString) {
+    throw new Error("TRADING_DB_DRILLS_DATABASE_URL_REQUIRED");
+  }
+
+  let databaseUrl: URL;
+  try {
+    databaseUrl = new URL(connectionString);
+  } catch {
+    throw new Error("TRADING_DB_DRILLS_DATABASE_URL_INVALID");
+  }
+
+  const databaseName = databaseUrl.pathname.replace(/^\\//, "");
+  const schema = databaseUrl.searchParams.get("schema");
+
+  if (
+    databaseUrl.protocol !== "postgres:" &&
+    databaseUrl.protocol !== "postgresql:"
+  ) {
+    throw new Error("TRADING_DB_DRILLS_REQUIRE_POSTGRES");
+  }
+
+  if (
+    !["127.0.0.1", "localhost", "::1"].includes(databaseUrl.hostname) ||
+    databaseName !== "gamevortex_ci" ||
+    databaseUrl.username !== "ci" ||
+    schema !== "public"
+  ) {
+    throw new Error("TRADING_DB_DRILLS_REQUIRE_ISOLATED_CI_DATABASE");
+  }
+}
+
+if (enabled) assertIsolatedTradingDrillDatabase();
+
 const ownerIds: string[] = [];
 const idempotencyKeys: string[] = [];
 
