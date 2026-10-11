@@ -124,8 +124,8 @@ function assertProviderExitFillMatchesOrder(
   }
 }
 
-async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, reason: string): Promise<LiveOrderRow> {
-  const rows = await tx.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, reason: string): Promise<LiveOrderSettlementRow> {
+  const rows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
     SET "settlementStatus" = 'BLOCKED', "settlementError" = ${reason.slice(0, 500)}, "version" = "version" + 1
     WHERE "id" = ${orderId}
