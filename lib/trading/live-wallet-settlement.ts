@@ -61,19 +61,26 @@ export type LiveWalletSettlementResult = {
 };
 
 export type OwnerWalletSettlementCalculation = {
+  /** Amount credited to the USD wallet, whose database scale is two decimals. */
   returnedUsd: Prisma.Decimal;
+  /** Exact exchange proceeds minus the amount credited; positive means rounded down. */
+  roundingUsd: Prisma.Decimal;
 };
 
 export function calculateOwnerWalletSettlement(
   returnedUsdInput: Prisma.Decimal | string | number,
 ): OwnerWalletSettlementCalculation {
-  const returnedUsd = returnedUsdInput instanceof Prisma.Decimal
+  const exactProceeds = returnedUsdInput instanceof Prisma.Decimal
     ? returnedUsdInput
     : new Prisma.Decimal(returnedUsdInput);
-  if (!returnedUsd.isFinite() || returnedUsd.lessThan(0)) {
+  if (!exactProceeds.isFinite() || exactProceeds.lessThan(0)) {
     throw new Error("INVALID_SETTLEMENT_PROCEEDS");
   }
-  return { returnedUsd };
+
+  // OwnerWallet.availableUsd and OwnerLedger.usdAmount are Decimal(18,2).
+  // Round explicitly instead of letting PostgreSQL silently coerce the amount.
+  const returnedUsd = exactProceeds.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  return { returnedUsd, roundingUsd: exactProceeds.sub(returnedUsd) };
 }
 
 function assertProviderExitFillMatchesOrder(
@@ -356,7 +363,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           allocationId: allocation.id,
           returnedUsd: calculation.returnedUsd.toString(),
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
-          roundingUsd: "0",
+          roundingUsd: calculation.roundingUsd.toString(),
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
         },
@@ -392,7 +399,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         "walletSettledAt" = CURRENT_TIMESTAMP,
         "settledUsd" = ${calculation.returnedUsd.toString()}::numeric,
         "settledPoints" = 0,
-        "settlementRoundingUsd" = 0::numeric,
+        "settlementRoundingUsd" = ${calculation.roundingUsd.toString()}::numeric,
         "settlementError" = NULL,
         "version" = "version" + 1
       WHERE "id" = ${order.id} AND "status" = 'CLOSED' AND "settlementStatus" = 'EXCHANGE_CLOSED_PENDING_WALLET'
@@ -415,10 +422,18 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
+          roundingUsd: calculation.roundingUsd.toString(),
         },
       },
     });
 
-    return { order: updated, status: "SETTLED", settledUsd: calculation.returnedUsd.toString(), settledPoints: 0, roundingUsd: "0", blockers: [] };
+    return {
+      order: updated,
+      status: "SETTLED",
+      settledUsd: calculation.returnedUsd.toString(),
+      settledPoints: 0,
+      roundingUsd: calculation.roundingUsd.toString(),
+      blockers: [],
+    };
   });
 }
