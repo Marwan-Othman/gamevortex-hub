@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { hasBinanceSigningCredential, signBinancePayload } from "@/lib/trading/binance-signer";
 
 const BINANCE_BASE_URL = "https://api.binance.com";
@@ -54,9 +55,10 @@ async function fetchBinanceUsdt(): Promise<{ free: Prisma.Decimal; locked: Prism
   const signature = signBinancePayload(query, credentials);
   let response: Response;
   try {
-    response = await fetch(
+    response = await fetchWithTimeout(
       `${BINANCE_BASE_URL}/api/v3/account?${query}&signature=${encodeURIComponent(signature)}`,
       { method: "GET", headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey }, cache: "no-store" },
+      10_000,
     );
   } catch {
     throw new Error("BINANCE_LIVE_NETWORK_ERROR");

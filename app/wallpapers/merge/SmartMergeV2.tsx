@@ -244,7 +244,7 @@ export default function SmartMergeV2() {
         <p className="muted" style={{ margin: 0 }}>ارفع صورك، اعزل الأشخاص عند الحاجة محليًا، ثم ركبها داخل Wallpaper بدقة 1080×1920.</p>
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 18, marginTop: 18, alignItems: "start" }}>
+      <section className="gv-m-split" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 18, marginTop: 18, alignItems: "start" }}>
         <div className="glass card" style={{ padding: 16, display: "grid", placeItems: "center" }}>
           <div style={{ width: "min(100%, 390px)", background: "#07090d", padding: 7, borderRadius: 34 }}>
             <canvas ref={canvasRef} width={W} height={H} style={{ display: "block", width: "100%", height: "auto", borderRadius: 28 }} />

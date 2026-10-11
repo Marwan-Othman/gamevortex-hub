@@ -44,8 +44,13 @@ export default function TradingAllocationPanel({
   const [message, setMessage] = useState<string | null>(null);
 
   async function refresh() {
-    const res = await fetch("/api/admin/trading/allocations", { cache: "no-store" });
-    if (res.ok) setAllocations((await res.json()).allocations);
+    try {
+      const res = await fetch("/api/admin/trading/allocations", { cache: "no-store" });
+      if (res.ok) setAllocations((await res.json()).allocations);
+    } catch {
+      // The allocation itself already succeeded; a failed list refresh only
+      // means the table is momentarily stale, not that anything was lost.
+    }
   }
 
   async function submit() {
@@ -62,13 +67,15 @@ export default function TradingAllocationPanel({
         headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({ amountUsd: value }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) setMessage(ERROR_TEXT[data.error] ?? "تعذّر تنفيذ العملية.");
       else {
         setMessage(`تم تخصيص $${value} (${value * pointsPerUsd} نقطة).`);
         setAmount("");
         await refresh();
       }
+    } catch {
+      setMessage("تعذّر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة؛ لن يتم تكرار التخصيص إلا بطلب جديد منك.");
     } finally {
       setBusy(false);
     }

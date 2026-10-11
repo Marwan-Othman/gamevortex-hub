@@ -1,7 +1,5 @@
-export const dynamic = "force-dynamic";
-
 import Link from "next/link";
-import { db } from "../lib/prisma";
+import { getHomeData } from "../lib/home-data";
 import styles from "./home.module.css";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import GameRow from "@/components/home/GameRow";
@@ -164,81 +162,7 @@ const Arrow = () => (
 );
 
 export default async function Home() {
-  const [
-    newest,
-    rated,
-    played,
-    apps,
-    gamesCount,
-    appsCount,
-  ] = await Promise.all([
-    db.game.findMany({
-      where: {
-        published: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 10,
-    }),
-
-    db.game.findMany({
-      where: {
-        published: true,
-      },
-      orderBy: [
-        {
-          ratingAverage: "desc",
-        },
-        {
-          ratingCount: "desc",
-        },
-      ],
-      take: 10,
-    }),
-
-    db.game.findMany({
-      where: {
-        published: true,
-      },
-      orderBy: [
-        {
-          playCount: "desc",
-        },
-        {
-          viewCount: "desc",
-        },
-      ],
-      take: 10,
-    }),
-
-    db.app.findMany({
-      where: {
-        published: true,
-      },
-      orderBy: [
-        {
-          featured: "desc",
-        },
-        {
-          createdAt: "desc",
-        },
-      ],
-      take: 6,
-    }),
-
-    db.game.count({
-      where: {
-        published: true,
-      },
-    }),
-
-    db.app.count({
-      where: {
-        published: true,
-      },
-    }),
-  ]);
+  const { newest, rated, played, apps, gamesCount, appsCount } = await getHomeData();
 
   return (
     <main className={styles.page}>
@@ -288,18 +212,18 @@ export default async function Home() {
         />
 
         <div className={styles.dealCard}>
-          <small>HOT DEALS</small>
+          <small>VORTEX STORE</small>
 
           <LocaleText
             as="h2"
-            ar="عروض ساخنة"
-            en="HOT DEALS"
+            ar="متجر GameVortex"
+            en="GameVortex Store"
           />
 
           <LocaleText
             as="p"
-            ar="عروض لفترة محدودة على الألعاب وبطاقات الهدايا"
-            en="Limited time offers on Games & Gift Cards"
+            ar="مفاتيح ألعاب رقمية وبطاقات هدايا موثقة"
+            en="Verified digital game keys and gift cards"
           />
 
           <Link
@@ -307,8 +231,8 @@ export default async function Home() {
             className={styles.dealBtn}
           >
             <LocaleText
-              ar="تسوّق العروض"
-              en="Shop Deals"
+              ar="تصفّح المتجر"
+              en="Browse the store"
             />
           </Link>
         </div>

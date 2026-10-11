@@ -45,6 +45,30 @@ export const GAME_FILE_ACCEPT = [...GAME_EXTENSIONS].join(",");
 
 export const COVER_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"] as const;
 
+export const COVER_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif"] as const;
+
+const COVER_EXTENSION_BY_TYPE: Record<(typeof COVER_CONTENT_TYPES)[number], string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/avif": ".avif",
+};
+
+export function hasAllowedCoverExtension(fileName: string): boolean {
+  const lower = fileName.trim().toLowerCase();
+  return COVER_EXTENSIONS.some((extension) => lower.endsWith(extension));
+}
+
+/**
+ * Image file name that always carries a real image extension (phones sometimes name pictures
+ * "image" or "download" with no extension; the extension is part of the server-side pathname rule).
+ */
+export function coverFileName(fileName: string, mimeType: string): string {
+  if (hasAllowedCoverExtension(fileName)) return fileName;
+  const extension = COVER_EXTENSION_BY_TYPE[mimeType.toLowerCase() as keyof typeof COVER_EXTENSION_BY_TYPE] ?? ".jpg";
+  return `${fileName.trim() || "image"}${extension}`;
+}
+
 /**
  * Game/Mod files are always uploaded with this content type. Mobile browsers report
  * inconsistent MIME types for .apk/.rar/.deb/.pkg, so we pin one safe type instead of
@@ -192,7 +216,7 @@ export function isValidBlobPathname(pathname: string, kind: UploadKind): boolean
   if (value.startsWith("/") || value.includes("..") || value.includes("\\") || value.includes("\0")) return false;
   if (value.includes("//")) return false;
   if (!value.startsWith(BLOB_FOLDERS[kind])) return false;
-  if (kind === "cover") return true;
+  if (kind === "cover") return hasAllowedCoverExtension(value);
   return hasAllowedGameExtension(value);
 }
 

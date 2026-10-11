@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -56,7 +56,7 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_ADMIN_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_ADMIN_FAILED");
     return NextResponse.json(
       { error: message },
       { status: message === "UNAUTHORIZED" ? 401 : 403 },
@@ -127,7 +127,7 @@ export async function POST(
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_REPLY_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_REPLY_FAILED");
     const status =
       message === "UNAUTHORIZED"
         ? 401
@@ -203,7 +203,7 @@ export async function PATCH(
 
     return NextResponse.json({ data: result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_STATUS_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_STATUS_FAILED");
     const status =
       message === "UNAUTHORIZED"
         ? 401

@@ -4,7 +4,7 @@ import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { isHttpsUrl, normalizeWallpaperTags, normalizeWallpaperSlug } from "@/lib/wallpapers";
 import { validateWallpaperMedia } from "@/lib/wallpaper-moderation";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: wallpaper }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Upload failed";
+    const message = publicErrorCode(error, "Upload failed");
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

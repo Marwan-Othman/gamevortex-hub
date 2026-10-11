@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run db:generate && next build",
+    "build:webpack": "npm run db:generate && next build --webpack",
     "build:production": "npm run production:validate",
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:phase19": "vitest run tests/phase19",
     "test:smoke": "node scripts/smoke-check.mjs",
     "test:source": "node scripts/source-integrity-check.mjs",
     "test:owner-policy": "node scripts/test-owner-role-policy.mjs",

@@ -50,9 +50,8 @@ const updateSchema = z
     currency: z
       .string()
       .trim()
-      .min(3)
-      .max(10)
       .transform((value) => value.toUpperCase())
+      .pipe(z.string().regex(/^[A-Z]{3}$/))
       .optional(),
 
     kind: z
@@ -96,6 +95,7 @@ const updateSchema = z
       .trim()
       .url()
       .max(2000)
+      .refine((value) => /^https?:\/\//i.test(value))
       .nullable()
       .optional(),
 
@@ -425,8 +425,14 @@ export async function PATCH(
       body.inventory !==
       undefined
     ) {
+      // Key products: the stock IS the number of available keys, never a hand-typed number
+      // (a wrong number would block sales or promise keys that do not exist).
+      const resultingKind = body.kind ?? existing.kind;
+      const resultingDelivery = body.deliveryType ?? existing.deliveryType;
       data.inventory =
-        body.inventory;
+        resultingKind === ProductKind.GAME_KEY && resultingDelivery === DeliveryType.CODE
+          ? await db.digitalKey.count({ where: { productId, status: "AVAILABLE" } })
+          : body.inventory;
     }
 
     if (body.region !== undefined) {
@@ -504,7 +510,8 @@ export async function PATCH(
      * مصدر اللعبة موثق
      * يوجد مفتاح رقمي متاح
      */
-    if (body.publish === true) {
+    // Switching "active" on directly is the same decision as publishing: same checks, no shortcut.
+    if (body.publish === true || (body.active === true && body.publish === undefined)) {
       const resultingKind =
         body.kind ??
         existing.kind;
@@ -568,10 +575,11 @@ export async function PATCH(
         );
       }
 
-      if (
-        existing._count.digitalKeys <=
-        0
-      ) {
+      const availableKeys = await db.digitalKey.count({
+        where: { productId, status: "AVAILABLE" },
+      });
+
+      if (availableKeys <= 0) {
         return NextResponse.json(
           {
             success: false,
@@ -855,15 +863,16 @@ export async function DELETE(
       );
     }
 
-    if (
-      product._count.digitalKeys >
-      0
-    ) {
+    // Keys that were delivered or revoked belong to a customer's history: keep the product.
+    const usedKeys = await db.digitalKey.count({
+      where: { productId, status: { not: "AVAILABLE" } },
+    });
+
+    if (usedKeys > 0) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "PRODUCT_HAS_DIGITAL_KEYS",
+          error: "PRODUCT_HAS_DIGITAL_KEYS",
         },
         {
           status: 409,
@@ -873,6 +882,11 @@ export async function DELETE(
 
     await db.$transaction(
       async (transaction) => {
+        // Never-sold keys go away with the product (they are encrypted stock, nothing else uses them).
+        await transaction.digitalKey.deleteMany({
+          where: { productId, status: "AVAILABLE" },
+        });
+
         await transaction.gameProduct.delete(
           {
             where: {

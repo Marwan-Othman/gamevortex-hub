@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { findOwnerAccount } from "@/lib/owner-account";
 import {
   DeliveryType,
   DigitalKeyStatus,
@@ -17,6 +18,8 @@ import { logSystemError } from "@/lib/observability";
 import { processVipPaymentWebhook } from "@/lib/vip-payment-webhook";
 import { calculateProductRewardPoints, creditPointsInTransaction, reversePointsInTransaction } from "@/lib/points";
 import { applyVipPointsMultiplier, getVipPointsMultiplierInTransaction } from "@/lib/vip";
+import { revokeEntitlementsForRefund } from "@/lib/store-guards";
+import { publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -86,11 +89,13 @@ function normalizeStripe(raw: any): NormalizedEvent | null {
     return null;
   }
 
+  // A refund event must carry the amount that was actually refunded. Using the
+  // original charge amount would make a partial refund look like a full one
+  // and reverse the whole order (keys, owner revenue and points).
   const amountCents = Number(
-    object?.amount_total ??
-      object?.amount ??
-      object?.amount_refunded ??
-      -1,
+    status === "REFUNDED"
+      ? object?.amount_refunded ?? -1
+      : object?.amount_total ?? object?.amount ?? -1,
   );
 
   return {
@@ -193,20 +198,15 @@ async function deliverGameKeys(
       throw new Error("UNSUPPORTED_DELIVERY_TYPE");
     }
 
-    const availableKeys =
-      await transaction.digitalKey.findMany({
-        where: {
-          productId: item.productId,
-          status: DigitalKeyStatus.AVAILABLE,
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-        take: item.quantity,
-        select: {
-          id: true,
-        },
-      });
+    // Row-lock the keys to claim (SKIP LOCKED) so concurrent webhook deliveries
+    // for the same product never select the same keys.
+    const availableKeys = await transaction.$queryRaw<{ id: string }[]>(
+      Prisma.sql`SELECT "id" FROM "DigitalKey"
+        WHERE "productId" = ${item.productId} AND "status" = 'AVAILABLE'
+        ORDER BY "createdAt" ASC
+        LIMIT ${item.quantity}
+        FOR UPDATE SKIP LOCKED`,
+    );
 
     if (availableKeys.length !== item.quantity) {
       throw new Error("OUT_OF_STOCK");
@@ -281,14 +281,7 @@ async function rewardOwnerPoints(
     return;
   }
 
-  const owner = await transaction.user.findFirst({
-    where: {
-      role: "SUPER_ADMIN",
-    },
-    select: {
-      id: true,
-    },
-  });
+  const owner = await findOwnerAccount(transaction);
 
   if (!owner) {
     throw new Error("OWNER_ACCOUNT_NOT_FOUND");
@@ -435,14 +428,7 @@ async function recordOwnerRevenue(
   provider: string,
   paymentId: string,
 ) {
-  const owner = await transaction.user.findFirst({
-    where: {
-      role: "SUPER_ADMIN",
-    },
-    select: {
-      id: true,
-    },
-  });
+  const owner = await findOwnerAccount(transaction);
 
   if (!owner) {
     throw new Error("OWNER_ACCOUNT_NOT_FOUND");
@@ -475,14 +461,20 @@ async function recordOwnerRevenue(
       update: {},
     });
 
-  const usdAmount = new Prisma.Decimal(
-    order.totalCents,
-  ).div(100);
+  // OwnerWallet.availableUsd is a USD balance. An order in another currency
+  // must not be added to it as if it were dollars; it is still written to the
+  // ledger (with usdAmount = null) so the sale stays traceable.
+  const isUsd = (order.currency || "USD").toUpperCase() === "USD";
+  const usdAmount = isUsd
+    ? new Prisma.Decimal(order.totalCents).div(100)
+    : null;
 
-  await transaction.ownerWallet.update({
-    where: { id: wallet.id },
-    data: { availableUsd: { increment: usdAmount } },
-  });
+  if (usdAmount) {
+    await transaction.ownerWallet.update({
+      where: { id: wallet.id },
+      data: { availableUsd: { increment: usdAmount } },
+    });
+  }
 
   await transaction.ownerLedger.create({
     data: {
@@ -498,6 +490,7 @@ async function recordOwnerRevenue(
         orderId: order.id,
         source: "GAMEVORTEX_STORE_PURCHASE",
         totalCents: order.totalCents,
+        ...(isUsd ? {} : { notCreditedToUsdBalance: true }),
       },
     },
   });
@@ -733,6 +726,34 @@ async function refundOwnerPoints(
   });
 }
 
+/**
+ * Releases the "pending" part of a wallet deposit that will never complete
+ * (failed, cancelled or refunded before it was credited). The release is
+ * clamped to what the wallet really holds as pending so a drifted counter can
+ * never be pushed below zero.
+ */
+async function releasePendingDeposit(
+  transaction: Prisma.TransactionClient,
+  userId: string,
+  amount: Prisma.Decimal,
+) {
+  const wallet = await transaction.wallet.findUnique({ where: { userId } });
+  if (!wallet) return new Prisma.Decimal(0);
+
+  await transaction.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
+  );
+  const locked = await transaction.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+  const release = locked.pendingBalance.lt(amount) ? locked.pendingBalance : amount;
+  if (release.gt(0)) {
+    await transaction.wallet.update({
+      where: { id: wallet.id },
+      data: { pendingBalance: { decrement: release } },
+    });
+  }
+  return release;
+}
+
 async function processWalletDepositWebhook(event: NormalizedEvent) {
   return db.$transaction(async (transaction) => {
     const depositExists = await transaction.walletDeposit.findUnique({
@@ -778,6 +799,8 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       throw new Error("PAYMENT_ID_MISMATCH");
     }
 
+    const amount = new Prisma.Decimal(deposit.amountCents).div(100);
+
     if (event.status === "SUCCEEDED") {
       if (deposit.status === "COMPLETED") return true;
       if (deposit.status === "REFUNDED") return true;
@@ -802,23 +825,34 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       const existing = await transaction.walletTransaction.findUnique({ where: { idempotencyKey } });
       if (!existing) {
         const before = lockedWallet.balance;
-        const amount = new Prisma.Decimal(event.amountCents).div(100);
         const after = before.add(amount);
+
+        // The provider confirmed that the money arrived, so the balance is
+        // always credited. Only a deposit that is still PENDING has an amount
+        // sitting in pendingBalance; a deposit already marked FAILED/CANCELLED
+        // (for example after a timeout on our side) had it released already.
+        // Throwing here would leave real money received but never credited and
+        // make the provider retry the webhook forever.
+        const pendingToRelease =
+          deposit.status === "PENDING"
+            ? (lockedWallet.pendingBalance.lt(amount) ? lockedWallet.pendingBalance : amount)
+            : new Prisma.Decimal(0);
+        const pendingShortfall = deposit.status === "PENDING" ? amount.sub(pendingToRelease) : new Prisma.Decimal(0);
+
         const settled = await transaction.wallet.updateMany({
           where: {
             id: wallet.id,
-            pendingBalance: { gte: amount },
+            balance: before,
+            pendingBalance: { gte: pendingToRelease },
           },
           data: {
             balance: after,
-            pendingBalance: {
-              decrement: amount,
-            },
+            pendingBalance: { decrement: pendingToRelease },
           },
         });
 
         if (settled.count !== 1) {
-          throw new Error("WALLET_PENDING_BALANCE_MISMATCH");
+          throw new Error("WALLET_BALANCE_CHANGED");
         }
         await transaction.walletTransaction.create({
           data: {
@@ -832,7 +866,12 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
             referenceType: "WALLET_DEPOSIT",
             referenceId: deposit.id,
             idempotencyKey,
-            metadata: { provider: event.provider, paymentId: event.paymentId },
+            metadata: {
+              provider: event.provider,
+              paymentId: event.paymentId,
+              depositStatusBefore: deposit.status,
+              ...(pendingShortfall.gt(0) ? { pendingShortfall: pendingShortfall.toString() } : {}),
+            },
           },
         });
       }
@@ -853,33 +892,10 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
     if (event.status === "REFUNDED") {
       if (deposit.status === "REFUNDED") return true;
       if (deposit.status !== "COMPLETED") {
+        // The deposit was never credited, so there is nothing to take back from
+        // the balance; only the pending amount (if any) is released.
         if (deposit.status === "PENDING") {
-          const pendingWallet = await transaction.wallet.findUnique({
-            where: { userId: deposit.userId },
-          });
-
-          if (pendingWallet) {
-            await transaction.$queryRaw(
-              Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${pendingWallet.id} FOR UPDATE`,
-            );
-
-            const pendingAmount = new Prisma.Decimal(deposit.amountCents).div(100);
-            const released = await transaction.wallet.updateMany({
-              where: {
-                id: pendingWallet.id,
-                pendingBalance: { gte: pendingAmount },
-              },
-              data: {
-                pendingBalance: {
-                  decrement: pendingAmount,
-                },
-              },
-            });
-
-            if (released.count !== 1) {
-              throw new Error("WALLET_PENDING_BALANCE_MISMATCH");
-            }
-          }
+          await releasePendingDeposit(transaction, deposit.userId, amount);
         }
 
         await transaction.walletDeposit.update({
@@ -901,18 +917,23 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
         where: { id: wallet.id },
       });
 
-      const amount = new Prisma.Decimal(event.amountCents).div(100);
-
       // A provider refund is a real liability reversal. The user may already
       // have spent the deposited funds, so the ledger must still record the
       // full debit instead of silently leaving the wallet over-credited.
-      // Future wallet spending must reject a negative available balance.
+      // The balance can therefore become negative here (and only here); every
+      // spending path checks `balance >= amount`, so a negative wallet cannot
+      // spend anything until it is topped up again. The transaction is flagged
+      // so it can be found and followed up.
       const idempotencyKey = `wallet-refund:${deposit.id}:${event.provider}:${event.paymentId}`;
       const existing = await transaction.walletTransaction.findUnique({ where: { idempotencyKey } });
       if (!existing) {
         const before = lockedWallet.balance;
         const after = before.sub(amount);
-        await transaction.wallet.update({ where: { id: wallet.id }, data: { balance: after } });
+        const debited = await transaction.wallet.updateMany({
+          where: { id: wallet.id, balance: before },
+          data: { balance: after },
+        });
+        if (debited.count !== 1) throw new Error("WALLET_BALANCE_CHANGED");
         await transaction.walletTransaction.create({
           data: {
             userId: deposit.userId,
@@ -925,7 +946,11 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
             referenceType: "WALLET_DEPOSIT_REFUND",
             referenceId: deposit.id,
             idempotencyKey,
-            metadata: { provider: event.provider, paymentId: event.paymentId },
+            metadata: {
+              provider: event.provider,
+              paymentId: event.paymentId,
+              ...(after.isNegative() ? { resultedInNegativeBalance: true } : {}),
+            },
           },
         });
       }
@@ -933,31 +958,16 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
       return true;
     }
 
+    // FAILED: only a deposit that is still PENDING may move to FAILED. A late
+    // or out-of-order failure event must never turn a COMPLETED or REFUNDED
+    // deposit (whose balance changes are already booked) into FAILED.
     if (deposit.status === "PENDING") {
-      const pendingWallet = await transaction.wallet.findUnique({
-        where: { userId: deposit.userId },
+      await releasePendingDeposit(transaction, deposit.userId, amount);
+      await transaction.walletDeposit.update({
+        where: { id: deposit.id },
+        data: { status: "FAILED" },
       });
-
-      if (pendingWallet) {
-        await transaction.$queryRaw(
-          Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${pendingWallet.id} FOR UPDATE`,
-        );
-
-        await transaction.wallet.update({
-          where: { id: pendingWallet.id },
-          data: {
-            pendingBalance: {
-              decrement: new Prisma.Decimal(deposit.amountCents).div(100),
-            },
-          },
-        });
-      }
     }
-
-    await transaction.walletDeposit.update({
-      where: { id: deposit.id },
-      data: { status: "FAILED" },
-    });
     return true;
   });
 }
@@ -1038,6 +1048,10 @@ async function refundApiAccessOwnerRevenue(
 
 async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
   await db.$transaction(async (transaction) => {
+    // Serialize concurrent provider events for the same purchase.
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "ApiAccessPurchase" WHERE "id" = ${event.orderId} FOR UPDATE`,
+    );
     const purchase = await transaction.apiAccessPurchase.findUnique({ where: { id: event.orderId } });
     if (!purchase) throw new Error("API_ACCESS_PURCHASE_NOT_FOUND");
     if (event.amountCents !== purchase.amountCents || event.currency?.toUpperCase() !== purchase.currency) {
@@ -1057,7 +1071,7 @@ async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
         data: { status: "SUCCEEDED", provider: event.provider, providerPaymentId: event.paymentId, completedAt: new Date() },
       });
 
-      const owner = await transaction.user.findFirst({ where: { role: "SUPER_ADMIN" }, select: { id: true } });
+      const owner = await findOwnerAccount(transaction);
       if (!owner) throw new Error("OWNER_ACCOUNT_NOT_FOUND");
       const wallet = await transaction.ownerWallet.upsert({
         where: { ownerId: owner.id },
@@ -1118,6 +1132,8 @@ async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
   });
 }
 
+const MAX_WEBHOOK_BYTES = 1_000_000;
+
 export async function POST(request: NextRequest) {
   /*
    * Payment provider webhooks are server-to-server requests.
@@ -1149,7 +1165,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Bound the payload before reading it: provider events are a few KB.
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BYTES) {
+    return NextResponse.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
+
   const rawBody = await request.text();
+  if (rawBody.length > MAX_WEBHOOK_BYTES) {
+    return NextResponse.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
 
   const signature =
     request.headers.get("stripe-signature") ||
@@ -1164,13 +1189,21 @@ export async function POST(request: NextRequest) {
     ),
   );
 
-  if (
-    !(await provider.verifyWebhook(
+  let signatureValid = false;
+  try {
+    signatureValid = await provider.verifyWebhook(
       rawBody,
       signature,
       webhookHeaders,
-    ))
-  ) {
+    );
+  } catch (error) {
+    // Verification itself failed (provider unreachable, misconfiguration). Answer 503 so the
+    // provider retries later; never treat an unverifiable event as verified.
+    await logSystemError("payments:webhook-verify", error, { statusCode: 503 });
+    return NextResponse.json({ error: "WEBHOOK_VERIFICATION_UNAVAILABLE" }, { status: 503 });
+  }
+
+  if (!signatureValid) {
     return NextResponse.json(
       {
         error: "INVALID_SIGNATURE",
@@ -1289,6 +1322,14 @@ export async function POST(request: NextRequest) {
       async (
         transaction: Prisma.TransactionClient,
       ) => {
+        // Serialize every provider event (and any wallet checkout) for this
+        // order. Without the lock two concurrent duplicate webhooks both read
+        // the order as unpaid, and one of them then fails on the unique
+        // payment index after doing all of the work.
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "Order" WHERE "id" = ${event.orderId} FOR UPDATE`,
+        );
+
         const order =
           await transaction.order.findUnique({
             where: {
@@ -1362,6 +1403,35 @@ export async function POST(request: NextRequest) {
           event.status === "SUCCEEDED" &&
           order.paymentStatus === "REFUNDED"
         ) {
+          return;
+        }
+
+        /*
+         * The order was already paid by a different payment (for example from
+         * the wallet while a card checkout was still open). Fulfilling it again
+         * would deliver a second set of keys and book revenue twice, so the
+         * extra payment is only recorded for follow-up (refund) and not applied.
+         */
+        if (
+          event.status === "SUCCEEDED" &&
+          !existing &&
+          order.paymentStatus === "SUCCEEDED"
+        ) {
+          await transaction.auditLog.create({
+            data: {
+              action: "DUPLICATE_PAYMENT_FOR_PAID_ORDER",
+              entityType: "Order",
+              entityId: order.id,
+              metadata: {
+                provider: event.provider,
+                paymentId: event.paymentId,
+                amountCents: event.amountCents,
+                currency: event.currency ?? null,
+                orderPaidWith: order.paymentProvider ?? null,
+                action: "MANUAL_REFUND_REQUIRED",
+              },
+            },
+          });
           return;
         }
 
@@ -1522,20 +1592,13 @@ export async function POST(request: NextRequest) {
           /*
            * Revoke game entitlements.
            */
-          await transaction.entitlement.updateMany({
-            where: {
-              userId: order.userId,
-              orderItemId: {
-                in: order.items.map(
-                  (item: WebhookOrder["items"][number]) =>
-                    item.id,
-                ),
-              },
-            },
-            data: {
-              revokedAt: new Date(),
-            },
-          });
+          await revokeEntitlementsForRefund(
+            transaction,
+            order.userId,
+            order.items.map(
+              (item: WebhookOrder["items"][number]) => item.id,
+            ),
+          );
 
           /*
            * Reverse owner revenue.
@@ -1582,9 +1645,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "WEBHOOK_PROCESSING_FAILED";
+      publicErrorCode(error, "WEBHOOK_PROCESSING_FAILED");
 
     // Fulfillment/accounting failures are retryable. Returning 4xx here can
     // cause providers to stop retrying a signed payment event even though the
@@ -1597,15 +1658,23 @@ export async function POST(request: NextRequest) {
       "OWNER_ACCOUNT_NOT_FOUND",
       "OWNER_WALLET_NOT_FOUND",
       "WALLET_NOT_FOUND",
+      "WALLET_BALANCE_CHANGED",
       "API_ACCESS_PURCHASE_NOT_FOUND",
     ]);
 
+    // A signed event whose body is not valid JSON can never succeed: 400 (no retry loop).
+    // Any UNEXPECTED failure (database down, bug) is masked as WEBHOOK_PROCESSING_FAILED and
+    // must stay retryable (500), otherwise a paid order could be dropped by the provider.
     const status =
-      message === "ORDER_NOT_FOUND"
-        ? 404
-        : retryableMessages.has(message)
-          ? 503
-          : 400;
+      error instanceof SyntaxError
+        ? 400
+        : message === "ORDER_NOT_FOUND"
+          ? 404
+          : retryableMessages.has(message)
+            ? 503
+            : message === "WEBHOOK_PROCESSING_FAILED"
+              ? 500
+              : 400;
 
     await logSystemError(
       "payments:webhook",

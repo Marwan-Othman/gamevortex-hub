@@ -1,8 +1,6 @@
-"use client";
-
 import Link from "next/link";
 import styles from "../../app/home.module.css";
-import { useLocale } from "@/components/ui/useLocale";
+import { getServerLocale } from "@/lib/server-locale";
 
 type Props = {
   gamesCount?: number;
@@ -31,11 +29,11 @@ function StatIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function HeroCarousel({
+export default async function HeroCarousel({
   gamesCount = 0,
   appsCount = 0,
 }: Props) {
-  const locale = useLocale();
+  const locale = await getServerLocale();
   const english = locale === "en";
 
   const t = (ar: string, en: string) => (english ? en : ar);
@@ -51,6 +49,23 @@ export default function HeroCarousel({
       dir={english ? "ltr" : "rtl"}
       lang={locale}
     >
+      {/* The hero artwork is a CSS background, which the browser only discovers after the CSS is
+          parsed. Preloading it (React 19 hoists these <link>s into <head>) improves LCP. Only the
+          variant for the current viewport is fetched (same breakpoint as home.module.css). */}
+      <link
+        rel="preload"
+        as="image"
+        href="/images/home/hero-mobile.webp"
+        media="(max-width: 699px)"
+        fetchPriority="high"
+      />
+      <link
+        rel="preload"
+        as="image"
+        href="/images/home/hero-desktop.webp"
+        media="(min-width: 700px)"
+        fetchPriority="high"
+      />
       {/* =========================================================
           MAIN HERO
           ========================================================= */}
@@ -59,8 +74,8 @@ export default function HeroCarousel({
         aria-label="GameVortex"
         style={
           {
-            "--hero-desktop": "url('/images/home/hero-desktop.png')",
-            "--hero-mobile": "url('/images/home/hero-mobile.png')",
+            "--hero-desktop": "url('/images/home/hero-desktop.webp')",
+            "--hero-mobile": "url('/images/home/hero-mobile.webp')",
           } as React.CSSProperties
         }
       >
@@ -250,7 +265,7 @@ export default function HeroCarousel({
           style={
             {
               backgroundImage:
-                "url('/images/home/vip-banner.png')",
+                "url('/images/home/vip-banner.webp')",
               backgroundSize: "cover",
               backgroundPosition: "center",
               backgroundRepeat: "no-repeat",
@@ -301,7 +316,7 @@ export default function HeroCarousel({
           style={
             {
               backgroundImage:
-                "url('/images/home/ai-banner.png')",
+                "url('/images/home/ai-banner.webp')",
               backgroundSize: "cover",
               backgroundPosition: "center",
               backgroundRepeat: "no-repeat",

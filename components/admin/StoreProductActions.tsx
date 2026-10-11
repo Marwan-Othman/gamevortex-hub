@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { storeErrorText } from "./store-errors";
 
 type Product = {
   id: string;
@@ -91,8 +92,7 @@ export default function StoreProductActions({
 
       if (!response.ok) {
         throw new Error(
-          payload?.error ||
-            "PRODUCT_UPDATE_FAILED",
+          storeErrorText(payload?.error, "تعذر تحديث المنتج."),
         );
       }
 
@@ -115,9 +115,9 @@ export default function StoreProductActions({
 
     if (!confirmed) return;
 
+    // publish=true runs the server-side sale checks (game published + verified, keys available).
     await updateProduct({
-      active: true,
-      supplierVerified: true,
+      publish: true,
     });
   }
 
@@ -129,7 +129,7 @@ export default function StoreProductActions({
     if (!confirmed) return;
 
     await updateProduct({
-      active: false,
+      publish: false,
     });
   }
 
@@ -220,8 +220,7 @@ export default function StoreProductActions({
 
       if (!response.ok) {
         throw new Error(
-          payload?.error ||
-            "DIGITAL_KEY_IMPORT_FAILED",
+          storeErrorText(payload?.error, "تعذر استيراد المفاتيح."),
         );
       }
 
@@ -245,7 +244,7 @@ export default function StoreProductActions({
 
   async function handleDelete() {
     const confirmed = window.confirm(
-      `هل أنت متأكد من حذف المنتج "${product.title}"؟\n\nلن يسمح النظام بالحذف إذا كان المنتج مرتبطًا بطلبات أو مفاتيح رقمية.`,
+      `هل أنت متأكد من حذف المنتج "${product.title}"؟\n\nلن يسمح النظام بالحذف إذا كان المنتج مرتبطًا بطلبات أو بمفاتيح سُلّمت لعملاء. المفاتيح غير المباعة تُحذف معه.`,
     );
 
     if (!confirmed) return;
@@ -265,8 +264,7 @@ export default function StoreProductActions({
 
       if (!response.ok) {
         throw new Error(
-          payload?.error ||
-            "PRODUCT_DELETE_FAILED",
+          storeErrorText(payload?.error, "تعذر حذف المنتج."),
         );
       }
 
@@ -620,9 +618,9 @@ export default function StoreProductActions({
 
       {product.digitalKeys > 0 && (
         <p className="muted">
-          لا يمكن حذف المنتج لأنه يحتوي
-          على {product.digitalKeys} مفتاحًا
-          رقميًا.
+          لا يمكن حذف المنتج لأن
+          {" "}{product.digitalKeys} مفتاحًا
+          سُلّم أو أُلغي. أخفِه بدل الحذف.
         </p>
       )}
 

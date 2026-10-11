@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { guardMutation } from '../../../../../lib/api';
+import { guardMutation, guardRead, ownerRouteError } from '../../../../../lib/api';
 import { z } from 'zod';
 import { Prisma, SourceStatus } from '@prisma/client';
 import { db } from '../../../../../lib/prisma';
@@ -28,13 +28,14 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const blocked = await guardRead(request, 'owner:quran:read', 60); if (blocked) return blocked;
   try {
     await requireOwner();
     const reciters = await db.quranReciter.findMany({ orderBy: [{ sortOrder: 'asc' }, { nameAr: 'asc' }] });
     return NextResponse.json(reciters);
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : 'UNAUTHORIZED', 403);
+    return ownerRouteError(error, 'QURAN_LOAD_FAILED', 500);
   }
 }
 
@@ -61,8 +62,7 @@ export async function POST(request: Request) {
     await db.auditLog.create({ data: { actorUserId: owner.id, action: 'QURAN_RECITER_CREATED', entityType: 'QuranReciter', entityId: reciter.id, metadata: { sourceVerificationStatus: reciter.sourceVerificationStatus, provider: reciter.provider } } });
     return NextResponse.json(reciter, { status: 201 });
   } catch (error) {
-    if (error instanceof z.ZodError) return jsonError(error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
-    return jsonError(error instanceof Error ? error.message : 'CREATE_FAILED', 403);
+    return ownerRouteError(error, 'CREATE_FAILED', 500);
   }
 }
 
@@ -94,8 +94,7 @@ export async function PATCH(request: Request) {
     await db.auditLog.create({ data: { actorUserId: owner.id, action: 'QURAN_RECITER_UPDATED', entityType: 'QuranReciter', entityId: id, metadata: { changed: Object.keys(body) } } });
     return NextResponse.json(reciter);
   } catch (error) {
-    if (error instanceof z.ZodError) return jsonError(error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
-    return jsonError(error instanceof Error ? error.message : 'UPDATE_FAILED', 403);
+    return ownerRouteError(error, 'UPDATE_FAILED', 500);
   }
 }
 
@@ -108,6 +107,6 @@ export async function DELETE(request: Request) {
     await db.auditLog.create({ data: { actorUserId: owner.id, action: 'QURAN_RECITER_DELETED', entityType: 'QuranReciter', entityId: id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : 'DELETE_FAILED', 403);
+    return ownerRouteError(error, 'DELETE_FAILED', 500);
   }
 }

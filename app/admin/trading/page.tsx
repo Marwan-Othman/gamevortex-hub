@@ -3,7 +3,6 @@ import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import { getTradingSummary } from "@/lib/trading/allocation";
 import { tradingMaxAllocationUsd, TRADING_MIN_ALLOCATION_USD } from "@/lib/trading/money";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
-import AdminShell from "@/components/admin/AdminShell";
 import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
 import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
 import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
@@ -36,7 +35,7 @@ export default async function TradingPage() {
     : null;
 
   return (
-    <AdminShell ownerLabel={result.owner.username || result.owner.email}>
+    <>
       <section className={styles.ownerCard}>
         <div className={styles.ownerCardName}>GameVortex AI Trading — Owner Edition</div>
         <p className="muted">
@@ -70,6 +69,6 @@ export default async function TradingPage() {
       <TradingLivePreflightPanel />
       <TradingLiveOrderPanel />
       <TradingAuditPanel />
-    </AdminShell>
+    </>
   );
 }

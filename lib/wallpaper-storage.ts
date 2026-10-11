@@ -1,4 +1,5 @@
 import { del, put } from "@vercel/blob";
+import { fetchWithTimeout } from "./fetch-timeout";
 import {
   WALLPAPER_ANIMATED_MIME_TYPES,
   WALLPAPER_IMAGE_MIME_TYPES,
@@ -57,7 +58,7 @@ export function filenameFromUrl(value: string, fallback = "wallpaper") {
 
 export async function validateRemoteBlobImage(url: string, expectedMime?: string, expectedSize?: number) {
   if (!isVercelBlobUrl(url)) throw new Error("INVALID_BLOB_URL");
-  const res = await fetch(url, { method: "GET", redirect: "follow" });
+  const res = await fetchWithTimeout(url, { method: "GET", redirect: "follow" }, 20_000);
   if (!res.ok) throw new Error("BLOB_VALIDATION_FAILED");
   const mime = (res.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
   if (!isSupportedWallpaperMimeType(mime)) throw new Error("IMAGE_SOURCE_TYPE_NOT_SUPPORTED");

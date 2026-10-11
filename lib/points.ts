@@ -173,6 +173,58 @@ function validateIdempotencyKey(
   }
 }
 
+const SERIALIZATION_RETRIES = 3;
+
+/**
+ * Serializable transactions can be aborted by PostgreSQL (P2034) when two
+ * writers touch the same rows. That is not a failure of the operation, only a
+ * lost race, so it is retried a few times before surfacing the error.
+ */
+async function runSerializable<T>(
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < SERIALIZATION_RETRIES; attempt += 1) {
+    try {
+      return await db.$transaction(work, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      lastError = error;
+      const code = (error as { code?: string } | null)?.code;
+      if (code !== "P2034") throw error;
+    }
+  }
+  throw lastError;
+}
+
+type LedgerExpectation = {
+  userId: string;
+  amount: number;
+  type: "CREDIT" | "DEBIT" | "REFUND" | "ADJUSTMENT";
+  reason: string;
+};
+
+/**
+ * An idempotency key may only ever replay the exact same operation. Reusing a
+ * key for a different user, amount, type or reason is a client bug (or an
+ * attack) and must fail loudly instead of silently returning the old entry.
+ */
+function assertLedgerMatches<T extends { userId: string; amount: number; type: string; reason: string }>(
+  existing: T,
+  expected: LedgerExpectation,
+): T {
+  if (
+    existing.userId !== expected.userId ||
+    existing.amount !== expected.amount ||
+    existing.type !== expected.type ||
+    existing.reason !== expected.reason
+  ) {
+    throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+  }
+  return existing;
+}
+
 async function getExistingLedgerEntry(
   idempotencyKey: string,
 ) {
@@ -262,380 +314,110 @@ export async function debitPointsInTransaction(
   });
 }
 
-export async function creditPoints(
+/**
+ * Single code path for every stand-alone ledger write (credit, debit, refund,
+ * adjustment). Keeping one implementation guarantees that every operation:
+ *  - validates its input the same way,
+ *  - is idempotent and rejects a reused key with different parameters,
+ *  - changes the balance with one atomic statement (no read-modify-write),
+ *  - never lets a debit take the balance below zero,
+ *  - writes the ledger row in the same transaction as the balance change.
+ */
+async function postLedgerEntry(
   input: CreditPointsInput,
+  type: LedgerExpectation["type"],
+  signedAmount: number,
+  insufficientError: string,
 ) {
   validateUserId(input.userId);
-  validatePositiveInteger(input.amount, "amount");
   validateReason(input.reason);
   validateIdempotencyKey(input.idempotencyKey);
 
-  const existing = await getExistingLedgerEntry(
-    input.idempotencyKey,
-  );
+  const expected: LedgerExpectation = {
+    userId: input.userId,
+    amount: signedAmount,
+    type,
+    reason: input.reason,
+  };
 
-  if (existing) {
-    return existing;
-  }
+  const existing = await getExistingLedgerEntry(input.idempotencyKey);
+  if (existing) return assertLedgerMatches(existing, expected);
 
   try {
-    return await db.$transaction(
-      async (tx) => {
-        const existingInsideTransaction =
-          await tx.pointLedger.findUnique({
-            where: {
-              idempotencyKey: input.idempotencyKey,
-            },
-          });
+    return await runSerializable(async (tx) => {
+      const existingInsideTransaction = await tx.pointLedger.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+      if (existingInsideTransaction) {
+        return assertLedgerMatches(existingInsideTransaction, expected);
+      }
 
-        if (existingInsideTransaction) {
-          return existingInsideTransaction;
-        }
+      const updated =
+        signedAmount >= 0
+          ? await tx.user.updateMany({
+              where: { id: input.userId },
+              data: { points: { increment: signedAmount } },
+            })
+          : await tx.user.updateMany({
+              where: { id: input.userId, points: { gte: -signedAmount } },
+              data: { points: { decrement: -signedAmount } },
+            });
 
-        await tx.user.update({
-          where: {
-            id: input.userId,
-          },
-          data: {
-            points: {
-              increment: input.amount,
-            },
-          },
+      if (updated.count !== 1) {
+        const known = await tx.user.findUnique({
+          where: { id: input.userId },
+          select: { id: true },
         });
+        if (!known) throw new Error("User not found");
+        throw new Error(insufficientError);
+      }
 
-        const user = await tx.user.findUnique({
-          where: {
-            id: input.userId,
-          },
-          select: {
-            points: true,
-          },
-        });
+      const user = await tx.user.findUnique({
+        where: { id: input.userId },
+        select: { points: true },
+      });
+      if (!user) throw new Error("User not found");
 
-        if (!user) {
-          throw new Error("User not found");
-        }
-
-        return tx.pointLedger.create({
-          data: {
-            userId: input.userId,
-            type: "CREDIT",
-            amount: input.amount,
-            balanceAfter: user.points,
-            reason: input.reason,
-            sourceId: input.sourceId,
-            idempotencyKey: input.idempotencyKey,
-            metadata: input.metadata,
-          },
-        });
-      },
-      {
-        isolationLevel:
-          Prisma.TransactionIsolationLevel.Serializable,
-      },
-    );
+      return tx.pointLedger.create({
+        data: {
+          userId: input.userId,
+          type,
+          amount: signedAmount,
+          balanceAfter: user.points,
+          reason: input.reason,
+          sourceId: input.sourceId,
+          idempotencyKey: input.idempotencyKey,
+          metadata: input.metadata,
+        },
+      });
+    });
   } catch (error) {
-    const existingAfterError =
-      await getExistingLedgerEntry(
-        input.idempotencyKey,
-      );
-
-    if (existingAfterError) {
-      return existingAfterError;
-    }
-
+    // Two identical requests can race on the unique idempotency key. The loser
+    // rolls back and simply returns what the winner wrote.
+    const existingAfterError = await getExistingLedgerEntry(input.idempotencyKey);
+    if (existingAfterError) return assertLedgerMatches(existingAfterError, expected);
     throw error;
   }
 }
 
-export async function debitPoints(
-  input: DebitPointsInput,
-) {
-  validateUserId(input.userId);
+export async function creditPoints(input: CreditPointsInput) {
   validatePositiveInteger(input.amount, "amount");
-  validateReason(input.reason);
-  validateIdempotencyKey(input.idempotencyKey);
-
-  const existing = await getExistingLedgerEntry(
-    input.idempotencyKey,
-  );
-
-  if (existing) {
-    return existing;
-  }
-
-  try {
-    return await db.$transaction(
-      async (tx) => {
-        const existingInsideTransaction =
-          await tx.pointLedger.findUnique({
-            where: {
-              idempotencyKey: input.idempotencyKey,
-            },
-          });
-
-        if (existingInsideTransaction) {
-          return existingInsideTransaction;
-        }
-
-        const updatedUsers =
-          await tx.user.updateMany({
-            where: {
-              id: input.userId,
-              points: {
-                gte: input.amount,
-              },
-            },
-            data: {
-              points: {
-                decrement: input.amount,
-              },
-            },
-          });
-
-        if (updatedUsers.count !== 1) {
-          const user = await tx.user.findUnique({
-            where: {
-              id: input.userId,
-            },
-            select: {
-              id: true,
-              points: true,
-            },
-          });
-
-          if (!user) {
-            throw new Error("User not found");
-          }
-
-          throw new Error(
-            `Insufficient points. Current balance: ${user.points}`,
-          );
-        }
-
-        const user = await tx.user.findUnique({
-          where: {
-            id: input.userId,
-          },
-          select: {
-            points: true,
-          },
-        });
-
-        if (!user) {
-          throw new Error("User not found");
-        }
-
-        return tx.pointLedger.create({
-          data: {
-            userId: input.userId,
-            type: "DEBIT",
-            amount: -input.amount,
-            balanceAfter: user.points,
-            reason: input.reason,
-            sourceId: input.sourceId,
-            idempotencyKey: input.idempotencyKey,
-            metadata: input.metadata,
-          },
-        });
-      },
-      {
-        isolationLevel:
-          Prisma.TransactionIsolationLevel.Serializable,
-      },
-    );
-  } catch (error) {
-    const existingAfterError =
-      await getExistingLedgerEntry(
-        input.idempotencyKey,
-      );
-
-    if (existingAfterError) {
-      return existingAfterError;
-    }
-
-    throw error;
-  }
+  return postLedgerEntry(input, "CREDIT", input.amount, "INSUFFICIENT_POINTS");
 }
 
-export async function adjustPoints(
-  input: AdjustPointsInput,
-) {
-  validateUserId(input.userId);
+export async function debitPoints(input: DebitPointsInput) {
+  validatePositiveInteger(input.amount, "amount");
+  return postLedgerEntry(input, "DEBIT", -input.amount, "INSUFFICIENT_POINTS");
+}
+
+export async function adjustPoints(input: AdjustPointsInput) {
   validateNonZeroInteger(input.amount, "amount");
-  validateReason(input.reason);
-  validateIdempotencyKey(input.idempotencyKey);
-
-  const existing = await getExistingLedgerEntry(
-    input.idempotencyKey,
-  );
-
-  if (existing) {
-    return existing;
-  }
-
-  try {
-    return await db.$transaction(
-      async (tx) => {
-        const existingInsideTransaction =
-          await tx.pointLedger.findUnique({
-            where: {
-              idempotencyKey: input.idempotencyKey,
-            },
-          });
-
-        if (existingInsideTransaction) {
-          return existingInsideTransaction;
-        }
-
-        const user = await tx.user.findUnique({
-          where: {
-            id: input.userId,
-          },
-          select: {
-            id: true,
-            points: true,
-          },
-        });
-
-        if (!user) {
-          throw new Error("User not found");
-        }
-
-        const newBalance =
-          user.points + input.amount;
-
-        if (newBalance < 0) {
-          throw new Error(
-            `Adjustment would make points negative. Current balance: ${user.points}`,
-          );
-        }
-
-        await tx.user.update({
-          where: {
-            id: input.userId,
-          },
-          data: {
-            points: newBalance,
-          },
-        });
-
-        return tx.pointLedger.create({
-          data: {
-            userId: input.userId,
-            type: "ADJUSTMENT",
-            amount: input.amount,
-            balanceAfter: newBalance,
-            reason: input.reason,
-            sourceId: input.sourceId,
-            idempotencyKey: input.idempotencyKey,
-            metadata: input.metadata,
-          },
-        });
-      },
-      {
-        isolationLevel:
-          Prisma.TransactionIsolationLevel.Serializable,
-      },
-    );
-  } catch (error) {
-    const existingAfterError =
-      await getExistingLedgerEntry(
-        input.idempotencyKey,
-      );
-
-    if (existingAfterError) {
-      return existingAfterError;
-    }
-
-    throw error;
-  }
+  return postLedgerEntry(input, "ADJUSTMENT", input.amount, "ADJUSTMENT_WOULD_MAKE_POINTS_NEGATIVE");
 }
 
-export async function refundPoints(
-  input: CreditPointsInput,
-) {
-  validateUserId(input.userId);
+export async function refundPoints(input: CreditPointsInput) {
   validatePositiveInteger(input.amount, "amount");
-  validateReason(input.reason);
-  validateIdempotencyKey(input.idempotencyKey);
-
-  const existing = await getExistingLedgerEntry(
-    input.idempotencyKey,
-  );
-
-  if (existing) {
-    return existing;
-  }
-
-  try {
-    return await db.$transaction(
-      async (tx) => {
-        const existingInsideTransaction =
-          await tx.pointLedger.findUnique({
-            where: {
-              idempotencyKey: input.idempotencyKey,
-            },
-          });
-
-        if (existingInsideTransaction) {
-          return existingInsideTransaction;
-        }
-
-        await tx.user.update({
-          where: {
-            id: input.userId,
-          },
-          data: {
-            points: {
-              increment: input.amount,
-            },
-          },
-        });
-
-        const user = await tx.user.findUnique({
-          where: {
-            id: input.userId,
-          },
-          select: {
-            points: true,
-          },
-        });
-
-        if (!user) {
-          throw new Error("User not found");
-        }
-
-        return tx.pointLedger.create({
-          data: {
-            userId: input.userId,
-            type: "REFUND",
-            amount: input.amount,
-            balanceAfter: user.points,
-            reason: input.reason,
-            sourceId: input.sourceId,
-            idempotencyKey: input.idempotencyKey,
-            metadata: input.metadata,
-          },
-        });
-      },
-      {
-        isolationLevel:
-          Prisma.TransactionIsolationLevel.Serializable,
-      },
-    );
-  } catch (error) {
-    const existingAfterError =
-      await getExistingLedgerEntry(
-        input.idempotencyKey,
-      );
-
-    if (existingAfterError) {
-      return existingAfterError;
-    }
-
-    throw error;
-  }
+  return postLedgerEntry(input, "REFUND", input.amount, "INSUFFICIENT_POINTS");
 }
 
 export async function getPointBalance(

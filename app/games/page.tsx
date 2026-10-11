@@ -1,9 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { db } from "../../lib/prisma";
 import { vortexScore } from "../../lib/game-score";
 import LocaleText from "@/components/ui/LocaleText";
+import { getServerLocale } from "../../lib/server-locale";
 import {
   GAME_PLATFORMS,
   normalizePlatform,
@@ -27,6 +29,7 @@ export default async function Games({
   searchParams,
 }: Props) {
   const params = await searchParams;
+  const en = (await getServerLocale()) === "en";
 
   const q = (params.q || "").trim().slice(0, 80);
 
@@ -178,11 +181,24 @@ export default async function Games({
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          gamePlatforms: true,
-          gameCategories: {
-            include: {
-              category: true,
+        // Only the columns the cards render. The old `include` pulled full rows (long
+        // description, screenshots[]) plus a join through every category for each game.
+        select: {
+          id: true,
+          slug: true,
+          titleAr: true,
+          titleEn: true,
+          coverUrl: true,
+          platform: true,
+          genre: true,
+          ratingAverage: true,
+          ratingCount: true,
+          playCount: true,
+          viewCount: true,
+          featured: true,
+          gamePlatforms: {
+            select: {
+              platform: true,
             },
           },
         },
@@ -292,6 +308,11 @@ export default async function Games({
       Math.ceil(total / limit),
     );
 
+  // A page number past the end (old link, deleted games) goes to the last real page, not "No results".
+  if (total > 0 && page > totalPages) {
+    redirect(buildPageHref(totalPages));
+  }
+
   return (
     <main className="wrap">
       <section className="glass hero">
@@ -374,13 +395,22 @@ export default async function Games({
           className="glass card filters"
           method="get"
         >
+          {limit !== 24 && (
+            <input
+              type="hidden"
+              name="limit"
+              value={limit}
+            />
+          )}
+
           <input
             className="input"
             name="q"
             defaultValue={q}
             maxLength={80}
-            placeholder="Search for games, genres..."
-            aria-label="Search for a game"
+            placeholder={en ? "Search for games, genres..." : "ابحث عن لعبة أو نوع..."}
+            aria-label={en ? "Search for a game" : "بحث عن لعبة"}
+            enterKeyHint="search"
           />
 
           <div className="filter-row">
@@ -390,10 +420,10 @@ export default async function Games({
               defaultValue={
                 normalizedPlatform ?? ""
               }
-              aria-label="Platform"
+              aria-label={en ? "Platform" : "المنصة"}
             >
               <option value="">
-                كل المنصات
+                {en ? "All platforms" : "كل المنصات"}
               </option>
 
               {GAME_PLATFORMS.map(
@@ -402,7 +432,7 @@ export default async function Games({
                     key={item.slug}
                     value={item.slug}
                   >
-                    {item.nameAr}
+                    {en ? item.nameEn : item.nameAr}
                   </option>
                 ),
               )}
@@ -412,10 +442,10 @@ export default async function Games({
               className="input"
               name="genre"
               defaultValue={genre}
-              aria-label="Genre"
+              aria-label={en ? "Genre" : "النوع"}
             >
               <option value="">
-                كل الأنواع
+                {en ? "All genres" : "كل الأنواع"}
               </option>
 
               {genreValues.map(
@@ -424,8 +454,7 @@ export default async function Games({
                     key={value.slug}
                     value={value.slug}
                   >
-                    {value.nameAr ||
-                      value.nameEn}
+                    {en ? value.nameEn || value.nameAr : value.nameAr || value.nameEn}
                   </option>
                 ),
               )}
@@ -435,30 +464,22 @@ export default async function Games({
               className="input"
               name="sort"
               defaultValue={sort}
-              aria-label="Sort order"
+              aria-label={en ? "Sort order" : "الترتيب"}
             >
-              <option value="rating">
-                الأعلى تقييمًا
-              </option>
+              <option value="rating">{en ? "Top rated" : "الأعلى تقييمًا"}</option>
 
-              <option value="popular">
-                الأكثر لعبًا
-              </option>
+              <option value="popular">{en ? "Most played" : "الأكثر لعبًا"}</option>
 
-              <option value="views">
-                الأكثر مشاهدة
-              </option>
+              <option value="views">{en ? "Most viewed" : "الأكثر مشاهدة"}</option>
 
-              <option value="newest">
-                الأحدث
-              </option>
+              <option value="newest">{en ? "Newest" : "الأحدث"}</option>
             </select>
 
             <button
               className="btn"
               type="submit"
             >
-              بحث
+              {en ? "Search" : "بحث"}
             </button>
           </div>
         </form>
@@ -471,7 +492,7 @@ export default async function Games({
           fontSize: "13px",
         }}
       >
-        بيانات الألعاب المستوردة من RAWG تستخدم وفق شروط المصدر، مع روابط المتاجر الرسمية عند توفرها.{" "}
+        {en ? "Game data imported from RAWG is used under the source terms, with official store links where available." : "بيانات الألعاب المستوردة من RAWG تستخدم وفق شروط المصدر، مع روابط المتاجر الرسمية عند توفرها."}{" "}
         <a
           href="https://rawg.io"
           target="_blank"
@@ -479,6 +500,16 @@ export default async function Games({
         >
           RAWG
         </a>
+      </p>
+
+      <p className="muted" role="status" style={{ marginTop: "10px", fontSize: "13px" }}>
+        {en ? `${total} game(s)` : `${total} لعبة`}
+        {(q || normalizedPlatform || genre) && (
+          <>
+            {" · "}
+            <Link href="/games">{en ? "Clear filters" : "مسح الفلاتر"}</Link>
+          </>
+        )}
       </p>
 
       <div className="grid">
@@ -497,6 +528,7 @@ export default async function Games({
                   game.titleAr
                 }
                 loading="lazy"
+                decoding="async"
               />
             )}
 
@@ -524,9 +556,10 @@ export default async function Games({
               />
             </h2>
 
-            {game.titleEn && (
-              <p>{game.titleEn}</p>
-            )}
+            {game.titleEn &&
+              game.titleEn !== game.titleAr && (
+                <p>{game.titleEn}</p>
+              )}
 
             <div className="game-platform-list">
               {game.gamePlatforms.length >
@@ -604,7 +637,7 @@ export default async function Games({
         total > limit && (
           <nav
             className="glass card"
-            aria-label="Pagination"
+            aria-label={en ? "Pagination" : "الصفحات"}
             style={{
               marginTop: "18px",
               display: "flex",
@@ -663,6 +696,11 @@ export default async function Games({
               en="Try changing your search or filters."
             />
           </p>
+          {(q || normalizedPlatform || genre) && (
+            <Link className="btn" href="/games">
+              {en ? "Clear filters" : "مسح الفلاتر"}
+            </Link>
+          )}
         </section>
       )}
     </main>

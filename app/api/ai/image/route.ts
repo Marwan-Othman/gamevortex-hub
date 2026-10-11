@@ -5,37 +5,69 @@ import { guardMutation } from "@/lib/api";
 import { consumeAiCredit, refundAiCredit } from "@/lib/ai/credits";
 import { getAiCost } from "@/lib/ai/costs";
 import { generateImage } from "@/lib/ai/media";
+import {
+  aiErrorCode,
+  aiErrorResponse,
+  guardUser,
+  MAX_IMAGE_DATA_CHARS,
+  parseImageData,
+  pickAspectRatio,
+  pickImageSize,
+  readIdempotencyKey,
+} from "@/lib/ai/http";
+import { recordMediaUsage } from "@/lib/ai/media-usage";
 import { getVipAccess } from "@/lib/vip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-function safeError(error: unknown) {
-  const code = error instanceof Error ? error.message : "";
-  const known = new Set(["UNAUTHORIZED", "AI_VIP_REQUIRED", "AI_CREDITS_EXHAUSTED", "INVALID_REQUEST", "INVALID_IMAGE_INPUT", "AI_SERVICE_UNAVAILABLE"]);
-  return known.has(code) ? code : "AI_SERVICE_UNAVAILABLE";
-}
-
+/**
+ * POST /api/ai/image
+ * Request : { prompt, imageData?, aspectRatio?, imageSize?, idempotencyKey? }
+ * Success : 200 with the raw image bytes (Content-Type: image/png|jpeg|webp).
+ *           components/ai/AiMediaClient.tsx reads response.blob().
+ * Failure : { error: <code>, requestId } JSON.
+ */
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
-  const blocked = await guardMutation(request, "ai:image", 4);
+  const blocked = await guardMutation(request, "ai:image", 10);
   if (blocked) return blocked;
 
-  const user = await getOptionalUser();
+  // A database failure while reading the session must answer JSON (503), not throw out of the handler.
+  let user: Awaited<ReturnType<typeof getOptionalUser>>;
+  try {
+    user = await getOptionalUser();
+  } catch (error) {
+    return aiErrorResponse(error, requestId, "ai_auth_failure");
+  }
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED", requestId }, { status: 401 });
+
+  const limited = await guardUser(user.id, "ai:image", 4);
+  if (limited) return limited;
 
   const body = await request.json().catch(() => null);
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
-  const imageData = typeof body?.imageData === "string" ? body.imageData : undefined;
-  const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : undefined;
-  const imageSize = typeof body?.imageSize === "string" ? body.imageSize : undefined;
-  const idempotencyKey = typeof body?.idempotencyKey === "string" && body.idempotencyKey.trim() ? body.idempotencyKey.trim() : requestId;
+  const imageData = typeof body?.imageData === "string" && body.imageData ? body.imageData : undefined;
+  const aspectRatio = pickAspectRatio(body?.aspectRatio);
+  const imageSize = pickImageSize(body?.imageSize);
+  const idempotencyKey = readIdempotencyKey(body?.idempotencyKey, requestId);
 
-  if (!prompt || prompt.length > 4000) return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 400 });
-  if (imageData && imageData.length > 4_000_000) return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 413 });
+  if (!prompt || prompt.length > 4000 || !idempotencyKey || aspectRatio === null || imageSize === null) {
+    return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 400 });
+  }
+  if (imageData) {
+    if (imageData.length > MAX_IMAGE_DATA_CHARS) return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 413 });
+    // Validate before any credit is taken.
+    try { parseImageData(imageData); } catch { return NextResponse.json({ error: "INVALID_IMAGE_INPUT", requestId }, { status: 400 }); }
+  }
 
-  const vip = await getVipAccess(user.id);
+  let vip: Awaited<ReturnType<typeof getVipAccess>>;
+  try {
+    vip = await getVipAccess(user.id);
+  } catch (error) {
+    return aiErrorResponse(error, requestId, "ai_vip_lookup_failure");
+  }
   if (!vip.isVip) return NextResponse.json({ error: "AI_VIP_REQUIRED", requestId }, { status: 403 });
 
   const costKey = imageData ? "IMAGE_EDIT_COST" : imageSize === "2K" || imageSize === "4K" ? "HIGH_QUALITY_IMAGE_COST" : "IMAGE_COST";
@@ -45,24 +77,35 @@ export async function POST(request: NextRequest) {
 
   try {
     if (!owner) {
-      await consumeAiCredit(user.id, "IMAGE", idempotencyKey, cost);
+      const reservation = await consumeAiCredit(user.id, "IMAGE", idempotencyKey, cost);
+      // The same key already paid for an earlier request. Generating again
+      // would be free work, so a replay is refused instead of served.
+      if (reservation.alreadyApplied) throw new Error("AI_REQUEST_IN_PROGRESS");
       reserved = true;
     }
     const result = await generateImage({ prompt, imageData, aspectRatio, imageSize });
     const bytes = Buffer.from(result.data, "base64");
+    if (!bytes.length) throw new Error("AI_EMPTY_RESPONSE");
+
+    await recordMediaUsage({ userId: user.id, operation: "IMAGE", idempotencyKey, requestId, status: "COMPLETED", gvcUsed: owner ? 0 : cost });
     return new NextResponse(bytes, {
       status: 200,
       headers: {
         "Content-Type": result.mimeType,
+        "Content-Length": String(bytes.length),
         "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
         "X-Request-Id": requestId,
       },
     });
   } catch (error) {
-    if (reserved) await refundAiCredit(user.id, "IMAGE", idempotencyKey, cost).catch(() => undefined);
-    const code = safeError(error);
-    const status = code === "AI_CREDITS_EXHAUSTED" ? 402 : code === "AI_VIP_REQUIRED" ? 403 : code === "INVALID_REQUEST" || code === "INVALID_IMAGE_INPUT" ? 400 : 503;
-    console.error(JSON.stringify({ event: "ai_image_failure", requestId, code }));
-    return NextResponse.json({ error: code, requestId }, { status });
+    let refunded = 0;
+    if (reserved) {
+      refunded = await refundAiCredit(user.id, "IMAGE", idempotencyKey, cost).then(() => cost).catch(() => 0);
+    }
+    if (aiErrorCode(error) !== "AI_REQUEST_IN_PROGRESS" && aiErrorCode(error) !== "AI_IDEMPOTENCY_KEY_CONFLICT") {
+      await recordMediaUsage({ userId: user.id, operation: "IMAGE", idempotencyKey, requestId, status: "FAILED", gvcUsed: 0, gvcRefunded: refunded, errorCode: aiErrorCode(error) });
+    }
+    return aiErrorResponse(error, requestId, "ai_image_failure");
   }
 }

@@ -24,9 +24,24 @@ try {
   if (existingOwners.length > 1) {
     throw new Error('Multiple SUPER_ADMIN accounts already exist. Refusing automatic ownership changes; resolve manually before bootstrap.');
   }
+  // SECURITY: registration does not verify e-mail ownership. If an account with OWNER_EMAIL already
+  // exists and is not yet SUPER_ADMIN, someone else may have pre-registered it with THEIR password.
+  // Promoting it as-is would hand them the owner role, so the first promotion also replaces the
+  // password with OWNER_INITIAL_PASSWORD and removes any linked social logins.
+  const preExisting = await db.user.findUnique({ where: { email }, select: { id: true, role: true } });
+  const needsCredentialReset = Boolean(preExisting && preExisting.role !== Role.SUPER_ADMIN);
+  if (needsCredentialReset) {
+    await db.oAuthAccount.deleteMany({ where: { userId: preExisting.id } });
+    console.log('Production seed: promoting a pre-existing account; its password was reset to OWNER_INITIAL_PASSWORD.');
+  }
   const owner = await db.user.upsert({
     where: { email },
-    update: { role: Role.SUPER_ADMIN, sessionVersion: { increment: 1 }, username: process.env.OWNER_USERNAME?.trim() || 'marwan_hoshiya' },
+    update: {
+      role: Role.SUPER_ADMIN,
+      sessionVersion: { increment: 1 },
+      username: process.env.OWNER_USERNAME?.trim() || 'marwan_hoshiya',
+      ...(needsCredentialReset ? { passwordHash: hashPassword(password), emailVerifiedAt: new Date() } : {}),
+    },
     create: { email, username: process.env.OWNER_USERNAME?.trim() || 'marwan_hoshiya', role: Role.SUPER_ADMIN, passwordHash: hashPassword(password), emailVerifiedAt: new Date() }
   });
   await db.gamerProfile.upsert({ where: { userId: owner.id }, update: { displayName: process.env.OWNER_NAME?.trim() || 'marwan hoshiya' }, create: { userId: owner.id, displayName: process.env.OWNER_NAME?.trim() || 'marwan hoshiya' } });

@@ -2,23 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { getPlatformEnum } from "@/lib/platforms";
+import { guardRead } from "@/lib/api";
+import { toPublicContent } from "@/lib/downloads";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const blocked = await guardRead(request, "games:list", 120);
+  if (blocked) return blocked;
+
   try {
     const { searchParams } = new URL(request.url);
 
     const platformParam = searchParams.get("platform");
-    const category = searchParams.get("category");
-    const search = searchParams.get("search");
+    // `genre` is accepted too so the API matches the /games page URL; inputs are length-capped.
+    const category = (searchParams.get("category") ?? searchParams.get("genre"))?.slice(0, 80) ?? null;
+    const search = searchParams.get("search")?.slice(0, 100) ?? null;
     const sortParam = searchParams.get("sort");
     const pageParam = Number(searchParams.get("page") ?? "1");
     const limitParam = Number(searchParams.get("limit") ?? "24");
 
     const page =
       Number.isFinite(pageParam) && pageParam > 0
-        ? Math.floor(pageParam)
+        ? Math.min(Math.floor(pageParam), 100_000)
         : 1;
 
     const limit =
@@ -70,6 +76,12 @@ export async function GET(request: NextRequest) {
         },
         {
           slug: {
+            contains: query,
+            mode: "insensitive",
+          },
+        },
+        {
+          description: {
             contains: query,
             mode: "insensitive",
           },
@@ -129,7 +141,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: games,
+      data: games.map(toPublicContent),
       pagination: {
         page,
         limit,

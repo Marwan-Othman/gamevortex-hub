@@ -1,3 +1,12 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 enum AiUsageStatus {
   QUEUED
   PROCESSING
@@ -37,15 +46,6 @@ model AiUsageLedger {
   @@index([taskId])
   @@index([requestId])
 }
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 enum Role {
   SUPER_ADMIN
   STAFF
@@ -434,6 +434,9 @@ model OwnerLedger {
   createdAt DateTime @default(now())
 
   wallet OwnerWallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([walletId, createdAt])
+  @@index([withdrawalId])
 }
 
 model Game {
@@ -457,6 +460,7 @@ model Game {
   officialUrl    String?
   downloadSource String?
   isMod          Boolean  @default(false)
+  version        String?
 
   sourceStatus   SourceStatus @default(NEEDS_SOURCE)
   sourceProvider String?
@@ -486,6 +490,12 @@ model Game {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([published, featured])
+  @@index([published, createdAt])
+  @@index([published, ratingAverage, ratingCount])
+  @@index([published, playCount, viewCount])
+  @@index([published, viewCount])
 }
 
 model Category {
@@ -554,6 +564,7 @@ model App {
   officialUrl     String?
   downloadSource  String?
   isMod           Boolean       @default(false)
+  version         String?
   sourceStatus    SourceStatus  @default(NEEDS_SOURCE)
   sourceProvider  String?
   priceCents      Int           @default(0)
@@ -570,6 +581,7 @@ model App {
   updatedAt       DateTime      @updatedAt
 
   @@index([published, featured])
+  @@index([published, createdAt])
   @@index([sourceStatus])
 }
 
@@ -634,6 +646,7 @@ model GameLibraryItem {
 
   @@unique([userId, gameId])
   @@index([userId, status, updatedAt])
+  @@index([userId, updatedAt])
   @@index([gameId, status])
 }
 
@@ -662,6 +675,8 @@ model WithdrawalRequest {
   processedAt DateTime?
 
   ownerWallet OwnerWallet @relation(fields: [ownerWalletId], references: [id], onDelete: Restrict)
+
+  @@index([ownerWalletId, status, createdAt])
 }
 
 model AuditLog {
@@ -812,6 +827,7 @@ model GamerProfile {
   xpEvents     XpEvent[]
 
   @@index([level])
+  @@index([level, xp])
   @@index([xp])
 }
 
@@ -1095,6 +1111,7 @@ model GameProduct {
   digitalKeys DigitalKey[]
 
   @@index([gameId, active])
+  @@index([active, createdAt])
 }
 
 model Order {
@@ -2050,4 +2067,90 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
   @@index([authorId, createdAt])
+}
+
+/**
+ * =========================================================
+ * TRADING TABLES MANAGED OUTSIDE THE GENERATED CLIENT
+ * Created by migrations 20261001210000 .. 20261003120000 and accessed via
+ * parameterized SQL. @@ignore keeps them out of the client while keeping
+ * migrate diff aware of them. Do NOT query these through prisma.<model>.
+ * =========================================================
+ */
+
+model TradingApproval {
+  id              String    @id
+  opportunityId   String
+  ownerId         String
+  amountUsd       Decimal   @db.Decimal(18, 2)
+  issuedAt        DateTime  @default(now())
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  status          String    @default("PENDING")
+  strategyVersion String?
+  shariahStatus   String
+  riskSnapshot    Json?
+  tokenHash       String    @unique
+  executionSnapshot Json?
+
+  @@index([ownerId, issuedAt])
+  @@index([opportunityId, issuedAt])
+  @@index([status, expiresAt])
+  @@ignore
+}
+
+model TradingLiveOrder {
+  id                    String    @id
+  ownerId               String
+  approvalId            String
+  opportunityId         String
+  idempotencyKey        String    @unique
+  clientOrderId         String    @unique
+  providerOrderId       String?   @unique
+  symbol                String
+  side                  String    @default("BUY")
+  amountUsd             Decimal   @db.Decimal(18, 2)
+  entryPrice            Decimal   @db.Decimal(30, 12)
+  stopLossPrice         Decimal   @db.Decimal(30, 12)
+  takeProfitPrice       Decimal?  @db.Decimal(30, 12)
+  status                String    @default("INTENT_CREATED")
+  providerStatus        String?
+  executedQty           Decimal?  @db.Decimal(30, 18)
+  cumulativeQuoteQty    Decimal?  @db.Decimal(30, 18)
+  averageFillPrice      Decimal?  @db.Decimal(30, 18)
+  lastProviderUpdateAt  DateTime?
+  lastReconciledAt      DateTime?
+  lastError             String?
+  version               Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now())
+  protectionStatus      String    @default("NOT_REQUIRED")
+  protectionOrderId     String?
+  stopLossOrderId       String?
+  takeProfitOrderId     String?
+  protectionUpdatedAt   DateTime?
+  protectionError       String?
+  settlementStatus      String    @default("NOT_SETTLED")
+  exitProviderOrderId   String?
+  exitClientOrderId     String?
+  exitPrice             Decimal?  @db.Decimal(30, 18)
+  exitExecutedQty       Decimal?  @db.Decimal(30, 18)
+  exitCumulativeQuoteQty Decimal? @db.Decimal(30, 18)
+  realizedPnlUsd        Decimal?  @db.Decimal(30, 18)
+  exchangeClosedAt      DateTime?
+  settlementError       String?
+  walletSettledAt       DateTime?
+  settledUsd            Decimal?  @db.Decimal(30, 18)
+  settledPoints         Int?
+  settlementRoundingUsd Decimal?  @db.Decimal(30, 18)
+
+  @@index([ownerId, createdAt])
+  @@index([status, updatedAt])
+  @@index([approvalId])
+  @@index([opportunityId])
+  @@index([protectionStatus, updatedAt])
+  @@index([settlementStatus, updatedAt])
+  @@index([exitProviderOrderId])
+  @@index([walletSettledAt])
+  @@ignore
 }

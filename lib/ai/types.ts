@@ -20,7 +20,11 @@ export type AiChatResult = {
   latencyMs: number;
 };
 
+export type AiChatAttempt = { provider: AiProvider; error?: AiProviderError; result?: AiChatResult };
+
 export class AiProviderError extends Error {
+  /** Filled by the failover runner when every provider failed, so callers can still record the failed attempts. */
+  attempts: AiChatAttempt[] = [];
   readonly provider: AiProvider;
   readonly code: string;
   readonly status?: number;

@@ -3,7 +3,7 @@ import { DeliveryType, DigitalKeyStatus, ProductKind } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, ownerRouteError } from "@/lib/api";
 import { encryptDigitalKey, keyFingerprint } from "@/lib/digital-keys";
 
 const keySchema = z.object({
@@ -45,7 +45,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_PRODUCT_ID" }, { status: 400 });
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    // 401 not signed in / 403 not owner / 500 real failure (previously EVERY failure was reported as 403).
+    return ownerRouteError(error, "DIGITAL_KEY_LOAD_FAILED", 500);
   }
 }
 
@@ -64,7 +65,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (product.kind !== ProductKind.GAME_KEY || product.deliveryType !== DeliveryType.CODE) {
       return NextResponse.json({ error: "PRODUCT_DOES_NOT_USE_DIGITAL_KEYS" }, { status: 409 });
     }
-    if (!product.supplierVerified) return NextResponse.json({ error: "SUPPLIER_NOT_VERIFIED" }, { status: 409 });
+    // Keys can be loaded before the product is published: publishing needs available keys, and
+    // an unverified/inactive product is never shown in the store, so nothing is exposed meanwhile.
 
     const keys = normalizedCodes.map((code) => ({
       productId,
@@ -96,6 +98,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error instanceof Error && error.message === "DIGITAL_KEY_ENCRYPTION_SECRET_NOT_CONFIGURED") {
       return NextResponse.json({ error: "DIGITAL_KEY_ENCRYPTION_SECRET_NOT_CONFIGURED" }, { status: 503 });
     }
-    return NextResponse.json({ error: "DIGITAL_KEY_IMPORT_FAILED" }, { status: 400 });
+    return ownerRouteError(error, "DIGITAL_KEY_IMPORT_FAILED", 500);
   }
 }

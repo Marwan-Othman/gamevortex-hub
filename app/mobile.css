@@ -1,0 +1,139 @@
+/* =====================================================================
+   Phase 17 — Mobile hardening
+   Loaded LAST (see app/layout.tsx) so it wins over older route CSS.
+   Only fixes things that overflow / become unusable on phones.
+   ===================================================================== */
+
+/* ---- Global safety nets ---------------------------------------------- */
+img, video, canvas, svg, iframe { max-width: 100%; }
+img, video { height: auto; }
+.gv-app-main { min-width: 0; }
+.gv-app-main :where(h1, h2, h3, h4, p, li, td, th, label, a, span, small, strong) {
+  overflow-wrap: anywhere;
+}
+.gv-app-main :where(pre, code) { max-width: 100%; overflow-x: auto; overflow-wrap: anywhere; }
+.gv-app-main :where(pre) { white-space: pre-wrap; }
+
+/* Keep the page out of the notch in landscape (viewport-fit=cover) */
+body {
+  padding-inline-start: env(safe-area-inset-left, 0px);
+  padding-inline-end: env(safe-area-inset-right, 0px);
+  min-height: 100vh;
+}
+@supports (height: 100dvh) {
+  body { min-height: 100dvh; }
+}
+
+/* ---- Tables: any table scrolls inside its own box --------------------- */
+.gv-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.gv-table-scroll > table { min-width: 560px; }
+
+/* ---- Side-column layouts (merge / studio / AI chat / support) --------- */
+@media (max-width: 900px) {
+  .gv-m-split {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .gv-m-split > * { min-width: 0; }
+}
+
+/* ---- Phones ------------------------------------------------------------ */
+@media (max-width: 767px) {
+  /* 16px inputs everywhere: stops iOS Safari zooming the page on focus
+     (older rules only covered <=430px, so large iPhones still zoomed). */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea,
+  .gv-search input,
+  .gv-mobile-search-panel input {
+    font-size: 16px !important;
+  }
+  select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+    min-height: 44px;
+  }
+
+  /* Touch targets */
+  button, [role="button"], .btn, summary { min-height: 44px; }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  main label:has(> input[type="checkbox"]),
+  main label:has(> input[type="radio"]) { min-height: 44px; align-items: center; }
+
+  /* Forms stack instead of squeezing */
+  form .row, form .form-row, .form-row, .field-row { flex-wrap: wrap; }
+  form :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]) { max-width: 100%; }
+
+  /* Upload: file inputs and drop zones span the screen */
+  input[type="file"] { width: 100%; max-width: 100%; min-height: 48px; font-size: 14px !important; }
+  [class*="dropzone"], [class*="dropZone"], [class*="uploadBox"] { padding: 18px 12px; }
+
+  /* Action rows: buttons wrap and fill the width */
+  .actions, .action-row, .draw-actions, [class*="actionsRow"], [class*="btnRow"] {
+    flex-wrap: wrap;
+  }
+
+  /* Admin: shell, panels, lists never exceed the screen */
+  [class*="panelHead"] { flex-wrap: wrap; gap: 10px; }
+  [class*="panelHead"] > * { min-width: 0; }
+  [class*="statsGrid"], [class*="kpiGrid"], [class*="cardsGrid"] {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)) !important;
+  }
+  [class*="topbar"] { gap: 8px; }
+  [class*="searchWrap"] { min-width: 0; flex: 1 1 100%; }
+
+  /* Admin / generic tables: cells wrap so one long e-mail does not
+     push the whole table to thousands of px */
+  .gv-table-scroll td, .gv-table-scroll th { white-space: normal !important; min-width: 84px; }
+
+  /* Modals / dialogs / drawers fit the visible viewport (iOS toolbar aware) */
+  .gv-m-modal { padding: 10px !important; align-items: end !important; }
+  .gv-m-modal > * {
+    max-height: calc(100dvh - 20px) !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    width: min(100%, 620px) !important;
+    margin-inline: auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Toasts / notifications sit above the bottom nav and never overflow */
+  .notifications-container {
+    inset-inline: 10px !important;
+    max-width: none !important;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Footer must clear the floating bottom nav */
+  .gv-footer, .footer { padding-bottom: 12px; }
+}
+
+/* ---- Chat (GameVortex AI) -------------------------------------------- */
+@media (max-width: 767px) {
+  .gv-m-aihub { padding: 12px !important; }
+  .gv-m-h1 { font-size: 26px !important; }
+  .gv-m-chatbox, .gv-m-chatcol { min-height: min(560px, 72dvh) !important; }
+  .gv-m-chathead { flex-wrap: wrap; }
+  .gv-m-chathead strong { flex: 1 1 100%; }
+  .gv-m-chathead button { flex: 1 1 auto; }
+  .gv-m-chatform { flex-direction: column; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important; }
+  .gv-m-chatform textarea { width: 100%; min-height: 80px !important; }
+  .gv-m-chatform button { min-height: 48px; width: 100%; }
+}
+
+/* ---- Very small phones (<= 360px) ------------------------------------ */
+@media (max-width: 360px) {
+  .gv-app-main .grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .wrap { width: calc(100% - 16px) !important; }
+  .gv-m-split { gap: 12px !important; }
+}
+
+/* ---- Landscape phones: do not let sticky chrome eat the screen --------- */
+@media (max-height: 480px) and (orientation: landscape) {
+  .gv-bottom-nav { position: static !important; }
+  body { padding-bottom: 0 !important; }
+  .gv-m-modal > * { max-height: calc(100dvh - 10px) !important; }
+}

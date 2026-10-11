@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardRead } from "@/lib/api";
+import { guardRead, logRouteError } from "@/lib/api";
 import { beginOAuth, OAuthProvider, oauthProviderConfigured } from "@/lib/auth/oauth";
 
 const supported = new Set<OAuthProvider>(["google", "apple", "steam"]);
@@ -14,7 +14,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
   try {
     const destination = await beginOAuth(provider, request.nextUrl.origin);
     return NextResponse.redirect(destination, { status: 302, headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    // The user only sees "unavailable"; the real reason (bad client id, network, state storage) goes to the server log.
+    logRouteError(`auth:oauth:begin:${provider}`, error);
     return NextResponse.redirect(new URL("/auth/login?error=oauth_unavailable", request.url));
   }
 }

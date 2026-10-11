@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, ownerRouteError } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,14 +18,15 @@ export async function GET(request: NextRequest) {
     const [users, games, products, orders, payments, withdrawals, vipSubscriptions, errors, reports] = await Promise.all([
       db.user.count(), db.game.count(), db.gameProduct.count(), db.order.count(), db.payment.count(),
       db.withdrawalRequest.count({ where: { status: { in: ["REQUESTED", "PENDING", "PROCESSING"] } } }),
-      db.vipSubscription.count({ where: { status: "ACTIVE" } }),
+      db.vipSubscription.count({ where: { status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } }),
       db.systemError.count({ where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }),
       db.contentReport.count({ where: { status: "PENDING" } }),
     ]);
     return NextResponse.json({ ok: true, owner: { id: owner.id, username: owner.username, email: owner.email, role: owner.role }, stats: { users, games, products, orders, payments, pendingWithdrawals: withdrawals, activeVip: vipSubscriptions, errors24h: errors, pendingReports: reports } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "OWNER_CONTROL_FAILED";
-    return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : 403 });
+    // 401 signed out, 403 not the owner, 503 database outage, 500 anything else. A database failure used to be
+    // reported as 403, which made a healthy owner look "not allowed" during an outage.
+    return ownerRouteError(error, "OWNER_CONTROL_FAILED", 500);
   }
 }
 
@@ -34,7 +35,9 @@ export async function PATCH(request: NextRequest) {
   if (blocked) return blocked;
   try {
     const owner = await requireOwner();
-    const body = await request.json();
+    const parsedBody: unknown = await request.json();
+    // `null`, a number or an array is not a valid body: treat it like {} so validation answers 400, not a TypeError 500.
+    const body = parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody) ? (parsedBody as Record<string, unknown>) : {};
     const userId = z.string().cuid().parse(body.userId);
     const { role } = roleSchema.parse(body);
     if (userId === owner.id && role !== Role.SUPER_ADMIN) {
@@ -79,14 +82,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updated = await db.$transaction(async (tx) => {
-      const user = await tx.user.update({ where: { id: userId }, data: { role }, select: { id: true, role: true, username: true, email: true } });
+      const user = await tx.user.update({ where: { id: userId }, data: { role, sessionVersion: { increment: 1 } }, select: { id: true, role: true, username: true, email: true } });
       await tx.auditLog.create({ data: { actorUserId: owner.id, action: "OWNER_ROLE_CHANGED", entityType: "User", entityId: user.id, metadata: { from: target.role, to: role, username: target.username, email: target.email } } });
       return user;
     });
     return NextResponse.json({ ok: true, user: updated });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "OWNER_CONTROL_FAILED";
-    const status = message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : message === "USER_NOT_FOUND" ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return ownerRouteError(error, "OWNER_CONTROL_FAILED", 500);
   }
 }

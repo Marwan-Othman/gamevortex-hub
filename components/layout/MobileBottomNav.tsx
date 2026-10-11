@@ -80,7 +80,7 @@ const navigationItems = [
   { href: "/games", label: "Games", Icon: GameIcon, premium: false },
   { href: "/marketplace", label: "Marketplace", Icon: GiftIcon, premium: false },
   { href: "/ai", label: "AI", Icon: GridIcon, premium: false },
-  { href: "/library", label: "Library", Icon: CardIcon, premium: false },
+  { href: "/profile/gamer", label: "Profile", Icon: UserIcon, premium: false },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -98,13 +98,13 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const locale = useLocale();
   const labels: Record<string, string> = locale === "ar"
-    ? { Home: "الرئيسية", Games: "الألعاب", Marketplace: "المتجر", AI: "الذكاء", Library: "المكتبة" }
-    : { Home: "Home", Games: "Games", Marketplace: "Marketplace", AI: "AI", Library: "Library" };
+    ? { Home: "الرئيسية", Games: "الألعاب", Marketplace: "المتجر", AI: "الذكاء", Profile: "حسابي" }
+    : { Home: "Home", Games: "Games", Marketplace: "Store", AI: "AI", Profile: "Account" };
 
   return (
     <nav
       className="gv-bottom-nav"
-      aria-label="التنقل الرئيسي"
+      aria-label={locale === "ar" ? "التنقل السفلي" : "Bottom navigation"}
       lang={locale}
       dir={locale === "ar" ? "rtl" : "ltr"}
       style={{

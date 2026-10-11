@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { db } from "../../lib/prisma";
-import { requireOwner } from "../../lib/auth";
-import AdminShell from "@/components/admin/AdminShell";
+import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import RevenueLineChart from "@/components/admin/RevenueLineChart";
 import PlatformDonutChart from "@/components/admin/PlatformDonutChart";
 import styles from "./admin.module.css";
@@ -62,62 +61,9 @@ function platformOf(platform: string | null) {
 }
 
 export default async function Admin() {
-  let owner;
-
-  try {
-    owner = await requireOwner();
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "FORBIDDEN";
-
-    return (
-      <main className="wrap" dir="rtl">
-        <section
-          className={styles.panel}
-          style={{
-            textAlign: "center",
-            padding: 60,
-            margin: "40px auto",
-            maxWidth: 480,
-          }}
-        >
-          {message === "UNAUTHORIZED" ? (
-            <>
-              <h1>سجّل الدخول للوصول للوحة التحكم</h1>
-
-              <p
-                className="muted"
-                style={{ margin: "10px 0 20px" }}
-              >
-                تحتاج لتسجيل الدخول بحساب المالك للوصول إلى هذه الصفحة.
-              </p>
-
-              <Link href="/auth/login" className="btn">
-                تسجيل الدخول
-              </Link>
-            </>
-          ) : (
-            <>
-              <h1>ليس لديك صلاحية الوصول</h1>
-
-              <p
-                className="muted"
-                style={{ margin: "10px 0 20px" }}
-              >
-                هذه الصفحة مخصصة لحساب المالك
-                (SUPER_ADMIN) فقط. سجّل الدخول بالحساب الصحيح إذا كنت
-                تعتقد أن هذا خطأ.
-              </p>
-
-              <Link href="/" className="btn">
-                العودة للرئيسية
-              </Link>
-            </>
-          )}
-        </section>
-      </main>
-    );
-  }
+  const gate = await getOwnerOrAccessScreen();
+  if ("screen" in gate) return gate.screen;
+  const owner = gate.owner;
 
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -463,7 +409,6 @@ export default async function Admin() {
   ];
 
   return (
-    <AdminShell ownerLabel={owner.username || owner.email}>
       <div className={styles.dashboard} dir="rtl">
 
         {/* OWNER HEADER */}
@@ -931,7 +876,6 @@ export default async function Admin() {
         )}
 
       </div>
-    </AdminShell>
   );
 }
 

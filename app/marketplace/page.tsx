@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProductKind, SourceStatus } from "@prisma/client";
+import { DigitalKeyStatus, ProductKind, SourceStatus } from "@prisma/client";
 import BuyNowButton from "@/components/marketplace/BuyNowButton";
 import { db } from "@/lib/prisma";
 
@@ -16,8 +16,21 @@ export default async function Marketplace() {
         published: true,
         sourceStatus: { in: [SourceStatus.VERIFIED, SourceStatus.OFFICIAL_SOURCE] },
       },
+      // Sold-out products are not offered (same rule as /api/marketplace/products).
+      digitalKeys: { some: { status: DigitalKeyStatus.AVAILABLE } },
     },
-    include: { game: true },
+    // Only the columns the cards render (the old `include: { game: true }` pulled whole Game rows
+    // with long descriptions and screenshot arrays for up to 100 products).
+    select: {
+      id: true,
+      title: true,
+      region: true,
+      inventory: true,
+      priceCents: true,
+      currency: true,
+      rewardPoints: true,
+      game: { select: { titleAr: true, titleEn: true } },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -55,7 +68,11 @@ export default async function Marketplace() {
               </div>
               <h2>{product.title}</h2>
               <p className="muted">{product.game.titleAr || product.game.titleEn}</p>
-              <div className="product-price">{product.priceCents === 0 ? "مجاني · +10 نقاط" : `${(product.priceCents / 100).toFixed(2)} ${product.currency}`}</div>
+              <div className="product-price">{product.priceCents === 0
+                  ? product.rewardPoints && product.rewardPoints > 0
+                    ? `مجاني · +${product.rewardPoints} نقطة`
+                    : "مجاني"
+                  : `${(product.priceCents / 100).toFixed(2)} ${product.currency}`}</div>
               <p className="muted">تسليم رقمي عبر مفتاح تفعيل. تحقق من المنطقة والمنصة قبل إتمام الدفع.</p>
               <BuyNowButton productId={product.id} productTitle={product.title} priceCents={product.priceCents} />
             </article>

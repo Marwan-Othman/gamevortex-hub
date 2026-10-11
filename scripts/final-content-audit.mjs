@@ -10,7 +10,8 @@ const required = [
 const missing=required.filter(f=>!fs.existsSync(path.join(process.cwd(),f)));
 if(missing.length){console.error("Final content audit: FAIL");missing.forEach(x=>console.error("MISSING",x));process.exit(1)}
 const schema=fs.readFileSync("prisma/schema.prisma","utf8");
-for(const token of ["model App {","model AppPlatform {","model AppCategory {","appPlatforms AppPlatform[]","appCategories AppCategory[]"]){if(!schema.includes(token)){console.error("Final content audit: FAIL missing schema token",token);process.exit(1)}}
+const schemaTokens=[/^model\s+App\s*\{/m,/^model\s+AppPlatform\s*\{/m,/^model\s+AppCategory\s*\{/m,/\bappPlatforms\s+AppPlatform\[\]/,/\bappCategories\s+AppCategory\[\]/];
+for(const token of schemaTokens){if(!token.test(schema)){console.error("Final content audit: FAIL missing schema token",String(token));process.exit(1)}}
 const migration=fs.readFileSync("prisma/migrations/20260926200000_add_apps_system/migration.sql","utf8");
 for(const token of ['CREATE TABLE "App"','CREATE TABLE "AppPlatform"','CREATE TABLE "AppCategory"']){if(!migration.includes(token)){console.error("Final content audit: FAIL missing migration token",token);process.exit(1)}}
 console.log("Final content audit: PASS");

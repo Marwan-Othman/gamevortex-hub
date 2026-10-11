@@ -52,10 +52,16 @@ async function unlockMilestones(tx: any, userId: string, profileId: string, leve
   if (level >= 25) keys.push("LEVEL_25");
   if (!keys.length) return [];
   const achievements = await tx.achievement.findMany({ where: { key: { in: keys } } });
+  if (!achievements.length) return [];
+  // One query for all already-unlocked achievements instead of one lookup per milestone.
+  const alreadyUnlocked = await tx.userAchievement.findMany({
+    where: { profileId, achievementId: { in: achievements.map((a: { id: string }) => a.id) } },
+    select: { achievementId: true },
+  });
+  const unlockedIds = new Set(alreadyUnlocked.map((row: { achievementId: string }) => row.achievementId));
   const unlocked: any[] = [];
   for (const achievement of achievements) {
-    const existing = await tx.userAchievement.findUnique({ where: { profileId_achievementId: { profileId, achievementId: achievement.id } } });
-    if (existing) continue;
+    if (unlockedIds.has(achievement.id)) continue;
     const result = await tx.userAchievement.create({ data: { profileId, achievementId: achievement.id } });
     unlocked.push({ ...result, achievement });
     await tx.activity.create({ data: { userId, type: "ACHIEVEMENT_UNLOCKED", message: "Unlocked " + achievement.name, metadata: { achievementKey: achievement.key } } });

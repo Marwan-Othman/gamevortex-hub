@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode, userRouteError } from "@/lib/api";
 import { ConfiguredPaymentProvider } from "@/lib/payments";
 
 export const runtime = "nodejs";
@@ -17,18 +17,59 @@ const schema = z.object({
   idempotencyKey: z.string().trim().min(1).max(255).optional(),
 });
 
+// The raw row also holds the idempotency key and provider identifiers; the
+// browser only needs the public part of a deposit.
+function publicDeposit(deposit: {
+  id: string;
+  amountCents: number;
+  currency: string;
+  status: string;
+  createdAt: Date;
+}) {
+  return {
+    id: deposit.id,
+    amountCents: deposit.amountCents,
+    currency: deposit.currency,
+    status: deposit.status,
+    createdAt: deposit.createdAt,
+  };
+}
+
 export async function POST(request: NextRequest) {
   const blocked = await guardMutation(request, "wallet:deposit", 10);
   if (blocked) return blocked;
-  const user = await requireUser();
+  let user: Awaited<ReturnType<typeof requireUser>>;
+  try {
+    user = await requireUser();
+  } catch (error) {
+    return userRouteError(error, "AUTH_CHECK_FAILED", "wallet:deposit:auth");
+  }
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "INVALID_REQUEST" }, { status: 400 });
 
-  const idempotencyKey = parsed.data.idempotencyKey || randomUUID();
+  try {
+    return await createDeposit(user, parsed.data);
+  } catch (error) {
+    // The idempotency lookup and the deposit insert run before the provider is called. A database
+    // failure there must answer JSON (503 for an outage, 500 otherwise), never an uncaught throw.
+    return userRouteError(error, "DEPOSIT_CREATE_FAILED", "wallet:deposit");
+  }
+}
+
+async function createDeposit(user: { id: string }, input: z.infer<typeof schema>): Promise<NextResponse> {
+  const idempotencyKey = input.idempotencyKey || randomUUID();
   const existing = await db.walletDeposit.findUnique({ where: { idempotencyKey } });
   if (existing) {
     if (existing.userId !== user.id) return NextResponse.json({ error: "IDEMPOTENCY_CONFLICT" }, { status: 409 });
-    return NextResponse.json({ ok: true, deposit: existing, checkoutUrl: null });
+    // A reused key must describe the same deposit, never a different amount.
+    if (existing.amountCents !== input.amountCents) {
+      return NextResponse.json({ error: "IDEMPOTENCY_CONFLICT" }, { status: 409 });
+    }
+    // Only a deposit that is still waiting for its provider payment is resumed
+    // below. Anything else is simply reported back.
+    if (existing.status !== "PENDING" || existing.providerPaymentId) {
+      return NextResponse.json({ ok: true, deposit: publicDeposit(existing), checkoutUrl: null });
+    }
   }
 
   const provider = new ConfiguredPaymentProvider();
@@ -37,11 +78,11 @@ export async function POST(request: NextRequest) {
   const appOrigin = process.env.APP_ORIGIN?.trim();
   if (!appOrigin) return NextResponse.json({ error: "APP_ORIGIN_NOT_CONFIGURED" }, { status: 503 });
 
-  const deposit = await db.$transaction(async (transaction) => {
+  const deposit = existing ?? await db.$transaction(async (transaction) => {
     const created = await transaction.walletDeposit.create({
       data: {
         userId: user.id,
-        amountCents: parsed.data.amountCents,
+        amountCents: input.amountCents,
         currency: "USD",
         provider: provider.name,
         status: "PENDING",
@@ -62,7 +103,7 @@ export async function POST(request: NextRequest) {
     await transaction.wallet.update({
       where: { id: wallet.id },
       data: {
-        pendingBalance: { increment: new Prisma.Decimal(parsed.data.amountCents).div(100) },
+        pendingBalance: { increment: new Prisma.Decimal(input.amountCents).div(100) },
       },
     });
 
@@ -70,7 +111,7 @@ export async function POST(request: NextRequest) {
   }).catch(async (error) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const concurrent = await db.walletDeposit.findUnique({ where: { idempotencyKey } });
-      if (concurrent && concurrent.userId === user.id) return concurrent;
+      if (concurrent && concurrent.userId === user.id && concurrent.amountCents === input.amountCents) return concurrent;
     }
     throw error;
   });
@@ -97,15 +138,21 @@ export async function POST(request: NextRequest) {
       data: { providerPaymentId: payment.paymentId },
     });
 
-    return NextResponse.json({ ok: true, deposit: updated, checkoutUrl: payment.checkoutUrl || null, status: payment.status }, { status: 201 });
+    return NextResponse.json({ ok: true, deposit: publicDeposit(updated), checkoutUrl: payment.checkoutUrl || null, status: payment.status }, { status: 201 });
   } catch (error) {
     if (!providerPaymentCreated) {
       await db.$transaction(async (transaction) => {
+        // Lock the deposit so this rollback cannot race a provider webhook.
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "WalletDeposit" WHERE "id" = ${deposit.id} FOR UPDATE`,
+        );
         const current = await transaction.walletDeposit.findUnique({
           where: { id: deposit.id },
-          select: { id: true, userId: true, amountCents: true, status: true },
+          select: { id: true, userId: true, amountCents: true, status: true, providerPaymentId: true },
         });
-        if (!current || current.status !== "PENDING") return;
+        // A deposit that already has a provider payment may still be paid, and
+        // anything no longer PENDING is already settled. Leave both alone.
+        if (!current || current.status !== "PENDING" || current.providerPaymentId) return;
 
         const wallet = await transaction.wallet.findUnique({
           where: { userId: current.userId },
@@ -114,14 +161,15 @@ export async function POST(request: NextRequest) {
           await transaction.$queryRaw(
             Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
           );
-          await transaction.wallet.update({
-            where: { id: wallet.id },
-            data: {
-              pendingBalance: {
-                decrement: new Prisma.Decimal(current.amountCents).div(100),
-              },
-            },
-          });
+          const locked = await transaction.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+          const amount = new Prisma.Decimal(current.amountCents).div(100);
+          const release = locked.pendingBalance.lt(amount) ? locked.pendingBalance : amount;
+          if (release.gt(0)) {
+            await transaction.wallet.update({
+              where: { id: wallet.id },
+              data: { pendingBalance: { decrement: release } },
+            });
+          }
         }
 
         await transaction.walletDeposit.update({
@@ -132,7 +180,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      error: providerPaymentCreated ? "DEPOSIT_PERSISTENCE_PENDING" : error instanceof Error ? error.message : "DEPOSIT_CREATE_FAILED",
+      error: providerPaymentCreated ? "DEPOSIT_PERSISTENCE_PENDING" : publicErrorCode(error, "DEPOSIT_CREATE_FAILED"),
     }, { status: 502 });
   }
 }

@@ -1,0 +1,95 @@
+/* =====================================================================
+   Phase 13 — Public UI (mobile / tablet / desktop)
+   Loaded LAST in app/layout.tsx. Small, targeted overrides only.
+   ===================================================================== */
+
+/* Dynamic viewport: avoids content hidden under Android Chrome's URL bar */
+.gv-app-main { min-height: calc(100dvh - 72px); }
+body { min-height: 100dvh; }
+
+/* Never let the page scroll sideways */
+html, body { overflow-x: clip; }
+.gv-app-main img, .gv-app-main video { max-width: 100%; height: auto; }
+.gv-app-main h1, .gv-app-main h2, .gv-app-main h3 { overflow-wrap: anywhere; }
+
+/* Keyboard focus must be visible everywhere */
+.gv-app-main a:focus-visible, .gv-app-main button:focus-visible,
+.gv-app-main input:focus-visible, .gv-app-main select:focus-visible,
+.gv-header a:focus-visible, .gv-header button:focus-visible,
+.gv-bottom-nav a:focus-visible, .gv-drawer a:focus-visible, .gv-drawer button:focus-visible {
+  outline: 2px solid var(--gold, #f4c95d);
+  outline-offset: 2px;
+}
+
+/* Mobile search panel (opened from the header search icon) */
+.gv-mobile-search-panel {
+  display: flex; gap: 8px; align-items: center;
+  width: calc(100% - 20px); margin: 0 auto 8px;
+}
+.gv-mobile-search-panel input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 14px;
+  border-radius: 14px; border: 1px solid rgba(155,104,243,.35);
+  background: rgba(7,10,24,.86); color: #fff; font: inherit; font-size: 16px;
+}
+.gv-mobile-search-panel button {
+  height: 44px; padding: 0 18px; border-radius: 14px; border: 0;
+  background: linear-gradient(180deg,#f9da8d,#f4c95d); color: #1a1200;
+  font: inherit; font-weight: 800; cursor: pointer;
+}
+@media (min-width: 1000px) { .gv-mobile-search-panel { display: none; } }
+
+/* Header actions: the search icon must stay visible on the smallest phones */
+@media (max-width: 430px) {
+  .gv-header-actions .gv-search-mobile { display: grid !important; }
+}
+
+/* Touch targets >= 44px on touch devices */
+@media (pointer: coarse) {
+  .gv-icon-button, .gv-menu-button, .gv-close-button, .gv-profile-button { min-width: 44px; min-height: 44px; }
+  .gv-mobile-tabs a, .gv-drawer-link, .platform-chip, .btn { min-height: 44px; }
+  .gv-bottom-nav a { min-height: 52px; }
+}
+
+/* Forms: 16px inputs avoid the browser zoom-on-focus, stacked filters on phones */
+@media (max-width: 700px) {
+  .input, input.input, select.input, textarea.input { font-size: 16px; min-height: 46px; }
+  .filter-row { display: grid !important; grid-template-columns: 1fr !important; gap: 10px !important; }
+  .filter-row > .btn, .filters .btn { width: 100%; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+  .platform-list { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .platform-chip { flex: 0 0 auto; }
+  .gv-wallet-actions { gap: 8px; }
+  .gv-wallet-amounts .btn { flex: 1 1 calc(33% - 8px); }
+  .gv-wallet-table { min-width: 460px; }
+  .section-head { flex-direction: column; align-items: flex-start; }
+  .store-shell { grid-template-columns: 1fr; }
+}
+
+/* Tablet: two-up product grids instead of one cramped column */
+@media (min-width: 701px) and (max-width: 999px) {
+  .store-shell { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Room for the floating bottom nav + Android gesture bar */
+@media (max-width: 999px) {
+  body { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important; }
+  .gv-footer { margin-bottom: 8px; }
+}
+
+/* Promo cards: a solid base so they look intentional while photos are absent */
+.gv-app-main [class*="promoCard"] { background-color: #0b0a12; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+/* ---- Phase 16: route loading skeletons (components/ui/ListSkeleton.tsx) ---- */
+.gv-skel{background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.11),rgba(255,255,255,.05));background-size:200% 100%;animation:gv-skel-shimmer 1.3s ease-in-out infinite;border-radius:12px}
+.gv-skel-line{height:14px;margin:10px 0}
+.gv-skel-title{height:28px;width:min(360px,60%);margin:0 0 12px}
+.gv-skel-hero{height:120px;border-radius:20px;margin-bottom:18px}
+.gv-skel-card{height:260px;border-radius:18px}
+@keyframes gv-skel-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.gv-skel{animation:none}}

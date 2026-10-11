@@ -1,6 +1,13 @@
-import { del } from "@vercel/blob";
+import { BlobNotFoundError, del, head } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { canonicalBlobUrl, type UploadKind } from "@/lib/game-upload-shared";
+import {
+  COVER_CONTENT_TYPES,
+  MAX_COVER_FILE_SIZE,
+  MAX_GAME_FILE_SIZE,
+  canonicalBlobUrl,
+  type UploadKind,
+} from "@/lib/game-upload-shared";
+import { detectImageType, looksLikeApk } from "@/lib/content-admin";
 
 const KINDS: readonly UploadKind[] = ["game", "mod", "cover"];
 
@@ -140,4 +147,72 @@ export async function resolveUploadCategoryIds(values: readonly string[]): Promi
     for (const id of await resolveCategoryIds(prisma, remaining)) foundIds.add(id);
   }
   return Array.from(foundIds);
+}
+
+
+export type UploadedFileCheck = { url: string; kind: "apk" | "file" | "image" };
+
+/** First bytes of a stored file. Never downloads more than one chunk. Returns null when it cannot be read. */
+async function readFileHead(url: string, length: number): Promise<Uint8Array | null> {
+  try {
+    const response = await fetch(url, {
+      headers: { Range: `bytes=0-${length - 1}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok || !response.body) return null;
+    const reader = response.body.getReader();
+    const chunk = await reader.read();
+    // A host that ignores Range would stream the whole file: stop after the first chunk.
+    await reader.cancel().catch(() => undefined);
+    return chunk.value ? chunk.value.slice(0, length) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Server-side check of files the browser uploaded straight to Blob (the file never passes through
+ * our server, so the real content is only verifiable after the upload):
+ *  - the file exists in Blob storage and is not empty,
+ *  - the stored size is within the limits,
+ *  - images are real JPEG/PNG/WEBP/AVIF (checked by signature, not by name or browser MIME type),
+ *  - an Android file is a real APK (ZIP signature).
+ * Returns an error code, or null when everything is fine. A temporary storage/network failure
+ * never blocks a save (it is logged); a missing or wrong file always does.
+ */
+export async function verifyUploadedFiles(checks: readonly UploadedFileCheck[]): Promise<string | null> {
+  const unique = Array.from(new Map(checks.map((check) => [check.url, check])).values());
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+
+  const results = await Promise.all(
+    unique.map(async (check): Promise<string | null> => {
+      try {
+        const info = await head(check.url, token ? { token } : {});
+        if (!Number.isFinite(info.size) || info.size <= 0) return "UPLOADED_FILE_EMPTY";
+
+        if (check.kind === "image") {
+          if (info.size > MAX_COVER_FILE_SIZE) return "COVER_FILE_TOO_LARGE";
+          const declared = (info.contentType ?? "").toLowerCase().split(";")[0].trim();
+          if (!(COVER_CONTENT_TYPES as readonly string[]).includes(declared)) return "INVALID_IMAGE_FILE";
+          const bytes = await readFileHead(check.url, 16);
+          if (bytes && !detectImageType(bytes)) return "INVALID_IMAGE_FILE";
+          return null;
+        }
+
+        if (info.size > MAX_GAME_FILE_SIZE) return "GAME_FILE_TOO_LARGE";
+        if (check.kind === "apk") {
+          const bytes = await readFileHead(check.url, 4);
+          if (bytes && !looksLikeApk(bytes)) return "INVALID_APK_FILE";
+        }
+        return null;
+      } catch (error) {
+        if (error instanceof BlobNotFoundError) return "UPLOADED_FILE_MISSING";
+        console.error("Upload verification skipped:", error instanceof Error ? error.message : "UNKNOWN");
+        return null;
+      }
+    }),
+  );
+
+  return results.find((code): code is string => code !== null) ?? null;
 }

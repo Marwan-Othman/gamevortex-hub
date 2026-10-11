@@ -6,9 +6,9 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/prisma";
+import { runSerializable } from "@/lib/db-serializable";
 import {
   addMonthsUtc,
-  getVipPlan,
 } from "@/lib/vip-plans";
 
 type ActivateVipInput = {
@@ -57,6 +57,61 @@ async function grantVipGvc(
       idempotencyKey,
     },
   });
+}
+
+/**
+ * Takes back the GVC that a payment granted when that payment is refunded.
+ *
+ * Only what is still in the balance can be taken (the user may already have
+ * spent part of it), the balance can never go below zero, and the key makes a
+ * repeated refund event a no-op.
+ */
+export async function revokeVipGvcInTransaction(
+  tx: Prisma.TransactionClient,
+  input: { userId: string; subscriptionId: string; paymentId: string | null },
+): Promise<number> {
+  if (!input.paymentId) return 0;
+
+  const grantKeys = [
+    `vip:activation:${input.subscriptionId}:${input.paymentId}`,
+    `vip:renewal:${input.subscriptionId}:${input.paymentId}`,
+  ];
+  const grant = await tx.aiCreditLedger.findFirst({
+    where: { idempotencyKey: { in: grantKeys }, userId: input.userId, delta: { gt: 0 } },
+  });
+  if (!grant) return 0;
+
+  const revokeKey = `vip:revoke:${grant.idempotencyKey}`;
+  const already = await tx.aiCreditLedger.findUnique({ where: { idempotencyKey: revokeKey } });
+  if (already) return Math.abs(already.delta);
+
+  // Lock the balance row so a spend that is happening right now cannot slip
+  // between reading the balance and taking the credits back.
+  const rows = await tx.$queryRaw<Array<{ gvcBalance: number }>>(
+    Prisma.sql`SELECT "gvcBalance" FROM "AiCreditBalance" WHERE "userId" = ${input.userId} FOR UPDATE`,
+  );
+  const balance = rows[0]?.gvcBalance ?? 0;
+  const revoked = Math.min(balance, grant.delta);
+
+  if (revoked > 0) {
+    await tx.aiCreditBalance.update({
+      where: { userId: input.userId },
+      data: { gvcBalance: { decrement: revoked } },
+    });
+  }
+  // Written even when nothing was left to take, so the refund is recorded and
+  // replaying the event cannot take credits that were bought later.
+  await tx.aiCreditLedger.create({
+    data: {
+      userId: input.userId,
+      kind: "GVC",
+      delta: -revoked,
+      reason: "VIP_GVC_REFUND_REVOKE",
+      referenceId: grant.idempotencyKey,
+      idempotencyKey: revokeKey,
+    },
+  });
+  return revoked;
 }
 
 type CancelVipInput = {
@@ -232,6 +287,42 @@ async function notifyVipActivation(
 }
 
 /**
+ * A refunded or canceled subscription is closed. A late success event must
+ * not bring it back to life (the refund already returned the money).
+ */
+function assertActivatableStatus(status: VipSubscriptionStatus) {
+  if (
+    status === VipSubscriptionStatus.REFUNDED ||
+    status === VipSubscriptionStatus.CANCELED
+  ) {
+    throw new Error("VIP_SUBSCRIPTION_NOT_ACTIVATABLE");
+  }
+}
+
+/**
+ * The payment must match the amount/currency this checkout was created with
+ * (VipPurchase), falling back to the plan when no purchase row exists.
+ */
+function assertPaymentMatchesCheckout(
+  input: { amountCents: number; currency?: string },
+  plan: { priceCents: number; currency: string },
+  purchase: { amountCents: number; currency: string } | null,
+) {
+  const expectedAmount = purchase?.amountCents ?? plan.priceCents;
+  const expectedCurrency = (purchase?.currency ?? plan.currency).toUpperCase();
+
+  if (input.amountCents !== expectedAmount) {
+    throw new Error("VIP_PAYMENT_AMOUNT_MISMATCH");
+  }
+  if (
+    input.currency &&
+    input.currency.toUpperCase() !== expectedCurrency
+  ) {
+    throw new Error("VIP_PAYMENT_CURRENCY_MISMATCH");
+  }
+}
+
+/**
  * Activates a VIP subscription after the payment
  * has already been verified by the payment provider.
  *
@@ -265,7 +356,7 @@ export async function activateVipSubscription(
 
   const now = new Date();
 
-  return db.$transaction(
+  return runSerializable(
     async (tx) => {
       const subscription =
         await tx.vipSubscription.findUnique({
@@ -304,26 +395,17 @@ export async function activateVipSubscription(
       }
 
       /*
-       * Server-side price verification.
+       * Server-side price verification against what this checkout was
+       * created for. An admin editing the plan price while a payment is open
+       * must not turn a correct payment into a mismatch (money taken, no VIP).
        */
-      if (
-        input.amountCents !==
-        subscription.plan.priceCents
-      ) {
-        throw new Error(
-          "VIP_PAYMENT_AMOUNT_MISMATCH",
-        );
-      }
+      assertPaymentMatchesCheckout(
+        input,
+        subscription.plan,
+        subscription.purchase,
+      );
 
-      if (
-        input.currency &&
-        input.currency.toUpperCase() !==
-          subscription.plan.currency.toUpperCase()
-      ) {
-        throw new Error(
-          "VIP_PAYMENT_CURRENCY_MISMATCH",
-        );
-      }
+      assertActivatableStatus(subscription.status);
 
       /*
        * Already active with the same payment:
@@ -525,10 +607,6 @@ export async function activateVipSubscription(
           updated,
       };
     },
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
-    },
   );
 }
 
@@ -572,7 +650,7 @@ export async function renewVipSubscription(
 
   const now = new Date();
 
-  return db.$transaction(
+  return runSerializable(
     async (tx) => {
       const subscription =
         await tx.vipSubscription.findUnique({
@@ -588,6 +666,7 @@ export async function renewVipSubscription(
                 role: true,
               },
             },
+            purchase: true,
           },
         });
 
@@ -606,14 +685,38 @@ export async function renewVipSubscription(
         );
       }
 
+      assertPaymentMatchesCheckout(
+        input,
+        subscription.plan,
+        subscription.purchase,
+      );
+
+      /*
+       * The same payment can never extend the subscription twice, even when
+       * the provider did not send a stable event id.
+       */
       if (
-        input.amountCents !==
-        subscription.plan.priceCents
+        subscription.status ===
+          VipSubscriptionStatus.ACTIVE &&
+        subscription.paymentId ===
+          input.paymentId
+      ) {
+        return {
+          reused: true,
+          subscription,
+        };
+      }
+
+      if (
+        subscription.status ===
+        VipSubscriptionStatus.ACTIVE
       ) {
         throw new Error(
-          "VIP_PAYMENT_AMOUNT_MISMATCH",
+          "VIP_SUBSCRIPTION_ALREADY_ACTIVE",
         );
       }
+
+      assertActivatableStatus(subscription.status);
 
       /*
        * Duplicate renewal protection.
@@ -643,6 +746,7 @@ export async function renewVipSubscription(
         | {
             id: string;
             userId: string;
+            status: VipSubscriptionStatus;
             plan: { code: string };
             expiresAt: Date | null;
           }
@@ -658,6 +762,7 @@ export async function renewVipSubscription(
             select: {
               id: true,
               userId: true,
+              status: true,
               plan: {
                 select: {
                   code: true,
@@ -692,8 +797,16 @@ export async function renewVipSubscription(
         }
       }
 
+      /*
+       * Only time that is still paid for and still active carries over. A
+       * source that was refunded, canceled or expired in the meantime gives
+       * nothing (otherwise a refunded plan could pass its time on).
+       */
       const remainingMs =
-        renewalSource?.expiresAt &&
+        renewalSource &&
+        renewalSource.status ===
+          VipSubscriptionStatus.ACTIVE &&
+        renewalSource.expiresAt &&
         renewalSource.expiresAt > now
           ? renewalSource.expiresAt.getTime() -
             now.getTime()
@@ -752,10 +865,12 @@ export async function renewVipSubscription(
       );
 
       if (renewalSource) {
-        await tx.vipSubscription.update({
+        await tx.vipSubscription.updateMany({
           where: {
             id:
               renewalSource.id,
+            status:
+              VipSubscriptionStatus.ACTIVE,
           },
           data: {
             status:
@@ -926,10 +1041,6 @@ export async function renewVipSubscription(
           updated,
       };
     },
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
-    },
   );
 }
 
@@ -1017,8 +1128,13 @@ export async function cancelVipSubscription(
 /**
  * Marks a subscription expired.
  *
- * Access checks already verify expiresAt,
- * so expiration does not depend on a cron job.
+ * Access checks already verify expiresAt, so a user loses VIP the moment the
+ * date passes whether or not this runs. This only keeps the stored status,
+ * the event history and the notification in step with reality.
+ *
+ * The status change is a single conditional UPDATE, so two workers (or a
+ * worker and a lazy caller) racing on the same subscription expire it once and
+ * send one notification.
  */
 export async function expireVipSubscription(
   subscriptionId: string,
@@ -1029,7 +1145,7 @@ export async function expireVipSubscription(
 
   const now = new Date();
 
-  return db.$transaction(
+  return runSerializable(
     async (tx) => {
       const subscription =
         await tx.vipSubscription.findUnique({
@@ -1048,40 +1164,30 @@ export async function expireVipSubscription(
         );
       }
 
-      if (
-        subscription.status !==
-        VipSubscriptionStatus.ACTIVE
-      ) {
-        return {
-          changed: false,
-          subscription,
-        };
-      }
-
-      if (
-        !subscription.expiresAt ||
-        subscription.expiresAt > now
-      ) {
-        return {
-          changed: false,
-          subscription,
-        };
-      }
-
-      const updated =
-        await tx.vipSubscription.update({
+      const claimed =
+        await tx.vipSubscription.updateMany({
           where: {
             id:
               subscription.id,
+            status:
+              VipSubscriptionStatus.ACTIVE,
+            expiresAt: {
+              not: null,
+              lte: now,
+            },
           },
           data: {
             status:
               VipSubscriptionStatus.EXPIRED,
           },
-          include: {
-            plan: true,
-          },
         });
+
+      if (claimed.count !== 1) {
+        return {
+          changed: false,
+          subscription,
+        };
+      }
 
       await createSubscriptionEvent(
         tx,
@@ -1117,6 +1223,9 @@ export async function expireVipSubscription(
             planCode:
               subscription.plan.code,
 
+            subscriptionId:
+              subscription.id,
+
             expiredAt:
               now.toISOString(),
           },
@@ -1125,11 +1234,68 @@ export async function expireVipSubscription(
 
       return {
         changed: true,
-        subscription:
-          updated,
+        subscription: {
+          ...subscription,
+          status:
+            VipSubscriptionStatus.EXPIRED,
+        },
       };
     },
   );
+}
+
+/**
+ * Expires every subscription whose end date has passed. Meant to be run by a
+ * scheduled job; safe to run repeatedly and from several workers at once.
+ */
+export async function expireDueVipSubscriptions(
+  limit = 200,
+) {
+  const safeLimit =
+    Number.isInteger(limit) &&
+    limit > 0 &&
+    limit <= 1000
+      ? limit
+      : 200;
+
+  const due =
+    await db.vipSubscription.findMany({
+      where: {
+        status:
+          VipSubscriptionStatus.ACTIVE,
+        expiresAt: {
+          not: null,
+          lte: new Date(),
+        },
+      },
+      select: {
+        id: true,
+      },
+      orderBy: {
+        expiresAt:
+          "asc",
+      },
+      take: safeLimit,
+    });
+
+  let expired = 0;
+  let failed = 0;
+
+  for (const { id } of due) {
+    try {
+      const result =
+        await expireVipSubscription(id);
+      if (result.changed) expired += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  return {
+    scanned: due.length,
+    expired,
+    failed,
+  };
 }
 
 /**
@@ -1183,17 +1349,62 @@ export async function getVipSubscriptionStatus(
 
   const now = new Date();
 
-  const subscription =
+  /*
+   * Prefer the subscription that currently grants access. A plain
+   * "ORDER BY expiresAt DESC" is wrong here: PostgreSQL sorts NULLs first on
+   * DESC, so a PENDING checkout (expiresAt = NULL) would hide the real,
+   * active subscription and a paying VIP would be shown as Free.
+   */
+  const current =
     await db.vipSubscription.findFirst({
       where: {
         userId,
+        status:
+          VipSubscriptionStatus.ACTIVE,
+        OR: [
+          {
+            expiresAt: null,
+          },
+          {
+            expiresAt: {
+              gt: now,
+            },
+          },
+        ],
+      },
+      include: {
+        plan: true,
+      },
+      orderBy: {
+        expiresAt:
+          "desc",
+      },
+    });
+
+  const subscription =
+    current ??
+    (await db.vipSubscription.findFirst({
+      where: {
+        userId,
+        // A checkout that was never paid says nothing about VIP.
+        status: {
+          in: [
+            VipSubscriptionStatus.ACTIVE,
+            VipSubscriptionStatus.EXPIRED,
+            VipSubscriptionStatus.CANCELED,
+            VipSubscriptionStatus.REFUNDED,
+          ],
+        },
+        startedAt: {
+          not: null,
+        },
       },
       include: {
         plan: true,
       },
       orderBy: [
         {
-          expiresAt:
+          startedAt:
             "desc",
         },
         {
@@ -1201,7 +1412,7 @@ export async function getVipSubscriptionStatus(
             "desc",
         },
       ],
-    });
+    }));
 
   if (!subscription) {
     return {
@@ -1218,14 +1429,7 @@ export async function getVipSubscriptionStatus(
   }
 
   const active =
-    subscription.status ===
-      VipSubscriptionStatus.ACTIVE &&
-    (
-      subscription.expiresAt ===
-        null ||
-      subscription.expiresAt >
-        now
-    );
+    current !== null;
 
   /*
    * If the subscription has passed its expiration,
@@ -1236,14 +1440,21 @@ export async function getVipSubscriptionStatus(
    * depends on that worker.
    */
   if (!active) {
+    const ranOut =
+      subscription.status ===
+        VipSubscriptionStatus.EXPIRED ||
+      (subscription.status ===
+        VipSubscriptionStatus.ACTIVE &&
+        subscription.expiresAt !== null &&
+        subscription.expiresAt <= now);
+
     return {
       isOwner: false,
       isVip: false,
       status:
-        subscription.status ===
-          VipSubscriptionStatus.EXPIRED
-          ? "EXPIRED"
-          : "NONE",
+        ranOut
+          ? ("EXPIRED" as const)
+          : ("NONE" as const),
       planCode: "FREE" as const,
       subscriptionId:
         subscription.id,

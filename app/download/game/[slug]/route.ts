@@ -1,71 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { handleDownload } from "@/lib/download-handler";
 import { db } from "@/lib/prisma";
-import { normalizeExternalSourceUrl } from "@/lib/content-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const DISTRIBUTABLE_STATUSES = [
-  "OFFICIAL_SOURCE",
-  "LICENSED_FOR_DISTRIBUTION",
-  "OPEN_SOURCE",
-  "FREEWARE_REDISTRIBUTABLE",
-];
-
-function isGameVortexBlobUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && url.hostname.endsWith(".blob.vercel-storage.com");
-  } catch {
-    return false;
-  }
-}
-
-/** The owner may also save a single external https link (validated again when it was saved). */
-function isDownloadableUrl(value: string) {
-  return isGameVortexBlobUrl(value) || normalizeExternalSourceUrl(value) !== null;
-}
 
 /**
  * Game files can be hundreds of MB. They are NOT proxied through this function:
  * a serverless response is streamed without Content-Length (the browser shows "?" as the
  * total size) and is bound by the function's duration and bandwidth limits.
  * Instead we validate, count, and redirect to Vercel Blob, which serves the file directly
- * with Content-Length and Range/resume support.
+ * with Content-Length and Range/resume support. Blob URLs are stored and redirected without a
+ * query string; verify Content-Length with: curl -sIL <download url>.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> },
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-
-  const game = await db.game.findFirst({
-    where: { slug, published: true },
-    select: { id: true, downloadSource: true, sourceStatus: true },
-  });
-
-  if (!game?.downloadSource || !isDownloadableUrl(game.downloadSource)) {
-    return NextResponse.json({ success: false, error: "DOWNLOAD_NOT_AVAILABLE" }, { status: 404 });
-  }
-  if (!DISTRIBUTABLE_STATUSES.includes(game.sourceStatus)) {
-    return NextResponse.json({ success: false, error: "DOWNLOAD_SOURCE_NOT_DISTRIBUTABLE" }, { status: 403 });
-  }
-
-  await db.game.update({
-    where: { id: game.id },
-    data: { downloadCount: { increment: 1 } },
-  });
-
-  // Plain Blob URL, no query string. Game files are stored as application/octet-stream, so
-  // browsers download them anyway, so `?download=1` is not needed. It was dropped because with it
-  // the browser showed "?" as the total size; verify Content-Length with: curl -sIL <download url>.
-  const downloadUrl = new URL(game.downloadSource);
-  // Blob URLs are stored without a query; external links keep theirs (they may be needed by the host).
-  if (isGameVortexBlobUrl(game.downloadSource)) downloadUrl.search = "";
-  downloadUrl.hash = "";
-
-  return NextResponse.redirect(downloadUrl.toString(), {
-    status: 303,
-    headers: { "Cache-Control": "no-store, private" },
+  return handleDownload(request, {
+    scope: "download:game",
+    find: () =>
+      db.game.findFirst({
+        where: { slug, published: true },
+        select: { id: true, downloadSource: true, sourceStatus: true },
+      }),
+    countDownload: (id) => db.game.update({ where: { id }, data: { downloadCount: { increment: 1 } } }),
   });
 }

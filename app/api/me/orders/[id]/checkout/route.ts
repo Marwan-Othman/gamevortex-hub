@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   DeliveryType,
   DigitalKeyStatus,
+  Prisma,
   ProductKind,
   SourceStatus,
 } from "@prisma/client";
@@ -15,6 +16,7 @@ import {
 import {
   logSystemError,
 } from "@/lib/observability";
+import { orderSaleProblem, ownedGameIds } from "@/lib/store-guards";
 
 function checkoutUrlFrom(
   value: unknown,
@@ -322,6 +324,36 @@ export async function POST(
       }
     }
 
+    /*
+     * Same price and not already owned: the order may be old, and the money is taken by the
+     * provider before delivery, so these must be refused before a payment session exists.
+     */
+    const saleProblem = orderSaleProblem(order.items, order.currency);
+
+    if (saleProblem) {
+      return NextResponse.json(
+        { error: saleProblem },
+        { status: 409 },
+      );
+    }
+
+    const alreadyOwned =
+      await ownedGameIds(
+        db,
+        user.id,
+        order.items.map(
+          (item) =>
+            item.product.gameId,
+        ),
+      );
+
+    if (alreadyOwned.size > 0) {
+      return NextResponse.json(
+        { error: "ALREADY_OWNED" },
+        { status: 409 },
+      );
+    }
+
     const configuredProvider =
       (
         process.env
@@ -426,77 +458,64 @@ export async function POST(
      */
     await db.$transaction(
       async (transaction) => {
-        await transaction.payment.upsert(
-          {
-            where: {
-              provider_providerPaymentId:
-                {
-                  provider:
-                    payment.provider,
-
-                  providerPaymentId:
-                    payment.paymentId,
-                },
-            },
-
-            create: {
-              orderId:
-                order.id,
-
-              provider:
-                payment.provider,
-
-              providerPaymentId:
-                payment.paymentId,
-
-              status:
-                payment.status,
-
-              amountCents:
-                order.totalCents,
-
-              currency:
-                order.currency,
-
-              rawEvent:
-                payment.checkoutUrl
-                  ? {
-                      checkoutUrl:
-                        payment.checkoutUrl,
-                    }
-                  : undefined,
-            },
-
-            update: {
-              status:
-                payment.status,
-
-              rawEvent:
-                payment.checkoutUrl
-                  ? {
-                      checkoutUrl:
-                        payment.checkoutUrl,
-                    }
-                  : undefined,
-            },
-          },
+        // The provider call above takes a while. In the meantime a webhook or a
+        // wallet payment may already have settled this order. Lock the order and
+        // never move a SUCCEEDED / REFUNDED payment or order back to a
+        // pending state.
+        await transaction.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "Order" WHERE "id" = ${order.id} FOR UPDATE`,
         );
 
-        await transaction.order.update(
-          {
-            where: {
-              id: order.id,
-            },
+        const isSettled = (status: string | null | undefined) =>
+          status === "SUCCEEDED" || status === "REFUNDED";
 
+        const currentOrder = await transaction.order.findUnique({
+          where: { id: order.id },
+          select: { paymentStatus: true },
+        });
+
+        const currentPayment = await transaction.payment.findUnique({
+          where: {
+            provider_providerPaymentId: {
+              provider: payment.provider,
+              providerPaymentId: payment.paymentId,
+            },
+          },
+          select: { id: true, status: true },
+        });
+
+        const rawEvent = payment.checkoutUrl
+          ? { checkoutUrl: payment.checkoutUrl }
+          : undefined;
+
+        if (!currentPayment) {
+          await transaction.payment.create({
             data: {
-              paymentProvider:
-                payment.provider,
-
-              paymentStatus:
-                payment.status,
+              orderId: order.id,
+              provider: payment.provider,
+              providerPaymentId: payment.paymentId,
+              status: payment.status,
+              amountCents: order.totalCents,
+              currency: order.currency,
+              rawEvent,
             },
-          },
-        );
+          });
+        } else if (!isSettled(currentPayment.status)) {
+          await transaction.payment.update({
+            where: { id: currentPayment.id },
+            data: { status: payment.status, rawEvent },
+          });
+        }
+
+        if (currentOrder && !isSettled(currentOrder.paymentStatus)) {
+          await transaction.order.update({
+            where: { id: order.id },
+            data: {
+              paymentProvider: payment.provider,
+              paymentStatus: payment.status,
+            },
+          });
+        }
       },
     );
 

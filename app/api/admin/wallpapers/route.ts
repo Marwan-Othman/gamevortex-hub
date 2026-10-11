@@ -5,7 +5,7 @@ import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { normalizeWallpaperTags } from "@/lib/wallpapers";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode, internalError } from "@/lib/api";
 import {
   WALLPAPER_MAX_FILE_SIZE,
   filenameFromUrl,
@@ -337,6 +337,7 @@ export async function GET(
     );
   }
 
+  try {
   const { searchParams } =
     new URL(request.url);
 
@@ -386,6 +387,9 @@ export async function GET(
       wallpapers,
     ),
   });
+  } catch (error) {
+    return internalError("admin:wallpapers:list", error, "WALLPAPERS_LOAD_FAILED");
+  }
 }
 
 export async function POST(
@@ -703,9 +707,7 @@ export async function POST(
       {
         success: false,
         error:
-          error instanceof Error
-            ? error.message
-            : "Failed to create wallpaper",
+          publicErrorCode(error, "Failed to create wallpaper"),
       },
       { status: 400 },
     );
@@ -820,7 +822,7 @@ export async function PATCH(
   } catch (error) {
     console.error("PATCH /api/admin/wallpapers error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Failed to update wallpaper" },
+      { success: false, error: publicErrorCode(error, "Failed to update wallpaper") },
       { status: 500 },
     );
   }
@@ -1126,9 +1128,7 @@ export async function DELETE(
       {
         success: false,
         error:
-          error instanceof Error
-            ? error.message
-            : "Failed to delete wallpaper(s)",
+          publicErrorCode(error, "Failed to delete wallpaper(s)"),
       },
       { status: 500 },
     );

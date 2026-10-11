@@ -305,18 +305,20 @@ export default function VipPlansClient() {
         },
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok) {
+      if (!response.ok || !data) {
         if (response.status === 401) {
           window.location.href =
             "/auth/login?next=/vip";
           return;
         }
 
+        // Raw API codes (e.g. PLAN_NOT_FOUND) are not user-facing text.
         throw new Error(
-          data?.error ||
-            "تعذر بدء عملية الدفع.",
+          typeof data?.error === "string" && /[\u0600-\u06FF]/.test(data.error)
+            ? data.error
+            : "تعذر بدء عملية الدفع. حاول مجددًا بعد قليل.",
         );
       }
 

@@ -1,3 +1,5 @@
+import { fetchWithTimeout, readJsonSafe } from "./fetch-timeout";
+
 type QfEnv = "production" | "prelive";
 
 const HOSTS: Record<QfEnv, { auth: string; api: string }> = {
@@ -57,7 +59,7 @@ let pending: Promise<string> | null = null;
 async function requestToken(): Promise<string> {
   const { clientId, clientSecret, auth } = getConfig();
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const res = await fetch(`${auth}/oauth2/token`, {
+  const res = await fetchWithTimeout(`${auth}/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${basic}`,
@@ -97,7 +99,7 @@ export async function qfGet<T>(
   }
 
   const call = (token: string) =>
-    fetch(url, {
+    fetchWithTimeout(url, {
       headers: {
         "x-auth-token": token,
         "x-client-id": clientId,
@@ -109,7 +111,7 @@ export async function qfGet<T>(
   let res = await call(await getToken());
   if (res.status === 401) res = await call(await getToken(true));
   if (!res.ok) throw new Error(`QURAN_API_${res.status}`);
-  return (await res.json()) as T;
+  return (await readJsonSafe<T>(res)) as T;
 }
 
 export async function getChapters(): Promise<Chapter[]> {

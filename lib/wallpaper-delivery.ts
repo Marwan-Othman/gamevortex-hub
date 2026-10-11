@@ -3,6 +3,8 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { isVercelBlobUrl } from "./wallpaper-constants";
+import { fetchWithTimeout } from "./fetch-timeout";
+import { normalizeExternalSourceUrl } from "./content-admin";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -50,7 +52,7 @@ export async function openWallpaperSource(url: string) {
     } catch {
       // Not on local disk (e.g. serverless bundle): fall back to the site's own public URL.
     }
-    const response = await fetch(`${configuredOrigin()}${url}`, { cache: "no-store" });
+    const response = await fetchWithTimeout(`${configuredOrigin()}${url}`, { cache: "no-store" }, 20_000);
     if (!response.ok || !response.body) throw new Error("LOCAL_IMAGE_NOT_FOUND");
     return {
       stream: response.body,
@@ -60,7 +62,9 @@ export async function openWallpaperSource(url: string) {
   }
 
   if (!/^https:\/\//i.test(url)) throw new Error("IMAGE_SOURCE_UNSUPPORTED");
-  const response = await fetch(url, { redirect: "follow" });
+  // SSRF gate: stored URLs are owner-supplied, but a private/loopback/metadata host must never be fetched server-side.
+  if (!isVercelBlobUrl(url) && !normalizeExternalSourceUrl(url)) throw new Error("IMAGE_SOURCE_UNSUPPORTED");
+  const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) });
   if (!response.ok || !response.body) throw new Error("IMAGE_SOURCE_FETCH_FAILED");
   return {
     stream: response.body,

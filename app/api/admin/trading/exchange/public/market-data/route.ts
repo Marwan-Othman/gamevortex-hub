@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTradingOwner } from "@/lib/trading/access";
 import { fetchPublicKlines } from "@/lib/trading/binance-public-market-data";
 import { tradingRouteError } from "@/lib/trading/route-helpers";
+import { publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
       candles: result.candles,
     });
   } catch (error) {
-    const code = error instanceof Error ? error.message : "";
+    const code = publicErrorCode(error, "");
     if (STATUS_BY_CODE[code]) {
       return NextResponse.json({ error: code }, { status: STATUS_BY_CODE[code] });
     }

@@ -6,7 +6,7 @@ function getBaseUrl() {
 }
 const REQUEST_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
-const MAX_POLL_MS = 240_000;
+const MAX_POLL_MS = 200_000;
 
 function getKey() {
   const value = process.env.MANUS_API_KEY?.trim();
@@ -32,6 +32,9 @@ async function request(path: string, init: RequestInit, signal?: AbortSignal) {
       if (response.status === 429) throw new AiProviderError({ provider: "manus", code: "RATE_LIMITED", status: response.status, retryable: true, failoverable: true });
       if (response.status >= 500) throw new AiProviderError({ provider: "manus", code: "UNAVAILABLE", status: response.status, retryable: true, failoverable: true });
       throw new AiProviderError({ provider: "manus", code: "PROVIDER_ERROR", status: response.status });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new AiProviderError({ provider: "manus", code: "INVALID_TASK_RESPONSE", failoverable: true });
     }
     return body as Record<string, unknown>;
   } catch (error) {

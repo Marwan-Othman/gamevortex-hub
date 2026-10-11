@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../fetch-timeout";
 const FAZERCARDS_BASE_URL = "https://api.fzr.cards/api/v2";
 
 const PAGE_SIZE = 100;
@@ -148,7 +149,7 @@ async function fetchCategoriesPage(
   }
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${FAZERCARDS_BASE_URL}/giftcards?${query}`,
       {
         method: "GET",
@@ -158,6 +159,7 @@ async function fetchCategoriesPage(
         },
         cache: "no-store",
       },
+      15_000,
     );
 
     const text = await response.text();

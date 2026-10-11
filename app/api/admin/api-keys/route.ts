@@ -1,9 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, ownerRouteError } from "@/lib/api";
 import { createApiKey } from "@/lib/gamevortex-api/keys";
 
 export const runtime = "nodejs";
@@ -37,8 +36,8 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ data: keys });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "OWNER_API_KEYS_FAILED";
-    return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : 403 });
+    // 401 signed out, 403 not the owner, 503 database outage, 500 otherwise (was: every failure -> 403).
+    return ownerRouteError(error, "OWNER_API_KEYS_FAILED", 500);
   }
 }
 
@@ -82,9 +81,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: { ...apiKey, key: generated.key } }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "OWNER_API_KEYS_FAILED";
-    const status = message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500;
-    if (status === 500) console.error(JSON.stringify({ event: "owner_api_key_create_failed", requestId: randomUUID() }));
-    return NextResponse.json({ error: status === 500 ? "OWNER_API_KEYS_FAILED" : message }, { status });
+    return ownerRouteError(error, "OWNER_API_KEYS_FAILED", 500);
   }
 }

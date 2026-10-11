@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import type { PlatformType } from "@prisma/client";
+import type { PlatformType, SourceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
+import type { UploadedFileCheck } from "@/lib/game-upload-server";
 import {
   DEFAULT_UPLOAD_SOURCE_STATUS,
   UPLOAD_PLATFORM_OPTIONS,
@@ -15,6 +16,8 @@ import {
   isContentType,
   isHttpsUrl,
   normalizeExternalSourceUrl,
+  parseCategoryValues,
+  parseVersionValue,
   type ContentFormData,
   type ContentType,
   type SourceMode,
@@ -33,9 +36,13 @@ export type ContentInput = {
   description: string;
   platform: PlatformType;
   isMod: boolean;
+  /** undefined = not sent (keep stored), null = cleared, string = new value. */
+  version: string | null | undefined;
   published: boolean;
   mainImage: string | null;
   screenshots: string[];
+  /** null = the client did not send the field, keep what is stored. */
+  categories: string[] | null;
   source: SourceInput;
 };
 
@@ -86,6 +93,9 @@ export function parseContentInput(
   if (body.isMod !== undefined && typeof body.isMod !== "boolean") return { ok: false, error: "INVALID_VERSION_TYPE" };
   if (body.published !== undefined && typeof body.published !== "boolean") return { ok: false, error: "INVALID_PUBLISHED" };
 
+  const version = parseVersionValue(body.version);
+  if (version === "INVALID") return { ok: false, error: "INVALID_VERSION" };
+
   // Images already stored on this item (for example imported covers) stay valid when saved unchanged.
   const keptImages = new Set(options.existingImageUrls ?? []);
   const imageUrl = (value: unknown) =>
@@ -107,6 +117,9 @@ export function parseContentInput(
       if (!screenshots.includes(canonical)) screenshots.push(canonical);
     }
   }
+
+  const categories = parseCategoryValues(body.categories);
+  if (categories === "INVALID") return { ok: false, error: "INVALID_CATEGORIES" };
 
   let source: SourceInput = { kind: "none" };
   if (body.source !== undefined && body.source !== null) {
@@ -138,15 +151,17 @@ export function parseContentInput(
       description,
       platform,
       isMod: body.isMod === true,
+      version,
       published: body.published === true,
       mainImage,
       screenshots,
+      categories,
       source,
     },
   };
 }
 
-export function sourceStatusFor(source: SourceInput) {
+export function sourceStatusFor(source: SourceInput): SourceStatus {
   return source.kind === "none" ? "NEEDS_SOURCE" : DEFAULT_UPLOAD_SOURCE_STATUS;
 }
 
@@ -168,6 +183,21 @@ export async function uniqueSlug(type: ContentType, name: string) {
     if (!taken) return candidate;
   }
   return `${base}-${crypto.randomUUID().slice(0, 6)}`;
+}
+
+/**
+ * Files the browser just uploaded to Blob that must be verified before they are saved:
+ * the APK/package (APK signature when the platform is Android) and every image.
+ */
+export function uploadedFileChecks(input: ContentInput, only?: (url: string) => boolean): UploadedFileCheck[] {
+  const keep = (url: string | null): url is string => Boolean(url) && (only ? only(url as string) : true);
+  const checks: UploadedFileCheck[] = [];
+  if (input.source.kind === "upload" && keep(input.source.url)) {
+    checks.push({ url: input.source.url, kind: input.platform === "ANDROID" ? "apk" : "file" });
+  }
+  if (keep(input.mainImage)) checks.push({ url: input.mainImage as string, kind: "image" });
+  for (const shot of input.screenshots) if (keep(shot)) checks.push({ url: shot, kind: "image" });
+  return checks;
 }
 
 /** Everything a stored item references in Blob, used to clean up replaced/removed files after an edit. */
@@ -195,9 +225,10 @@ export async function loadContentForm(type: ContentType, id: string): Promise<Co
     const game = await prisma.game.findUnique({
       where: { id },
       select: {
-        id: true, titleAr: true, description: true, platform: true, isMod: true, published: true,
+        id: true, titleAr: true, description: true, platform: true, isMod: true, version: true, published: true,
         coverUrl: true, screenshots: true, downloadSource: true,
         gamePlatforms: { select: { platform: true }, orderBy: { createdAt: "asc" } },
+        gameCategories: { select: { categoryId: true } },
       },
     });
     if (!game) return null;
@@ -208,9 +239,11 @@ export async function loadContentForm(type: ContentType, id: string): Promise<Co
       description: game.description ?? "",
       platform: game.gamePlatforms[0]?.platform ?? game.platform?.split(",")[0] ?? "ANDROID",
       isMod: game.isMod,
+      version: game.version ?? "",
       published: game.published,
       mainImage: game.coverUrl,
       screenshots: game.screenshots,
+      categories: game.gameCategories.map((item) => item.categoryId),
       source: sourceFromStored(game.downloadSource),
     };
   }
@@ -218,9 +251,10 @@ export async function loadContentForm(type: ContentType, id: string): Promise<Co
   const app = await prisma.app.findUnique({
     where: { id },
     select: {
-      id: true, nameAr: true, descriptionAr: true, isMod: true, published: true,
+      id: true, nameAr: true, descriptionAr: true, isMod: true, version: true, published: true,
       coverUrl: true, iconUrl: true, screenshots: true, downloadSource: true,
       appPlatforms: { select: { platform: true }, orderBy: { createdAt: "asc" } },
+      appCategories: { select: { categoryId: true } },
     },
   });
   if (!app) return null;
@@ -231,9 +265,11 @@ export async function loadContentForm(type: ContentType, id: string): Promise<Co
     description: app.descriptionAr ?? "",
     platform: app.appPlatforms[0]?.platform ?? "ANDROID",
     isMod: app.isMod,
+    version: app.version ?? "",
     published: app.published,
     mainImage: app.coverUrl ?? app.iconUrl,
     screenshots: app.screenshots,
+    categories: app.appCategories.map((item) => item.categoryId),
     source: sourceFromStored(app.downloadSource),
   };
 }

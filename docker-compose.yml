@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: gamevortex_password
       POSTGRES_DB: gamevortex
     ports:
-      - "5432:5432"
+      # Bound to loopback only: the dev database must not be reachable from the network with a default password.
+      - "127.0.0.1:5432:5432"
     volumes:
       - gamevortex_pgdata:/var/lib/postgresql/data
     healthcheck:

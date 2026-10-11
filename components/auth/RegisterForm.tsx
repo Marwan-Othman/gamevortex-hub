@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { invalidateMe } from "@/lib/client-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "../../app/auth/auth.module.css";
@@ -54,6 +55,7 @@ export default function RegisterForm() {
         setError(messages[data.error] || (english ? "Could not create your account. Please try again." : "تعذّر إنشاء الحساب. حاول مجددًا."));
         return;
       }
+      invalidateMe();
       router.push("/profile/gamer");
       router.refresh();
     } catch {

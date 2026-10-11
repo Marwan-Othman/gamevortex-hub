@@ -13,9 +13,7 @@ import {
   requireUser,
 } from "@/lib/auth";
 
-import {
-  guardMutation,
-} from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 
 import {
   ConfiguredPaymentProvider,
@@ -347,20 +345,13 @@ export async function POST(
       );
     }
 
-    if (
-      subscription.purchase.amountCents !==
-      subscription.plan.priceCents
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "PAYMENT_AMOUNT_MISMATCH",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
+    /*
+     * The amount is the one stored when this checkout was created. It is not
+     * compared with the current catalog price: an admin editing a plan while a
+     * payment is open must not stop that payment from being captured. The
+     * provider's real charge is verified against this stored amount when the
+     * webhook activates the subscription.
+     */
 
     await provider.capturePayment(
         body.paymentId,
@@ -391,9 +382,7 @@ export async function POST(
     }
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "PAYMENT_CAPTURE_FAILED";
+      publicErrorCode(error, "PAYMENT_CAPTURE_FAILED");
 
     const status =
       message ===

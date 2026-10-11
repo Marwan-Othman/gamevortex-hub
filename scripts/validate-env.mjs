@@ -16,6 +16,16 @@ if (production && process.env.REQUIRE_OWNER_BOOTSTRAP === '1') {
 }
 if (missing.length) errors.push(`Missing required environment variables: ${missing.join(', ')}`);
 if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) errors.push('AUTH_SECRET must be at least 32 characters.');
+// Placeholders from the .env examples are public: they pass a length check but must never reach production.
+const placeholderPattern = /(replace|change[_-]?me|changeme|placeholder|example|your[_-]?secret|your[_-]?key|secret[_-]?here|random[_-]?characters|todo|dummy|default|password|123456)/i;
+const weakSecret = (value) => !value || placeholderPattern.test(value) || new Set(value).size < 8;
+if (production) {
+  for (const name of ['AUTH_SECRET', 'CRON_SECRET', 'DIGITAL_KEY_ENCRYPTION_SECRET', 'PAYMENT_WEBHOOK_SECRET']) {
+    const value = process.env[name];
+    if (value && weakSecret(value)) errors.push(`${name} looks like a placeholder or low-entropy value; generate a random one (openssl rand -base64 48).`);
+  }
+  if (process.env.POSTGRES_PASSWORD && weakSecret(process.env.POSTGRES_PASSWORD)) errors.push('POSTGRES_PASSWORD looks like a placeholder; use a strong random password.');
+}
 if (process.env.APP_ORIGIN) {
   try {
     const url = new URL(process.env.APP_ORIGIN);
@@ -32,26 +42,22 @@ if (process.env.DATABASE_URL) {
   } catch { errors.push('DATABASE_URL must be a valid PostgreSQL URL.'); }
 }
 if (production && (!process.env.GEMINI_API_KEY || !process.env.MANUS_API_KEY)) errors.push('GEMINI_API_KEY and MANUS_API_KEY are required in production.');
+for (const name of ['CHAT_COST', 'ADVANCED_CHAT_COST', 'IMAGE_COST', 'IMAGE_EDIT_COST', 'HIGH_QUALITY_IMAGE_COST', 'VIDEO_COST', 'VIDEO_EDIT_COST']) {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') continue;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 1_000_000) errors.push(`${name} must be a positive integer (GVC credits) up to 1,000,000.`);
+}
+if (process.env.GEMINI_MAX_OUTPUT_TOKENS) {
+  const tokens = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS);
+  if (!Number.isInteger(tokens) || tokens < 64 || tokens > 65536) errors.push('GEMINI_MAX_OUTPUT_TOKENS must be an integer between 64 and 65536.');
+}
 const exposedSecretNames = Object.keys(process.env).filter((key) => /^NEXT_PUBLIC_.*(KEY|SECRET|TOKEN|PASSWORD)/i.test(key));
 if (exposedSecretNames.length) errors.push('Secrets must not use NEXT_PUBLIC_: ' + exposedSecretNames.join(', '));
-/* legacy runtime variables are ignored by the application and should be removed from deployment settings. */
-if (process.env.GAMEVORTEX_AI_RUNTIME_URL || process.env.GAMEVORTEX_AI_RUNTIME_TOKEN || process.env.GAMEVORTEX_AI_MODEL) errors.push('Legacy GameVortex AI runtime variables are no longer supported.');
-/*
-  try {
-    const url = new URL(process.env.GAMEVORTEX_AI_RUNTIME_URL);
-    const local = ['localhost', '127.0.0.1', '::1', '[::1]', 'ollama'].includes(url.hostname.toLowerCase());
-    if (!['http:', 'https:'].includes(url.protocol) || (production && !local && url.protocol !== 'https:')) errors.push('GAMEVORTEX_AI_RUNTIME_URL must use HTTPS for remote runtimes.');
-    if (url.username || url.password || url.search || url.hash) errors.push('GAMEVORTEX_AI_RUNTIME_URL must not contain credentials, query, or hash.');
-    if (!local && !process.env.GAMEVORTEX_AI_RUNTIME_TOKEN) errors.push('GAMEVORTEX_AI_RUNTIME_TOKEN is required for a remote GameVortex AI gateway.');
-  } catch { errors.push('GAMEVORTEX_AI_RUNTIME_URL must be a valid URL.'); }
-}
-if (false) {
-  errors.push('GAMEVORTEX_AI_RUNTIME_TOKEN must be a non-placeholder secret of at least 64 characters.');
-}
-if (false) {
-  errors.push('GAMEVORTEX_AI_MODEL must be a valid model identifier of at most 128 characters.');
-}
-*/
+// Legacy GameVortex AI runtime variables are ignored by the application and must be removed from deployment settings.
+const legacyRuntimeVars = ['GAMEVORTEX_AI_RUNTIME_URL', 'GAMEVORTEX_AI_RUNTIME_TOKEN', 'GAMEVORTEX_AI_MODEL'];
+const staleLegacyVars = legacyRuntimeVars.filter((key) => process.env[key]);
+if (staleLegacyVars.length) errors.push(`Legacy GameVortex AI runtime variables are no longer supported: ${staleLegacyVars.join(', ')}.`);
 if (process.env.OWNER_WITHDRAWAL_ENABLED === 'true') {
   if (!process.env.OWNER_EXTERNAL_WALLET_ADDRESS) errors.push('OWNER_EXTERNAL_WALLET_ADDRESS is required when owner withdrawals are enabled.');
   if (!process.env.PAYOUT_PROVIDER || !process.env.PAYOUT_PROVIDER_BASE_URL || !process.env.PAYOUT_PROVIDER_SECRET) errors.push('PAYOUT_PROVIDER, PAYOUT_PROVIDER_BASE_URL and PAYOUT_PROVIDER_SECRET are required when owner withdrawals are enabled.');
@@ -64,5 +70,11 @@ if (production && process.env.PAYMENT_PROVIDER === 'hmac' && !process.env.PAYMEN
 if (production && process.env.PAYMENT_PROVIDER && process.env.PAYMENT_PROVIDER !== 'stripe' && process.env.PAYMENT_PROVIDER !== 'paypal' && process.env.PAYMENT_PROVIDER !== 'hmac') errors.push('PAYMENT_PROVIDER must be stripe, paypal, or hmac.');
 if (production && process.env.PAYMENT_PROVIDER && (!process.env.DIGITAL_KEY_ENCRYPTION_SECRET || process.env.DIGITAL_KEY_ENCRYPTION_SECRET.length < 32)) errors.push('DIGITAL_KEY_ENCRYPTION_SECRET must be at least 32 characters when payments are enabled.');
 if (production && process.env.RESEND_API_KEY && !process.env.EMAIL_FROM) errors.push('EMAIL_FROM is required when Resend email is enabled.');
+if (production && process.env.VERCEL && process.env.RATE_LIMIT_STORE !== 'upstash') {
+  console.warn('WARNING: RATE_LIMIT_STORE is not "upstash". On Vercel every serverless instance keeps its own in-memory counters, so rate limits are only best-effort. Set RATE_LIMIT_STORE=upstash with UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
+}
+if (production && process.env.VERCEL && process.env.DATABASE_URL && !/pgbouncer=true|-pooler\.|pooler\./i.test(process.env.DATABASE_URL)) {
+  console.warn('WARNING: DATABASE_URL does not look like a pooled connection. Serverless functions open many short-lived connections; use your provider\'s pooled URL (for example Neon "-pooler" host or Supabase pgbouncer) for the app and a direct URL only for migrations.');
+}
 if (errors.length) { console.error(errors.map((x) => `ERROR: ${x}`).join('\n')); process.exit(1); }
 console.log(`Environment validation: PASS (${production ? 'production' : 'development'})`);

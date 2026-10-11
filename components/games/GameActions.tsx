@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { messageFromResponse, NETWORK_ERROR_MESSAGE } from "@/lib/error-messages";
 
 type LibraryItem = { id: string; status: "WANT" | "PLAYING" | "BEATEN" | "ARCHIVED"; game: { id: string } };
 type RelationItem = { id: string; game: { id: string } };
@@ -30,6 +31,10 @@ export default function GameActions({ gameId }: { gameId: string }) {
       if (lr.status === 401 || fr.status === 401 || wr.status === 401) {
         setMessage("سجّل الدخول لاستخدام المكتبة والمفضلة وقائمة الرغبات.");
         return;
+      }
+      if (!lr.ok || !fr.ok || !wr.ok) {
+        // Do not silently show a wrong "not in library" state when the server failed.
+        setMessage("تعذر تحميل حالة اللعبة الآن. حدّث الصفحة وحاول مجددًا.");
       }
       if (lr.ok) {
         const data = (await lr.json()) as LibraryItem[];
@@ -63,11 +68,11 @@ export default function GameActions({ gameId }: { gameId: string }) {
     try {
       const response = await fetch(url, options);
       if (response.status === 401) throw new Error("سجّل الدخول أولًا.");
-      if (!response.ok) throw new Error("تعذر تنفيذ العملية.");
+      if (!response.ok) throw new Error(await messageFromResponse(response, "تعذر تنفيذ العملية."));
       await load();
       setMessage(success);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "حدث خطأ.");
+      setMessage(error instanceof TypeError ? NETWORK_ERROR_MESSAGE : error instanceof Error ? error.message : "حدث خطأ.");
     } finally {
       setBusy(false);
     }

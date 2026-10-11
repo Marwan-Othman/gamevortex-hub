@@ -820,15 +820,25 @@ export default function WallpaperAdminClient({
       return;
     }
 
-    const response =
-      await fetch(
-        `/api/admin/wallpapers?id=${encodeURIComponent(
-          id,
-        )}`,
-        {
-          method: "DELETE",
-        },
+    let response: Response;
+
+    try {
+      response =
+        await fetch(
+          `/api/admin/wallpapers?id=${encodeURIComponent(
+            id,
+          )}`,
+          {
+            method: "DELETE",
+          },
+        );
+    } catch {
+      setMessage(
+        "تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.",
       );
+
+      return;
+    }
 
     if (!response.ok) {
       const result =

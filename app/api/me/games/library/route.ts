@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, userRouteError } from "@/lib/api";
 import { awardActionXp, createActivity } from "@/lib/gamer";
+import { toPublicContent } from "@/lib/downloads";
 
 const statuses = new Set(["WANT", "PLAYING", "BEATEN", "ARCHIVED"]);
 
@@ -13,8 +14,8 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get("status");
     const gameId = request.nextUrl.searchParams.get("gameId");
     const items = await db.gameLibraryItem.findMany({ where: { userId: user.id, ...(gameId ? { gameId } : {}), ...(status && statuses.has(status) ? { status: status as any } : {}) }, include: { game: true }, orderBy: { updatedAt: "desc" } });
-    return NextResponse.json(items);
-  } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "UNAUTHORIZED" }, { status: 401 }); }
+    return NextResponse.json(items.map((item) => ({ ...item, game: toPublicContent(item.game) })));
+  } catch (e) { return userRouteError(e, "LIBRARY_LOAD_FAILED", "me:library:get"); }
 }
 
 export async function POST(request: NextRequest) {
@@ -30,11 +31,11 @@ export async function POST(request: NextRequest) {
     if (!existed) { await awardActionXp(user.id, "ADDED_TO_LIBRARY", gameId); await createActivity(user.id, "ADDED_TO_LIBRARY", gameId, `Added ${game.titleEn} to library`); }
     if (status === "BEATEN" && existed?.status !== "BEATEN") { await awardActionXp(user.id, "COMPLETED_GAME", gameId); await createActivity(user.id, "COMPLETED_GAME", gameId, `Completed ${game.titleEn}`); }
     return NextResponse.json(item, { status: existed ? 200 : 201 });
-  } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "BAD_REQUEST" }, { status: 400 }); }
+  } catch (e) { return userRouteError(e, "LIBRARY_UPDATE_FAILED", "me:library:post"); }
 }
 
 export async function DELETE(request: NextRequest) {
   const blocked = await guardMutation(request, "games:library", 30); if (blocked) return blocked;
   try { const user = await requireUser(); const gameId = request.nextUrl.searchParams.get("gameId"); if (!gameId) return NextResponse.json({ error: "GAME_ID_REQUIRED" }, { status: 400 }); await db.gameLibraryItem.deleteMany({ where: { userId: user.id, gameId } }); return NextResponse.json({ ok: true }); }
-  catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "FAILED" }, { status: 400 }); }
+  catch (e) { return userRouteError(e, "LIBRARY_DELETE_FAILED", "me:library:delete"); }
 }

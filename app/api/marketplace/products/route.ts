@@ -8,11 +8,11 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/prisma";
-import { guardRead } from "@/lib/api";
+import { guardRead, internalError } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
+async function handleGET(
   request: NextRequest,
 ) {
   const blocked =
@@ -195,4 +195,12 @@ export async function GET(
       },
     },
   );
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    return await handleGET(request);
+  } catch (error) {
+    return internalError("marketplace:products", error, "PRODUCTS_LOAD_FAILED");
+  }
 }

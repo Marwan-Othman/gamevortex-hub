@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getOptionalUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import {
   COVER_CONTENT_TYPES,
   GAME_BLOB_CONTENT_TYPE,
@@ -44,6 +44,8 @@ const GAME_CONTENT_TYPES = Array.from(new Set([
   "application/x-gzip",
   "application/x-tar",
 ]));
+
+const APK_CONTENT_TYPES = ["application/vnd.android.package-archive", GAME_BLOB_CONTENT_TYPE];
 
 const CLIENT_ERRORS = new Set([
   "INVALID_UPLOAD_KIND",
@@ -109,7 +111,7 @@ export async function DELETE(request: NextRequest) {
     const result = await deleteUnreferencedBlobs(urls);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    console.error("DELETE /api/admin/content/upload cleanup error:", error instanceof Error ? error.message : "UNKNOWN");
+    console.error("DELETE /api/admin/content/upload cleanup error:", publicErrorCode(error, "UNKNOWN"));
     return NextResponse.json({ success: false, error: "CLEANUP_FAILED" }, { status: 500 });
   }
 }
@@ -165,7 +167,8 @@ export async function POST(request: NextRequest) {
           throw new Error("APK_FILE_REQUIRED");
         }
         return {
-          allowedContentTypes: GAME_CONTENT_TYPES,
+          // An Android upload can only be an APK: accept just its own type (the browser is told to send it).
+          allowedContentTypes: payload.platform === "ANDROID" ? APK_CONTENT_TYPES : GAME_CONTENT_TYPES,
           maximumSizeInBytes: MAX_GAME_FILE_SIZE,
           addRandomSuffix: false,
         };
@@ -174,10 +177,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "UPLOAD_FAILED";
+    const message = publicErrorCode(error, "UPLOAD_FAILED");
+    const known = CLIENT_ERRORS.has(message) || message === "UNAUTHORIZED" || message === "FORBIDDEN";
     const status = CLIENT_ERRORS.has(message) ? 400 : message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500;
 
     console.error("POST /api/admin/content/upload error:", message);
-    return NextResponse.json({ success: false, error: "GAME_UPLOAD_FAILED", detail: message }, { status });
+    // Only our own error codes are returned; internal/storage error text never reaches the browser.
+    return NextResponse.json(
+      { success: false, error: "GAME_UPLOAD_FAILED", ...(known ? { detail: message } : {}) },
+      { status },
+    );
   }
 }

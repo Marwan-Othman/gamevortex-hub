@@ -1,14 +1,27 @@
 "use client";
 
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "../../app/admin/admin.module.css";
 
+/**
+ * One navigation source of truth for every /admin/* page.
+ *
+ * - Every entry points to a page that really exists (no "coming soon"
+ *   placeholders for pages that are already built, and no placeholders at all
+ *   for sections that have no page yet — they were dead items).
+ * - `also` lists extra path prefixes that belong to the same entry, so the
+ *   right item is highlighted on nested pages (for example the wallpaper
+ *   review screen lives under the moderation entry).
+ * - `keywords` feed the "jump to page" search box in the top bar.
+ */
 type NavItem = {
   label: string;
-  href?: string;
+  href: string;
   icon: React.ReactNode;
-  soon?: boolean;
+  also?: string[];
+  keywords?: string;
 };
 
 type NavSection = {
@@ -20,139 +33,83 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "الرئيسية",
     items: [
-      {
-        label: "لوحة التحكم",
-        href: "/admin",
-        icon: <IconDashboard />,
-      },
+      { label: "لوحة التحكم", href: "/admin", icon: <IconDashboard />, keywords: "dashboard home إحصائيات تقارير" },
+      { label: "مركز المالك", href: "/admin/owner-control", icon: <IconSettings />, keywords: "owner control مالك صلاحيات" },
+      { label: "المالية والاسترداد", href: "/admin/control-center", icon: <IconPayments />, keywords: "finance refund wallet محفظة مالية استرداد رصيد طلبات مشتريات سحب" },
     ],
   },
   {
     title: "إدارة المحتوى",
     items: [
+      { label: "الألعاب والتطبيقات", href: "/admin/content", icon: <IconGames />, keywords: "games apps ألعاب تطبيقات" },
+      { label: "فحص المحتوى", href: "/admin/content-health", icon: <IconSupport />, keywords: "content health تكرار" },
+      { label: "Mods", href: "/admin/mods", icon: <IconGames />, keywords: "mods مودات" },
+      { label: "الخلفيات", href: "/admin/wallpapers", icon: <IconWallpaper />, keywords: "wallpapers خلفيات" },
+      { label: "القرآن", href: "/admin/quran", icon: <IconQuran />, keywords: "quran reciters قراء" },
       {
-        label: "الألعاب والتطبيقات",
-        href: "/admin/content",
-        icon: <IconGames />,
-      },
-      {
-        label: "الخلفيات",
-        href: "/admin/wallpapers",
-        icon: <IconWallpaper />,
-      },
-      {
-        label: "Mods",
-        href: "/admin/mods",
-        icon: <IconGames />,
-      },
-      {
-        label: "مراجعة الخلفيات",
-        href: "/admin/wallpapers/moderation",
-        icon: <IconSupport />,
-      },
-      {
-        label: "القرآن",
-        href: "/admin/quran",
-        icon: <IconQuran />,
-      },
-      {
-        label: "المراجعة والمحتوى",
+        label: "المراجعة والإشراف",
         href: "/admin/moderation",
         icon: <IconSupport />,
+        also: ["/admin/wallpapers/moderation"],
+        keywords: "moderation reports بلاغات مراجعة خلفيات",
       },
     ],
   },
   {
     title: "المتجر والمبيعات",
     items: [
-      {
-        label: "المتجر",
-        href: "/admin/store",
-        icon: <IconStore />,
-      },
-      {
-        label: "البطاقات والهدايا",
-        icon: <IconCards />,
-        soon: true,
-      },
-      {
-        label: "الطلبات",
-        icon: <IconOrders />,
-        soon: true,
-      },
-      {
-        label: "المشتريات",
-        icon: <IconPurchases />,
-        soon: true,
-      },
+      { label: "المتجر والمنتجات", href: "/admin/store", icon: <IconStore />, keywords: "store products orders keys متجر منتجات مفاتيح طلبات" },
+      { label: "البطاقات والهدايا", href: "/admin/gift-cards", icon: <IconCards />, keywords: "gift cards fazercards بطاقات هدايا" },
     ],
   },
   {
     title: "المستخدمون والبرامج",
     items: [
-      {
-        label: "المستخدمون",
-        icon: <IconUsers />,
-        soon: true,
-      },
-      {
-        label: "VIP",
-        icon: <IconVip />,
-        soon: true,
-      },
-      {
-        label: "المكافآت والنقاط",
-        icon: <IconRewards />,
-        soon: true,
-      },
-      {
-        label: "الإحالات",
-        icon: <IconReferrals />,
-        soon: true,
-      },
-      {
-        label: "السحوبات",
-        href: "/admin/draws",
-        icon: <IconDraws />,
-      },
+      { label: "المستخدمون", href: "/admin/users", icon: <IconUsers />, keywords: "users roles مستخدمين أدوار" },
+      { label: "VIP", href: "/admin/vip", icon: <IconVip />, keywords: "vip subscriptions اشتراكات" },
+      { label: "سحوبات الجوائز", href: "/admin/draws", icon: <IconDraws />, keywords: "draws raffle قرعة سحب جوائز" },
+      { label: "الدعم الفني", href: "/admin/support", icon: <IconMessages />, keywords: "support tickets دعم تذاكر" },
     ],
   },
   {
     title: "الذكاء والأنظمة",
     items: [
-      {
-        label: "الذكاء الاصطناعي",
-        icon: <IconAI />,
-        soon: true,
-      },
-      {
-        label: "الإحصائيات والتقارير",
-        href: "/admin",
-        icon: <IconReports />,
-      },
-      {
-        label: "المدفوعات وسجل الأخطاء",
-        href: "/admin/errors",
-        icon: <IconPayments />,
-      },
+      { label: "الذكاء الاصطناعي", href: "/admin/ai", icon: <IconAI />, keywords: "ai gamevortex ذكاء" },
+      { label: "التداول", href: "/admin/trading", icon: <IconReports />, keywords: "trading تداول" },
+      { label: "مفاتيح API", href: "/admin/api-keys", icon: <IconKey />, keywords: "api keys مفاتيح" },
+      { label: "سجل الأخطاء", href: "/admin/errors", icon: <IconPayments />, keywords: "errors logs أخطاء سجل" },
     ],
   },
   {
     title: "النظام",
     items: [
-      {
-        label: "الرسائل والإشعارات",
-        icon: <IconMessages />,
-        soon: true,
-      },
-      {
-        label: "الإعدادات",
-        href: "/admin/settings",
-        icon: <IconSettings />,
-      },
+      { label: "الإعدادات", href: "/admin/settings", icon: <IconSettings />, keywords: "settings إعدادات تكاملات" },
     ],
   },
 ];
+
+const ALL_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
+
+function matchesPath(pathname: string, base: string) {
+  return base === "/admin"
+    ? pathname === "/admin"
+    : pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/** The most specific matching entry wins, so only one item is ever active. */
+function activeHref(pathname: string) {
+  let best: { href: string; length: number } | null = null;
+
+  for (const item of ALL_ITEMS) {
+    for (const base of [item.href, ...(item.also ?? [])]) {
+      if (matchesPath(pathname, base) && (!best || base.length > best.length)) {
+        best = { href: item.href, length: base.length };
+      }
+    }
+  }
+
+  return best?.href ?? null;
+}
 
 export default function AdminShell({
   ownerLabel,
@@ -162,63 +119,43 @@ export default function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [query, setQuery] = useState("");
 
-  const initial =
-    ownerLabel.trim().charAt(0).toUpperCase() || "O";
+  const initial = ownerLabel.trim().charAt(0).toUpperCase() || "O";
+  const current = activeHref(pathname);
 
-  function isActive(item: NavItem) {
-    if (!item.href) return false;
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
 
-    return item.href === "/admin"
-      ? pathname === "/admin"
-      : pathname === item.href ||
-          pathname.startsWith(`${item.href}/`);
+    return ALL_ITEMS.filter((item) =>
+      `${item.label} ${item.href} ${item.keywords ?? ""}`.toLowerCase().includes(q),
+    ).slice(0, 6);
+  }, [query]);
+
+  function go(href: string) {
+    setQuery("");
+    router.push(href);
+  }
+
+  function onSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (results[0]) go(results[0].href);
   }
 
   function renderNavItem(item: NavItem, mobile = false) {
-    const active = isActive(item);
-
-    if (item.soon || !item.href) {
-      return (
-        <span
-          key={item.label}
-          className={
-            mobile
-              ? styles.mobileAdminLinkSoon
-              : `${styles.navLink} ${styles.soon}`
-          }
-        >
-          {item.icon}
-
-          <span className={mobile ? styles.mobileAdminLinkText : undefined}>
-            {item.label}
-          </span>
-
-          <span
-            className={
-              mobile
-                ? styles.mobileAdminSoonBadge
-                : styles.soonBadge
-            }
-          >
-            قريبًا
-          </span>
-        </span>
-      );
-    }
+    const active = current === item.href;
 
     return (
       <Link
-        key={item.label}
+        key={item.href}
         href={item.href}
+        aria-current={active ? "page" : undefined}
         className={
           mobile
-            ? `${styles.mobileAdminLink} ${
-                active ? styles.mobileAdminLinkActive : ""
-              }`
-            : `${styles.navLink} ${
-                active ? styles.active : ""
-              }`
+            ? `${styles.mobileAdminLink} ${active ? styles.mobileAdminLinkActive : ""}`
+            : `${styles.navLink} ${active ? styles.active : ""}`
         }
       >
         {item.icon}
@@ -233,39 +170,18 @@ export default function AdminShell({
   return (
     <div className={styles.shell}>
       <div className={styles.layout}>
-
-        {/* =====================================================
-            DESKTOP SIDEBAR
-            يظهر فقط على الشاشات الكبيرة
-           ===================================================== */}
-
+        {/* Desktop sidebar (>= 960px) */}
         <aside className={styles.sidebar}>
           <div className={styles.sidebarBrand}>
-            <svg
-              width="26"
-              height="26"
-              viewBox="0 0 40 40"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M20 3 36 30H4z"
-                stroke="#a78bfa"
-                strokeWidth="2.5"
-                fill="none"
-              />
+            <svg width="26" height="26" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+              <path d="M20 3 36 30H4z" stroke="#a78bfa" strokeWidth="2.5" fill="none" />
             </svg>
-
             GAMEVORTEX HUB
           </div>
 
           <nav
             aria-label="قائمة إدارة المالك"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-            }}
+            style={{ display: "flex", flexDirection: "column", gap: 6 }}
           >
             {NAV_SECTIONS.map((section) => (
               <div key={section.title}>
@@ -280,120 +196,128 @@ export default function AdminShell({
                   {section.title}
                 </div>
 
-                {section.items.map((item) =>
-                  renderNavItem(item)
-                )}
+                {section.items.map((item) => renderNavItem(item))}
               </div>
             ))}
           </nav>
 
-          <Link
-            href="/"
-            className={styles.viewSiteBtn}
-          >
+          <Link href="/" className={styles.viewSiteBtn}>
             <IconExternal />
             عرض الموقع
           </Link>
 
-          <div className={styles.sidebarFooter}>
-            GameVortex Hub © 2026
-          </div>
+          <div className={styles.sidebarFooter}>GameVortex Hub © 2026</div>
         </aside>
 
-        {/* =====================================================
-            MAIN AREA
-           ===================================================== */}
-
         <div className={styles.adminMain}>
-
           <header className={styles.topbar}>
-            <div className={styles.searchBar}>
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
+            <form
+              className={styles.searchWrap}
+              role="search"
+              onSubmit={onSearchSubmit}
+            >
+              <div className={styles.searchBar}>
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
 
-              <input
-                placeholder="ابحث عن لعبة أو منتج أو مستخدم..."
-                aria-label="البحث في لوحة الإدارة"
-              />
-            </div>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setQuery("");
+                  }}
+                  placeholder="انتقل إلى صفحة في الإدارة..."
+                  aria-label="الانتقال السريع بين صفحات الإدارة"
+                  autoComplete="off"
+                />
+              </div>
+
+              {query.trim() ? (
+                <div className={styles.searchResults} role="listbox">
+                  {results.length ? (
+                    results.map((item) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        key={item.href}
+                        className={styles.searchResult}
+                        onClick={() => go(item.href)}
+                      >
+                        {item.icon}
+                        <span>{item.label}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className={styles.searchEmpty}>لا توجد صفحة بهذا الاسم</div>
+                  )}
+                </div>
+              ) : null}
+            </form>
 
             <div className={styles.ownerChip}>
               <span>{ownerLabel}</span>
 
-              <span className={styles.ownerAvatar}>
-                {initial}
-              </span>
+              <span className={styles.ownerAvatar}>{initial}</span>
             </div>
           </header>
 
-          {/* ===================================================
-              MOBILE ADMIN NAVIGATION
-              لا Sidebar على الهاتف
-             =================================================== */}
-
-          <section
-            className={styles.mobileAdminNav}
-            aria-label="إدارة المنصة"
-          >
-            <div className={styles.mobileAdminHeader}>
-              <div>
-                <span className={styles.mobileAdminEyebrow}>
-                  GAMEVORTEX HUB
-                </span>
-
-                <h2>إدارة المنصة</h2>
-
-                <p>
-                  جميع أدوات لوحة المالك في مكان واحد
-                </p>
-              </div>
-
-              <div className={styles.mobileAdminIcon}>
-                <IconDashboard />
-              </div>
-            </div>
-
-            <div className={styles.mobileAdminSections}>
-              {NAV_SECTIONS.map((section) => (
-                <div
-                  className={styles.mobileAdminSection}
-                  key={section.title}
-                >
-                  <div className={styles.mobileAdminSectionTitle}>
-                    {section.title}
-                  </div>
-
-                  <div className={styles.mobileAdminGrid}>
-                    {section.items.map((item) =>
-                      renderNavItem(item, true)
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Link
-              href="/"
-              className={styles.mobileAdminViewSite}
+          {/* Mobile navigation: collapsed on inner pages so it never pushes
+              the real content down; open on the dashboard. `key` re-mounts it
+              on every navigation so the menu closes after you pick a page. */}
+          <section className={styles.mobileAdminNav} aria-label="إدارة المنصة">
+            <details
+              key={pathname}
+              className={styles.mobileAdminDetails}
+              open={pathname === "/admin"}
             >
-              <IconExternal />
-              <span>عرض الموقع</span>
-            </Link>
+              <summary className={styles.mobileAdminHeader}>
+                <div>
+                  <span className={styles.mobileAdminEyebrow}>GAMEVORTEX HUB</span>
+
+                  <h2>إدارة المنصة</h2>
+
+                  <p>القائمة الكاملة — اضغط للفتح أو الإغلاق</p>
+                </div>
+
+                <div className={styles.mobileAdminIcon}>
+                  <IconDashboard />
+                </div>
+              </summary>
+
+              <div className={styles.mobileAdminSections}>
+                {NAV_SECTIONS.map((section) => (
+                  <div className={styles.mobileAdminSection} key={section.title}>
+                    <div className={styles.mobileAdminSectionTitle}>
+                      {section.title}
+                    </div>
+
+                    <div className={styles.mobileAdminGrid}>
+                      {section.items.map((item) => renderNavItem(item, true))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Link href="/" className={styles.mobileAdminViewSite}>
+                <IconExternal />
+                <span>عرض الموقع</span>
+              </Link>
+            </details>
           </section>
 
-          <main className={styles.content}>
-            {children}
-          </main>
+          {/* Pages render their own <main>, so this is a plain container. */}
+          <div className={styles.content}>{children}</div>
         </div>
       </div>
     </div>
@@ -715,6 +639,25 @@ function IconExternal() {
       strokeWidth="2.2"
     >
       <path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
+    </svg>
+  );
+}
+
+function IconKey() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 9-9M16 7l3 3M14 9l2 2" />
     </svg>
   );
 }

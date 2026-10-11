@@ -130,7 +130,8 @@ export default async function AdminStore() {
         _count: {
           select: {
             orderItems: true,
-            digitalKeys: true,
+            // Only delivered/revoked keys block deleting a product; never-sold keys are removed with it.
+            digitalKeys: { where: { status: { not: "AVAILABLE" } } },
           },
         },
       },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 
 const createSchema = z.object({
   title: z.string().trim().min(2).max(140),
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(raffles);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "FORBIDDEN" }, { status: 403 });
+    return NextResponse.json({ error: publicErrorCode(error, "FORBIDDEN") }, { status: 403 });
   }
 }
 
@@ -51,6 +51,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(raffle, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_DRAW_INPUT" }, { status: 400 });
-    return NextResponse.json({ error: error instanceof Error ? error.message : "DRAW_CREATE_FAILED" }, { status: 400 });
+    return NextResponse.json({ error: publicErrorCode(error, "DRAW_CREATE_FAILED") }, { status: 400 });
   }
 }

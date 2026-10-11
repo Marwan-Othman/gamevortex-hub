@@ -1,9 +1,7 @@
-"use client";
+import { getServerLocale } from "@/lib/server-locale";
 
-import { useLocale } from "@/components/ui/useLocale";
-
-export default function SiteFooter() {
-  const locale = useLocale();
+export default async function SiteFooter() {
+  const locale = await getServerLocale();
   const english = locale === "en";
   return <footer className="gv-footer" lang={locale} dir={english ? "ltr" : "rtl"}>
     <strong>GAMEVORTEX HUB</strong>

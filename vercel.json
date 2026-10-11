@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/trading-live-monitor",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/vip-expiry",
+      "schedule": "0 2 * * *"
     }
   ]
 }

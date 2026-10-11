@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { LocaleContext } from "./LocaleProvider";
 
 export type Locale = "ar" | "en";
 
@@ -12,7 +13,9 @@ export function readLocale(): Locale {
 }
 
 export function useLocale() {
-  const [locale, setLocale] = useState<Locale>("en");
+  // Start from the locale the server rendered (cookie) so first paint and hydration agree.
+  const initial = useContext(LocaleContext);
+  const [locale, setLocale] = useState<Locale>(initial);
 
   useEffect(() => {
     const sync = () => setLocale(readLocale());

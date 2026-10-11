@@ -3,7 +3,7 @@ import { DeliveryType, ProductKind } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import {
   getFazerCardsCards,
   getFazerCardsCategories,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       {
         ok: false,
         error: "IMPORT_FAILED",
-        detail: error instanceof Error ? error.message : "Unknown error",
+        detail: publicErrorCode(error, "Unknown error"),
       },
       { status: 502 },
     );

@@ -4,7 +4,8 @@ import {
   type HandleUploadBody,
 } from "@vercel/blob/client";
 import { getOptionalUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
+import { logSafe } from "@/lib/redact";
 import {
   WALLPAPER_IMAGE_MIME_TYPES,
   WALLPAPER_MAX_FILE_SIZE,
@@ -207,7 +208,7 @@ export async function POST(
           ) {
             console.warn(
               "GameVortex wallpaper upload rejected: invalid pathname.",
-              pathname,
+              logSafe(pathname),
             );
 
             throw new Error(
@@ -286,9 +287,7 @@ export async function POST(
     );
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "UNKNOWN_BLOB_UPLOAD_ERROR";
+      publicErrorCode(error, "UNKNOWN_BLOB_UPLOAD_ERROR");
 
     /*
      * ------------------------------------------------------------

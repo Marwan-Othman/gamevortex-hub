@@ -1,12 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { invalidateMe } from "@/lib/client-auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../../app/auth/auth.module.css";
 import { AuthTextField, AuthPasswordField } from "./AuthFields";
 import SocialLoginRow from "./SocialLoginRow";
 import { useLocale } from "@/components/ui/useLocale";
+
+/** Only same-site relative paths are honoured (blocks open redirects such as //evil.com or /\\evil.com). */
+function safeNextPath() {
+  try {
+    const value = new URLSearchParams(window.location.search).get("next") || "";
+    if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\") || value.startsWith("/auth")) return null;
+    return value.slice(0, 300);
+  } catch {
+    return null;
+  }
+}
 
 export default function LoginForm() {
   const router = useRouter();
@@ -37,7 +49,8 @@ export default function LoginForm() {
         setError(messages[data.error] || (english ? "Could not sign in. Please try again." : "تعذّر تسجيل الدخول. حاول مجددًا."));
         return;
       }
-      router.push("/profile/gamer");
+      invalidateMe();
+      router.push(safeNextPath() || "/profile/gamer");
       router.refresh();
     } catch {
       setError(english ? "Could not reach the server. Check your connection and try again." : "تعذر الاتصال بالخادم. تحقق من اتصالك وحاول مجددًا.");

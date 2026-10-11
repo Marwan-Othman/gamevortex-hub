@@ -35,9 +35,10 @@ jobs:
       - name: Reconcile live orders
         env:
           CRON_SECRET: ${{ secrets.GAMEVORTEX_CRON_SECRET }}
+          APP_URL: ${{ vars.GAMEVORTEX_APP_URL || 'https://gamevortex-hub.vercel.app' }}
         run: |
           curl --fail --silent --show-error --location \
             --max-time 60 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Accept: application/json" \
-            "https://gamevortex-hub.vercel.app/api/cron/trading-live-monitor"
+            "${APP_URL%/}/api/cron/trading-live-monitor"

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LedgerType, WithdrawalStatus } from "@prisma/client";
+import { LedgerType, Prisma, WithdrawalStatus } from "@prisma/client";
+import { logSystemError } from "@/lib/observability";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, internalError, isDatabaseUnavailable, publicErrorCode } from "@/lib/api";
 import { validateOwnerWithdrawalTransition } from "@/lib/owner-points";
 
 export const runtime = "nodejs";
@@ -32,13 +33,16 @@ export async function PATCH(
   try {
     const owner = await requireOwner();
     const { id } = await context.params;
-    const body = updateSchema.parse(await request.json());
+    const body = updateSchema.parse(await request.json().catch(() => null));
 
     if (isPayoutStatus(body.status) && !body.providerTransactionId) {
       return NextResponse.json({ error: "PAYOUT_REFERENCE_REQUIRED" }, { status: 400 });
     }
 
     const result = await db.$transaction(async (tx) => {
+      // Serialize concurrent status changes for this withdrawal. Without the lock, two requests
+      // (e.g. REJECTED and PAID) can both read PENDING and both move the reserved points.
+      await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "WithdrawalRequest" WHERE "id" = ${id} FOR UPDATE`);
       const withdrawal = await tx.withdrawalRequest.findUnique({
         where: { id },
         include: { ownerWallet: true },
@@ -127,14 +131,19 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true, replayed: result.replayed, withdrawal: result.withdrawal });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "WITHDRAWAL_UPDATE_FAILED";
-    const status = message === "UNAUTHORIZED" ? 401
-      : message === "FORBIDDEN" ? 403
-        : message === "WITHDRAWAL_NOT_FOUND" ? 404
-          : message === "WITHDRAWAL_ALREADY_FINAL" ? 409
-            : message === "INVALID_WITHDRAWAL_TRANSITION" ? 409
-              : message === "OWNER_WALLET_RESERVATION_MISMATCH" ? 409
-                : 400;
-    return NextResponse.json({ error: message }, { status });
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
+    if (isDatabaseUnavailable(error)) return internalError("admin:withdrawals:update", error, "INTERNAL_ERROR");
+    const message = publicErrorCode(error, "WITHDRAWAL_UPDATE_FAILED");
+    const known: Record<string, number> = {
+      UNAUTHORIZED: 401,
+      FORBIDDEN: 403,
+      WITHDRAWAL_NOT_FOUND: 404,
+      WITHDRAWAL_ALREADY_FINAL: 409,
+      INVALID_WITHDRAWAL_TRANSITION: 409,
+      OWNER_WALLET_RESERVATION_MISMATCH: 409,
+    };
+    if (message in known) return NextResponse.json({ error: message }, { status: known[message] });
+    await logSystemError("admin:withdrawals:update", error);
+    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
   }
 }

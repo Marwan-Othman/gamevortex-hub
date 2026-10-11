@@ -1,7 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useLocale } from "@/components/ui/useLocale";
+import { getServerLocale } from "@/lib/server-locale";
 import styles from "../../app/home.module.css";
 import { vortexScore } from "../../lib/game-score";
 
@@ -24,7 +22,7 @@ function platformLabel(platform: string | null) {
   return first || "Multi";
 }
 
-export default function GameRow({
+export default async function GameRow({
   title,
   icon,
   href,
@@ -35,7 +33,7 @@ export default function GameRow({
   href: string;
   games: Game[];
 }) {
-  const english = useLocale() === "en";
+  const english = (await getServerLocale()) === "en";
   const translatedTitle = english ? ({ "أحدث الألعاب": "Latest games", "الأعلى تقييمًا": "Top rated", "الأكثر لعبًا": "Most played" } as Record<string, string>)[title] || title : title;
   return (
     <section className={styles.section} aria-label={translatedTitle}>
@@ -62,8 +60,9 @@ export default function GameRow({
                 {game.coverUrl ? (
                   <img
                     src={game.coverUrl}
-                    alt={game.titleEn}
+                    alt={(english ? game.titleEn || game.titleAr : game.titleAr || game.titleEn) || "game"}
                     loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className={styles.gameCoverFallback}>
@@ -96,11 +95,11 @@ export default function GameRow({
                 </div>
 
                 <p className={styles.gameTitle}>
-                  {game.titleAr}
+                  {english ? game.titleEn || game.titleAr : game.titleAr || game.titleEn}
                 </p>
 
                 <span className={styles.gameEnglishTitle}>
-                  {game.titleEn}
+                  {english ? "" : game.titleEn !== game.titleAr ? game.titleEn : ""}
                 </span>
               </div>
             </Link>

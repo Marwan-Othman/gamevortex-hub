@@ -7,6 +7,7 @@ import {
 import { cookies } from "next/headers";
 import { Role } from "@prisma/client";
 import { db } from "./prisma";
+import { isWeakSecret } from "./secret-strength";
 
 const COOKIE = "gv_session";
 const TTL = 60 * 60 * 24 * 7;
@@ -15,6 +16,11 @@ function secret() {
   const value = process.env.AUTH_SECRET;
 
   if (!value || value.length < 32) {
+    throw new Error("AUTH_SECRET_NOT_CONFIGURED");
+  }
+
+  // A copied example/placeholder value is public knowledge: refuse to sign sessions with it in production.
+  if (process.env.NODE_ENV === "production" && isWeakSecret(value)) {
     throw new Error("AUTH_SECRET_NOT_CONFIGURED");
   }
 
@@ -198,6 +204,18 @@ export async function destroySession() {
   store.delete(COOKIE);
 }
 
+/**
+ * Server-side logout: bumping sessionVersion invalidates EVERY signed cookie issued for
+ * this user, so a copied/stolen cookie stops working at logout instead of living 7 days.
+ */
+export async function revokeSessions(userId: string) {
+  await db.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+    select: { id: true },
+  });
+}
+
 export async function getOptionalUser() {
   const store = await cookies();
 
@@ -243,10 +261,10 @@ export async function requireUser() {
 export async function requireOwner() {
   const user = await requireUser();
 
-  // Owner/admin authorization is role-based. OWNER_EMAIL is intentionally
-  // not used as an access-control gate because an email address is not a
-  // permission boundary. Initial owner bootstrap may still use OWNER_EMAIL
-  // to create or identify the first SUPER_ADMIN account.
+  // Access is granted by role only (SUPER_ADMIN), read fresh from the database on
+  // every request. OWNER_EMAIL is not checked here; it is used elsewhere to (a) restrict
+  // who may be promoted to SUPER_ADMIN (/api/admin/owner-control) and (b) choose which
+  // SUPER_ADMIN receives revenue credits (lib/owner-account.ts).
   if (user.role !== Role.SUPER_ADMIN) {
     throw new Error("FORBIDDEN");
   }

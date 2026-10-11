@@ -6,57 +6,82 @@ import { consumeAiCredit, refundAiCredit } from "@/lib/ai/credits";
 import { getAiCost } from "@/lib/ai/costs";
 import { startVideo } from "@/lib/ai/media";
 import { createMediaToken } from "@/lib/ai/media-token";
+import {
+  aiErrorCode,
+  aiErrorResponse,
+  guardUser,
+  MAX_IMAGE_DATA_CHARS,
+  parseImageData,
+  pickVideoAspectRatio,
+  pickVideoResolution,
+  readIdempotencyKey,
+} from "@/lib/ai/http";
+import { recordMediaUsage } from "@/lib/ai/media-usage";
 import { getVipAccess } from "@/lib/vip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
-function safeError(error: unknown) {
-  const code = error instanceof Error ? error.message : "";
-  const known = new Set([
-    "UNAUTHORIZED",
-    "AI_VIP_REQUIRED",
-    "AI_CREDITS_EXHAUSTED",
-    "INVALID_REQUEST",
-    "INVALID_IMAGE_INPUT",
-    "AI_SERVICE_UNAVAILABLE",
-  ]);
-  return known.has(code) ? code : "AI_SERVICE_UNAVAILABLE";
-}
-
+/**
+ * POST /api/ai/video  (starts a long-running generation, does not wait for it)
+ * Request : { prompt, imageData?, aspectRatio?, resolution?, idempotencyKey? }
+ * Success : 200 { data: { status: "processing", token, requestId, provider, model } }
+ * Then    : GET /api/ai/video/status?token=...  ->  { data: { status, videoUrl? } }
+ *           GET /api/ai/video/file?token=...    ->  the mp4 stream
+ */
 export async function POST(request: NextRequest) {
   const requestId = randomUUID();
-  const blocked = await guardMutation(request, "ai:video", 2);
+  const blocked = await guardMutation(request, "ai:video", 6);
   if (blocked) return blocked;
 
-  const user = await getOptionalUser();
+  // A database failure while reading the session must answer JSON (503), not throw out of the handler.
+  let user: Awaited<ReturnType<typeof getOptionalUser>>;
+  try {
+    user = await getOptionalUser();
+  } catch (error) {
+    return aiErrorResponse(error, requestId, "ai_auth_failure");
+  }
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED", requestId }, { status: 401 });
+
+  const limited = await guardUser(user.id, "ai:video", 2);
+  if (limited) return limited;
 
   const body = await request.json().catch(() => null);
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
-  const imageData = typeof body?.imageData === "string" ? body.imageData : undefined;
-  const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : undefined;
-  const resolution = typeof body?.resolution === "string" ? body.resolution : undefined;
+  const imageData = typeof body?.imageData === "string" && body.imageData ? body.imageData : undefined;
+  const aspectRatio = pickVideoAspectRatio(body?.aspectRatio);
+  const resolution = pickVideoResolution(body?.resolution);
+  // The credit reservation is keyed by this value. Using a fresh server-side id
+  // for every call (the old behaviour) made a double-click or a client retry
+  // start - and charge - a second video.
+  const idempotencyKey = readIdempotencyKey(body?.idempotencyKey, requestId);
 
-  if (!prompt || prompt.length > 4000) {
+  if (!prompt || prompt.length > 4000 || !idempotencyKey || aspectRatio === null || resolution === null) {
     return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 400 });
   }
-  if (imageData && imageData.length > 4_000_000) {
-    return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 413 });
+  if (imageData) {
+    if (imageData.length > MAX_IMAGE_DATA_CHARS) return NextResponse.json({ error: "INVALID_REQUEST", requestId }, { status: 413 });
+    try { parseImageData(imageData); } catch { return NextResponse.json({ error: "INVALID_IMAGE_INPUT", requestId }, { status: 400 }); }
   }
 
-  const vip = await getVipAccess(user.id);
+  let vip: Awaited<ReturnType<typeof getVipAccess>>;
+  try {
+    vip = await getVipAccess(user.id);
+  } catch (error) {
+    return aiErrorResponse(error, requestId, "ai_vip_lookup_failure");
+  }
   if (!vip.isVip) return NextResponse.json({ error: "AI_VIP_REQUIRED", requestId }, { status: 403 });
 
-  const creditKey = requestId;
   const cost = getAiCost(imageData ? "VIDEO_EDIT_COST" : "VIDEO_COST");
   const owner = vip.isOwner;
   let reserved = false;
 
   try {
     if (!owner) {
-      await consumeAiCredit(user.id, "VIDEO", creditKey, cost);
+      const reservation = await consumeAiCredit(user.id, "VIDEO", idempotencyKey, cost);
+      // Same key already paid for a video that was started earlier: never start (or charge) another.
+      if (reservation.alreadyApplied) throw new Error("AI_REQUEST_IN_PROGRESS");
       reserved = true;
     }
 
@@ -65,31 +90,23 @@ export async function POST(request: NextRequest) {
       sub: user.id,
       interactionId: result.interactionId,
       kind: "VIDEO",
-      creditKey,
+      creditKey: idempotencyKey,
       creditAmount: cost,
       ttlSeconds: 6 * 60 * 60,
     });
 
     return NextResponse.json({
-      data: {
-        status: "processing",
-        token,
-        requestId,
-        provider: "gemini",
-        model: result.model,
-      },
-    });
+      data: { status: "processing", token, requestId, provider: "gemini", model: result.model },
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    if (reserved) await refundAiCredit(user.id, "VIDEO", creditKey, cost).catch(() => undefined);
-    const code = safeError(error);
-    const status = code === "AI_CREDITS_EXHAUSTED"
-      ? 402
-      : code === "AI_VIP_REQUIRED"
-        ? 403
-        : code === "INVALID_REQUEST" || code === "INVALID_IMAGE_INPUT"
-          ? 400
-          : 503;
-    console.error(JSON.stringify({ event: "ai_video_failure", requestId, code }));
-    return NextResponse.json({ error: code, requestId }, { status });
+    let refunded = 0;
+    if (reserved) {
+      refunded = await refundAiCredit(user.id, "VIDEO", idempotencyKey, cost).then(() => cost).catch(() => 0);
+    }
+    const code = aiErrorCode(error);
+    if (code !== "AI_REQUEST_IN_PROGRESS" && code !== "AI_IDEMPOTENCY_KEY_CONFLICT") {
+      await recordMediaUsage({ userId: user.id, operation: "VIDEO", idempotencyKey, requestId, status: "FAILED", gvcUsed: 0, gvcRefunded: refunded, errorCode: code });
+    }
+    return aiErrorResponse(error, requestId, "ai_video_failure");
   }
 }

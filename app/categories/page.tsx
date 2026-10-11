@@ -13,23 +13,32 @@ export const metadata = {
 };
 
 export default async function CategoriesPage() {
-  const genres = await db.game.groupBy({
-    by: ["genre"],
-    where: {
-      published: true,
-      genre: {
-        not: null,
-      },
-    },
-    _count: {
-      _all: true,
-    },
-    orderBy: {
+  // Real categories (the same ones the /games filter and the owner form use), with the number of
+  // published games in each. Games added by the owner only have categories, not the legacy `genre` text.
+  const categories = await db.category.findMany({
+    where: { active: true },
+    orderBy: [{ sortOrder: "asc" }, { nameEn: "asc" }],
+    select: {
+      slug: true,
+      nameAr: true,
+      nameEn: true,
       _count: {
-        genre: "desc",
+        select: {
+          gameCategories: { where: { game: { published: true } } },
+        },
       },
     },
   });
+
+  const genres = categories
+    .map((category) => ({
+      value: category.slug,
+      label: category.nameAr || category.nameEn,
+      labelEn: category.nameEn || category.nameAr,
+      count: category._count.gameCategories,
+    }))
+    .filter((category) => category.count > 0)
+    .sort((a, b) => b.count - a.count);
 
   return (
     <main className={styles.page}>
@@ -111,40 +120,32 @@ export default async function CategoriesPage() {
         </div>
 
         <div className="grid">
-          {genres.map((genre) => {
-            const value = genre.genre;
-
-            if (!value) {
-              return null;
-            }
-
-            return (
-              <Link
-                key={value}
-                href={`/games?genre=${encodeURIComponent(
-                  value,
-                )}`}
-                className="card game-card"
+          {genres.map((genre) => (
+            <Link
+              key={genre.value}
+              href={`/games?genre=${encodeURIComponent(
+                genre.value,
+              )}`}
+              className="card game-card"
+            >
+              <h3
+                style={{
+                  margin: 0,
+                }}
               >
-                <h3
-                  style={{
-                    margin: 0,
-                  }}
-                >
-                  {value}
-                </h3>
+                <LocaleText ar={genre.label} en={genre.labelEn} />
+              </h3>
 
-                <p
-                  className="muted"
-                  style={{
-                    margin: "6px 0 0",
-                  }}
-                >
-                  {genre._count._all} <LocaleText ar="لعبة" en="games" />
-                </p>
-              </Link>
-            );
-          })}
+              <p
+                className="muted"
+                style={{
+                  margin: "6px 0 0",
+                }}
+              >
+                {genre.count} <LocaleText ar="لعبة" en="games" />
+              </p>
+            </Link>
+          ))}
 
           {!genres.length && (
             <p className="muted">

@@ -2,7 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { Prisma } from "@prisma/client";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
+import { normalizeExternalSourceUrl } from "@/lib/content-admin";
+
+// z.url() alone accepts javascript:, http: and private hosts. Mod links are rendered as <a href>
+// on /mods, so only public https URLs are allowed.
+const publicUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((value) => normalizeExternalSourceUrl(value) !== null, "INVALID_URL")
+  .optional()
+  .or(z.literal(""));
+
+function failure(error: unknown, fallback: string) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") return NextResponse.json({ error: "MOD_SLUG_ALREADY_EXISTS" }, { status: 409 });
+    if (error.code === "P2025") return NextResponse.json({ error: "MOD_NOT_FOUND" }, { status: 404 });
+  }
+  const message = publicErrorCode(error, fallback);
+  return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : message === "INVALID_INPUT" || error instanceof SyntaxError ? 400 : 500 });
+}
 
 const schema = z.object({
   slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -10,10 +31,10 @@ const schema = z.object({
   titleEn: z.string().trim().min(1).max(160),
   descriptionAr: z.string().trim().max(4000).optional().default(""),
   descriptionEn: z.string().trim().max(4000).optional().default(""),
-  imageUrl: z.string().trim().url().max(2000).optional().or(z.literal("")),
-  modUrl: z.string().trim().url().max(2000).optional().or(z.literal("")),
-  downloadUrl: z.string().trim().url().max(2000).optional().or(z.literal("")),
-  sourceUrl: z.string().trim().url().max(2000).optional().or(z.literal("")),
+  imageUrl: publicUrl,
+  modUrl: publicUrl,
+  downloadUrl: publicUrl,
+  sourceUrl: publicUrl,
   sourceProvider: z.string().trim().max(120).optional().or(z.literal("")),
   platform: z.enum(["PC","PLAYSTATION","XBOX","NINTENDO","ANDROID","IOS","MAC","LINUX","STEAM_DECK","WEB"]).optional().or(z.literal("")),
   gameId: z.string().cuid().optional().or(z.literal("")),
@@ -29,7 +50,7 @@ export async function GET(req: NextRequest) {
     await requireOwner();
     return NextResponse.json({ mods: await db.mod.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }], take: 250 }) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "FORBIDDEN";
+    const message = publicErrorCode(error, "FORBIDDEN");
     return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500 });
   }
 }
@@ -49,8 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ mod }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_MOD", details: error.issues }, { status: 400 });
-    const message = error instanceof Error ? error.message : "MOD_CREATE_FAILED";
-    return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500 });
+    return failure(error, "MOD_CREATE_FAILED");
   }
 }
 
@@ -82,8 +102,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ mod });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_MOD", details: error.issues }, { status: 400 });
-    const message = error instanceof Error ? error.message : "MOD_UPDATE_FAILED";
-    return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500 });
+    return failure(error, "MOD_UPDATE_FAILED");
   }
 }
 
@@ -98,7 +117,6 @@ export async function DELETE(req: NextRequest) {
     await db.auditLog.create({ data: { actorUserId: owner.id, action: "MOD_DELETED", entityType: "Mod", entityId: id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "MOD_DELETE_FAILED";
-    return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : 500 });
+    return failure(error, "MOD_DELETE_FAILED");
   }
 }

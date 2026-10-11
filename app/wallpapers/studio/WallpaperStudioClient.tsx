@@ -300,7 +300,7 @@ export default function WallpaperStudioClient({ library }: { library: LibraryIte
         </div>
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 380px)", gap: 18, marginTop: 18, alignItems: "start" }}>
+      <section className="gv-m-split" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 380px)", gap: 18, marginTop: 18, alignItems: "start" }}>
         <div className="glass card" style={{ display: "grid", placeItems: "center", padding: 16 }}>
           <div style={{ width: "min(100%, 390px)", position: "relative", borderRadius: 34, padding: 7, background: "#08090c", boxShadow: "0 24px 70px rgba(0,0,0,.5)" }}>
             <canvas ref={canvasRef} width={W} height={H} style={{ display: "block", width: "100%", height: "auto", borderRadius: 28, touchAction: "none", background: "#111" }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} aria-label="Wallpaper editor canvas" />

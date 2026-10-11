@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { isWeakSecret } from "../secret-strength";
 
 type MediaTokenPayload = {
   sub: string;
@@ -12,7 +13,9 @@ type MediaTokenPayload = {
 
 function secret() {
   const value = process.env.AUTH_SECRET;
-  if (!value || value.length < 32) throw new Error("AUTH_SECRET_NOT_CONFIGURED");
+  if (!value || value.length < 32 || (process.env.NODE_ENV === "production" && isWeakSecret(value))) {
+    throw new Error("AUTH_SECRET_NOT_CONFIGURED");
+  }
   return value;
 }
 
@@ -25,7 +28,8 @@ function decode(value: string) {
 }
 
 function sign(payload: string) {
-  return createHmac("sha256", secret()).update(payload).digest("base64url");
+  // Domain separation: a media token signature can never double as a session-cookie signature.
+  return createHmac("sha256", secret()).update("gv-media-token:" + payload).digest("base64url");
 }
 
 export function createMediaToken(input: Omit<MediaTokenPayload, "exp"> & { ttlSeconds?: number }) {

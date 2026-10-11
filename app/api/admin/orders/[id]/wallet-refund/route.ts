@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { DigitalKeyStatus, LedgerType, Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
+import { logSystemError } from "@/lib/observability";
 import { reversePointsInTransaction } from "@/lib/points";
+import { revokeEntitlementsForRefund } from "@/lib/store-guards";
 
 export const runtime = "nodejs";
 
@@ -19,6 +21,11 @@ export async function POST(
     const { id: orderId } = await params;
 
     const result = await db.$transaction(async (tx) => {
+      // Serialize every refund / webhook / checkout touching this order. The
+      // order and its payments are read only after the lock is held, so two
+      // simultaneous refund clicks can never both see a SUCCEEDED payment.
+      await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`);
+
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: {
@@ -180,16 +187,8 @@ export async function POST(
         });
       }
 
-      if (orderItemIds.length > 0) {
-        await tx.entitlement.updateMany({
-          where: {
-            userId: order.userId,
-            orderItemId: { in: orderItemIds },
-            revokedAt: null,
-          },
-          data: { revokedAt: new Date() },
-        });
-      }
+      // Access moves to another valid purchase of the same game when there is one.
+      await revokeEntitlementsForRefund(tx, order.userId, orderItemIds);
 
       const originalPaymentKey = `purchase-points:${order.id}:wallet:${originalTransaction.id}`;
       const buyerReward = await tx.pointLedger.findUnique({
@@ -211,17 +210,27 @@ export async function POST(
         });
       }
 
-      const ownerWallet = await tx.ownerWallet.findUnique({
-        where: { ownerId: owner.id },
+      // The sale was credited to the owner account's wallet, which is not necessarily the admin who
+      // clicks refund: find the wallet from the original ledger rows, never from the acting user.
+      const saleRevenueKey = `sale-revenue:${order.id}:wallet:${originalTransaction.id}`;
+      const salePointsKey = `sale-points:${order.id}:wallet:${originalTransaction.id}`;
+      const saleRevenue = await tx.ownerLedger.findUnique({
+        where: { idempotencyKey: saleRevenueKey },
+        select: { id: true, walletId: true, usdAmount: true },
       });
+      const salePoints = await tx.ownerLedger.findUnique({
+        where: { idempotencyKey: salePointsKey },
+        select: { id: true, walletId: true, points: true },
+      });
+      const creditedWalletId = saleRevenue?.walletId ?? salePoints?.walletId ?? null;
+      const ownerWallet = creditedWalletId
+        ? await tx.ownerWallet.findUnique({ where: { id: creditedWalletId } })
+        : null;
 
       if (ownerWallet) {
-        const saleRevenueKey = `sale-revenue:${order.id}:wallet:${originalTransaction.id}`;
-        const saleRevenue = await tx.ownerLedger.findUnique({
-          where: { idempotencyKey: saleRevenueKey },
-          select: { id: true, walletId: true, usdAmount: true },
-        });
-
+        // Lock and re-read: the points clamp below must use the balance as it is now.
+        await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "OwnerWallet" WHERE "id" = ${ownerWallet.id} FOR UPDATE`);
+        const lockedOwnerWallet = await tx.ownerWallet.findUniqueOrThrow({ where: { id: ownerWallet.id } });
         if (saleRevenue) {
           const refundUsd = saleRevenue.usdAmount ?? new Prisma.Decimal(0);
           const debitedUsd = await tx.ownerWallet.updateMany({
@@ -251,25 +260,18 @@ export async function POST(
           });
         }
 
-        const salePointsKey = `sale-points:${order.id}:wallet:${originalTransaction.id}`;
-        const salePoints = await tx.ownerLedger.findUnique({
-          where: { idempotencyKey: salePointsKey },
-          select: { id: true, walletId: true, points: true },
-        });
-
         if (salePoints && salePoints.points > 0) {
           const pointsToReturn = Math.min(
             salePoints.points,
-            Math.max(ownerWallet.availablePoints, 0),
+            Math.max(lockedOwnerWallet.availablePoints, 0),
           );
 
           if (pointsToReturn > 0) {
-            await tx.ownerWallet.update({
-              where: { id: ownerWallet.id },
-              data: {
-                availablePoints: { decrement: pointsToReturn },
-              },
+            const pointsDebited = await tx.ownerWallet.updateMany({
+              where: { id: ownerWallet.id, availablePoints: { gte: pointsToReturn } },
+              data: { availablePoints: { decrement: pointsToReturn } },
             });
+            if (pointsDebited.count !== 1) throw new Error("OWNER_POINTS_BALANCE_CHANGED");
           }
 
           await tx.ownerLedger.create({
@@ -338,16 +340,25 @@ export async function POST(
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "WALLET_REFUND_FAILED";
+      publicErrorCode(error, "WALLET_REFUND_FAILED");
+
+    const conflicts = new Set([
+      "WALLET_PAYMENT_NOT_FOUND", "WALLET_CURRENCY_NOT_SUPPORTED", "PAYMENT_AMOUNT_MISMATCH",
+      "WALLET_PAYMENT_REFERENCE_INVALID", "WALLET_IDEMPOTENCY_CONFLICT",
+      "OWNER_USD_BALANCE_INSUFFICIENT_FOR_REFUND", "OWNER_POINTS_BALANCE_CHANGED",
+    ]);
+    const known = new Set(["ORDER_NOT_FOUND", "UNAUTHORIZED", "FORBIDDEN", "WALLET_NOT_FOUND", ...conflicts]);
+
+    if (!known.has(message)) {
+      await logSystemError("admin:wallet-order-refund", error, { statusCode: 500 });
+      return NextResponse.json({ error: "WALLET_REFUND_FAILED" }, { status: 500 });
+    }
 
     const status =
       message === "ORDER_NOT_FOUND" ? 404 :
-      message === "WALLET_PAYMENT_NOT_FOUND" ? 409 :
-      message === "WALLET_CURRENCY_NOT_SUPPORTED" ? 409 :
-      message === "PAYMENT_AMOUNT_MISMATCH" ? 409 :
-      message === "WALLET_PAYMENT_REFERENCE_INVALID" ? 409 :
-      message === "WALLET_IDEMPOTENCY_CONFLICT" ? 409 :
+      conflicts.has(message) ? 409 :
       message === "UNAUTHORIZED" ? 401 :
+      message === "FORBIDDEN" ? 403 :
       400;
 
     return NextResponse.json({ error: message }, { status });

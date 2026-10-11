@@ -1,14 +1,31 @@
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { db } from "../../lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+// Leaderboard is public and identical for everyone: one query per minute instead of one per visit,
+// and only the columns that are rendered.
+const getTopPlayers = unstable_cache(
+  async () =>
+    db.gamerProfile.findMany({
+      orderBy: [{ level: "desc" }, { xp: "desc" }, { totalPlayMinutes: "desc" }],
+      take: 50,
+      select: {
+        id: true,
+        displayName: true,
+        level: true,
+        xp: true,
+        totalPlayMinutes: true,
+        user: { select: { username: true } },
+      },
+    }),
+  ["rankings-top-players-v1"],
+  { revalidate: 60, tags: ["rankings"] },
+);
+
 export default async function RankingsPage() {
-  const players = await db.gamerProfile.findMany({
-    orderBy: [{ level: "desc" }, { xp: "desc" }, { totalPlayMinutes: "desc" }],
-    take: 50,
-    include: { user: { select: { username: true } } }
-  });
+  const players = await getTopPlayers();
 
   return (
     <main className="wrap" dir="rtl">

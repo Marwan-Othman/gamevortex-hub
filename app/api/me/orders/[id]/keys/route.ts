@@ -3,7 +3,7 @@ import { DigitalKeyStatus, PaymentStatus } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, userRouteError } from "@/lib/api";
 import { decryptDigitalKey } from "@/lib/digital-keys";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -60,6 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (error instanceof Error && error.message === "DIGITAL_KEY_ENCRYPTION_SECRET_NOT_CONFIGURED") {
       return NextResponse.json({ error: "DELIVERY_NOT_CONFIGURED" }, { status: 503 });
     }
-    return NextResponse.json({ error: "KEY_DELIVERY_FAILED" }, { status: 400 });
+    // 401 for a signed-out user, 503 for a database outage, 500 + server log for anything else.
+    return userRouteError(error, "KEY_DELIVERY_FAILED", "orders:keys");
   }
 }

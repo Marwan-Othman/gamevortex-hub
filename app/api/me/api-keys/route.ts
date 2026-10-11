@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 import { createApiKey } from "@/lib/gamevortex-api/keys";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     ]);
     return NextResponse.json({ data: { purchased: Boolean(purchase), paymentStatus: latestPurchase?.status || null, keys, activeKeyLimit: MAX_ACTIVE_KEYS } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "API_KEYS_FAILED";
+    const message = publicErrorCode(error, "API_KEYS_FAILED");
     return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : 500 });
   }
 }
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: { ...apiKey, key: generated.key } }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "API_KEY_CREATE_FAILED";
+    const message = publicErrorCode(error, "API_KEY_CREATE_FAILED");
     const status = message === "UNAUTHORIZED" ? 401 : message === "API_ACCESS_REQUIRED" ? 403 : message === "API_KEY_LIMIT_REACHED" ? 409 : 500;
     return NextResponse.json({ error: status === 500 ? "API_KEY_CREATE_FAILED" : message }, { status });
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 import { requireTradingOwner, tradingErrorStatus, tradingForbidden } from "@/lib/trading/access";
 import { createAllocation, getTradingSummary } from "@/lib/trading/allocation";
 import { validateIdempotencyKey } from "@/lib/trading/money";
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       { status: replayed ? 200 : 201 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
+    const message = publicErrorCode(error, "INTERNAL_ERROR");
     if (message === "FORBIDDEN") return tradingForbidden();
     const status = tradingErrorStatus(message);
     if (status) return NextResponse.json({ error: message }, { status });

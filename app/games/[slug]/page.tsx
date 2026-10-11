@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
+import { cache } from "react";
 import Link from "next/link";
+import { canDownload } from "@/lib/downloads";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -13,6 +15,45 @@ import {
   getPlatformSlugFromEnum,
 } from "@/lib/platforms";
 
+/**
+ * One query per request: generateMetadata() and the page both need this game. React's cache()
+ * de-duplicates the call inside a single render pass (previously two separate DB round-trips).
+ */
+const getGame = cache(async (slug: string) =>
+  db.game.findFirst({
+    where: {
+      slug,
+      published: true,
+    },
+
+    include: {
+      gamePlatforms: true,
+
+      gameCategories: {
+        include: {
+          category: true,
+        },
+      },
+
+      reviews: {
+        orderBy: {
+          createdAt: "desc",
+        },
+
+        take: 8,
+
+        include: {
+          user: {
+            select: {
+              username: true,
+            },
+          },
+        },
+      },
+    },
+  }),
+);
+
 export async function generateMetadata({
   params,
 }: {
@@ -20,19 +61,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
 
-  const game = await db.game.findFirst({
-    where: {
-      slug,
-      published: true,
-    },
-    select: {
-      titleAr: true,
-      titleEn: true,
-      description: true,
-      coverUrl: true,
-      slug: true,
-    },
-  });
+  const game = await getGame(slug);
 
   if (!game) {
     return {
@@ -77,6 +106,17 @@ export async function generateMetadata({
   };
 }
 
+/** Only plain http(s) links are rendered as hrefs (blocks javascript:/data: values from bad data). */
+function safeHttpUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function GameDetails({
   params,
 }: {
@@ -84,42 +124,20 @@ export default async function GameDetails({
 }) {
   const { slug } = await params;
 
-  const game = await db.game.findFirst({
-    where: {
-      slug,
-      published: true,
-    },
-
-    include: {
-      gamePlatforms: true,
-
-      gameCategories: {
-        include: {
-          category: true,
-        },
-      },
-
-      reviews: {
-        orderBy: {
-          createdAt: "desc",
-        },
-
-        take: 8,
-
-        include: {
-          user: {
-            select: {
-              username: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  const game = await getGame(slug);
 
   if (!game) {
     notFound();
   }
+
+  // The view counter (shown here and used by "most viewed" sorting) only moved through the API before.
+  // Best effort: a failed counter update must never break the page.
+  void db.game
+    .update({ where: { id: game.id }, data: { viewCount: { increment: 1 } } })
+    .catch(() => undefined);
+
+  const officialUrl = safeHttpUrl(game.officialUrl);
+  const downloadable = canDownload(game);
 
   const relatedCategoryIds = game.gameCategories.map(
     (item) => item.categoryId,
@@ -189,6 +207,9 @@ export default async function GameDetails({
             className="detail-cover"
             src={game.coverUrl}
             alt={game.titleEn}
+            // Above-the-fold cover is the LCP element: fetch it first, never lazy.
+            fetchPriority="high"
+            decoding="async"
           />
         )}
 
@@ -197,12 +218,15 @@ export default async function GameDetails({
             VORTEX SCORE {score}
           </span>
           {game.isMod && <span className="badge">MOD</span>}
+          {game.version && <span className="badge" dir="ltr">v{game.version.replace(/^v/i, "")}</span>}
 
           <h1>{game.titleAr}</h1>
 
-          <p className="muted">
-            {game.titleEn}
-          </p>
+          {game.titleEn && game.titleEn !== game.titleAr && (
+            <p className="muted">
+              {game.titleEn}
+            </p>
+          )}
 
           <p>
             {game.description ||
@@ -284,7 +308,7 @@ export default async function GameDetails({
             </span>
           </div>
 
-          {game.downloadSource && (
+          {downloadable && (
             <a
               className="btn"
               href={`/download/game/${game.slug}`}
@@ -293,15 +317,21 @@ export default async function GameDetails({
             </a>
           )}
 
-          {game.officialUrl && (
+          {officialUrl && (
             <a
               className="btn secondary"
-              href={game.officialUrl}
+              href={officialUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noreferrer noopener"
             >
               الموقع الرسمي
             </a>
+          )}
+
+          {!downloadable && !officialUrl && (
+            <p className="muted">
+              التحميل غير متاح لهذه اللعبة حاليًا.
+            </p>
           )}
         </div>
       </section>
@@ -316,6 +346,7 @@ export default async function GameDetails({
                 src={src}
                 alt=""
                 loading="lazy"
+                decoding="async"
                 style={{ height: 220, width: "auto", borderRadius: 14, flex: "0 0 auto" }}
               />
             ))}
@@ -339,6 +370,8 @@ export default async function GameDetails({
                   <img
                     src={related.coverUrl}
                     alt={related.titleEn}
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       width: "100%",
                       borderRadius: 12,

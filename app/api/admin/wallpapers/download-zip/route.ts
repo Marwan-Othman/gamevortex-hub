@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import { openWallpaperSource } from "@/lib/wallpaper-delivery";
 import {
   WALLPAPER_BULK_DOWNLOAD_MAX,
@@ -240,7 +240,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Wallpaper ZIP error", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to build ZIP" },
+      { error: publicErrorCode(error, "Failed to build ZIP") },
       { status: 400 },
     );
   }

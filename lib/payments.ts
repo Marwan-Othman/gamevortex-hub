@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { fetchWithTimeout, readJsonSafe } from "./fetch-timeout";
+
 export type PaymentCreateInput = {
   orderId: string;
   amountCents: number;
@@ -108,7 +110,7 @@ async function stripeRequest(
     throw new Error("PAYMENT_PROVIDER_NOT_CONFIGURED");
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://api.stripe.com/v1/${path}`,
     {
       method: "POST",
@@ -126,7 +128,7 @@ async function stripeRequest(
   );
 
   const data =
-    (await response.json()) as Record<string, unknown>;
+    (await readJsonSafe(response)) as Record<string, unknown>;
 
   if (!response.ok) {
     const error =
@@ -161,7 +163,7 @@ export async function resolveStripePaymentIntentReference(
     throw new Error("PAYMENT_PROVIDER_NOT_CONFIGURED");
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(id)}`,
     {
       method: "GET",
@@ -172,7 +174,7 @@ export async function resolveStripePaymentIntentReference(
     },
   );
 
-  const data = (await response.json()) as Record<string, unknown>;
+  const data = (await readJsonSafe(response)) as Record<string, unknown>;
 
   if (!response.ok) {
     throw new Error("STRIPE_PAYMENT_INTENT_LOOKUP_FAILED");
@@ -216,7 +218,7 @@ async function paypalAccessToken() {
     `${id}:${secret}`,
   ).toString("base64");
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${paypalBase()}/v1/oauth2/token`,
     {
       method: "POST",
@@ -232,7 +234,7 @@ async function paypalAccessToken() {
   );
 
   const data =
-    (await response.json()) as Record<string, unknown>;
+    (await readJsonSafe(response)) as Record<string, unknown>;
 
   if (
     !response.ok ||
@@ -305,7 +307,7 @@ async function paypalRequest(
   const token =
     await paypalAccessToken();
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${paypalBase()}${path}`,
     {
       method: "POST",
@@ -323,7 +325,7 @@ async function paypalRequest(
   );
 
   const data =
-    (await response.json()) as Record<string, unknown>;
+    (await readJsonSafe(response)) as Record<string, unknown>;
 
   if (!response.ok) {
     throw new Error(
@@ -517,7 +519,7 @@ export class ConfiguredPaymentProvider
           .PAYMENT_PROVIDER_SECRET;
 
       const response =
-        await fetch(
+        await fetchWithTimeout(
           `${base.replace(/\/$/, "")}/payments`,
           {
             method: "POST",
@@ -544,7 +546,7 @@ export class ConfiguredPaymentProvider
         );
 
       const data =
-        (await response.json()) as Record<
+        (await readJsonSafe(response)) as Record<
           string,
           unknown
         >;
@@ -806,7 +808,7 @@ export async function verifyPayPalWebhook(
     await paypalAccessToken();
 
   const response =
-    await fetch(
+    await fetchWithTimeout(
       `${paypalBase()}/v1/notifications/verify-webhook-signature`,
       {
         method: "POST",
@@ -843,7 +845,7 @@ export async function verifyPayPalWebhook(
   }
 
   const data =
-    (await response.json()) as Record<
+    (await readJsonSafe(response)) as Record<
       string,
       unknown
     >;

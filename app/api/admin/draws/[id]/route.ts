@@ -3,7 +3,7 @@ import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 
 const paramsSchema = z.object({ id: z.string().cuid() });
 
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(raffle);
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "INVALID_DRAW_INPUT" }, { status: 400 });
-    const message = error instanceof Error ? error.message : "DRAW_UPDATE_FAILED";
+    const message = publicErrorCode(error, "DRAW_UPDATE_FAILED");
     const status = message === "DRAW_NOT_FOUND" ? 404 : message === "FORBIDDEN" ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
   }

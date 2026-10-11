@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ data: tickets }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_ADMIN_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_ADMIN_FAILED");
     return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : 403 });
   }
 }

@@ -11,7 +11,13 @@ const areas = [
   ["المتجر", "Store", "/admin/store", "المنتجات والمخزون والمفاتيح.", "Products, inventory and digital keys."],
   ["مفاتيح API", "API keys", "/admin/api-keys", "إصدار مفاتيح خاصة ومتابعة الاستخدام وإلغاؤها.", "Issue private keys, monitor usage, and revoke access."],
   ["الدعم الفني", "Support", "/admin/support", "متابعة طلبات المستخدمين والرد عليها.", "Review user support tickets and respond."],
-  ["السحوبات", "Draws", "/admin/draws", "إدارة السحوبات والفائزين.", "Manage draws and winners."],
+  ["سحوبات الجوائز", "Prize draws", "/admin/draws", "إدارة سحوبات الجوائز والفائزين.", "Manage prize draws and winners."],
+  ["المالية والاسترداد", "Finance & refunds", "/admin/control-center", "المحفظة والاسترداد وتسوية رصيد المالك.", "Wallet, refunds and owner cash reconciliation."],
+  ["فحص المحتوى", "Content health", "/admin/content-health", "تكرار الأسماء والعناصر بلا تصنيف أو مصدر.", "Duplicates and items missing category or source."],
+  ["Mods", "Mods", "/admin/mods", "إدارة المودات ومصادرها.", "Manage mods and their sources."],
+  ["الخلفيات", "Wallpapers", "/admin/wallpapers", "رفع وإدارة الخلفيات.", "Upload and manage wallpapers."],
+  ["بطاقات الهدايا", "Gift cards", "/admin/gift-cards", "استيراد بطاقات FazerCards وتفعيلها.", "Import and enable FazerCards gift cards."],
+  ["الذكاء الاصطناعي", "AI monitor", "/admin/ai", "حالة المزوّدين والاستخدام.", "Provider health and usage."],
   ["المراجعة", "Moderation", "/admin/moderation", "البلاغات وإجراءات الإشراف.", "Reports and moderation actions."],
   ["القرآن", "Quran", "/admin/quran", "القراء ومصادر المحتوى.", "Reciters and content sources."],
   ["الأخطاء", "Errors", "/admin/errors", "أخطاء النظام وسجل التشغيل.", "System errors and runtime logs."],
@@ -24,7 +30,7 @@ export default async function OwnerControlPage() {
   const owner = result.owner;
   const [users, staff, products, orders, payments, activeVip, pendingWithdrawals] = await Promise.all([
     db.user.count(), db.user.count({ where: { role: "STAFF" } }), db.gameProduct.count(), db.order.count(), db.payment.count(),
-    db.vipSubscription.count({ where: { status: "ACTIVE" } }),
+    db.vipSubscription.count({ where: { status: "ACTIVE", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } }),
     db.withdrawalRequest.count({ where: { status: { in: ["REQUESTED", "PENDING", "PROCESSING"] } } }),
   ]);
   return <main className="wrap">

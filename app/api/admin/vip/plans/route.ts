@@ -17,10 +17,7 @@ import {
   requireOwner,
 } from "@/lib/auth";
 
-import {
-  guardMutation,
-  guardRead,
-} from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 
 const updateSchema =
   z.object({
@@ -74,6 +71,13 @@ const updateSchema =
         .min(1)
         .max(100),
 
+    /* GVC credits granted with each purchase of this plan. */
+    gvcGrant:
+      z.number()
+        .int()
+        .min(0)
+        .max(10_000_000)
+        .optional(),
 
     active:
       z.boolean(),
@@ -122,9 +126,7 @@ export async function GET(
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "ADMIN_VIP_PLANS_FAILED";
+      publicErrorCode(error, "ADMIN_VIP_PLANS_FAILED");
 
     const status =
       message ===
@@ -204,7 +206,8 @@ export async function PATCH(
     ) {
       if (
         input.priceCents !== 0 ||
-        input.durationMonths !== null
+        input.durationMonths !== null ||
+        (input.gvcGrant ?? 0) !== 0
       ) {
         return NextResponse.json(
           {
@@ -263,6 +266,12 @@ export async function PATCH(
               input.pointsMultiplier,
             ),
 
+          ...(input.gvcGrant !== undefined
+            ? {
+                gvcGrant:
+                  input.gvcGrant,
+              }
+            : {}),
 
           active:
             input.active,
@@ -296,9 +305,7 @@ export async function PATCH(
     }
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "ADMIN_VIP_PLAN_UPDATE_FAILED";
+      publicErrorCode(error, "ADMIN_VIP_PLAN_UPDATE_FAILED");
 
     const status =
       message ===

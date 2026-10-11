@@ -59,6 +59,7 @@ export default function OwnerApiKeysClient() {
   }
 
   async function revoke(id: string) {
+    if (!window.confirm(t("إلغاء هذا المفتاح نهائيًا؟ سيتوقف عن العمل فورًا ولا يمكن إعادته.", "Revoke this key permanently? It stops working immediately and cannot be restored."))) return;
     setError("");
     try {
       const response = await fetch(`/api/admin/api-keys/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke" }) });

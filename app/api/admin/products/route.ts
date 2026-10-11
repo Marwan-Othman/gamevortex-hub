@@ -18,12 +18,12 @@ const productSchema = z.object({
 
   priceCents: z.number().int().min(0).max(100000000),
   rewardPoints: z.number().int().min(0).max(100000000).nullable().optional(),
+  // ISO-style 3-letter code (the wallet and the owner ledger only work with USD amounts).
   currency: z
     .string()
     .trim()
-    .min(3)
-    .max(10)
-    .transform((value) => value.toUpperCase()),
+    .transform((value) => value.toUpperCase())
+    .pipe(z.string().regex(/^[A-Z]{3}$/)),
 
   kind: z.nativeEnum(ProductKind),
   deliveryType: z.nativeEnum(DeliveryType),
@@ -44,6 +44,7 @@ const productSchema = z.object({
     .trim()
     .url()
     .max(2000)
+    .refine((value) => /^https?:\/\//i.test(value))
     .nullable()
     .optional(),
 

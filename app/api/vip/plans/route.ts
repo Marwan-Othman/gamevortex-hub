@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardRead } from "@/lib/api";
+import { guardRead, internalError } from "@/lib/api";
 import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import {
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * قائمة باقات VIP (عامة، لا تحتاج تسجيل دخول). الأسعار والمدد من الخادم.
  * خطة OWNER تُستثنى دائمًا إلا لحساب SUPER_ADMIN نفسه.
  */
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const blocked = await guardRead(request, "vip:plans", 120);
 
   if (blocked) {
@@ -110,4 +110,12 @@ export async function GET(request: NextRequest) {
       },
     ),
   });
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    return await handleGET(request);
+  } catch (error) {
+    return internalError("vip:plans", error, "VIP_PLANS_LOAD_FAILED");
+  }
 }

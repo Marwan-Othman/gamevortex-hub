@@ -1,14 +1,20 @@
 import { db } from "@/lib/prisma";
 import { geminiChat, geminiHealth } from "@/lib/ai/gemini";
 import { manusChat } from "@/lib/ai/manus";
-import { AiProviderError, type AiChatInput, type AiChatResult, type AiProvider, type AiProviderHealth } from "@/lib/ai/types";
+import { AiProviderError, type AiChatAttempt, type AiChatInput, type AiChatResult, type AiProvider, type AiProviderHealth } from "@/lib/ai/types";
 
 const COOLDOWN_MS = 60_000;
+// The chat route has maxDuration = 300s. The whole provider chain (including
+// failover) must give up before that so the credit refund can still run.
+const CHAT_DEADLINE_MS = 240_000;
+const MIN_ATTEMPT_MS = 15_000;
 
 async function recentlyFailed(provider: AiProvider) {
   const since = new Date(Date.now() - COOLDOWN_MS);
   const row = await db.aiUsageLedger.findFirst({
-    where: { provider, status: "FAILED", createdAt: { gte: since } },
+    // Image/video failures share provider "gemini" in the ledger; only chat
+    // failures may push chat traffic over to the fallback provider.
+    where: { provider, status: "FAILED", operation: { in: ["CHAT", "ADVANCED_CHAT"] }, createdAt: { gte: since } },
     select: { id: true },
     orderBy: { createdAt: "desc" },
   });
@@ -26,28 +32,45 @@ async function call(provider: AiProvider, input: AiChatInput): Promise<AiChatRes
 export async function runChatWithFailover(input: AiChatInput) {
   const geminiCooling = await recentlyFailed("gemini");
   const providers: AiProvider[] = geminiCooling ? ["manus", "gemini"] : ["gemini", "manus"];
-  const attempts: Array<{ provider: AiProvider; error?: AiProviderError; result?: AiChatResult }> = [];
+  const attempts: AiChatAttempt[] = [];
+  const deadline = Date.now() + CHAT_DEADLINE_MS;
 
   for (const provider of providers) {
+    const remaining = deadline - Date.now();
+    if (attempts.length > 0 && remaining < MIN_ATTEMPT_MS) break;
     if (provider === "gemini" && !process.env.GEMINI_API_KEY?.trim()) continue;
     if (provider === "manus" && !process.env.MANUS_API_KEY?.trim()) continue;
     try {
       const providerInput = provider === "gemini" && input.previousInteractionId
         ? { ...input, history: [] }
         : input;
-      const result = await call(provider, providerInput);
+      const attemptSignal = AbortSignal.timeout(Math.max(remaining, 1_000));
+      const signal = providerInput.signal ? AbortSignal.any([providerInput.signal, attemptSignal]) : attemptSignal;
+      const result = await call(provider, { ...providerInput, signal });
+      // A provider that answers 200 with an empty / non-string answer is a failure, not a reply.
+      if (!result || typeof result.answer !== "string" || !result.answer.trim()) {
+        throw new AiProviderError({ provider, code: "EMPTY_RESPONSE", failoverable: true });
+      }
       attempts.push({ provider, result });
       return { result, attempts };
     } catch (error) {
-      const normalized = error instanceof AiProviderError
-        ? error
-        : new AiProviderError({ provider, code: "UNAVAILABLE", retryable: true, failoverable: true });
+      const timedOut = Date.now() >= deadline;
+      const normalized = timedOut
+        ? new AiProviderError({ provider, code: "TIMEOUT", retryable: true })
+        : error instanceof AiProviderError
+          ? error
+          : new AiProviderError({ provider, code: "UNAVAILABLE", retryable: true, failoverable: true });
       attempts.push({ provider, error: normalized });
       if (!isFailoverable(normalized)) break;
     }
   }
 
-  throw attempts.at(-1)?.error || new AiProviderError({ provider: "gemini", code: "NO_PROVIDER_AVAILABLE" });
+  const last = attempts.at(-1)?.error;
+  const failure = last
+    ? new AiProviderError({ provider: last.provider, code: last.code, status: last.status, retryable: last.retryable, failoverable: last.failoverable })
+    : new AiProviderError({ provider: "gemini", code: "NO_PROVIDER_AVAILABLE" });
+  failure.attempts = attempts;
+  throw failure;
 }
 
 export async function getProviderHealth(): Promise<Record<AiProvider, { status: AiProviderHealth; latencyMs: number | null }>> {

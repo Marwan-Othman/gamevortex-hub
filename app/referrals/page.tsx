@@ -76,6 +76,7 @@ export default async function Referrals() {
       {referrals.length > 0 && (
         <section className="card" style={{ marginTop: 20 }}>
           <h2>سجل الإحالات</h2>
+          <div className="gv-table-scroll">
           <table className="referral-table">
             <thead><tr><th>المستخدم</th><th>الحالة</th><th>النقاط</th></tr></thead>
             <tbody>
@@ -88,6 +89,7 @@ export default async function Referrals() {
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       )}
     </main>

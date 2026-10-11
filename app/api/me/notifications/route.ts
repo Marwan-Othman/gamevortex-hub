@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, userRouteError } from "@/lib/api";
 
 const patchSchema = z.object({
   id: z.string().trim().min(1).max(100).optional(),
@@ -24,10 +24,7 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "UNAUTHORIZED" },
-      { status: 401 },
-    );
+    return userRouteError(error, "NOTIFICATIONS_LOAD_FAILED");
   }
 }
 
@@ -61,10 +58,6 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ ok: true, updated: result.count });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "NOTIFICATIONS_UPDATE_FAILED";
-    return NextResponse.json(
-      { error: message },
-      { status: message === "UNAUTHORIZED" ? 401 : 400 },
-    );
+    return userRouteError(error, "NOTIFICATIONS_UPDATE_FAILED");
   }
 }

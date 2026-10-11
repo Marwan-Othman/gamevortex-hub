@@ -1,14 +1,12 @@
-# GameVortex Hub V10
-
-> V10 hardening release: secure owner binding, revocable sessions, validated registration, source-gated publishing and admin game lifecycle.
-
 # GameVortex Hub — Production Build Edition
+
+> Historical release notes, audits and build manifests live in `docs/archive/`.
 
 GameVortex Hub is a Next.js + React + TypeScript application backed by PostgreSQL through Prisma. This repository is the existing project, upgraded for repeatable production validation rather than a separate demo.
 
 ## Stack
 
-- Next.js 15 + React 19 + TypeScript
+- Next.js 16 + React 19 + TypeScript
 - Prisma 6 + PostgreSQL
 - Zod server-side validation
 - HttpOnly signed sessions with scrypt password hashing

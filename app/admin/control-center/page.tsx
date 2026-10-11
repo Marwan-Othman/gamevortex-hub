@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/prisma";
-import { requireOwner } from "@/lib/auth";
-import AdminShell from "@/components/admin/AdminShell";
+import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import { calculateOwnerCashSummary } from "@/lib/owner-points";
 import WalletOrderRefunds from "@/components/admin/WalletOrderRefunds";
 import OwnerCashReconciliation from "@/components/admin/OwnerCashReconciliation";
@@ -14,19 +13,9 @@ function status(value: boolean) {
 }
 
 export default async function OwnerControlCenter() {
-  let owner;
-  try {
-    owner = await requireOwner();
-  } catch {
-    return (
-      <main className="wrap" dir="rtl">
-        <section className="glass card" style={{ margin: "40px auto", maxWidth: 620, textAlign: "center" }}>
-          <h1>غير مصرح</h1>
-          <p className="muted">مركز التحكم الكامل متاح لحساب SUPER_ADMIN فقط.</p>
-        </section>
-      </main>
-    );
-  }
+  const gate = await getOwnerOrAccessScreen();
+  if ("screen" in gate) return gate.screen;
+  const owner = gate.owner;
 
   const [
     users,
@@ -131,11 +120,11 @@ export default async function OwnerControlCenter() {
     ["محفظة الأموال", "/wallet", "محفظة المستخدم المالية"],
     ["القرآن", "/admin/quran", "إدارة المصادر والقراء"],
     ["المراجعة والمحتوى", "/admin/moderation", "بلاغات ومراجعة المحتوى"],
-    ["السحوبات", "/admin/draws", "إدارة السحوبات"],
+    ["سحوبات الجوائز", "/admin/draws", "إدارة سحوبات الجوائز"],
   ] as const;
 
   return (
-    <AdminShell ownerLabel={owner.username || owner.email}>
+    <>
       <section className={styles.ownerCard}>
         <div className={styles.ownerCardTop}>
           <span className={styles.ownerCardAvatar}>{(owner.username || owner.email).charAt(0).toUpperCase()}</span>
@@ -232,6 +221,6 @@ export default async function OwnerControlCenter() {
           <li>وجود التكامل هنا يعني فقط أن Environment Variable موجود، وليس أن الخدمة نجحت فعليًا.</li>
         </ul>
       </section>
-    </AdminShell>
+    </>
   );
 }

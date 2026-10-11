@@ -3,10 +3,13 @@ import SiteHeader from "@/components/layout/SiteHeader";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import SiteFooter from "@/components/layout/SiteFooter";
 import PwaRegister from "@/components/pwa/PwaRegister";
+import LocaleProvider from "@/components/ui/LocaleProvider";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./styles.css";
 import "./theme.css";
 import "./redesign.css";
+import "./public-ui.css";
+import "./mobile.css";
 
 const fontBody = IBM_Plex_Sans_Arabic({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-body", display: "swap" });
 
@@ -38,6 +41,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: "cover",
   themeColor: "#050507",
   colorScheme: "dark",
 };
@@ -55,15 +59,17 @@ export default async function RootLayout({
   return (
     <html lang={locale} dir={dir} className={`${fontBody.variable}`}>
       <body>
-        <SiteHeader />
+        <LocaleProvider locale={locale}>
+          <SiteHeader />
 
-        <PwaRegister />
+          <PwaRegister />
 
-        <main className="gv-app-main">{children}</main>
+          <main className="gv-app-main">{children}</main>
 
-        <MobileBottomNav />
+          <MobileBottomNav />
 
-        <SiteFooter />
+          <SiteFooter />
+        </LocaleProvider>
       </body>
     </html>
   );

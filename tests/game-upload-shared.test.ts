@@ -3,6 +3,7 @@ import {
   buildBlobPathname,
   canonicalBlobUrl,
   checkGameFile,
+  coverFileName,
   dedupeSlugs,
   GAME_CONTENT_TYPE_BY_EXTENSION,
   GAME_EXTENSIONS,
@@ -57,6 +58,21 @@ describe('game upload helpers', () => {
     expect(isValidBlobPathname('games/files/a.html', 'game')).toBe(false);
     expect(isValidBlobPathname('games/mods/a.zip', 'game')).toBe(false);
     expect(isValidBlobPathname('/games/files/a.zip', 'game')).toBe(false);
+  });
+
+  it('only accepts image pathnames in the cover folder', () => {
+    expect(isValidBlobPathname('games/covers/1-a/shot.webp', 'cover')).toBe(true);
+    expect(isValidBlobPathname('games/covers/1-a/shot.AVIF', 'cover')).toBe(true);
+    expect(isValidBlobPathname('games/covers/1-a/shot.exe', 'cover')).toBe(false);
+    expect(isValidBlobPathname('games/covers/1-a/shot.html', 'cover')).toBe(false);
+    expect(isValidBlobPathname('games/covers/1-a/shot', 'cover')).toBe(false);
+  });
+
+  it('gives extension-less phone pictures a real image extension', () => {
+    expect(coverFileName('photo.png', 'image/png')).toBe('photo.png');
+    expect(coverFileName('image', 'image/webp')).toBe('image.webp');
+    expect(coverFileName('download', 'image/jpeg')).toBe('download.jpg');
+    expect(isValidBlobPathname(buildBlobPathname('cover', coverFileName('image', 'image/png'), 'u'), 'cover')).toBe(true);
   });
 
   it('canonicalizes Blob URLs and rejects foreign ones', () => {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../../lib/prisma';
 import { requireUser } from '../../../../../lib/auth';
-import { guardMutation } from '../../../../../lib/api';
+import { guardMutation, userRouteError } from '../../../../../lib/api';
 import { awardActionXp, createActivity } from '../../../../../lib/gamer';
 
 const reviewSchema = z.object({ rating: z.number().int().min(1).max(5), text: z.string().trim().max(2000).optional().nullable() });
@@ -16,8 +16,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const review = await db.review.findUnique({ where: { userId_gameId: { userId: user.id, gameId: game.id } }, select: { id: true, rating: true, text: true } });
     return NextResponse.json(review);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'UNAUTHORIZED';
-    return NextResponse.json({ error: message }, { status: message === 'UNAUTHORIZED' ? 401 : 400 });
+    return userRouteError(error, 'REVIEW_LOAD_FAILED');
   }
 }
 
@@ -38,10 +37,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return item;
     });
     if (!existed) { await awardActionXp(user.id, 'REVIEWED_GAME', game.id); await createActivity(user.id, 'REVIEWED_GAME', game.id, `Reviewed ${game.titleEn}`); }
-    return NextResponse.json(review, { status: 201 });
+    return NextResponse.json(review, { status: existed ? 200 : 201 });
   } catch (error) {
-    if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') }, { status: 400 });
-    const message = error instanceof Error ? error.message : 'REVIEW_FAILED';
-    return NextResponse.json({ error: message }, { status: message === 'UNAUTHORIZED' ? 401 : 400 });
+    if (error instanceof z.ZodError) return NextResponse.json({ error: 'INVALID_REVIEW', fields: error.issues.map(i => i.path.join('.')) }, { status: 400 });
+    return userRouteError(error, 'REVIEW_FAILED');
   }
 }

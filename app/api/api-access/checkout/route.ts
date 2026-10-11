@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import { ConfiguredPaymentProvider } from "@/lib/payments";
 
 export const runtime = "nodejs";
@@ -42,6 +42,21 @@ export async function POST(request: NextRequest) {
     const activeAccess = await db.apiAccessPurchase.findFirst({ where: { userId: user.id, status: "SUCCEEDED" }, select: { id: true } });
     if (activeAccess) return NextResponse.json({ error: "API_ACCESS_ALREADY_PURCHASED" }, { status: 409 });
 
+    // A different idempotency key must not open a second payment while one is still pending.
+    const pending = await db.apiAccessPurchase.findFirst({
+      where: {
+        userId: user.id,
+        status: "PENDING",
+        providerCheckoutUrl: { not: null },
+        createdAt: { gte: new Date(Date.now() - 30 * 60_000) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, status: true, providerCheckoutUrl: true },
+    });
+    if (pending) {
+      return NextResponse.json({ data: { id: pending.id, status: pending.status, checkoutUrl: pending.providerCheckoutUrl } });
+    }
+
     const provider = new ConfiguredPaymentProvider();
     if (!provider.name) return NextResponse.json({ error: "PAYMENT_PROVIDER_NOT_CONFIGURED" }, { status: 503 });
 
@@ -64,12 +79,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ data: { id: updated.id, status: updated.status, checkoutUrl: updated.providerCheckoutUrl } }, { status: 201 });
     } catch (error) {
       await db.apiAccessPurchase.update({ where: { id: purchase.id }, data: { status: "FAILED" } });
-      const message = error instanceof Error ? error.message : "PAYMENT_PROVIDER_ERROR";
+      const message = publicErrorCode(error, "PAYMENT_PROVIDER_ERROR");
       const status = message === "APP_ORIGIN_NOT_CONFIGURED" ? 503 : 502;
       return NextResponse.json({ error: status === 503 ? message : "PAYMENT_PROVIDER_ERROR" }, { status });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "API_ACCESS_CHECKOUT_FAILED";
+    const message = publicErrorCode(error, "API_ACCESS_CHECKOUT_FAILED");
     const status = message === "UNAUTHORIZED" ? 401 : message === "IDEMPOTENCY_CONFLICT" ? 409 : 500;
     if (status === 500) console.error(JSON.stringify({ event: "api_access_checkout_failed", requestId: randomUUID() }));
     return NextResponse.json({ error: status === 500 ? "API_ACCESS_CHECKOUT_FAILED" : message }, { status });

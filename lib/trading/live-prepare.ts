@@ -10,6 +10,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { controlBlockReasons } from "@/lib/trading/control";
 import { getTradingControl } from "@/lib/trading/control-service";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
@@ -63,11 +64,11 @@ async function fetchUsdtFreeBalance(): Promise<number> {
 
   let response: Response;
   try {
-    response = await fetch(`https://api.binance.com/api/v3/account?${query}&signature=${encodeURIComponent(signature)}`, {
+    response = await fetchWithTimeout(`https://api.binance.com/api/v3/account?${query}&signature=${encodeURIComponent(signature)}`, {
       method: "GET",
       headers: { Accept: "application/json", "X-MBX-APIKEY": apiKey },
       cache: "no-store",
-    });
+    }, 10_000);
   } catch {
     throw new Error("BINANCE_LIVE_NETWORK_ERROR");
   }

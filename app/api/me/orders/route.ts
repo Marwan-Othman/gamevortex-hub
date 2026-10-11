@@ -11,9 +11,11 @@ import { requireUser } from "@/lib/auth";
 import {
   guardMutation,
   guardRead,
+  userRouteError,
 } from "@/lib/api";
 import { calculateProductRewardPoints, creditPointsInTransaction } from "@/lib/points";
 import { applyVipPointsMultiplier, getVipPointsMultiplierInTransaction } from "@/lib/vip";
+import { STORE_CONFLICT_ERRORS, isFreeProduct, ownedGameIds } from "@/lib/store-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -118,15 +120,9 @@ export async function GET(
     return NextResponse.json(
       orders,
     );
-  } catch {
-    return NextResponse.json(
-      {
-        error: "UNAUTHORIZED",
-      },
-      {
-        status: 401,
-      },
-    );
+  } catch (error) {
+    // Only "not signed in" is a 401. A database failure must not look like a logout.
+    return userRouteError(error, "ORDERS_LOAD_FAILED", "orders:read");
   }
 }
 
@@ -384,6 +380,17 @@ export async function POST(
       }
 
       /*
+       * المنتج المجاني يُستلم مرة واحدة فقط وبنسخة واحدة،
+       * حتى لا يُستنزف مخزونه أو تتكرر نقاط مكافأته.
+       */
+      if (isFreeProduct(product.priceCents) && item.quantity !== 1) {
+        return NextResponse.json(
+          { error: "FREE_PRODUCT_QUANTITY_LIMIT" },
+          { status: 400 },
+        );
+      }
+
+      /*
        * إذا كان المنتج لديه inventory
        * صريح، نتحقق من الكمية.
        */
@@ -460,6 +467,35 @@ export async function POST(
     const order =
       await db.$transaction(
         async (transaction) => {
+          /*
+           * Serialize this user's order creation so two quick requests cannot both pass the
+           * "already owned / already claimed" checks below (double click, two tabs, a script).
+           */
+          await transaction.$queryRaw(
+            Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`store-order:${user.id}`}))`,
+          );
+
+          const owned = await ownedGameIds(
+            transaction,
+            user.id,
+            products.map((product) => product.gameId),
+          );
+          if (owned.size > 0) throw new Error("ALREADY_OWNED");
+
+          const freeIds = products
+            .filter((product) => isFreeProduct(product.priceCents))
+            .map((product) => product.id);
+          if (freeIds.length) {
+            const claimed = await transaction.orderItem.findFirst({
+              where: {
+                productId: { in: freeIds },
+                order: { userId: user.id, status: "COMPLETED" },
+              },
+              select: { id: true },
+            });
+            if (claimed) throw new Error("FREE_PRODUCT_ALREADY_CLAIMED");
+          }
+
           const created = await transaction.order.create(
             {
               data: {
@@ -618,19 +654,20 @@ export async function POST(
       );
     }
 
-    console.error(
-      "POST /api/me/orders error:",
-      error,
-    );
+    if (
+      error instanceof Error &&
+      (STORE_CONFLICT_ERRORS.has(error.message) ||
+        error.message === "OUT_OF_STOCK" ||
+        error.message === "DIGITAL_KEYS_OUT_OF_STOCK")
+    ) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 409 },
+      );
+    }
 
-    return NextResponse.json(
-      {
-        error:
-          "ORDER_FAILED",
-      },
-      {
-        status: 400,
-      },
-    );
+    // 401 for a signed-out caller, 400 for a malformed body, 503 for a database outage, and 500 +
+    // requestId for anything unexpected (the detail goes to the server log, never to the client).
+    return userRouteError(error, "ORDER_FAILED", "orders:create");
   }
 }

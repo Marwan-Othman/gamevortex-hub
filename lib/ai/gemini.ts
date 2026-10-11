@@ -26,7 +26,16 @@ function classify(status: number, body: unknown): AiProviderError {
   }
   if (status === 408 || status === 504) return new AiProviderError({ provider: "gemini", code: "TIMEOUT", status, retryable: true, failoverable: true });
   if (status >= 500) return new AiProviderError({ provider: "gemini", code: "UNAVAILABLE", status, retryable: true, failoverable: true });
+  // 400/404 (bad model name, expired previous_interaction_id, rejected request) are
+  // provider-side configuration problems from the user's point of view: let the
+  // next provider try instead of failing the whole chat.
+  if (status === 400 || status === 404) return new AiProviderError({ provider: "gemini", code: "PROVIDER_ERROR", status, failoverable: true });
   return new AiProviderError({ provider: "gemini", code: "PROVIDER_ERROR", status });
+}
+
+function maxOutputTokens() {
+  const value = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS);
+  return Number.isInteger(value) && value >= 64 && value <= 65_536 ? value : 2048;
 }
 
 async function request(body: unknown, signal?: AbortSignal) {
@@ -83,7 +92,7 @@ export async function geminiChat(input: AiChatInput): Promise<AiChatResult> {
     model,
     input: [history, "User: " + input.prompt].filter(Boolean).join("\n\n"),
     system_instruction: input.systemInstruction || undefined,
-    generation_config: { max_output_tokens: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 2048), temperature: 0.7, thinking_level: process.env.GEMINI_THINKING_LEVEL?.trim() || "low" },
+    generation_config: { max_output_tokens: maxOutputTokens(), temperature: 0.7, thinking_level: process.env.GEMINI_THINKING_LEVEL?.trim() || "low" },
     ...(input.previousInteractionId ? { previous_interaction_id: input.previousInteractionId } : {}),
   }, input.signal);
   const answer = textFromPayload(result.payload);
@@ -98,12 +107,16 @@ export async function geminiHealth() {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
-    const response = await fetch(BASE_URL + "/models/" + encodeURIComponent(getModel("GEMINI_CHAT_MODEL", DEFAULT_CHAT_MODEL)), {
-      method: "GET",
-      signal: controller.signal,
-      headers: { "x-goog-api-key": getKey() },
-    });
-    clearTimeout(timer);
+    let response: Response;
+    try {
+      response = await fetch(BASE_URL + "/models/" + encodeURIComponent(getModel("GEMINI_CHAT_MODEL", DEFAULT_CHAT_MODEL)), {
+        method: "GET",
+        signal: controller.signal,
+        headers: { "x-goog-api-key": getKey() },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (response.ok) return "ACTIVE" as const;
     if (response.status === 429) return "RATE_LIMITED" as const;
     if (response.status === 402) return "QUOTA_EXCEEDED" as const;

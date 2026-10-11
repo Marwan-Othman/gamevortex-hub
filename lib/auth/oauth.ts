@@ -1,4 +1,4 @@
-import { createPrivateKey, createSign, createPublicKey, randomBytes, verify } from "node:crypto";
+import { createPrivateKey, createSign, createPublicKey, randomBytes, timingSafeEqual, verify } from "node:crypto";
 import { cookies } from "next/headers";
 import { AuthProvider, Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
@@ -176,7 +176,9 @@ export async function finishOAuth(provider: Provider, requestUrl: URL, form?: Fo
   const store = await cookies();
   const stateCookie = store.get(`gv_oauth_state_${provider}`)?.value;
   const state = form?.get("state")?.toString() || requestUrl.searchParams.get("state");
-  if (!stateCookie || !state || stateCookie !== state) throw new Error("OAUTH_STATE_INVALID");
+  const stateBytes = Buffer.from(state || "");
+  const cookieBytes = Buffer.from(stateCookie || "");
+  if (!stateCookie || !state || stateBytes.length !== cookieBytes.length || !timingSafeEqual(stateBytes, cookieBytes)) throw new Error("OAUTH_STATE_INVALID");
   const origin = siteOrigin(requestUrl.origin);
   const redirectUri = `${origin}/api/auth/oauth/${provider}/callback`;
 

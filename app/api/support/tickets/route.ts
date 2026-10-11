@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_TICKETS_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_TICKETS_FAILED");
     return NextResponse.json(
       { error: message },
       { status: message === "UNAUTHORIZED" ? 401 : 500 },
@@ -58,6 +58,12 @@ export async function POST(request: NextRequest) {
     }
 
     const ticket = await db.$transaction(async (tx) => {
+      // A single account cannot hold an unbounded number of open tickets.
+      const openTickets = await tx.supportTicket.count({
+        where: { requesterId: user.id, status: { not: "CLOSED" } },
+      });
+      if (openTickets >= 20) throw new Error("TOO_MANY_OPEN_TICKETS");
+
       const created = await tx.supportTicket.create({
         data: {
           requesterId: user.id,
@@ -100,10 +106,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: ticket }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_TICKET_CREATE_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_TICKET_CREATE_FAILED");
     return NextResponse.json(
       { error: message },
-      { status: message === "UNAUTHORIZED" ? 401 : 500 },
+      { status: message === "UNAUTHORIZED" ? 401 : message === "TOO_MANY_OPEN_TICKETS" ? 429 : 500 },
     );
   }
 }

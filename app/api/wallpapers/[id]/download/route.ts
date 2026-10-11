@@ -4,6 +4,9 @@ import path from "node:path";
 import { db } from "../../../../../lib/prisma";
 import { getOptionalUser } from "../../../../../lib/auth";
 import { getVipAccess } from "../../../../../lib/vip";
+import { guardRead } from "../../../../../lib/api";
+import { isVercelBlobUrl } from "../../../../../lib/wallpaper-constants";
+import { normalizeExternalSourceUrl } from "../../../../../lib/content-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +60,9 @@ function contentTypeFromPath(filePath: string) {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Downloads proxy upstream bytes and bump a counter, so they are rate limited per client.
+  const blocked = await guardRead(request, "wallpapers:download", 30);
+  if (blocked) return blocked;
   try {
     const { id } = await params;
     if (!id || id.length > 100) {
@@ -138,6 +144,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       );
       headers.set("Cache-Control", "private, no-store, max-age=0");
       headers.set("X-Content-Type-Options", "nosniff");
+      headers.set("Content-Security-Policy", "default-src 'none'; sandbox");
       headers.set("Content-Length", String(file.byteLength));
 
       return new Response(file, { status: 200, headers });
@@ -145,6 +152,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     // Uploaded/imported wallpapers are stored in GameVortex Blob storage.
     // The server proxies the bytes, so the user still downloads from GameVortex.
+    // SSRF gate: only public https hosts (or our Blob store) are ever fetched server-side.
+    if (!isVercelBlobUrl(targetUrl) && !normalizeExternalSourceUrl(targetUrl)) {
+      return NextResponse.json({ error: "Wallpaper file is currently unavailable" }, { status: 502 });
+    }
     const upstream = await fetch(targetUrl, {
       method: "GET",
       redirect: "follow",
@@ -177,6 +188,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     );
     headers.set("Cache-Control", "private, no-store, max-age=0");
     headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("Content-Security-Policy", "default-src 'none'; sandbox");
 
     const contentLength = upstream.headers.get("content-length");
     if (contentLength) headers.set("Content-Length", contentLength);

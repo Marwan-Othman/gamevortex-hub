@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { adminErrorMessage, NETWORK_ERROR_MESSAGE } from "@/lib/admin-client";
 
 export default function CreateDrawForm() {
   const router = useRouter();
@@ -33,13 +34,13 @@ export default function CreateDrawForm() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setMessage(data.error || "تعذّر إنشاء السحب.");
+        setMessage(adminErrorMessage(data.error, "تعذّر إنشاء السحب. راجع الحقول وحاول مجددًا."));
         return;
       }
       setTitle(""); setPrize(""); setDescription(""); setTicketCost(50); setMaxEntries(""); setStatus("DRAFT");
       router.refresh();
     } catch {
-      setMessage("تعذر الاتصال بالخادم.");
+      setMessage(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }

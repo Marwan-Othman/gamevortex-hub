@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, ownerRouteError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -32,8 +32,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     });
     return NextResponse.json({ ok: true, revoked: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "OWNER_API_KEY_REVOKE_FAILED";
-    const status = message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : message === "API_KEY_NOT_FOUND" ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return ownerRouteError(error, "OWNER_API_KEY_REVOKE_FAILED", 500);
   }
 }

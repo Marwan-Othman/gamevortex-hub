@@ -1,6 +1,5 @@
 import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import { db } from "@/lib/prisma";
-import AdminShell from "@/components/admin/AdminShell";
 import ModsManager from "./ModsManager";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +32,5 @@ export default async function AdminModsPage() {
     },
   });
 
-  return (
-    <AdminShell ownerLabel={gate.owner.username || gate.owner.email}>
-      <ModsManager initialMods={mods} />
-    </AdminShell>
-  );
+  return <ModsManager initialMods={mods} />;
 }

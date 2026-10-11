@@ -1,7 +1,14 @@
 import { AiProviderError } from "@/lib/ai/types";
+import { parseImageData } from "@/lib/ai/validation";
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const REQUEST_TIMEOUT_MS = 300_000;
+// Routes that call these helpers have maxDuration = 300s. Every provider call
+// must finish well inside that window, otherwise the platform kills the
+// function before the credit refund in the route's catch block can run.
+const DEFAULT_TIMEOUT_MS = 30_000;
+const IMAGE_TIMEOUT_MS = 120_000;
+const DOWNLOAD_TIMEOUT_MS = 240_000;
+const MAX_DOWNLOAD_REDIRECTS = 3;
 
 function getKey() {
   const value = process.env.GEMINI_API_KEY?.trim();
@@ -12,9 +19,9 @@ function getKey() {
   return value;
 }
 
-async function request(path: string, init: RequestInit, signal?: AbortSignal) {
+async function request(path: string, init: RequestInit, signal?: AbortSignal, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
 
@@ -36,16 +43,22 @@ async function request(path: string, init: RequestInit, signal?: AbortSignal) {
         ? "AUTH_FAILED"
         : status === 429
           ? "RATE_LIMITED"
-          : status >= 500
-            ? "UNAVAILABLE"
-            : "PROVIDER_ERROR";
+          : status === 408 || status === 504
+            ? "TIMEOUT"
+            : status >= 500
+              ? "UNAVAILABLE"
+              : "PROVIDER_ERROR";
       throw new AiProviderError({
         provider: "gemini",
         code,
         status,
-        retryable: status === 429 || status >= 500,
-        failoverable: status === 401 || status === 403 || status === 429 || status >= 500,
+        retryable: status === 408 || status === 429 || status >= 500,
+        failoverable: status === 401 || status === 403 || status === 408 || status === 429 || status >= 500,
       });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      // 200 with an empty / non-JSON / non-object body: never treat it as success.
+      throw new AiProviderError({ provider: "gemini", code: "INVALID_MEDIA_RESPONSE", failoverable: true });
     }
     return body as Record<string, unknown>;
   } catch (error) {
@@ -79,29 +92,17 @@ function modelOutput(payload: unknown, type: "image" | "video") {
 
 function inputParts(prompt: string, imageData?: string) {
   if (!imageData) return prompt;
-  const match = imageData.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
-  if (!match) throw new Error("INVALID_IMAGE_INPUT");
+  const image = parseImageData(imageData);
   return [
     { type: "text", text: prompt },
-    { type: "image", mime_type: match[1], data: match[2] },
+    { type: "image", mime_type: image.mimeType, data: image.data },
   ];
 }
 
 function videoInstance(prompt: string, imageData?: string) {
   if (!imageData) return { prompt };
-
-  const match = imageData.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
-  if (!match) throw new Error("INVALID_IMAGE_INPUT");
-
-  return {
-    prompt,
-    image: {
-      inlineData: {
-        mimeType: match[1],
-        data: match[2],
-      },
-    },
-  };
+  const image = parseImageData(imageData);
+  return { prompt, image: { inlineData: { mimeType: image.mimeType, data: image.data } } };
 }
 
 export async function generateImage(input: {
@@ -124,12 +125,16 @@ export async function generateImage(input: {
         delivery: "inline",
       },
     }),
-  }, input.signal);
+  }, input.signal, IMAGE_TIMEOUT_MS);
 
   const block = modelOutput(payload, "image");
-  const data = typeof block?.data === "string" ? block.data : "";
-  const mimeType = typeof block?.mime_type === "string" ? block.mime_type : "image/png";
-  if (!data) throw new AiProviderError({ provider: "gemini", code: "EMPTY_RESPONSE", failoverable: true });
+  const data = typeof block?.data === "string" ? block.data.trim() : "";
+  const rawMime = typeof block?.mime_type === "string" ? block.mime_type : "image/png";
+  // Only ever relay image types back to the browser (the route sets Content-Type from this).
+  const mimeType = /^image\/(png|jpeg|webp)$/.test(rawMime) ? rawMime : "image/png";
+  if (!data || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
+    throw new AiProviderError({ provider: "gemini", code: "EMPTY_RESPONSE", failoverable: true });
+  }
   return { data, mimeType };
 }
 
@@ -164,7 +169,7 @@ export async function startVideo(input: {
 }
 
 export async function getVideoOperation(operationName: string, signal?: AbortSignal) {
-  if (!operationName || operationName.length > 512 || /[\r\n]/.test(operationName)) {
+  if (!operationName || operationName.length > 512 || !/^[A-Za-z0-9_.\-/]+$/.test(operationName) || operationName.includes("..")) {
     throw new AiProviderError({ provider: "gemini", code: "INVALID_MEDIA_RESPONSE" });
   }
   return request("/" + operationName.replace(/^\/+/, ""), { method: "GET" }, signal);
@@ -199,32 +204,68 @@ export async function getFileState(fileUri: string, signal?: AbortSignal) {
   return request("/files/" + encodeURIComponent(match[1]), { method: "GET" }, signal);
 }
 
-export async function downloadFile(fileUri: string, signal?: AbortSignal) {
+function isGoogleApiHost(url: URL) {
+  return url.protocol === "https:" && (url.hostname === "googleapis.com" || url.hostname.endsWith(".googleapis.com"));
+}
+
+/**
+ * Streams a generated video from Google.
+ *
+ * - The URI comes from a signed token that was built from a provider response,
+ *   but it is still restricted to https + *.googleapis.com before the API key
+ *   is attached.
+ * - Redirects are followed by hand: fetch() would forward the custom
+ *   x-goog-api-key header to whatever host the redirect points at.
+ * - A Range header from the browser is forwarded so seeking works.
+ */
+export async function downloadFile(fileUri: string, signal?: AbortSignal, range?: string | null) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
 
   try {
-    const url = new URL(fileUri);
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "*/*",
-        "x-goog-api-key": getKey(),
-      },
-      redirect: "follow",
-    });
-    if (!response.ok || !response.body) {
-      throw new AiProviderError({
-        provider: "gemini",
-        code: "MEDIA_DOWNLOAD_FAILED",
-        status: response.status,
-        retryable: response.status >= 500,
-        failoverable: response.status >= 500,
-      });
+    let url = new URL(fileUri);
+    if (!isGoogleApiHost(url)) {
+      throw new AiProviderError({ provider: "gemini", code: "MEDIA_DOWNLOAD_FAILED" });
     }
-    return { body: response.body, contentType: response.headers.get("content-type") || "video/mp4" };
+
+    for (let hop = 0; hop <= MAX_DOWNLOAD_REDIRECTS; hop += 1) {
+      const headers: Record<string, string> = { Accept: "*/*" };
+      if (isGoogleApiHost(url)) headers["x-goog-api-key"] = getKey();
+      if (range && /^bytes=\d*-\d*$/.test(range)) headers.Range = range;
+
+      const response = await fetch(url, { signal: controller.signal, headers, redirect: "manual" });
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location) break;
+        const next = new URL(location, url);
+        if (next.protocol !== "https:") break;
+        url = next;
+        continue;
+      }
+
+      if ((response.status !== 200 && response.status !== 206) || !response.body) {
+        throw new AiProviderError({
+          provider: "gemini",
+          code: "MEDIA_DOWNLOAD_FAILED",
+          status: response.status,
+          retryable: response.status >= 500,
+          failoverable: response.status >= 500,
+        });
+      }
+
+      const upstreamType = response.headers.get("content-type") || "";
+      return {
+        body: response.body,
+        status: response.status,
+        contentType: /^video\//i.test(upstreamType) ? upstreamType : "video/mp4",
+        contentLength: response.headers.get("content-length"),
+        contentRange: response.headers.get("content-range"),
+      };
+    }
+    throw new AiProviderError({ provider: "gemini", code: "MEDIA_DOWNLOAD_FAILED" });
   } catch (error) {
     if (error instanceof AiProviderError) throw error;
     if (controller.signal.aborted) {

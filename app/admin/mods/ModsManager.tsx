@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NETWORK_ERROR_MESSAGE, readAdminError } from "@/lib/admin-client";
 
 const empty = {
   slug: "",
@@ -53,7 +54,13 @@ export default function ModsManager({ initialMods }: { initialMods: ModItem[] })
     try {
       const response = await fetch("/api/admin/mods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "MOD_SAVE_FAILED");
+      if (!response.ok) {
+        const labels: Record<string, string> = {
+          INVALID_MOD: "بيانات غير صحيحة. الروابط يجب أن تكون https عامة، والـ slug بحروف إنجليزية صغيرة وشرطات.",
+          MOD_SLUG_ALREADY_EXISTS: "الـ slug مستخدم من قبل.",
+        };
+        throw new Error(labels[data.error] || data.error || "MOD_SAVE_FAILED");
+      }
       setMods((current) => [data.mod, ...current]);
       setForm(empty);
       setMessage("تم حفظ الـMod.");
@@ -63,8 +70,18 @@ export default function ModsManager({ initialMods }: { initialMods: ModItem[] })
 
   async function remove(id: string) {
     if (!window.confirm("حذف هذا الـMod؟")) return;
-    const response = await fetch(`/api/admin/mods?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (response.ok) setMods((current) => current.filter((x) => x.id !== id));
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/mods?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!response.ok) {
+        setMessage(await readAdminError(response, "تعذر حذف الـMod."));
+        return;
+      }
+      setMods((current) => current.filter((x) => x.id !== id));
+      setMessage("تم حذف الـMod.");
+    } catch {
+      setMessage(NETWORK_ERROR_MESSAGE);
+    }
   }
 
   return (

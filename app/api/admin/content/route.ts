@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { guardMutation } from "@/lib/api";
-import { findReferencedBlobUrls, safeCleanupBlobs } from "@/lib/game-upload-server";
+import { guardMutation, publicErrorCode } from "@/lib/api";
+import { findReferencedBlobUrls, resolveUploadCategoryIds, safeCleanupBlobs, verifyUploadedFiles } from "@/lib/game-upload-server";
 import {
   parseContentInput,
   requireContentOwner,
   sourceProviderFor,
   sourceStatusFor,
   uniqueSlug,
+  uploadedFileChecks,
 } from "@/lib/content-admin-server";
 
 export const runtime = "nodejs";
@@ -52,6 +53,20 @@ export async function POST(request: NextRequest) {
     }
     newUrls = uploaded;
 
+    // The browser uploads straight to Blob: confirm the files exist, are not empty and are really an APK / images.
+    const fileProblem = await verifyUploadedFiles(uploadedFileChecks(input));
+    if (fileProblem) {
+      await safeCleanupBlobs(newUrls);
+      newUrls = [];
+      return NextResponse.json({ success: false, error: fileProblem }, { status: 400 });
+    }
+
+    // Categories must be real, active categories: unknown values are rejected, never created here.
+    const categoryIds = input.categories?.length ? await resolveUploadCategoryIds(input.categories) : [];
+    if (input.categories && categoryIds.length !== input.categories.length) {
+      return NextResponse.json({ success: false, error: "INVALID_CATEGORY" }, { status: 400 });
+    }
+
     const slug = await uniqueSlug(input.type, input.name);
     const downloadSource = input.source.url;
     const description = input.description || null;
@@ -69,10 +84,12 @@ export async function POST(request: NextRequest) {
               screenshots: input.screenshots,
               downloadSource,
               isMod: input.isMod,
+              version: input.version ?? null,
               sourceStatus: sourceStatusFor(input.source),
               sourceProvider: sourceProviderFor(input.source),
               published: input.published,
               gamePlatforms: { create: [{ platform: input.platform }] },
+              gameCategories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
             },
             select: { id: true, slug: true },
           })
@@ -88,10 +105,12 @@ export async function POST(request: NextRequest) {
               screenshots: input.screenshots,
               downloadSource,
               isMod: input.isMod,
+              version: input.version ?? null,
               sourceStatus: sourceStatusFor(input.source),
               sourceProvider: sourceProviderFor(input.source),
               published: input.published,
               appPlatforms: { create: [{ platform: input.platform }] },
+              appCategories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
             },
             select: { id: true, slug: true },
           });
@@ -108,7 +127,9 @@ export async function POST(request: NextRequest) {
             platform: input.platform,
             isMod: input.isMod,
             sourceKind: input.source.kind,
+            version: input.version ?? null,
             screenshots: input.screenshots.length,
+            categories: categoryIds.length,
           },
         },
       })
@@ -116,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: { ...created, type: input.type } }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/content error:", error instanceof Error ? error.message : "UNKNOWN");
+    console.error("POST /api/admin/content error:", publicErrorCode(error, "UNKNOWN"));
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ success: false, error: "SLUG_ALREADY_EXISTS" }, { status: 409 });
     }

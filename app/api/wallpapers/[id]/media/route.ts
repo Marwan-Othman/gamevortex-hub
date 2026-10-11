@@ -3,14 +3,17 @@ import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { getVipAccess } from "@/lib/vip";
 import { openWallpaperSource } from "@/lib/wallpaper-delivery";
+import { guardRead } from "@/lib/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const blocked = await guardRead(request, "wallpapers:media", 240);
+  if (blocked) return blocked;
   try {
     const { id } = await params;
     if (!id || id.length > 100) {
@@ -44,13 +47,21 @@ export async function GET(
       if (!access.isVip) return NextResponse.json({ error: "VIP_REQUIRED" }, { status: 403 });
     }
 
-    const target = wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl
-      ? wallpaper.mediaUrl
-      : wallpaper.imageUrl;
+    // Grid/list cards pass ?thumb=1 so they download the (small) thumbnail when the wallpaper has
+    // one, instead of the full-resolution original. Detail pages and downloads omit it.
+    const wantsThumb = new URL(request.url).searchParams.get("thumb") === "1";
+    const useThumb = wantsThumb && wallpaper.mediaType !== "VIDEO" && Boolean(wallpaper.thumbnailUrl);
+
+    const target = useThumb
+      ? (wallpaper.thumbnailUrl as string)
+      : wallpaper.mediaType === "VIDEO" && wallpaper.mediaUrl
+        ? wallpaper.mediaUrl
+        : wallpaper.imageUrl;
 
     const opened = await openWallpaperSource(target);
     const headers = new Headers();
-    headers.set("Content-Type", wallpaper.mimeType || opened.contentType);
+    // mimeType describes the original file, so a thumbnail keeps the type detected from its own bytes/extension.
+    headers.set("Content-Type", useThumb ? opened.contentType : wallpaper.mimeType || opened.contentType);
     headers.set(
       "Cache-Control",
       wallpaper.isVip
@@ -59,6 +70,9 @@ export async function GET(
     );
     if (wallpaper.isVip) headers.set("Vary", "Cookie");
     headers.set("X-Content-Type-Options", "nosniff");
+    // Served from our origin: never let an image/SVG execute script or be framed.
+    headers.set("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox");
+    headers.set("Cross-Origin-Resource-Policy", "same-origin");
     if (opened.contentLength) headers.set("Content-Length", String(opened.contentLength));
     return new Response(opened.stream, { status: 200, headers });
   } catch (error) {

@@ -54,14 +54,14 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
                   controls
                   playsInline
                   preload="metadata"
-                  style={{ display: "block", width: "100%", maxHeight: "82vh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
+                  style={{ display: "block", width: "100%", maxHeight: "82dvh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
                 />
               ) : (
                 <img
                   src={`/api/wallpapers/${wallpaper.id}/media`}
                   alt={wallpaper.titleEn}
                   fetchPriority="high"
-                  style={{ display: "block", width: "100%", maxHeight: "82vh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
+                  style={{ display: "block", width: "100%", maxHeight: "82dvh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
                 />
               )
             ) : (
@@ -107,7 +107,7 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
         </div>
       </section>
 
-      {related.length > 0 && <section style={{ marginTop: 28 }}><div className="section-head"><h2>خلفيات مشابهة</h2></div><div className="grid">{related.map(item => <Link key={item.id} href={`/wallpapers/${item.id}`} className="glass card game-card" style={{ overflow: "hidden", padding: 0 }}><img src={item.isVip && !vip?.isVip ? "/icon.svg" : `/api/wallpapers/${item.id}/media`} alt={item.titleEn} loading="lazy" style={{ width: "100%", aspectRatio: item.width && item.height ? `${item.width} / ${item.height}` : item.type === "MOBILE" ? "9/16" : "16/9", objectFit: "contain", background: "rgba(0,0,0,.28)" }} /><div style={{ padding: 12 }}><strong>{item.titleAr}</strong>{item.isVip && <span className="badge" style={{ marginInlineStart: 8 }}>💎 VIP</span>}</div></Link>)}</div></section>}
+      {related.length > 0 && <section style={{ marginTop: 28 }}><div className="section-head"><h2>خلفيات مشابهة</h2></div><div className="grid">{related.map(item => <Link key={item.id} href={`/wallpapers/${item.id}`} className="glass card game-card" style={{ overflow: "hidden", padding: 0 }}><img src={item.isVip && !vip?.isVip ? "/icon.svg" : `/api/wallpapers/${item.id}/media?thumb=1`} alt={item.titleEn} loading="lazy" style={{ width: "100%", aspectRatio: item.width && item.height ? `${item.width} / ${item.height}` : item.type === "MOBILE" ? "9/16" : "16/9", objectFit: "contain", background: "rgba(0,0,0,.28)" }} /><div style={{ padding: 12 }}><strong>{item.titleAr}</strong>{item.isVip && <span className="badge" style={{ marginInlineStart: 8 }}>💎 VIP</span>}</div></Link>)}</div></section>}
     </main>
   );
 }

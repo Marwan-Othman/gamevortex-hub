@@ -6,7 +6,7 @@ import {
   validateOwnerPointsBalance,
   OWNER_POINTS_PER_USD,
 } from "../../../../lib/owner-points";
-import { guardMutation } from "../../../../lib/api";
+import { guardMutation, internalError, isDatabaseUnavailable, publicErrorCode } from "../../../../lib/api";
 import { logSystemError } from "../../../../lib/observability";
 
 const MAX_IDEMPOTENCY_KEY_LENGTH = 200;
@@ -174,11 +174,16 @@ export async function POST(req: NextRequest) {
       },
     );
   } catch (error) {
+    // Database outage: nothing was reserved (single transaction). Answer 503 + Retry-After.
+    if (isDatabaseUnavailable(error)) {
+      return internalError("owner:withdraw", error, "INTERNAL_ERROR");
+    }
     const message =
-      error instanceof Error
-        ? error.message
-        : "INTERNAL_ERROR";
+      publicErrorCode(error, "INTERNAL_ERROR");
 
+    // A concurrent request with the same idempotency key hits the unique index (P2002).
+    // Tell the client to retry, instead of surfacing a database error.
+    const isDuplicateKey = (error as { code?: string })?.code === "P2002";
     const status =
       message === "UNAUTHORIZED"
         ? 401
@@ -186,7 +191,16 @@ export async function POST(req: NextRequest) {
           ? 403
           : message === "OWNER_WALLET_NOT_FOUND"
             ? 404
-            : 400;
+            : isDuplicateKey
+              ? 409
+              : ["IDEMPOTENCY_KEY_CONFLICT", "INSUFFICIENT_POINTS", "MINIMUM_WITHDRAWAL_NOT_MET", "INVALID_JSON", "INVALID_OWNER_POINTS", "INVALID_OWNER_BALANCE", "IDEMPOTENCY_KEY_REQUIRED"].includes(message)
+                ? 400
+                : 500;
+    const publicMessage = isDuplicateKey
+      ? "IDEMPOTENCY_KEY_IN_PROGRESS"
+      : status === 500
+        ? "INTERNAL_ERROR"
+        : message;
 
     const ignoredErrors = new Set([
       "UNAUTHORIZED",
@@ -212,7 +226,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: message },
+      { error: publicMessage },
       { status },
     );
   }

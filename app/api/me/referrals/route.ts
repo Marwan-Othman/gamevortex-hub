@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, userRouteError } from "@/lib/api";
 import { ensureReferralCode } from "@/lib/referrals";
 
 export async function GET(request: NextRequest) {
@@ -35,6 +35,6 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "UNAUTHORIZED" }, { status: 401 });
+    return userRouteError(error, "REFERRALS_FAILED");
   }
 }

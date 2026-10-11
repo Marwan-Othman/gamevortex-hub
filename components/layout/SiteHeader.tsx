@@ -2,14 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import LanguageSwitcher from "@/components/ui/LanguageSwitcher";
-
-type Me = {
-  username?: string | null;
-  email?: string | null;
-  role?: string | null;
-} | null;
+import { AUTH_CHANGE_EVENT, fetchMe, invalidateMe, type Me } from "@/lib/client-auth";
 
 const NAV_LINKS = [
   { href: "/ai", label: "GameVortex AI", icon: GameIcon },
@@ -249,6 +244,62 @@ function LogoMark() {
   );
 }
 
+/**
+ * Search box with its own state. Keeping the text here means typing no longer re-renders the whole
+ * header (nav, drawer, 17 links, icons) on every keystroke.
+ */
+const HeaderSearch = memo(function HeaderSearch({
+  variant,
+  language,
+  onDone,
+}: {
+  variant: "desktop" | "mobile";
+  language: "ar" | "en";
+  onDone?: () => void;
+}) {
+  const router = useRouter();
+  const [text, setText] = useState("");
+  const ar = language === "ar";
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const q = text.trim().slice(0, 80);
+    onDone?.();
+    router.push(q ? `/games?q=${encodeURIComponent(q)}` : "/games");
+  };
+
+  if (variant === "mobile") {
+    return (
+      <form className="gv-mobile-search-panel" role="search" onSubmit={submit}>
+        <input
+          type="search"
+          autoFocus
+          enterKeyHint="search"
+          value={text}
+          maxLength={80}
+          onChange={(event) => setText(event.target.value)}
+          placeholder={ar ? "ابحث عن لعبة..." : "Search games..."}
+          aria-label={ar ? "بحث" : "Search"}
+        />
+        <button type="submit">{ar ? "بحث" : "Search"}</button>
+      </form>
+    );
+  }
+
+  return (
+    <form className="gv-search" role="search" onSubmit={submit}>
+      <input
+        type="search"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        placeholder={ar ? "ابحث عن ألعاب، تطبيقات، أو أي شيء..." : "Search games, apps, or anything..."}
+        aria-label={ar ? "بحث" : "Search"}
+      />
+      <button type="submit" aria-label={ar ? "بحث" : "Search"}><SearchIcon /></button>
+    </form>
+  );
+});
+
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -264,14 +315,21 @@ export default function SiteHeader() {
     return () => window.removeEventListener("gv-language-change", applyLanguage);
   }, []);
 
+  // One shared, cached identity lookup instead of a request per navigation.
   useEffect(() => {
-    fetch("/api/auth/me", {
-      cache: "no-store",
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => setMe(data))
-      .catch(() => setMe(null));
-  }, [pathname]);
+    let active = true;
+    const load = () => {
+      fetchMe().then((data) => {
+        if (active) setMe(data);
+      });
+    };
+    load();
+    window.addEventListener(AUTH_CHANGE_EVENT, load);
+    return () => {
+      active = false;
+      window.removeEventListener(AUTH_CHANGE_EVENT, load);
+    };
+  }, []);
 
   useEffect(() => {
     setIsOpen(false);
@@ -305,6 +363,7 @@ export default function SiteHeader() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {}
+    invalidateMe();
     setMe(null);
     setIsOpen(false);
     router.push("/");
@@ -326,7 +385,7 @@ export default function SiteHeader() {
 
   const profileHref = "/profile/gamer";
   const translateNav = (label: string) => language === "ar"
-    ? ({ Games: "الألعاب", Apps: "التطبيقات", VIP: "VIP", Store: "المتجر", Library: "المكتبة", Wallet: "المحفظة", "Gift Cards": "بطاقات الهدايا", Rewards: "المكافآت", Draws: "السحوبات", Referrals: "الإحالات", Rank: "الترتيب", Quran: "القرآن", Profile: "الملف الشخصي", "GameVortex AI": "GameVortex AI", "الإدارة": "الإدارة" } as Record<string, string>)[label] || label
+    ? ({ Games: "الألعاب", Apps: "التطبيقات", Mods: "المودات", VIP: "VIP", Store: "المتجر", "Developer API": "واجهة المطورين", Support: "الدعم", Library: "المكتبة", Wallet: "المحفظة", "Gift Cards": "بطاقات الهدايا", Rewards: "المكافآت", Draws: "السحوبات", Referrals: "الإحالات", Rank: "الترتيب", Quran: "القرآن", Profile: "الملف الشخصي", "GameVortex AI": "GameVortex AI", "الإدارة": "الإدارة" } as Record<string, string>)[label] || label
     : ({ "GameVortex AI": "GameVortex AI", "الإدارة": "Admin" } as Record<string, string>)[label] || label;
 
   const publicNavLinks = isOwner
@@ -349,12 +408,12 @@ export default function SiteHeader() {
     { href: "/ai", label: "AI", icon: GameIcon },
   ];
 
-  const [searchText, setSearchText] = useState("");
-  const submitSearch = (event: React.FormEvent) => {
-    event.preventDefault();
-    const q = searchText.trim();
-    router.push(q ? `/games?q=${encodeURIComponent(q)}` : "/games");
-  };
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const closeMobileSearch = useCallback(() => setMobileSearchOpen(false), []);
+
+  useEffect(() => {
+    setMobileSearchOpen(false);
+  }, [pathname]);
 
   return (
     <>
@@ -363,7 +422,7 @@ export default function SiteHeader() {
           <button
             type="button"
             className="gv-menu-button"
-            aria-label="فتح القائمة"
+            aria-label={language === "ar" ? "فتح القائمة" : "Open menu"}
             aria-expanded={isOpen}
             onClick={() => setIsOpen(true)}
           >
@@ -380,7 +439,7 @@ export default function SiteHeader() {
 
           <nav
             className="gv-desktop-nav"
-            aria-label="التنقل الرئيسي"
+            aria-label={language === "ar" ? "التنقل الرئيسي" : "Main navigation"}
           >
             {desktopNavLinks.map((link) => {
               const IconComponent = link.icon;
@@ -405,40 +464,32 @@ export default function SiteHeader() {
             </button>
           </nav>
 
-          <form className="gv-search" role="search" onSubmit={submitSearch}>
-            <input
-              type="search"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder={language === "ar" ? "ابحث عن ألعاب، تطبيقات، أو أي شيء..." : "Search games, apps, or anything..."}
-              aria-label={language === "ar" ? "بحث" : "Search"}
-            />
-            <button type="submit" aria-label={language === "ar" ? "بحث" : "Search"}><SearchIcon /></button>
-          </form>
+          <HeaderSearch variant="desktop" language={language} />
 
           <div className="gv-header-actions">
             <LanguageSwitcher />
-            <Link
-              href="/games"
+            <button
+              type="button"
               className="gv-icon-button gv-search-mobile"
-              aria-label="البحث عن الألعاب"
+              aria-label={language === "ar" ? "بحث" : "Search"}
+              aria-expanded={mobileSearchOpen}
+              onClick={() => setMobileSearchOpen((value) => !value)}
             >
               <SearchIcon />
-            </Link>
+            </button>
 
             <Link
-              href={profileHref}
+              href="/library"
               className="gv-icon-button gv-notification-button"
-              aria-label="الإشعارات والحساب"
+              aria-label={language === "ar" ? "مكتبتي والإشعارات" : "Library and notifications"}
             >
               <BellIcon />
-              <span className="gv-notification-dot" />
             </Link>
 
             <Link
               href={profileHref}
               className="gv-profile-button"
-              aria-label="حسابي"
+              aria-label={language === "ar" ? "حسابي" : "My account"}
             >
               <span className="gv-profile-avatar">
                 {me?.username
@@ -448,7 +499,7 @@ export default function SiteHeader() {
               </span>
 
               <span className="gv-profile-label">
-                حسابي
+                {language === "ar" ? "حسابي" : "My account"}
               </span>
             </Link>
 
@@ -469,12 +520,20 @@ export default function SiteHeader() {
           </div>
         </div>
 
+        {mobileSearchOpen && <HeaderSearch variant="mobile" language={language} onDone={closeMobileSearch} />}
+
         <nav className="gv-mobile-tabs" aria-label={language === "ar" ? "التنقل" : "Sections"}>
           {desktopNavLinks.map((link) => (
-            <Link key={link.href} href={link.href} className={isActive(link.href) ? "is-active" : ""}>
+            <Link key={link.href} href={link.href} className={isActive(link.href) ? "is-active" : ""} aria-current={isActive(link.href) ? "page" : undefined}>
               {link.label}
             </Link>
           ))}
+          <Link href="/library" className={isActive("/library") ? "is-active" : ""} aria-current={isActive("/library") ? "page" : undefined}>
+            {language === "ar" ? "المكتبة" : "Library"}
+          </Link>
+          <Link href="/wallet" className={isActive("/wallet") ? "is-active" : ""} aria-current={isActive("/wallet") ? "page" : undefined}>
+            {language === "ar" ? "المحفظة" : "Wallet"}
+          </Link>
         </nav>
       </header>
 
@@ -491,7 +550,9 @@ export default function SiteHeader() {
           isOpen ? "is-open" : ""
         }`}
         role="dialog"
-        aria-modal="true"
+        aria-modal={isOpen}
+        aria-hidden={!isOpen}
+        inert={!isOpen}
         aria-label={language === "ar" ? "القائمة الرئيسية" : "Main menu"}
       >
         <div className="gv-drawer-top">

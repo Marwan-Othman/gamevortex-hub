@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { db } from "@/lib/prisma";
 import { getPlatformSlugFromEnum } from "@/lib/platforms";
+import { canDownload } from "@/lib/downloads";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,17 @@ export async function generateMetadata({
   };
 }
 
+/** Only plain http(s) links are rendered as hrefs (blocks javascript:/data: values from bad data). */
+function safeHttpUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function AppDetails({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
@@ -65,6 +77,15 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
   });
 
   if (!app) notFound();
+
+  // The view counter (shown here and used by "most viewed" sorting) only moved through the API before.
+  // Best effort: a failed counter update must never break the page.
+  void db.app
+    .update({ where: { id: app.id }, data: { viewCount: { increment: 1 } } })
+    .catch(() => undefined);
+
+  const officialUrl = safeHttpUrl(app.officialUrl);
+  const downloadable = canDownload(app);
 
   const relatedCategoryIds = app.appCategories.map((item) => item.categoryId);
 
@@ -87,7 +108,7 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
       <section className="glass hero game-detail" style={{ marginTop: 16 }}>
         <div className="detail-cover" style={{ display: "grid", placeItems: "center", overflow: "hidden" }}>
           {app.coverUrl ? (
-            <img src={app.coverUrl} alt={app.nameAr} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={app.coverUrl} alt={app.nameAr} fetchPriority="high" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : app.iconUrl ? (
             <img src={app.iconUrl} alt={app.nameAr} style={{ width: "70%", height: "70%", objectFit: "cover", borderRadius: 24 }} />
           ) : (
@@ -98,6 +119,7 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
         <div>
           <span className="badge">APP</span>
           {app.isMod && <span className="badge">MOD</span>}
+          {app.version && <span className="badge" dir="ltr">v{app.version.replace(/^v/i, "")}</span>}
           <h1>{app.nameAr}</h1>
           <p className="muted">{app.nameEn}</p>
 
@@ -122,16 +144,17 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
           </div>
 
           <div className="action-row" style={{ marginTop: 18 }}>
-            {app.downloadSource && (
+            {downloadable && (
               <a className="btn" href={`/download/app/${app.slug}`}>
                 تحميل التطبيق
               </a>
             )}
-            {app.officialUrl && (
-              <a className="btn secondary" href={app.officialUrl} target="_blank" rel="noreferrer">
+            {officialUrl && (
+              <a className="btn secondary" href={officialUrl} target="_blank" rel="noreferrer noopener">
                 المصدر الرسمي
               </a>
             )}
+            {!downloadable && !officialUrl && <p className="muted">التحميل غير متاح لهذا التطبيق حاليًا.</p>}
           </div>
         </div>
       </section>
@@ -146,6 +169,7 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
                 src={src}
                 alt=""
                 loading="lazy"
+                decoding="async"
                 style={{ height: 220, width: "auto", borderRadius: 14, flex: "0 0 auto" }}
               />
             ))}
@@ -165,6 +189,8 @@ export default async function AppDetails({ params }: { params: Promise<{ slug: s
                   <img
                     src={related.iconUrl || related.coverUrl || ""}
                     alt={related.nameEn}
+                    loading="lazy"
+                    decoding="async"
                     style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 16, marginBottom: 8 }}
                   />
                 )}

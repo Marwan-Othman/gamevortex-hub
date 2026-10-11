@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { adminErrorMessage, NETWORK_ERROR_MESSAGE } from "@/lib/admin-client";
 
 type Props = { raffleId: string; status: string; entryCount: number };
 
@@ -10,7 +11,10 @@ export default function DrawActions({ raffleId, status, entryCount }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
 
-  async function send(body: Record<string, unknown>) {
+  async function send(body: Record<string, unknown>, confirmText?: string) {
+    if (busy) return;
+    // Drawing a winner and cancelling cannot be undone, so ask first.
+    if (confirmText && !window.confirm(confirmText)) return;
     setBusy(true);
     setMessage(undefined);
     try {
@@ -21,12 +25,12 @@ export default function DrawActions({ raffleId, status, entryCount }: Props) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setMessage(data.error || "فشلت العملية.");
+        setMessage(adminErrorMessage(data.error, "فشلت العملية. حاول مرة أخرى."));
         return;
       }
       router.refresh();
     } catch {
-      setMessage("تعذر الاتصال بالخادم.");
+      setMessage(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -35,9 +39,9 @@ export default function DrawActions({ raffleId, status, entryCount }: Props) {
   return (
     <div className="draw-actions">
       {status === "DRAFT" && <button className="btn" type="button" disabled={busy} onClick={() => send({ action: "UPDATE", status: "OPEN" })}>فتح السحب</button>}
-      {status === "OPEN" && <button className="btn secondary" type="button" disabled={busy} onClick={() => send({ action: "UPDATE", status: "CANCELLED" })}>إلغاء</button>}
+      {status === "OPEN" && <button className="btn secondary" type="button" disabled={busy} onClick={() => send({ action: "UPDATE", status: "CANCELLED" }, "إلغاء هذا السحب نهائيًا؟ لا يمكن التراجع.")}>إلغاء</button>}
       {status === "OPEN" && (
-        <button className="btn" type="button" disabled={busy || entryCount === 0} onClick={() => send({ action: "DRAW" })}>
+        <button className="btn" type="button" disabled={busy || entryCount === 0} onClick={() => send({ action: "DRAW" }, "سحب الفائز الآن؟ لا يمكن التراجع بعد اختيار الفائز.")}>
           سحب الفائز {entryCount === 0 ? "(لا يوجد مشاركون)" : ""}
         </button>
       )}

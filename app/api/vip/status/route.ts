@@ -4,7 +4,7 @@ import {
 } from "next/server";
 
 import { requireUser } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, publicErrorCode } from "@/lib/api";
 import {
   getVipSubscriptionStatus,
 } from "@/lib/vip-subscriptions";
@@ -41,9 +41,7 @@ export async function GET(
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "VIP_STATUS_FAILED";
+      publicErrorCode(error, "VIP_STATUS_FAILED");
 
     if (
       message ===

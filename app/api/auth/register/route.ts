@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, userRouteError } from "@/lib/api";
 import { Prisma } from "@prisma/client";
 import { generateUniqueReferralCode, linkReferral } from "@/lib/referrals";
 
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "ACCOUNT_ALREADY_EXISTS" }, { status: 409 });
     }
-    return NextResponse.json({ error: "REGISTER_FAILED" }, { status: 400 });
+    // Malformed body -> 400; database outage -> 503; anything else -> 500 (full detail only in the server log).
+    return userRouteError(error, "REGISTER_FAILED", "auth:register");
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { messageFromResponse, NETWORK_ERROR_MESSAGE } from "@/lib/error-messages";
 
 type Review = { id: string; rating: number; text: string | null };
 
@@ -28,7 +29,10 @@ export default function ReviewForm({ slug }: { slug: string }) {
           setHasReview(true);
         }
       })
-      .catch(() => active && setMessage("سجّل الدخول لكتابة مراجعة."))
+      .catch((error: unknown) => {
+        // A server/network failure must not be reported as "please sign in".
+        if (active) setMessage(error instanceof TypeError ? NETWORK_ERROR_MESSAGE : error instanceof Error ? error.message : "تعذر تحميل مراجعتك.");
+      })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [slug]);
@@ -43,14 +47,13 @@ export default function ReviewForm({ slug }: { slug: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ rating, text: text.trim() || null }),
       });
-      const data = await response.json().catch(() => ({}));
       if (response.status === 401) throw new Error("سجّل الدخول أولًا لكتابة مراجعة.");
-      if (!response.ok) throw new Error(data.error || "تعذر حفظ المراجعة.");
+      if (!response.ok) throw new Error(await messageFromResponse(response, "تعذر حفظ المراجعة."));
       setHasReview(true);
       setMessage("تم حفظ مراجعتك وتحديث تقييم اللعبة.");
       window.location.reload();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+      setMessage(error instanceof TypeError ? NETWORK_ERROR_MESSAGE : error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
     } finally {
       setSaving(false);
     }

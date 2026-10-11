@@ -79,141 +79,139 @@ export default async function GamerProfilePage() {
       7 * 24 * 60 * 60 * 1000,
   );
 
-  /*
-   * ملاحظة: كانت هذه الاستعلامات مفصولة سابقًا عن Promise.all
-   * الرئيسي بسبب خطأ في استعلام الإحالات (تم إصلاحه أدناه).
-   * الفصل لم يعد ضروريًا تقنيًا، لكن تُركت الاستعلامات منفصلة
-   * الآن لتفادي أي تغيير غير ضروري في البنية.
-   */
-
-  const achievementsCount =
-    await db.userAchievement.count({
-      where: {
-        profileId: profile.id,
-      },
-    });
-
-  const unreadNotifications =
-    await db.notification.count({
-      where: {
-        userId: user.id,
-        readAt: null,
-      },
-    });
-
-  const libraryCount =
-    await db.gameLibraryItem.count({
-      where: {
-        userId: user.id,
-      },
-    });
-
-  const libraryRecent =
-    await db.gameLibraryItem.findMany({
-      where: {
-        userId: user.id,
-      },
-      include: {
-        game: true,
-      },
-      orderBy: {
-        updatedAt: "desc",
-      },
-      take: 6,
-    });
-
-  const libraryForStats =
-    await db.gameLibraryItem.findMany({
-      where: {
-        userId: user.id,
-      },
-      select: {
-        game: {
+  // Phase 16: these 11 independent queries ran one after another (11 sequential round-trips).
+  // They only depend on `profile.id` / `user.id`, so they now run concurrently.
+  const [
+    achievementsCount,
+    unreadNotifications,
+    libraryCount,
+    libraryRecent,
+    libraryForStats,
+    xpEvents,
+    recentOrders,
+    achievements,
+    wallet,
+    referralsCount,
+    rewardedReferralsCount,
+  ] = await Promise.all([
+    db.userAchievement.count({
+          where: {
+            profileId: profile.id,
+          },
+        }),
+    db.notification.count({
+          where: {
+            userId: user.id,
+            readAt: null,
+          },
+        }),
+    db.gameLibraryItem.count({
+          where: {
+            userId: user.id,
+          },
+        }),
+    db.gameLibraryItem.findMany({
+          where: {
+            userId: user.id,
+          },
           select: {
-            platform: true,
+            id: true,
+            game: {
+              select: {
+                slug: true,
+                coverUrl: true,
+                titleAr: true,
+                ratingAverage: true,
+              },
+            },
           },
-        },
-      },
-      take: 300,
-    });
-
-  const xpEvents =
-    await db.xpEvent.findMany({
-      where: {
-        profileId: profile.id,
-        createdAt: {
-          gte: sevenDaysAgo,
-        },
-      },
-      select: {
-        amount: true,
-        createdAt: true,
-      },
-    });
-
-  const recentOrders =
-    await db.order.findMany({
-      where: {
-        userId: user.id,
-        status: "COMPLETED",
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 3,
-      include: {
-        items: {
+          orderBy: {
+            updatedAt: "desc",
+          },
+          take: 6,
+        }),
+    db.gameLibraryItem.findMany({
+          where: {
+            userId: user.id,
+          },
+          select: {
+            game: {
+              select: {
+                platform: true,
+              },
+            },
+          },
+          take: 300,
+        }),
+    db.xpEvent.findMany({
+          where: {
+            profileId: profile.id,
+            createdAt: {
+              gte: sevenDaysAgo,
+            },
+          },
+          select: {
+            amount: true,
+            createdAt: true,
+          },
+        }),
+    db.order.findMany({
+          where: {
+            userId: user.id,
+            status: "COMPLETED",
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 3,
+          select: {
+            id: true,
+            createdAt: true,
+            totalCents: true,
+            items: {
+              select: {
+                product: {
+                  select: {
+                    title: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+    db.userAchievement.findMany({
+          where: {
+            profileId: profile.id,
+          },
           include: {
-            product: true,
+            achievement: true,
           },
+          orderBy: {
+            unlockedAt: "desc",
+          },
+          take: 6,
+        }),
+    db.wallet.findUnique({
+          where: {
+            userId: user.id,
+          },
+          select: {
+            balance: true,
+            pendingBalance: true,
+          },
+        }),
+    db.referral.count({
+        where: {
+          referrerId: user.id,
         },
-      },
-    });
-
-  const achievements =
-    await db.userAchievement.findMany({
-      where: {
-        profileId: profile.id,
-      },
-      include: {
-        achievement: true,
-      },
-      orderBy: {
-        unlockedAt: "desc",
-      },
-      take: 6,
-    });
-
-  const wallet =
-    await db.wallet.findUnique({
-      where: {
-        userId: user.id,
-      },
-      select: {
-        balance: true,
-        pendingBalance: true,
-      },
-    });
-
-  /*
-   * الإحالات:
-   *
-   * تم إصلاح المشكلة — الـ Model الصحيح في schema.prisma هو
-   * `Referral` (وليس referralsMade)، والعلاقة بالمُحيل هي
-   * referrerId. نجلب العدد الحقيقي من قاعدة البيانات.
-   */
-  const referralsCount = await db.referral.count({
-    where: {
-      referrerId: user.id,
-    },
-  });
-
-  const rewardedReferralsCount = await db.referral.count({
-    where: {
-      referrerId: user.id,
-      status: "REWARDED",
-    },
-  });
+      }),
+    db.referral.count({
+        where: {
+          referrerId: user.id,
+          status: "REWARDED",
+        },
+      }),
+  ]);
 
   const dayBuckets = Array.from({
     length: 7,

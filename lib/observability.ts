@@ -1,9 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { db } from "./prisma";
+import { redactSecrets } from "./redact";
 
 export function logEvent(event: string, data: Record<string, unknown> = {}) {
   const payload = { ts: new Date().toISOString(), event, ...data };
-  if (process.env.NODE_ENV !== "test") console.log(JSON.stringify(payload));
+  if (process.env.NODE_ENV !== "test") console.log(redactSecrets(JSON.stringify(payload)));
 }
 
 export function safeError(error: unknown) {
@@ -26,7 +27,7 @@ export async function logSystemError(
   error: unknown,
   options: { statusCode?: number; userId?: string | null; metadata?: Record<string, unknown> } = {}
 ) {
-  const message = safeError(error).slice(0, 2000);
+  const message = redactSecrets(safeError(error)).slice(0, 2000);
   logEvent("system_error", { scope, message, statusCode: options.statusCode });
   try {
     await db.systemError.create({
@@ -56,7 +57,7 @@ export async function logSystemError(
       event: "system_error_log_failed",
       scope,
       originalMessage: message,
-      loggerError: safeError(persistError),
+      loggerError: redactSecrets(safeError(persistError)),
     }));
   }
 }
@@ -76,7 +77,7 @@ function sanitizeMetadata(input: Record<string, unknown>, depth = 0): Record<str
     if (value && typeof value === "object" && !Array.isArray(value)) {
       output[key] = sanitizeMetadata(value as Record<string, unknown>, depth + 1);
     } else if (typeof value === "string") {
-      output[key] = value.slice(0, 500);
+      output[key] = redactSecrets(value).slice(0, 500);
     } else {
       output[key] = value;
     }

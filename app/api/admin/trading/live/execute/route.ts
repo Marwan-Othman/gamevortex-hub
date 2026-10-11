@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import { logSystemError } from "@/lib/observability";
 import { requireTradingOwner, tradingErrorStatus, tradingForbidden } from "@/lib/trading/access";
 import { executeApprovedLiveOrder } from "@/lib/trading/live-production-executor";
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
+    const message = publicErrorCode(error, "INTERNAL_ERROR");
     if (message === "FORBIDDEN") return tradingForbidden();
 
     const known = tradingErrorStatus(message);

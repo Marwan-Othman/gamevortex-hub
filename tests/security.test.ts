@@ -78,3 +78,28 @@ describe('sameOrigin (CSRF check for state-changing routes)', () => {
     ).toBe(false);
   });
 });
+
+describe('clientKey with TRUSTED_PROXY_HOPS (spoof-resistant client IP)', () => {
+  const previousHops = process.env.TRUSTED_PROXY_HOPS;
+  afterEach(() => {
+    if (previousHops === undefined) delete process.env.TRUSTED_PROXY_HOPS;
+    else process.env.TRUSTED_PROXY_HOPS = previousHops;
+  });
+
+  it('uses the entry N hops from the right so client-supplied prefixes are ignored', () => {
+    process.env.TRUSTED_PROXY_HOPS = '1';
+    const request = fakeRequest({ 'x-forwarded-for': '6.6.6.6, 1.2.3.4' });
+    expect(clientKey(request, 'scope')).toBe('scope:1.2.3.4');
+  });
+
+  it('counts multiple trusted hops and clamps to the left-most entry', () => {
+    process.env.TRUSTED_PROXY_HOPS = '2';
+    expect(clientKey(fakeRequest({ 'x-forwarded-for': '6.6.6.6, 1.2.3.4, 10.0.0.1' }), 'scope')).toBe('scope:1.2.3.4');
+    expect(clientKey(fakeRequest({ 'x-forwarded-for': '1.2.3.4' }), 'scope')).toBe('scope:1.2.3.4');
+  });
+
+  it('ignores invalid values and keeps the default behaviour', () => {
+    process.env.TRUSTED_PROXY_HOPS = 'abc';
+    expect(clientKey(fakeRequest({ 'x-forwarded-for': '1.2.3.4, 5.6.7.8' }), 'scope')).toBe('scope:1.2.3.4');
+  });
+});

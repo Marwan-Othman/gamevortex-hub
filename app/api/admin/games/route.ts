@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getPlatformEnum, normalizePlatform } from "@/lib/platforms";
+import { guardRead } from "@/lib/api";
 
 /**
  * Read-only list of games for the owner (used by the store product form).
@@ -17,12 +18,14 @@ async function requireSuperAdmin() {
 }
 
 export async function GET(request: NextRequest) {
+  const blocked = await guardRead(request, "admin:games", 60);
+  if (blocked) return blocked;
   try {
     const user = await requireSuperAdmin();
     if (!user) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search")?.trim() ?? "";
+    const search = (searchParams.get("search")?.trim() ?? "").slice(0, 100);
     const platformParam = searchParams.get("platform")?.trim() ?? "";
     const platform = normalizePlatform(platformParam);
     const where: Prisma.GameWhereInput = {};
@@ -41,6 +44,7 @@ export async function GET(request: NextRequest) {
       where,
       include: { gamePlatforms: true, gameCategories: { include: { category: true } } },
       orderBy: { createdAt: "desc" },
+      take: 500,
     });
 
     return NextResponse.json({ success: true, data: games });

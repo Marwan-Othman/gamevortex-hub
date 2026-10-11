@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { fetchWithTimeout } from "./fetch-timeout";
 
 type Bucket = {
   count: number;
@@ -15,15 +16,40 @@ const MAX_LOCAL_BUCKETS = 10_000;
  * RATE LIMITING
  * ======================================================= */
 
+/**
+ * Number of trusted reverse proxies in front of the app (TRUSTED_PROXY_HOPS).
+ *
+ * - unset / 0 (default, correct on Vercel where the platform overwrites
+ *   X-Forwarded-For): the first entry is used.
+ * - N > 0 (self-hosted behind nginx/Caddy/Cloudflare...): the entry N hops from
+ *   the RIGHT is used. Proxies append the address they saw, so the left-most
+ *   entries are client-controlled and spoofable; trusting them would let an
+ *   attacker rotate fake IPs to bypass every rate limit.
+ */
+function trustedProxyHops() {
+  const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0);
+  return Number.isInteger(hops) && hops > 0 && hops <= 10 ? hops : 0;
+}
+
+function forwardedClientIp(header: string | null) {
+  if (!header) return undefined;
+  const parts = header
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  const hops = trustedProxyHops();
+  if (!hops) return parts[0];
+  return parts[Math.max(0, parts.length - hops)];
+}
+
 export function clientKey(
   request: Request,
   scope: string,
 ) {
-  const forwarded =
-    request.headers
-      .get("x-forwarded-for")
-      ?.split(",")[0]
-      ?.trim();
+  const forwarded = forwardedClientIp(
+    request.headers.get("x-forwarded-for"),
+  );
 
   const real =
     request.headers
@@ -223,7 +249,7 @@ export async function rateLimitAsync(
 
   try {
     const response =
-      await fetch(
+      await fetchWithTimeout(
         `${url.replace(
           /\/$/,
           "",
@@ -249,6 +275,8 @@ export async function rateLimitAsync(
             ],
           ]),
         },
+        // A slow rate-limit store must never stall every request: fail fast and use the local limiter.
+        2_000,
       );
 
     if (!response.ok) {
@@ -296,13 +324,31 @@ export async function rateLimitAsync(
           ttl / 1000,
         ),
     };
-  } catch {
+  } catch (error) {
+    noteRateLimitStoreFailure(error);
     return localRateLimit(
       key,
       limit,
       windowMs,
     );
   }
+}
+
+let lastRateLimitStoreLog = 0;
+
+/** Rate-limit store outages must be visible in the logs (once a minute, no secrets), not silently swallowed. */
+function noteRateLimitStoreFailure(error: unknown) {
+  const now = Date.now();
+  if (now - lastRateLimitStoreLog < 60_000) return;
+  lastRateLimitStoreLog = now;
+  console.error(
+    JSON.stringify({
+      ts: new Date(now).toISOString(),
+      event: "rate_limit_store_unavailable",
+      fallback: "local",
+      name: error instanceof Error ? error.name : "UnknownError",
+    }),
+  );
 }
 
 /* =========================================================

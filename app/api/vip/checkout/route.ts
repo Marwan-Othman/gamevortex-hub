@@ -19,7 +19,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import {
   ConfiguredPaymentProvider,
 } from "@/lib/payments";
@@ -31,6 +31,14 @@ export const runtime = "nodejs";
 
 export const dynamic =
   "force-dynamic";
+
+/**
+ * An unpaid checkout older than this no longer blocks the user from starting
+ * a new one (for example to pick a different plan). The abandoned one moves to
+ * PAYMENT_FAILED rather than CANCELED on purpose: if its payment still
+ * completes later, the webhook can activate it and the money is not lost.
+ */
+const PENDING_CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
 
 const checkoutSchema =
   z.object({
@@ -329,6 +337,15 @@ export async function POST(
       });
 
     if (existingPurchase) {
+      // One key means one purchase. Replaying it for a different plan would
+      // hand back a checkout for something the user did not ask for.
+      if (existingPurchase.subscription.plan.code !== plan.code) {
+        return NextResponse.json(
+          { error: "VIP_IDEMPOTENCY_KEY_REUSED" },
+          { status: 409 },
+        );
+      }
+
       const storedMetadata =
         existingPurchase.metadata &&
         typeof existingPurchase.metadata === "object" &&
@@ -468,6 +485,59 @@ export async function POST(
      *
      * A previous failed payment is not included.
      */
+    const staleBefore =
+      new Date(Date.now() - PENDING_CHECKOUT_TTL_MS);
+
+    const abandoned =
+      await db.vipSubscription.findMany({
+        where: {
+          userId:
+            user.id,
+          status:
+            VipSubscriptionStatus.PENDING,
+          createdAt: {
+            lte: staleBefore,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    for (const stale of abandoned) {
+      await db.$transaction(async (tx) => {
+        const moved =
+          await tx.vipSubscription.updateMany({
+            where: {
+              id: stale.id,
+              status:
+                VipSubscriptionStatus.PENDING,
+            },
+            data: {
+              status:
+                VipSubscriptionStatus.PAYMENT_FAILED,
+            },
+          });
+
+        if (moved.count === 1) {
+          await tx.vipSubscriptionEvent.create({
+            data: {
+              subscriptionId:
+                stale.id,
+              type:
+                VipSubscriptionEventType.PAYMENT_FAILED,
+              metadata: {
+                reason:
+                  "CHECKOUT_ABANDONED",
+                abandonedAt:
+                  new Date().toISOString(),
+              },
+            },
+          });
+        }
+      });
+    }
+
     const pendingSubscription =
       await db.vipSubscription.findFirst({
         where: {
@@ -476,6 +546,10 @@ export async function POST(
 
           status:
             VipSubscriptionStatus.PENDING,
+
+          createdAt: {
+            gt: staleBefore,
+          },
 
           purchase: {
             status: {
@@ -611,6 +685,30 @@ export async function POST(
               renewalFromSubscriptionId
           ) {
             throw new Error("VIP_CHECKOUT_CONFLICT_RETRY");
+          }
+
+          // Same for an unfinished checkout: two requests with different
+          // idempotency keys must not both create one.
+          const concurrentPending =
+            await tx.vipSubscription.findFirst({
+              where: {
+                userId: user.id,
+                status: VipSubscriptionStatus.PENDING,
+                createdAt: { gt: staleBefore },
+                purchase: {
+                  status: {
+                    in: [
+                      PaymentStatus.CREATED,
+                      PaymentStatus.REQUIRES_ACTION,
+                    ],
+                  },
+                },
+              },
+              select: { id: true },
+            });
+
+          if (concurrentPending) {
+            throw new Error("VIP_CHECKOUT_ALREADY_STARTED");
           }
 
           const subscription =
@@ -771,10 +869,7 @@ export async function POST(
                 metadataWithCheckoutKey(
                   {
                     error:
-                      error instanceof
-                      Error
-                        ? error.message
-                        : "PAYMENT_PROVIDER_ERROR",
+                      publicErrorCode(error, "PAYMENT_PROVIDER_ERROR"),
 
                     failedAt:
                       new Date().toISOString(),
@@ -812,10 +907,7 @@ export async function POST(
 
               metadata: {
                 reason:
-                  error instanceof
-                  Error
-                    ? error.message
-                    : "PAYMENT_PROVIDER_ERROR",
+                  publicErrorCode(error, "PAYMENT_PROVIDER_ERROR"),
               },
             },
           });
@@ -962,9 +1054,7 @@ export async function POST(
     }
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "VIP_CHECKOUT_FAILED";
+      publicErrorCode(error, "VIP_CHECKOUT_FAILED");
 
     const knownErrors =
       new Set([

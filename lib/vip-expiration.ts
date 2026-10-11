@@ -1,80 +1,22 @@
 import {
-  VipSubscriptionEventType,
-} from "@prisma/client";
-
-import { db } from "@/lib/prisma";
+  expireDueVipSubscriptions,
+  expireVipSubscription as expireSubscription,
+} from "@/lib/vip-subscriptions";
 
 /**
  * Marks an expired VIP subscription as EXPIRED.
  *
- * Access checks do not depend on this function running because
- * getVipAccess() also checks expiresAt against the current time.
+ * Access checks do not depend on this running because getVipAccess() also
+ * checks expiresAt against the current time. There is a single implementation
+ * (in vip-subscriptions) so the event history, notification and conditional
+ * status change cannot drift apart; this wrapper only keeps the old boolean
+ * contract for existing callers.
  */
 export async function expireVipSubscription(
   subscriptionId: string,
-) {
-  const now =
-    new Date();
-
-  return db.$transaction(
-    async (tx) => {
-      const subscription =
-        await tx.vipSubscription.findUnique({
-          where: {
-            id:
-              subscriptionId,
-          },
-          select: {
-            id:
-              true,
-            status:
-              true,
-            expiresAt:
-              true,
-          },
-        });
-
-      if (!subscription) {
-        throw new Error(
-          "VIP_SUBSCRIPTION_NOT_FOUND",
-        );
-      }
-
-      if (
-        subscription.status !==
-          "ACTIVE" ||
-        !subscription.expiresAt ||
-        subscription.expiresAt >
-          now
-      ) {
-        return false;
-      }
-
-      await tx.vipSubscription.update({
-        where: {
-          id:
-            subscription.id,
-        },
-        data: {
-          status:
-            "EXPIRED",
-        },
-      });
-
-      await tx.vipSubscriptionEvent.create({
-        data: {
-          subscriptionId:
-            subscription.id,
-          type:
-            VipSubscriptionEventType.EXPIRED,
-          metadata: {
-            expiredAt:
-              now.toISOString(),
-          },
-        },
-      });
-
-      return true;
-    },
-  );
+): Promise<boolean> {
+  const result = await expireSubscription(subscriptionId);
+  return result.changed;
 }
+
+export { expireDueVipSubscriptions };

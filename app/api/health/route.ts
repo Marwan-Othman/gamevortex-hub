@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, logRouteError } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +30,12 @@ export async function GET(request: NextRequest) {
   if (administrativeCheck) {
     try {
       await requireOwner();
-    } catch {
-      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      const unauthenticated = error instanceof Error && error.message === "UNAUTHORIZED";
+      return NextResponse.json(
+        { error: unauthenticated ? "UNAUTHORIZED" : "FORBIDDEN" },
+        { status: unauthenticated ? 401 : 403, headers: { "Cache-Control": "no-store" } },
+      );
     }
   }
 
@@ -48,7 +52,9 @@ export async function GET(request: NextRequest) {
       { status: degraded ? "degraded" : "ok", database: "up", configured },
       { status: degraded ? 503 : 200, headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
+  } catch (error) {
+    // The monitor only sees "down"; the reason (timeout, auth failure, pool exhausted...) goes to the server log.
+    logRouteError("health:database", error);
     return NextResponse.json({ status: "degraded", database: "down" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

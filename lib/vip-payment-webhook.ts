@@ -5,11 +5,13 @@ import {
   VipSubscriptionStatus,
 } from "@prisma/client";
 
+import { runSerializable } from "@/lib/db-serializable";
 import { db } from "@/lib/prisma";
 
 import {
   activateVipSubscription,
   renewVipSubscription,
+  revokeVipGvcInTransaction,
 } from "@/lib/vip-subscriptions";
 
 export type VipPaymentWebhookInput = {
@@ -158,7 +160,7 @@ async function createEvent(
 async function markVipPaymentFailed(
   input: VipPaymentWebhookInput,
 ) {
-  return db.$transaction(
+  return runSerializable(
     async (tx) => {
       const subscription =
         await tx.vipSubscription.findUnique({
@@ -189,7 +191,15 @@ async function markVipPaymentFailed(
         subscription.status ===
           VipSubscriptionStatus.ACTIVE ||
         subscription.status ===
-          VipSubscriptionStatus.EXPIRED
+          VipSubscriptionStatus.EXPIRED ||
+        subscription.status ===
+          VipSubscriptionStatus.REFUNDED ||
+        subscription.status ===
+          VipSubscriptionStatus.CANCELED ||
+        subscription.purchase?.status ===
+          PaymentStatus.SUCCEEDED ||
+        subscription.purchase?.status ===
+          PaymentStatus.REFUNDED
       ) {
         return {
           ignored: true,
@@ -349,17 +359,13 @@ async function markVipPaymentFailed(
           updated,
       };
     },
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
-    },
   );
 }
 
 async function refundVipPayment(
   input: VipPaymentWebhookInput,
 ) {
-  return db.$transaction(
+  return runSerializable(
     async (tx) => {
       const subscription =
         await tx.vipSubscription.findUnique({
@@ -380,13 +386,58 @@ async function refundVipPayment(
       }
 
       /*
+       * Already refunded: a second refund event (or a retry) changes nothing.
+       */
+      if (
+        subscription.status ===
+          VipSubscriptionStatus.REFUNDED ||
+        subscription.purchase?.status ===
+          PaymentStatus.REFUNDED
+      ) {
+        return {
+          ignored: true,
+          reason:
+            "VIP_REFUND_ALREADY_PROCESSED",
+          subscription,
+        };
+      }
+
+      /*
+       * A refund can only undo a payment that was actually applied. For a
+       * subscription that never became active there is nothing to revoke.
+       */
+      if (
+        subscription.status ===
+          VipSubscriptionStatus.PENDING ||
+        subscription.status ===
+          VipSubscriptionStatus.PAYMENT_FAILED
+      ) {
+        return {
+          ignored: true,
+          reason:
+            "VIP_REFUND_FOR_UNPAID_SUBSCRIPTION",
+          subscription,
+        };
+      }
+
+      /*
        * VIP currently supports full refunds.
        * Partial refunds must not silently revoke
        * a subscription incorrectly.
+       *
+       * "Full" means the amount that was charged for this checkout, not the
+       * current catalog price (an admin may have changed it since).
        */
+      const chargedAmount =
+        subscription.purchase?.amountCents ??
+        subscription.plan.priceCents;
+      const chargedCurrency =
+        subscription.purchase?.currency ??
+        subscription.plan.currency;
+
       if (
         input.amountCents !==
-        subscription.plan.priceCents
+        chargedAmount
       ) {
         throw new Error(
           "VIP_PARTIAL_REFUND_UNSUPPORTED",
@@ -396,24 +447,11 @@ async function refundVipPayment(
       if (
         !input.currency ||
         input.currency.toUpperCase() !==
-          subscription.plan.currency.toUpperCase()
+          chargedCurrency.toUpperCase()
       ) {
         throw new Error(
           "VIP_REFUND_CURRENCY_MISMATCH",
         );
-      }
-
-      if (
-        subscription.purchase &&
-        subscription.purchase.status ===
-          PaymentStatus.REFUNDED
-      ) {
-        return {
-          ignored: true,
-          reason:
-            "VIP_REFUND_ALREADY_PROCESSED",
-          subscription,
-        };
       }
 
       if (
@@ -482,9 +520,6 @@ async function refundVipPayment(
             status:
               VipSubscriptionStatus.REFUNDED,
 
-
-
-
             updatedAt:
               new Date(),
           },
@@ -492,6 +527,23 @@ async function refundVipPayment(
             plan: true,
           },
         });
+
+      /*
+       * The refunded payment also bought GVC. Take back what is left of it so
+       * a refund does not leave the user with free AI credits.
+       */
+      const revokedGvc =
+        await revokeVipGvcInTransaction(
+          tx,
+          {
+            userId:
+              subscription.userId,
+            subscriptionId:
+              subscription.id,
+            paymentId:
+              subscription.paymentId,
+          },
+        );
 
       await createEvent(
         tx,
@@ -521,6 +573,8 @@ async function refundVipPayment(
 
             planCode:
               subscription.plan.code,
+
+            revokedGvc,
 
             raw:
               jsonObject(
@@ -565,10 +619,6 @@ async function refundVipPayment(
         subscription:
           updated,
       };
-    },
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
     },
   );
 }
@@ -657,9 +707,16 @@ export async function processVipPaymentWebhook(
    * A successful webhook must match the
    * server-side VIP plan price exactly.
    */
+  const expectedAmount =
+    subscription.purchase?.amountCents ??
+    subscription.plan.priceCents;
+  const expectedCurrency =
+    subscription.purchase?.currency ??
+    subscription.plan.currency;
+
   if (
     input.amountCents !==
-    subscription.plan.priceCents
+    expectedAmount
   ) {
     throw new Error(
       "VIP_PAYMENT_AMOUNT_MISMATCH",
@@ -669,7 +726,7 @@ export async function processVipPaymentWebhook(
   if (
     !input.currency ||
     input.currency.toUpperCase() !==
-      subscription.plan.currency.toUpperCase()
+      expectedCurrency.toUpperCase()
   ) {
     throw new Error(
       "VIP_PAYMENT_CURRENCY_MISMATCH",

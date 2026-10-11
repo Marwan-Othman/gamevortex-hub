@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import { requireTradingOwner } from "@/lib/trading/access";
 import { fetchPublicKlinesPaged, normalizePublicSymbol } from "@/lib/trading/binance-public-market-data";
 import { readJsonObject, tradingRouteError } from "@/lib/trading/route-helpers";
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, mode: "STRATEGY_LAB", researchOnly: true, symbols, interval, result });
   } catch (error) {
-    const code = error instanceof Error ? error.message : "";
+    const code = publicErrorCode(error, "");
     if (STATUS_BY_CODE[code]) return NextResponse.json({ error: code }, { status: STATUS_BY_CODE[code] });
     return tradingRouteError(error, "admin:trading:backtest:lab:post", ownerId);
   }

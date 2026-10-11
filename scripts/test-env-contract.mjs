@@ -22,7 +22,7 @@ function walk(dir) {
 
 for (const dir of sourceRoots) walk(path.join(root, dir));
 
-const ignoredRuntimeVars = new Set(['VERCEL_URL']);
+const ignoredRuntimeVars = new Set(['VERCEL_URL', 'VERCEL']);
 const failures = [];
 
 for (const envFile of envFiles) {

@@ -22,3 +22,13 @@ coverage/
 *.log
 *.zip
 .vercel
+
+# Private keys / credentials must never be committed
+*.pem
+*.key
+*.p8
+*.pfx
+*.p12
+id_rsa*
+.npmrc
+service-account*.json

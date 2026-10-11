@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOptionalUser } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, internalError } from "@/lib/api";
 import { db } from "@/lib/prisma";
 import { getVipAccess } from "@/lib/vip";
 
@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const blocked = await guardRead(request, "ai:usage", 60);
   if (blocked) return blocked;
+  try {
   const user = await getOptionalUser();
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const vip = await getVipAccess(user.id);
@@ -25,4 +26,7 @@ export async function GET(request: NextRequest) {
     unlimited: vip.isOwner,
     recent,
   });
+  } catch (error) {
+    return internalError("ai:usage", error, "AI_USAGE_FAILED");
+  }
 }

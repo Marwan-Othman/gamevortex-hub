@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
+import { logSystemError } from "@/lib/observability";
 
 export const runtime = "nodejs";
 
@@ -63,8 +64,23 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ok: true, replayed: result.replayed, beforeUsd: result.before.toString(), afterUsd: result.after.toString(), ledgerId: result.existing.id });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "OWNER_CASH_RECONCILIATION_FAILED";
-    const status = message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : message === "OWNER_WALLET_NOT_FOUND" ? 404 : 400;
+    // Two requests with the same idempotency key can race on the unique ledger
+    // key. The loser must be told to retry (it will then see the replay),
+    // not shown a database error.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "IDEMPOTENCY_KEY_IN_PROGRESS" }, { status: 409 });
+    }
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
+    }
+    const message = publicErrorCode(error, "OWNER_CASH_RECONCILIATION_FAILED");
+    const conflicts = new Set(["OWNER_CASH_BALANCE_CHANGED", "OWNER_CASH_BALANCE_CANNOT_BE_NEGATIVE", "IDEMPOTENCY_KEY_CONFLICT"]);
+    const known = new Set(["UNAUTHORIZED", "FORBIDDEN", "OWNER_WALLET_NOT_FOUND", ...conflicts]);
+    if (!known.has(message)) {
+      await logSystemError("admin:owner-wallet-reconcile", error, { statusCode: 500 });
+      return NextResponse.json({ error: "OWNER_CASH_RECONCILIATION_FAILED" }, { status: 500 });
+    }
+    const status = message === "UNAUTHORIZED" ? 401 : message === "FORBIDDEN" ? 403 : message === "OWNER_WALLET_NOT_FOUND" ? 404 : 409;
     return NextResponse.json({ error: message }, { status });
   }
 }

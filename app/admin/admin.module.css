@@ -3013,3 +3013,273 @@
 .navLink.active { background: linear-gradient(135deg, rgba(168,85,247,.24), rgba(37,217,255,.07)); border-color: rgba(168,85,247,.46); box-shadow: 0 10px 28px rgba(60,25,130,.18); }
 .mainArea { background: transparent; }
 @media (max-width: 900px) { .sidebar { min-width: 100%; width: 100%; height: auto; position: relative; border-inline-end: 0; border-bottom: 1px solid rgba(168,85,247,.25); } .layout { display: block; } .mainArea { width: 100%; max-width: 100%; } }
+
+
+/* ============================================================
+   PHASE 12 — ADMIN UNIFICATION
+   Shared layout (app/admin/layout.tsx) now wraps every /admin page.
+   ============================================================ */
+
+/* Pages written before the shared layout carry their own `.wrap`
+   (centered, 1440px, extra padding). Inside the shell the content area
+   already provides the padding, so neutralise it to avoid double gutters. */
+.content :global(.wrap) {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: 0;
+  padding: 0 0 40px;
+}
+
+/* Quick-jump search (top bar). The bar used to be a dead input. */
+.topbar {
+  overflow: visible;
+}
+
+.searchWrap {
+  position: relative;
+
+  display: flex;
+
+  flex: 1 1 0;
+
+  min-width: 0;
+  max-width: 560px;
+
+  margin: 0;
+}
+
+.searchResults {
+  position: absolute;
+
+  top: calc(100% + 8px);
+  inset-inline: 0;
+
+  z-index: 200;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+
+  padding: 6px;
+
+  border: 1px solid rgba(139, 61, 255, 0.28);
+  border-radius: 14px;
+
+  background: rgba(10, 9, 20, 0.98);
+
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.searchResult {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  width: 100%;
+  min-height: 42px;
+
+  padding: 8px 10px;
+
+  border: 0;
+  border-radius: 10px;
+
+  background: transparent;
+
+  color: #f7f8ff;
+
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+
+  cursor: pointer;
+}
+
+.searchResult svg {
+  width: 16px;
+  height: 16px;
+
+  flex: 0 0 16px;
+}
+
+.searchResult:hover,
+.searchResult:focus-visible {
+  background: rgba(139, 61, 255, 0.18);
+
+  outline: none;
+}
+
+.searchEmpty {
+  padding: 12px;
+
+  color: #8b93b0;
+
+  font-size: 12px;
+}
+
+/* Collapsible mobile menu (details/summary). */
+.mobileAdminDetails {
+  width: 100%;
+  min-width: 0;
+}
+
+.mobileAdminDetails > summary {
+  list-style: none;
+
+  cursor: pointer;
+}
+
+.mobileAdminDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobileAdminDetails[open] > summary {
+  margin-bottom: 12px;
+}
+
+.mobileAdminDetails > .mobileAdminViewSite {
+  margin-top: 12px;
+}
+
+.mobileAdminDetails > summary:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
+/* Shared state blocks used by loading.tsx / error.tsx and the admin forms. */
+.stateBox {
+  display: grid;
+
+  gap: 10px;
+
+  justify-items: center;
+
+  width: min(520px, 100%);
+
+  margin: 40px auto;
+
+  padding: 32px 20px;
+
+  text-align: center;
+
+  border: 1px solid rgba(139, 61, 255, 0.24);
+  border-radius: 18px;
+
+  background: rgba(15, 18, 42, 0.7);
+}
+
+.skeletonLine {
+  width: 100%;
+
+  height: 14px;
+
+  border-radius: 8px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(139, 61, 255, 0.16),
+      rgba(255, 255, 255, 0.04)
+    );
+  background-size: 200% 100%;
+
+  animation: adminShimmer 1.3s linear infinite;
+}
+
+.skeletonCard {
+  height: 96px;
+
+  border-radius: 16px;
+
+  border: 1px solid rgba(139, 61, 255, 0.16);
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(139, 61, 255, 0.12),
+      rgba(255, 255, 255, 0.03)
+    );
+  background-size: 200% 100%;
+
+  animation: adminShimmer 1.3s linear infinite;
+}
+
+.skeletonGrid {
+  display: grid;
+
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+
+  gap: 12px;
+
+  margin-top: 16px;
+}
+
+@keyframes adminShimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine,
+  .skeletonCard {
+    animation: none;
+  }
+}
+
+/* Inline feedback for admin forms/buttons. */
+.inlineError {
+  color: #ff8fa3;
+
+  font-size: 12px;
+}
+
+.inlineOk {
+  color: #76ffa6;
+
+  font-size: 12px;
+}
+
+/* Wide admin tables scroll inside their own box on phones. */
+.tableScroll {
+  width: 100%;
+
+  overflow-x: auto;
+
+  -webkit-overflow-scrolling: touch;
+}
+
+.tableScroll table {
+  width: 100%;
+  min-width: 560px;
+
+  border-collapse: collapse;
+}
+
+.tableScroll th,
+.tableScroll td {
+  padding: 8px 10px;
+
+  text-align: start;
+
+  vertical-align: top;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 959px) {
+  .searchWrap {
+    max-width: none;
+  }
+
+  .content :global(.wrap) {
+    padding-bottom: 24px;
+  }
+}

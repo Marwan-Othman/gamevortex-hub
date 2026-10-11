@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { storeErrorText } from "./store-errors";
 
 type Game = {
   id: string;
@@ -242,8 +243,7 @@ export default function StoreProductForm({
 
       if (!response.ok) {
         throw new Error(
-          payload?.error ||
-            "PRODUCT_CREATE_FAILED",
+          storeErrorText(payload?.error, "تعذر إنشاء المنتج."),
         );
       }
 

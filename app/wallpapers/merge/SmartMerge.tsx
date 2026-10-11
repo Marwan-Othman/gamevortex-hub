@@ -381,7 +381,7 @@ export default function SmartMerge() {
         <p className="muted" style={{ margin: 0 }}>ارفع صورك، استخدم العزل المحلي بالذكاء الاصطناعي عند الحاجة، ثم ركبها داخل Wallpaper بدقة 1080×1920.</p>
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 18, marginTop: 18, alignItems: "start" }}>
+      <section className="gv-m-split" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 360px", gap: 18, marginTop: 18, alignItems: "start" }}>
         <div className="glass card" style={{ padding: 16, display: "grid", placeItems: "center" }}>
           <div style={{ width: "min(100%, 390px)", background: "#07090d", padding: 7, borderRadius: 34 }}>
             <canvas ref={canvasRef} width={W} height={H} aria-label="معاينة Wallpaper المدمج" style={{ display: "block", width: "100%", height: "auto", borderRadius: 28 }} />
@@ -428,8 +428,8 @@ export default function SmartMerge() {
         const item = items.find((candidate) => candidate.id === interactiveId);
         if (!item) return null;
         return (
-          <div role="dialog" aria-modal="true" aria-label="تحديد عنصر بالذكاء الاصطناعي" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.78)", display: "grid", placeItems: "center", padding: 18 }}>
-            <div className="glass card" style={{ width: "min(94vw, 620px)", maxHeight: "92vh", overflow: "auto", padding: 16 }}>
+          <div className="gv-m-modal" role="dialog" aria-modal="true" aria-label="تحديد عنصر بالذكاء الاصطناعي" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.78)", display: "grid", placeItems: "center", padding: 18 }}>
+            <div className="glass card" style={{ width: "min(94vw, 620px)", maxHeight: "92dvh", overflow: "auto", padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                 <div>
                   <strong>تحديد AI</strong>

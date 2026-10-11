@@ -25,25 +25,40 @@ export async function GET(request: NextRequest) {
     return errorResponse("UNAUTHORIZED", 401);
   }
 
-  const apiKey = await db.gameVortexApiKey.findUnique({
-    where: { secretHash },
-    select: { id: true, userId: true, revokedAt: true, requiresPurchase: true },
-  });
-  if (!apiKey || apiKey.revokedAt) return errorResponse("UNAUTHORIZED", 401);
+  let apiKey: { id: string; userId: string; revokedAt: Date | null; requiresPurchase: boolean } | null;
+  try {
+    apiKey = await db.gameVortexApiKey.findUnique({
+      where: { secretHash },
+      select: { id: true, userId: true, revokedAt: true, requiresPurchase: true },
+    });
+  } catch {
+    return errorResponse("API_REQUEST_FAILED", 500);
+  }
+  if (!apiKey || apiKey.revokedAt) {
+    // Unknown/revoked keys are throttled per client IP so the key table cannot be probed or hammered.
+    const limited = await rateLimitAsync(clientKey(request, "api:v1:games:invalid"), 30, 60_000);
+    if (!limited.allowed) return errorResponse("RATE_LIMITED", 429, limited.retryAfter);
+    return errorResponse("UNAUTHORIZED", 401);
+  }
 
   const limited = await rateLimitAsync(`api:v1:games:key:${apiKey.id}`, 120, 60_000);
   if (!limited.allowed) return errorResponse("RATE_LIMITED", 429, limited.retryAfter);
 
-  if (apiKey.requiresPurchase) {
-    const access = await db.apiAccessPurchase.findFirst({ where: { userId: apiKey.userId, status: "SUCCEEDED" }, select: { id: true } });
-    if (!access) return errorResponse("API_ACCESS_REQUIRED", 403);
-  }
+  // These two lookups hit the database too: a failure there must be a JSON 500, not an uncaught throw.
+  try {
+    if (apiKey.requiresPurchase) {
+      const access = await db.apiAccessPurchase.findFirst({ where: { userId: apiKey.userId, status: "SUCCEEDED" }, select: { id: true } });
+      if (!access) return errorResponse("API_ACCESS_REQUIRED", 403);
+    }
 
-  const enabled = await db.gameVortexApiKey.updateMany({
-    where: { id: apiKey.id, revokedAt: null },
-    data: { lastUsedAt: new Date() },
-  });
-  if (enabled.count !== 1) return errorResponse("UNAUTHORIZED", 401);
+    const enabled = await db.gameVortexApiKey.updateMany({
+      where: { id: apiKey.id, revokedAt: null },
+      data: { lastUsedAt: new Date() },
+    });
+    if (enabled.count !== 1) return errorResponse("UNAUTHORIZED", 401);
+  } catch {
+    return errorResponse("API_REQUEST_FAILED", 500);
+  }
 
   const params = request.nextUrl.searchParams;
   const pageValue = Number(params.get("page") || 1);

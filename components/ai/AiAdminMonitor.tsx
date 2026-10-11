@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { NETWORK_ERROR_MESSAGE, readAdminError } from "@/lib/admin-client";
 
 type Health = { status: string; latencyMs: number | null };
 type Data = {
@@ -10,34 +11,76 @@ type Data = {
   providerUsage: Array<{ provider: string; requests: number; credits: number }>;
 };
 
+const cardStyle = { border: "1px solid #27272a", borderRadius: 14, padding: 18 } as const;
+
 export default function AiAdminMonitor() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  async function load() {
-    const response = await fetch("/api/ai/admin/health", { cache: "no-store" });
-    if (!response.ok) { setError("تعذر تحميل حالة AI."); return; }
-    setData(await response.json());
-  }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-  useEffect(() => { void load(); }, []);
+    try {
+      const response = await fetch("/api/ai/admin/health", { cache: "no-store" });
+
+      if (!response.ok) {
+        setError(await readAdminError(response, "تعذر تحميل حالة الذكاء الاصطناعي."));
+        return;
+      }
+
+      setData(await response.json());
+    } catch {
+      setError(NETWORK_ERROR_MESSAGE);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   return (
-    <main style={{ minHeight: "100vh", padding: 24 }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <h1>AI Monitoring</h1>
-        <p style={{ opacity: .65 }}>Owner-only monitoring for Gemini + Manus. API keys are never displayed.</p>
-        {error && <p>{error}</p>}
-        {data && <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-            {([{ name: "Gemini", health: data.health.gemini }, { name: "Manus", health: data.health.manus }]).map(item => <section key={item.name} style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>{item.name}</strong><div style={{ marginTop: 10 }}>{item.health.status}</div></section>)}
-            <section style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>Requests</strong><div style={{ marginTop: 10 }}>{data.requests.total}</div></section>
-            <section style={{ border: "1px solid #27272a", borderRadius: 14, padding: 18 }}><strong>Fallbacks</strong><div style={{ marginTop: 10 }}>{data.fallbackCount}</div></section>
-          </div>
-          <h2 style={{ marginTop: 28 }}>Provider Usage · 24h</h2>
-          <div style={{ display: "grid", gap: 8 }}>{data.providerUsage.map(item => <div key={item.provider} style={{ display: "flex", justifyContent: "space-between", padding: 12, borderBottom: "1px solid #27272a" }}><span>{item.provider}</span><span>{item.requests} requests · {item.credits} GVC</span></div>)}</div>
-        </>}
+    <main className="wrap" dir="rtl">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1>مراقبة الذكاء الاصطناعي</h1>
+          <p style={{ opacity: .65 }}>للمالك فقط: حالة Gemini و Manus. مفاتيح API لا تُعرض أبدًا.</p>
+        </div>
+
+        <button type="button" className="btn" onClick={() => void load()} disabled={loading}>
+          {loading ? "جارٍ التحديث..." : "تحديث"}
+        </button>
       </div>
+
+      {loading && !data ? <p className="muted" role="status">جارٍ تحميل الحالة...</p> : null}
+
+      {error ? <p role="alert" style={{ color: "#ff8fa3", marginTop: 12 }}>{error}</p> : null}
+
+      {data && <>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginTop: 16 }}>
+          {([{ name: "Gemini", health: data.health.gemini }, { name: "Manus", health: data.health.manus }]).map(item => (
+            <section key={item.name} style={cardStyle}>
+              <strong>{item.name}</strong>
+              <div style={{ marginTop: 10 }}>{item.health.status}</div>
+              {item.health.latencyMs !== null ? <small className="muted">{item.health.latencyMs} ms</small> : null}
+            </section>
+          ))}
+          <section style={cardStyle}><strong>الطلبات (24 ساعة)</strong><div style={{ marginTop: 10 }}>{data.requests.total}</div><small className="muted">ناجحة {data.requests.completed} · فاشلة {data.requests.failed}</small></section>
+          <section style={cardStyle}><strong>مرات التحويل للمزوّد البديل</strong><div style={{ marginTop: 10 }}>{data.fallbackCount}</div></section>
+        </div>
+
+        <h2 style={{ marginTop: 28 }}>استخدام المزوّدين · 24 ساعة</h2>
+        <div style={{ display: "grid", gap: 8 }}>
+          {data.providerUsage.map(item => (
+            <div key={item.provider} style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", padding: 12, borderBottom: "1px solid #27272a" }}>
+              <span>{item.provider}</span>
+              <span>{item.requests} طلب · {item.credits} GVC</span>
+            </div>
+          ))}
+          {!data.providerUsage.length ? <p className="muted">لا يوجد استخدام مسجّل خلال آخر 24 ساعة.</p> : null}
+        </div>
+      </>}
     </main>
   );
 }

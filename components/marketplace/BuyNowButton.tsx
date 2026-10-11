@@ -10,6 +10,18 @@ type BuyNowButtonProps = {
 
 type ApiError = { error?: string };
 
+/** Arabic text for the order/checkout error codes the store API returns. */
+function purchaseErrorText(code: string | undefined, fallback: string) {
+  if (!code) return fallback;
+  if (code === "UNAUTHORIZED") return "سجّل الدخول أولًا لإتمام الشراء.";
+  if (code === "ALREADY_OWNED") return "أنت تملك هذه اللعبة بالفعل.";
+  if (code === "FREE_PRODUCT_ALREADY_CLAIMED") return "استلمت هذا المنتج المجاني من قبل.";
+  if (code === "ORDER_PRICE_CHANGED") return "تغيّر سعر المنتج. حدّث الصفحة وأعد المحاولة.";
+  if (code === "ORDER_ITEM_NOT_AVAILABLE_FOR_SALE" || code === "PRODUCT_NOT_AVAILABLE_FOR_SALE") return "المنتج لم يعد متاحًا للبيع.";
+  if (code.startsWith("OUT_OF_STOCK") || code.startsWith("DIGITAL_KEYS_OUT_OF_STOCK")) return "نفدت كمية هذا المنتج.";
+  return fallback;
+}
+
 function idempotencyKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
@@ -54,7 +66,7 @@ export default function BuyNowButton({ productId, productTitle, priceCents }: Bu
       const orderData = await orderResponse.json() as { id?: string; paymentStatus?: string } & ApiError;
 
       if (!orderResponse.ok || !orderData.id) {
-        setMessage(orderData.error === "UNAUTHORIZED" ? "سجّل الدخول أولًا لإتمام الشراء." : "تعذر إنشاء الطلب.");
+        setMessage(purchaseErrorText(orderData.error, "تعذر إنشاء الطلب."));
         return;
       }
 
@@ -71,6 +83,8 @@ export default function BuyNowButton({ productId, productTitle, priceCents }: Bu
           setMessage("لم يعد رصيد المحفظة كافيًا لإتمام العملية.");
         } else if (paymentData.error === "OUT_OF_STOCK" || paymentData.error === "DIGITAL_KEY_ALREADY_CLAIMED") {
           setMessage("المنتج لم يعد متاحًا بالكمية المطلوبة.");
+        } else if (paymentData.error) {
+          setMessage(purchaseErrorText(paymentData.error, "تعذر إتمام الدفع من المحفظة. لم يتم الخصم إذا فشلت العملية."));
         } else {
           setMessage("تعذر إتمام الدفع من المحفظة. لم يتم الخصم إذا فشلت العملية.");
         }
@@ -102,7 +116,7 @@ export default function BuyNowButton({ productId, productTitle, priceCents }: Bu
       const orderData = await orderResponse.json() as { id?: string; paymentStatus?: string } & ApiError;
 
       if (!orderResponse.ok || !orderData.id) {
-        setMessage(orderData.error === "UNAUTHORIZED" ? "سجّل الدخول أولًا لإتمام الشراء." : "تعذر إنشاء الطلب. حدّث الصفحة وحاول مجددًا.");
+        setMessage(purchaseErrorText(orderData.error, "تعذر إنشاء الطلب. حدّث الصفحة وحاول مجددًا."));
         return;
       }
 
@@ -122,6 +136,8 @@ export default function BuyNowButton({ productId, productTitle, priceCents }: Bu
           setMessage("الدفع غير مهيأ بعد. لا يتم تحصيل أي مبلغ.");
         } else if (checkoutData.error === "UNAUTHORIZED") {
           setMessage("انتهت جلستك. سجّل الدخول ثم حاول مرة أخرى.");
+        } else if (checkoutData.error) {
+          setMessage(purchaseErrorText(checkoutData.error, "تعذر بدء الدفع. لم يتم تحصيل أي مبلغ."));
         } else {
           setMessage("تعذر بدء الدفع. لم يتم تحصيل أي مبلغ.");
         }

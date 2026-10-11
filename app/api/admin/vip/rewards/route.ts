@@ -15,10 +15,7 @@ import {
   requireOwner,
 } from "@/lib/auth";
 
-import {
-  guardMutation,
-  guardRead,
-} from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 
 const rewardSchema =
   z.object({
@@ -115,9 +112,7 @@ export async function GET(
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "ADMIN_VIP_REWARDS_FAILED";
+      publicErrorCode(error, "ADMIN_VIP_REWARDS_FAILED");
 
     const status =
       message ===
@@ -237,9 +232,7 @@ export async function POST(
     }
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "ADMIN_VIP_REWARD_CREATE_FAILED";
+      publicErrorCode(error, "ADMIN_VIP_REWARD_CREATE_FAILED");
 
     const status =
       message ===

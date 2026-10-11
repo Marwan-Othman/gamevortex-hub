@@ -19,10 +19,7 @@ import {
 } from "@/lib/auth";
 import { creditPointsInTransaction } from "@/lib/points";
 
-import {
-  guardMutation,
-  guardRead,
-} from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode, internalError } from "@/lib/api";
 
 const claimSchema =
   z.object({
@@ -54,6 +51,7 @@ export async function GET(
     return blocked;
   }
 
+  try {
   const rewards =
     await db.vipReward.findMany({
       where: {
@@ -78,6 +76,9 @@ export async function GET(
     success: true,
     data: rewards,
   });
+  } catch (error) {
+    return internalError("vip:rewards:list", error, "VIP_REWARDS_LOAD_FAILED");
+  }
 }
 
 export async function POST(
@@ -139,42 +140,80 @@ export async function POST(
             );
           }
 
-          if (
-            reward.planId
-          ) {
-            const subscription =
-              await tx.vipSubscription.findFirst({
-                where: {
-                  userId:
-                    user.id,
-                  status:
-                    VipSubscriptionStatus.ACTIVE,
-                  planId:
-                    reward.planId,
-                  OR: [
-                    {
-                      expiresAt:
-                        null,
+          /*
+           * A reward is only for someone whose VIP is active right now. A
+           * reward tied to a plan needs that plan; an open reward needs any
+           * active plan. (Without this check an open reward could be claimed
+           * by anybody, any number of times, by sending a new key each time.)
+           */
+          const subscription =
+            await tx.vipSubscription.findFirst({
+              where: {
+                userId:
+                  user.id,
+                status:
+                  VipSubscriptionStatus.ACTIVE,
+                ...(reward.planId
+                  ? {
+                      planId:
+                        reward.planId,
+                    }
+                  : {}),
+                OR: [
+                  {
+                    expiresAt:
+                      null,
+                  },
+                  {
+                    expiresAt: {
+                      gt:
+                        new Date(),
                     },
-                    {
-                      expiresAt: {
-                        gt:
-                          new Date(),
-                      },
-                    },
-                  ],
-                },
-                orderBy: {
-                  expiresAt:
-                    "desc",
-                },
-              });
+                  },
+                ],
+              },
+              orderBy: {
+                expiresAt:
+                  "desc",
+              },
+            });
 
-            if (!subscription) {
-              throw new Error(
-                "VIP_REWARD_PLAN_REQUIRED",
-              );
-            }
+          if (!subscription) {
+            throw new Error(
+              reward.planId
+                ? "VIP_REWARD_PLAN_REQUIRED"
+                : "VIP_REWARD_REQUIRES_ACTIVE_VIP",
+            );
+          }
+
+          /*
+           * One claim per reward per subscription period. The row lock makes
+           * two parallel requests (with different idempotency keys) take turns,
+           * so the second one sees the first one's claim.
+           */
+          await tx.$queryRaw(
+            Prisma.sql`SELECT "id" FROM "VipSubscription" WHERE "id" = ${subscription.id} FOR UPDATE`,
+          );
+
+          const alreadyClaimed =
+            await tx.vipRewardClaim.findFirst({
+              where: {
+                userId:
+                  user.id,
+                rewardId:
+                  reward.id,
+                subscriptionId:
+                  subscription.id,
+              },
+              select: {
+                id: true,
+              },
+            });
+
+          if (alreadyClaimed) {
+            throw new Error(
+              "VIP_REWARD_ALREADY_CLAIMED",
+            );
           }
 
           if (reward.points > 0) {
@@ -195,6 +234,8 @@ export async function POST(
                   user.id,
                 rewardId:
                   reward.id,
+                subscriptionId:
+                  subscription.id,
                 points:
                   reward.points,
                 idempotencyKey:
@@ -205,6 +246,17 @@ export async function POST(
                 },
               },
             });
+
+          await tx.vipSubscription.update({
+            where: {
+              id:
+                subscription.id,
+            },
+            data: {
+              lastRewardAt:
+                new Date(),
+            },
+          });
 
           await tx.notification.create({
             data: {
@@ -257,29 +309,57 @@ export async function POST(
       );
     }
 
+    if (
+      error instanceof
+        Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "VIP_REWARD_CLAIM_CONFLICT_RETRY",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     const message =
-      error instanceof Error
-        ? error.message
+      publicErrorCode(error, "VIP_REWARD_CLAIM_FAILED");
+
+    const known =
+      new Set([
+        "UNAUTHORIZED",
+        "VIP_REWARD_NOT_FOUND",
+        "VIP_REWARD_PLAN_REQUIRED",
+        "VIP_REWARD_REQUIRES_ACTIVE_VIP",
+        "VIP_REWARD_ALREADY_CLAIMED",
+        "IDEMPOTENCY_KEY_CONFLICT",
+      ]);
+
+    const code =
+      known.has(message)
+        ? message
         : "VIP_REWARD_CLAIM_FAILED";
 
     const status =
-      message ===
-        "UNAUTHORIZED"
+      code === "UNAUTHORIZED"
         ? 401
-        : message ===
-            "VIP_REWARD_NOT_FOUND"
+        : code === "VIP_REWARD_NOT_FOUND"
           ? 404
-          : message ===
-              "VIP_REWARD_PLAN_REQUIRED" ||
-            message ===
-              "VIP_REWARD_REQUIRES_ACTIVE_VIP"
+          : code === "VIP_REWARD_PLAN_REQUIRED" ||
+              code === "VIP_REWARD_REQUIRES_ACTIVE_VIP"
             ? 403
-            : 400;
+            : code === "VIP_REWARD_ALREADY_CLAIMED" ||
+                code === "IDEMPOTENCY_KEY_CONFLICT"
+              ? 409
+              : 500;
 
     return NextResponse.json(
       {
         error:
-          message,
+          code,
       },
       {
         status,

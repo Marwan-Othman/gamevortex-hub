@@ -85,7 +85,7 @@ export default function SupportCenter() {
   return <main className="wrap" dir="rtl">
     <h1>الدعم الفني</h1>
     <p>أرسل استفسارك وتابع الردود من هنا. محادثاتك خاصة بحسابك.</p>
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 0.8fr) minmax(0, 1.6fr)", gap: 20 }}>
+    <div className="gv-m-split gv-m-split-support" style={{ display: "grid", gridTemplateColumns: "minmax(220px, 0.8fr) minmax(0, 1.6fr)", gap: 20 }}>
       <section>
         <h2>طلب جديد</h2>
         <form onSubmit={(event) => void createTicket(event)}>

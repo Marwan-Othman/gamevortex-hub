@@ -7,6 +7,7 @@ import {
   GAME_FILE_ACCEPT,
   UPLOAD_PLATFORM_OPTIONS,
   buildBlobPathname,
+  coverFileName,
   formatBytes,
   gameContentTypeFor,
   hasAllowedGameExtension,
@@ -17,7 +18,10 @@ import {
 } from "@/lib/game-upload-shared";
 import {
   MAX_SCREENSHOTS,
+  MAX_VERSION_LENGTH,
+  looksLikeApk,
   normalizeExternalSourceUrl,
+  parseVersionValue,
   type ContentFormData,
   type ContentType,
   type SourceMode,
@@ -29,11 +33,14 @@ export type ContentListItem = {
   name: string;
   slug: string;
   isMod: boolean;
+  version: string | null;
   published: boolean;
   image: string | null;
   platform: string | null;
   updatedAt: number;
 };
+
+export type CategoryOption = { id: string; nameAr: string; nameEn: string };
 
 /** An image is either already stored (url) or a local file waiting to be uploaded on save. */
 type ImageItem = { key: string; url?: string; file?: File; preview: string };
@@ -47,6 +54,18 @@ const ERRORS: Record<string, string> = {
   INVALID_SCREENSHOT: "إحدى الصور التعريفية غير صالحة.",
   TOO_MANY_SCREENSHOTS: "عدد الصور التعريفية أكبر من المسموح.",
   INVALID_UPLOADED_FILE: "ملف التطبيق المرفوع غير صالح.",
+  INVALID_APK_FILE: "الملف ليس APK صالحًا (محتواه لا يطابق صيغة APK). اختر الملف الصحيح.",
+  INVALID_IMAGE_FILE: "إحدى الصور ليست صورة صالحة (JPG, PNG, WEBP, AVIF).",
+  UPLOADED_FILE_MISSING: "أحد الملفات لم يكتمل رفعه. أعد المحاولة.",
+  UPLOADED_FILE_EMPTY: "أحد الملفات المرفوعة فارغ.",
+  UPLOAD_FAILED: "تعذر رفع الملف. تحقق من الاتصال وحاول مرة ثانية.",
+  INVALID_VERSION: `الإصدار غير صالح. استخدم حروفًا إنجليزية وأرقامًا ونقاطًا فقط (حتى ${MAX_VERSION_LENGTH} حرفًا).`,
+  INVALID_VERSION_TYPE: "نوع النسخة غير صالح.",
+  INVALID_PUBLISHED: "قيمة النشر غير صالحة.",
+  INVALID_SOURCE: "مصدر التحميل غير صالح.",
+  INVALID_TYPE: "نوع المحتوى غير صحيح.",
+  CONTENT_CREATE_FAILED: "تعذر إضافة المحتوى. حاول مرة ثانية.",
+  CONTENT_UPDATE_FAILED: "تعذر حفظ التعديلات. حاول مرة ثانية.",
   APK_FILE_REQUIRED: "لمنصة Android يجب أن يكون الملف بصيغة APK.",
   INVALID_APK_LINK: "رابط APK غير صالح. يجب أن يكون رابط https عام.",
   SOURCE_REQUIRED: "أضف ملف APK أو رابط APK.",
@@ -54,6 +73,17 @@ const ERRORS: Record<string, string> = {
   Unauthorized: "سجّل الدخول بحساب المالك.",
   Forbidden: "هذه الصفحة للمالك فقط.",
   NOT_FOUND: "المحتوى غير موجود.",
+  SLUG_ALREADY_EXISTS: "يوجد محتوى بنفس الاسم. غيّر الاسم قليلًا.",
+  INVALID_CATEGORY: "أحد التصنيفات المختارة غير موجود أو غير مفعّل.",
+  INVALID_CATEGORIES: "قائمة التصنيفات غير صالحة.",
+  INVALID_BODY: "البيانات المرسلة غير صالحة.",
+  CONTENT_HAS_PURCHASES: "لا يمكن حذفها لأن مستخدمين اشتروها أو يملكونها. اخفها من الموقع بدل الحذف.",
+  CONTENT_DELETE_FAILED: "تعذر الحذف. حاول مرة ثانية.",
+  GAME_FILE_TOO_LARGE: "حجم الملف أكبر من الحد المسموح.",
+  COVER_FILE_TOO_LARGE: "حجم الصورة أكبر من الحد المسموح.",
+  COVER_TYPE_NOT_SUPPORTED: "الصور المسموحة: JPG, PNG, WEBP, AVIF.",
+  RATE_LIMITED: "طلبات كثيرة. انتظر دقيقة ثم حاول مرة ثانية.",
+  CSRF_ORIGIN_REJECTED: "تم رفض الطلب. حدّث الصفحة وحاول مرة ثانية.",
 };
 
 function errorText(code: unknown) {
@@ -64,13 +94,14 @@ function newKey() {
   return crypto.randomUUID();
 }
 
-export default function ContentManager({ items }: { items: ContentListItem[] }) {
+export default function ContentManager({ items, categories = [] }: { items: ContentListItem[]; categories?: CategoryOption[] }) {
   const router = useRouter();
 
   const [editing, setEditing] = useState<{ type: ContentType; id: string } | null>(null);
   const [type, setType] = useState<ContentType>("game");
   const [platform, setPlatform] = useState("ANDROID");
   const [isMod, setIsMod] = useState(false);
+  const [version, setVersion] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [published, setPublished] = useState(true);
@@ -80,6 +111,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
   const [existingSource, setExistingSource] = useState<{ mode: SourceMode; url: string } | null>(null);
   const [mainImage, setMainImage] = useState<ImageItem | null>(null);
   const [screenshots, setScreenshots] = useState<ImageItem[]>([]);
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -87,6 +119,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
   const [error, setError] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef({ done: 0, total: 1 });
 
   // Web content has no installable file: only a link is possible.
@@ -111,6 +144,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
     setType("game");
     setPlatform("ANDROID");
     setIsMod(false);
+    setVersion("");
     setName("");
     setDescription("");
     setPublished(true);
@@ -120,6 +154,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
     setExistingSource(null);
     setMainImage(null);
     setScreenshots([]);
+    setCategoryIds([]);
     formRef.current?.reset();
   }
 
@@ -137,6 +172,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
       setType(data.type);
       setPlatform(data.platform);
       setIsMod(data.isMod);
+      setVersion(data.version ?? "");
       setName(data.name);
       setDescription(data.description);
       setPublished(data.published);
@@ -147,6 +183,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
       }
       setMainImage(data.mainImage ? { key: newKey(), url: data.mainImage, preview: data.mainImage } : null);
       setScreenshots(data.screenshots.map((url) => ({ key: newKey(), url, preview: url })));
+      setCategoryIds(data.categories ?? []);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(errorText(err instanceof Error ? err.message : null));
@@ -185,20 +222,37 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
     setScreenshots((current) => [...current, ...files.map((file) => ({ key: newKey(), file, preview: makePreview(file) }))]);
   }
 
-  function onApkFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
+  function onPlatformChange(next: string) {
+    setPlatform(next);
+    // A file picked for another platform must not travel with the new one (Android = APK only).
+    if (apkFile && next === "ANDROID" && !apkFile.name.toLowerCase().endsWith(".apk")) {
+      setApkFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setError("تم إلغاء الملف المختار لأنه ليس APK. اختر ملف APK لمنصة Android.");
+    }
+  }
+
+  async function onApkFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    const file = input.files?.[0] ?? null;
     if (!file) return setApkFile(null);
-    if (platform === "ANDROID" && !file.name.toLowerCase().endsWith(".apk")) {
-      event.target.value = "";
-      return setError("اختر ملف بصيغة APK.");
-    }
-    if (!hasAllowedGameExtension(file.name)) {
-      event.target.value = "";
-      return setError("صيغة الملف غير مدعومة.");
-    }
-    if (file.size <= 0 || file.size > MAX_GAME_FILE_SIZE) {
-      event.target.value = "";
-      return setError("حجم الملف غير مناسب.");
+    const reject = (text: string) => {
+      input.value = "";
+      setApkFile(null);
+      setError(text);
+    };
+    if (platform === "ANDROID" && !file.name.toLowerCase().endsWith(".apk")) return reject("اختر ملف بصيغة APK.");
+    if (!hasAllowedGameExtension(file.name)) return reject("صيغة الملف غير مدعومة.");
+    if (file.size <= 0) return reject("الملف فارغ.");
+    if (file.size > MAX_GAME_FILE_SIZE) return reject(`حجم الملف أكبر من ${formatBytes(MAX_GAME_FILE_SIZE)}.`);
+    if (file.name.toLowerCase().endsWith(".apk")) {
+      // An APK is a ZIP: catch a renamed/corrupted file before spending time on the upload.
+      try {
+        const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+        if (!looksLikeApk(head)) return reject(ERRORS.INVALID_APK_FILE);
+      } catch {
+        // the browser could not read the file head: the server checks it again after the upload
+      }
     }
     setError(null);
     setApkFile(file);
@@ -206,25 +260,32 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
 
   async function uploadOne(file: File, kind: UploadKind) {
     const isImage = kind === "cover";
-    const blob = await upload(buildBlobPathname(kind, file.name, crypto.randomUUID()), file, {
-      access: "public",
-      handleUploadUrl: "/api/admin/content/upload",
-      multipart: !isImage,
-      ...(isImage ? {} : { contentType: gameContentTypeFor(file.name) }),
-      clientPayload: JSON.stringify({
-        kind,
-        platform,
-        size: file.size,
-        mimeType: isImage ? file.type : gameContentTypeFor(file.name),
-      }),
-      onUploadProgress(event) {
-        const { done, total } = progressRef.current;
-        const value = Math.min(99, Math.round(((done + (file.size * event.percentage) / 100) / total) * 100));
-        setProgress((current) => Math.max(current, value));
-      },
-    });
-    progressRef.current.done += file.size;
-    return blob.url;
+    // Images always get a real image extension, because the server only accepts those pathnames.
+    const fileName = isImage ? coverFileName(file.name, file.type) : file.name;
+    try {
+      const blob = await upload(buildBlobPathname(kind, fileName, crypto.randomUUID()), file, {
+        access: "public",
+        handleUploadUrl: "/api/admin/content/upload",
+        multipart: !isImage,
+        ...(isImage ? {} : { contentType: gameContentTypeFor(file.name) }),
+        clientPayload: JSON.stringify({
+          kind,
+          platform,
+          size: file.size,
+          mimeType: isImage ? file.type : gameContentTypeFor(file.name),
+        }),
+        onUploadProgress(event) {
+          const { done, total } = progressRef.current;
+          const value = Math.min(99, Math.round(((done + (file.size * event.percentage) / 100) / total) * 100));
+          setProgress((current) => Math.max(current, value));
+        },
+      });
+      progressRef.current.done += file.size;
+      return blob.url;
+    } catch {
+      // The Blob client hides the server's reason; show one clear message instead of a generic failure.
+      throw new Error("UPLOAD_FAILED");
+    }
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -235,8 +296,19 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
 
     if (!name.trim()) return setError(ERRORS.NAME_REQUIRED);
 
+    const versionValue = parseVersionValue(version);
+    if (versionValue === "INVALID") return setError(ERRORS.INVALID_VERSION);
+    if (effectiveMode === "upload" && apkFile && platform === "ANDROID" && !apkFile.name.toLowerCase().endsWith(".apk")) {
+      return setError(ERRORS.APK_FILE_REQUIRED);
+    }
+
+    // Imported items (official store link, no file) can be edited without adding a file or link.
+    const noSourceEdit = Boolean(editing) && !existingSource && (effectiveMode === "link" ? !linkUrl.trim() : !apkFile);
+
     let linkValue = "";
-    if (effectiveMode === "link") {
+    if (noSourceEdit) {
+      // nothing to validate: the stored source stays as it is
+    } else if (effectiveMode === "link") {
       const normalized = normalizeExternalSourceUrl(linkUrl);
       if (!normalized) return setError(ERRORS.INVALID_APK_LINK);
       linkValue = normalized;
@@ -265,6 +337,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
       } else if (existingSource?.mode === "upload") {
         sourceUrl = existingSource.url;
       }
+      const sendSource = !noSourceEdit;
 
       let mainUrl: string | null = null;
       if (mainImage) {
@@ -300,10 +373,12 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
           description: description.trim(),
           platform,
           isMod,
+          version: versionValue ?? null,
           published,
           mainImage: mainUrl,
           screenshots: shotUrls,
-          source: { mode: effectiveMode, url: sourceUrl },
+          categories: categoryIds,
+          ...(sendSource ? { source: { mode: effectiveMode, url: sourceUrl } } : {}),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -332,6 +407,31 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onDelete(item: ContentListItem) {
+    if (busy) return;
+    const label = item.type === "game" ? "اللعبة" : "التطبيق";
+    if (!window.confirm(`حذف ${label} "${item.name}" نهائيًا مع ملفاتها المرفوعة؟ لا يمكن التراجع.`)) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/admin/content/${item.type}/${item.id}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) throw new Error(typeof payload?.error === "string" ? payload.error : "CONTENT_DELETE_FAILED");
+      if (editing?.id === item.id) resetForm();
+      setMessage("تم الحذف.");
+      router.refresh();
+    } catch (err) {
+      setError(errorText(err instanceof Error ? err.message : null));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleCategory(id: string) {
+    setCategoryIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
   }
 
   const box = { display: "grid", gap: 8 } as const;
@@ -370,7 +470,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
 
           <label style={box}>
             <strong>2. المنصة</strong>
-            <select value={platform} onChange={(e) => setPlatform(e.target.value)} disabled={busy}>
+            <select value={platform} onChange={(e) => onPlatformChange(e.target.value)} disabled={busy}>
               {UPLOAD_PLATFORM_OPTIONS.map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
@@ -400,6 +500,18 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} required disabled={busy} />
           </label>
 
+          <label style={box}>
+            <strong>الإصدار (اختياري)</strong>
+            <input
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              maxLength={MAX_VERSION_LENGTH}
+              dir="ltr"
+              placeholder="1.2.3"
+              disabled={busy}
+            />
+          </label>
+
           <div style={box}>
             <strong>5. {platform === "ANDROID" ? "مصدر APK" : "مصدر التحميل"}</strong>
             {platform !== "WEB" && (
@@ -416,7 +528,8 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
             )}
             {effectiveMode === "upload" ? (
               <>
-                <input type="file" accept={fileAccept} onChange={onApkFile} disabled={busy} />
+                <input ref={fileInputRef} type="file" accept={fileAccept} onChange={onApkFile} disabled={busy} />
+                <small className="muted">الحد الأقصى {formatBytes(MAX_GAME_FILE_SIZE)}{platform === "ANDROID" ? " · ملف APK فقط" : ""}</small>
                 {apkFile && <small className="muted">{apkFile.name} · {formatBytes(apkFile.size)}</small>}
                 {!apkFile && existingSource?.mode === "upload" && <small className="muted">الملف الحالي محفوظ. اختر ملفًا جديدًا فقط إذا أردت تغييره.</small>}
               </>
@@ -430,6 +543,9 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
                 onChange={(e) => setLinkUrl(e.target.value)}
                 disabled={busy}
               />
+            )}
+            {effectiveMode === "link" && (
+              <small className="muted">رابط https مباشر وعام. لا يتم تنزيل الملف على موقعك؛ المستخدم يُحوَّل إلى الرابط عند التحميل.</small>
             )}
           </div>
 
@@ -462,8 +578,28 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
             )}
           </div>
 
+          {categories.length > 0 && (
+            <div style={box}>
+              <strong>8. التصنيفات</strong>
+              <div style={choiceRow}>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={categoryIds.includes(category.id) ? "btn" : "btn secondary"}
+                    aria-pressed={categoryIds.includes(category.id)}
+                    disabled={busy}
+                    onClick={() => toggleCategory(category.id)}
+                  >
+                    {category.nameAr || category.nameEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <label style={box}>
-            <strong>8. الشرح</strong>
+            <strong>9. الشرح</strong>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={8} maxLength={8000} disabled={busy} />
           </label>
 
@@ -500,6 +636,7 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
                   <span className="badge">{item.type === "game" ? "لعبة" : "تطبيق"}</span>
                   {item.platform && <span className="badge">{item.platform}</span>}
                   {item.isMod && <span className="badge">MOD</span>}
+                  {item.version && <span className="badge" dir="ltr">v{item.version.replace(/^v/i, "")}</span>}
                   <span className="badge">{item.published ? "منشور" : "مخفي"}</span>
                 </div>
               </div>
@@ -508,6 +645,9 @@ export default function ContentManager({ items }: { items: ContentListItem[] }) 
               </a>
               <button type="button" className="btn" onClick={() => startEdit(item)} disabled={busy}>
                 تعديل
+              </button>
+              <button type="button" className="btn secondary" onClick={() => onDelete(item)} disabled={busy} style={{ color: "#f87171" }}>
+                حذف
               </button>
             </article>
           ))}

@@ -6,7 +6,7 @@ export default function AIBanner() {
     <section className={styles.aiBanner} aria-label="GameVortex AI">
       <div className={styles.aiImage}>
         <img
-          src="/images/home/file_0000000093788243a14953a1be8bcb87.png"
+          src="/images/home/ai-banner.webp"
           alt="GameVortex AI"
           loading="lazy"
         />

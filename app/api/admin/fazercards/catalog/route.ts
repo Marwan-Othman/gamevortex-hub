@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireOwner } from "@/lib/auth";
-import { guardRead } from "@/lib/api";
+import { guardRead, publicErrorCode } from "@/lib/api";
 import { getFazerCardsCards } from "@/lib/integrations/fazercards";
 import { getAllFazerCardsCategories } from "@/lib/integrations/fazercards-categories";
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       {
         ok: false,
         error: "FAZERCARDS_REQUEST_FAILED",
-        detail: error instanceof Error ? error.message : "Unknown error",
+        detail: publicErrorCode(error, "Unknown error"),
       },
       { status: 502 },
     );

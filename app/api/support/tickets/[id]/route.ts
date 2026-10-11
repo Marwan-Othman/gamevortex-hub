@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -50,7 +50,7 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_TICKET_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_TICKET_FAILED");
     return NextResponse.json(
       { error: message },
       { status: message === "UNAUTHORIZED" ? 401 : 500 },
@@ -119,7 +119,7 @@ export async function POST(
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "SUPPORT_REPLY_FAILED";
+    const message = publicErrorCode(error, "SUPPORT_REPLY_FAILED");
     const status =
       message === "UNAUTHORIZED"
         ? 401

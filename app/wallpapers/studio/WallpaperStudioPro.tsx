@@ -119,7 +119,7 @@ export default function WallpaperStudioPro({ library }: { library: { id: string;
       </div>
     </section>
 
-    <section style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 380px",gap:18,marginTop:18,alignItems:"start"}}>
+    <section className="gv-m-split" style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 380px",gap:18,marginTop:18,alignItems:"start"}}>
       <div className="glass card" style={{padding:16,display:"grid",placeItems:"center"}}>
         <div style={{width:"min(100%,390px)",background:"#07090d",padding:7,borderRadius:34,boxShadow:"0 25px 70px rgba(0,0,0,.55)"}}><canvas ref={canvasRef} width={W} height={H} onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{display:"block",width:"100%",height:"auto",borderRadius:28,touchAction:"none"}} aria-label="معاينة خلفية الهاتف" /></div>
         <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap",justifyContent:"center"}}><span className="badge">{target==='both'?'الرئيسية + القفل':target==='home'?'الشاشة الرئيسية':'شاشة القفل'}</span><span className="badge">1080×1920</span></div>

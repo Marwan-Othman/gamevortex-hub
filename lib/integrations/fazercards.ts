@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../fetch-timeout";
 const FAZERCARDS_BASE_URL = "https://api.fzr.cards/api/v2";
 
 type FazerCardsRequestOptions = {
@@ -119,15 +120,21 @@ async function fazerCardsRequest<T>(
   }
 
   for (let attempt = 1; ; attempt += 1) {
-    const response = await fetch(`${FAZERCARDS_BASE_URL}${path}`, {
-      method,
-      headers,
-      body:
-        options.body === undefined
-          ? undefined
-          : JSON.stringify(options.body),
-      cache: "no-store",
-    });
+    // Deadline: reads 15s, purchases (POST) 30s. A timed-out purchase is reported as a failure to the caller;
+    // the Idempotency-Key header (when provided) makes a later retry safe.
+    const response = await fetchWithTimeout(
+      `${FAZERCARDS_BASE_URL}${path}`,
+      {
+        method,
+        headers,
+        body:
+          options.body === undefined
+            ? undefined
+            : JSON.stringify(options.body),
+        cache: "no-store",
+      },
+      method === "GET" ? 15_000 : 30_000,
+    );
 
     const text = await response.text();
 

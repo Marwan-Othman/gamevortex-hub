@@ -1,11 +1,12 @@
-import { redirect } from "next/navigation";
-import { getOptionalUser } from "@/lib/auth";
+import { getOwnerOrAccessScreen } from "@/lib/admin-access";
 import AiAdminMonitor from "@/components/ai/AiAdminMonitor";
 
 export const dynamic = "force-dynamic";
 
 export default async function AiAdminPage() {
-  const user = await getOptionalUser();
-  if (!user || user.role !== "SUPER_ADMIN") redirect("/");
+  // Same owner gate as every other admin page: a logged-out visitor sees a
+  // "log in" screen instead of being silently bounced to the home page.
+  const gate = await getOwnerOrAccessScreen();
+  if ("screen" in gate) return gate.screen;
   return <AiAdminMonitor />;
 }

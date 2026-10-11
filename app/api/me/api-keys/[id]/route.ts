@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -18,7 +18,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     if (!updated.count) return NextResponse.json({ error: "API_KEY_NOT_FOUND" }, { status: 404 });
     return NextResponse.json({ ok: true, revoked: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "API_KEY_REVOKE_FAILED";
+    const message = publicErrorCode(error, "API_KEY_REVOKE_FAILED");
     return NextResponse.json({ error: message }, { status: message === "UNAUTHORIZED" ? 401 : 500 });
   }
 }

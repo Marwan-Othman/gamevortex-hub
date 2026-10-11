@@ -37,7 +37,8 @@ export default function ApiAccessClient() {
   useEffect(() => { void load().catch(() => setError("تعذر تحميل حالة الوصول.")); }, []);
   useEffect(() => {
     if (paymentStatus !== "PENDING") return;
-    const interval = window.setInterval(() => void load().catch(() => undefined), 5_000);
+    // Poll only while the tab is visible: a hidden tab does not need a request every 5 s.
+    const interval = window.setInterval(() => { if (!document.hidden) void load().catch(() => undefined); }, 5_000);
     return () => window.clearInterval(interval);
   }, [paymentStatus]);
 

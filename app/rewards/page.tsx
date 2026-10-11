@@ -117,7 +117,8 @@ export default async function RewardsPage() {
     },
     select: { id: true },
   });
-  const isVip = Boolean(activeVipSubscription);
+  // Owner VIP is permanent and comes from the role, not from a subscription row.
+  const isVip = user.role === "SUPER_ADMIN" || Boolean(activeVipSubscription);
   const pointValueCents = pointsToValueCents(Math.max(0, user.points), isVip);
   const pointLedger = await getPointLedger(user.id, 10);
 

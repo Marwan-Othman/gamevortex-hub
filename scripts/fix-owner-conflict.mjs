@@ -24,13 +24,18 @@ const apply = process.argv.includes('--apply');
 try {
   const targetEmail = process.env.OWNER_EMAIL?.trim().toLowerCase();
   if (!targetEmail) {
-    throw new Error('OWNER_EMAIL is not set in this environment. Set it first (e.g. to marwan.hoshiya.2002@gmail.com), then re-run.');
+    throw new Error('OWNER_EMAIL is not set in this environment. Set it first to the owner e-mail address, then re-run.');
   }
 
   const targetUser = await db.user.findUnique({ where: { email: targetEmail } });
   if (!targetUser) {
     throw new Error(`No user found with email ${targetEmail}. That account must already exist (register it first) — this script never creates accounts.`);
   }
+
+  // SECURITY: registration does not verify e-mail ownership. Only promote this account if YOU created it
+  // (you know its password). If it may have been pre-registered by someone else, run `npm run production:seed`
+  // instead: it resets the password to OWNER_INITIAL_PASSWORD when promoting an existing account.
+  console.log('WARNING: confirm that the account below was registered by you before applying.');
 
   const currentOwners = await db.user.findMany({
     where: { role: Role.SUPER_ADMIN },

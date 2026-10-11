@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guardMutation } from "@/lib/api";
+import { guardMutation, publicErrorCode } from "@/lib/api";
 import { requireTradingOwner, tradingErrorStatus, tradingForbidden } from "@/lib/trading/access";
 import { releaseAllocation } from "@/lib/trading/allocation";
 import { logSystemError } from "@/lib/observability";
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const result = await releaseAllocation({ ownerId: owner.id, allocationId: id });
     return NextResponse.json({ ok: true, allocationId: result.allocationId, amountUsd: result.amountUsd, points: result.points });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "INTERNAL_ERROR";
+    const message = publicErrorCode(error, "INTERNAL_ERROR");
     if (message === "FORBIDDEN") return tradingForbidden();
     const status = tradingErrorStatus(message);
     if (status) return NextResponse.json({ error: message }, { status });

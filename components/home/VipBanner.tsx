@@ -6,7 +6,7 @@ export default function VipBanner() {
     <section className={styles.vip} aria-label="GameVortex VIP">
       <div className={styles.vipImage}>
         <img
-          src="/images/home/file_000000007ab48246b7019f1f25684392.png"
+          src="/images/home/vip-banner.webp"
           alt="GameVortex VIP"
           loading="lazy"
         />
