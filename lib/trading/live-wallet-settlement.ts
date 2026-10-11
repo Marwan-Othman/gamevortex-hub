@@ -77,6 +77,33 @@ function assertProviderExitFillMatchesOrder(
     throw new Error("SETTLEMENT_EXIT_EXECUTION_DATA_REQUIRED");
   }
 
+  // Never let malformed provider fill values flow into aggregate comparisons:
+  // Decimal NaN comparisons can otherwise fail open in some predicate patterns.
+  for (const fill of fills.fills) {
+    let qty: Prisma.Decimal;
+    let quoteQty: Prisma.Decimal;
+    let commission: Prisma.Decimal;
+    try {
+      qty = new Prisma.Decimal(fill.qty);
+      quoteQty = new Prisma.Decimal(fill.quoteQty);
+      commission = new Prisma.Decimal(fill.commission);
+    } catch {
+      throw new Error("SETTLEMENT_EXIT_FILL_NUMERIC_VALUE_INVALID");
+    }
+    if (!qty.isFinite() || qty.lessThanOrEqualTo(0)) {
+      throw new Error("SETTLEMENT_EXIT_FILL_QTY_INVALID");
+    }
+    if (!quoteQty.isFinite() || quoteQty.lessThanOrEqualTo(0)) {
+      throw new Error("SETTLEMENT_EXIT_FILL_QUOTE_QTY_INVALID");
+    }
+    if (!commission.isFinite() || commission.lessThan(0)) {
+      throw new Error("SETTLEMENT_EXIT_FILL_COMMISSION_INVALID");
+    }
+    if (typeof fill.commissionAsset !== "string" || !fill.commissionAsset.trim()) {
+      throw new Error("SETTLEMENT_EXIT_FILL_COMMISSION_ASSET_REQUIRED");
+    }
+  }
+
   const totalQty = fills.fills.reduce(
     (total, fill) => total.add(new Prisma.Decimal(fill.qty)),
     new Prisma.Decimal(0),
