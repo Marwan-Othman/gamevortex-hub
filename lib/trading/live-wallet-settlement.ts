@@ -189,8 +189,9 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         const current = lockedRows[0];
         if (!current) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
         if (current.settlementStatus === "SETTLED") return current;
+        // Reject cross-owner access without mutating another owner's order.
         if (current.ownerId !== input.ownerId) {
-          return blockSettlement(tx, current.id, "SETTLEMENT_OWNER_MISMATCH");
+          throw new Error("SETTLEMENT_OWNER_MISMATCH");
         }
         if (current.status === "CLOSED" && current.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
           return blockSettlement(tx, current.id, blocker);
@@ -238,9 +239,9 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     const order = lockedRows[0];
     if (!order) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
 
+    // Reject cross-owner access without mutating another owner's order.
     if (order.ownerId !== input.ownerId) {
-      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_OWNER_MISMATCH");
-      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_OWNER_MISMATCH"] };
+      throw new Error("SETTLEMENT_OWNER_MISMATCH");
     }
 
     if (order.settlementStatus === "SETTLED") {
