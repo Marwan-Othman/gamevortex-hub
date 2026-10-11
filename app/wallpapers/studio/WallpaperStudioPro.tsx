@@ -66,6 +66,22 @@ export default function WallpaperStudioPro({ library }: { library: { id: string;
       setStatus("تعذر قراءة التصميمات المحفوظة من هذا الجهاز.");
     }
   }, []);
+  useEffect(() => {
+    const refreshDateLayers = () => {
+      const current = dates();
+      setLayers((existing) => existing.map((layer) => {
+        if (layer.kind === "clock") return { ...layer, text: current.clock };
+        if (layer.kind === "date") return { ...layer, text: current.date };
+        if (layer.kind === "hijri") return { ...layer, text: current.hijri };
+        return layer;
+      }));
+    };
+
+    refreshDateLayers();
+    const interval = window.setInterval(refreshDateLayers, 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   useEffect(() => () => { if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current); }, []);
 
   function draw() {
