@@ -106,9 +106,40 @@ describe("calculateLiveSpotNetExitProceeds", () => {
       exitExecutedQty: "0.01",
       exitQuoteQty: "110",
       exitFees: [{ commission: "0.00001", commissionAsset: "BTC" }],
+      baseAssetFeeQuoteValues: ["0.11"],
     });
 
     expect(result.netExitQuoteProceeds.toString()).toBe("109.89");
+  });
+
+  it("values base-asset commissions per individual fill, not the blended order price", () => {
+    const result = calculateLiveSpotNetExitProceeds({
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      exitExecutedQty: "1",
+      exitQuoteQty: "200",
+      exitFees: [
+        { commission: "0.01", commissionAsset: "BTC" },
+        { commission: "0.01", commissionAsset: "BTC" },
+      ],
+      // Fill prices are 100 and 300; fee quote values are 1 and 3.
+      // The blended order price would incorrectly value the fees at 4 total
+      // only coincidentally here, so use unequal fee quantities to distinguish.
+      baseAssetFeeQuoteValues: ["1", "3"],
+    });
+
+    expect(result.baseAssetFeeQuoteValue.toString()).toBe("4");
+    expect(result.netExitQuoteProceeds.toString()).toBe("196");
+  });
+
+  it("requires exact per-fill quote values for base-asset exit fees", () => {
+    expect(() => calculateLiveSpotNetExitProceeds({
+      baseAsset: "BTC",
+      quoteAsset: "USDT",
+      exitExecutedQty: "1",
+      exitQuoteQty: "200",
+      exitFees: [{ commission: "0.01", commissionAsset: "BTC" }],
+    })).toThrow("BASE_ASSET_FEE_QUOTE_CONVERSION_REQUIRED");
   });
 
   it("requires exact conversion for third-asset exit fees", () => {
