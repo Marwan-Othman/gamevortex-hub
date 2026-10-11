@@ -122,6 +122,26 @@ describe("live order reconciliation", () => {
     }
   });
 
+  it("rejects non-finite quantities and prices from the provider", () => {
+    for (const value of ["NaN", "Infinity", "-Infinity"]) {
+      const result = reconcileLiveOrderObservation(
+        intent,
+        observation({
+          executedQty: value,
+          cumulativeQuoteQty: value,
+          averageFillPrice: value,
+        }),
+      );
+
+      expect(result.status).toBe("MISMATCHED");
+      if (result.status === "MISMATCHED") {
+        expect(result.reasons).toContain("INVALID_EXECUTED_QTY");
+        expect(result.reasons).toContain("INVALID_CUMULATIVE_QUOTE_QTY");
+        expect(result.reasons).toContain("INVALID_AVERAGE_FILL_PRICE");
+      }
+    }
+  });
+
   it("rejects malformed provider quantities and timestamps", () => {
     const result = reconcileLiveOrderObservation(
       intent,
