@@ -15,7 +15,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.net.http.SslError
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
 import android.graphics.Color
 
 class MainActivity : Activity() {
@@ -123,11 +122,12 @@ class MainActivity : Activity() {
             webView.restoreState(savedInstanceState)
         }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else finish()
-            }
-        })
+    
+    }
+
+    @Deprecated("Deprecated in Android API")
+    override fun onBackPressed() {
+        if (::webView.isInitialized && webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
     @Deprecated("Deprecated in Android API, retained for WebView file chooser compatibility")
