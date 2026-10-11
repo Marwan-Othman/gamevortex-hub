@@ -39,7 +39,7 @@ const STRATEGY_VERSION = "owner-manual-v1";
  * independently verified. The explicit void return type keeps TypeScript
  * checking the downstream path while runtime execution still always throws.
  */
-function assertLiveAccountingReady(): void {
+function assertLiveAccountingReady(): never {
   throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
 }
 
