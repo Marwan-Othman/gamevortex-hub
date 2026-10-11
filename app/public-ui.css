@@ -10,7 +10,11 @@ body { min-height: 100dvh; }
 /* Never let the page scroll sideways */
 html, body { overflow-x: clip; }
 .gv-app-main img, .gv-app-main video { max-width: 100%; height: auto; }
-.gv-app-main h1, .gv-app-main h2, .gv-app-main h3 { overflow-wrap: anywhere; }
+.gv-app-main h1, .gv-app-main h2, .gv-app-main h3 {
+  overflow-wrap: break-word;
+  word-break: normal;
+  min-width: 0;
+}
 
 /* Keyboard focus must be visible everywhere */
 .gv-app-main a:focus-visible, .gv-app-main button:focus-visible,

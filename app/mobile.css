@@ -8,8 +8,17 @@
 img, video, canvas, svg, iframe { max-width: 100%; }
 img, video { height: auto; }
 .gv-app-main { min-width: 0; }
+/* Do not use overflow-wrap:anywhere on all UI text: it reduces min-content
+   width and can collapse flex/grid children to one character per line on
+   narrow Android WebViews. Break long tokens only when truly necessary. */
 .gv-app-main :where(h1, h2, h3, h4, p, li, td, th, label, a, span, small, strong) {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
+  min-width: 0;
+}
+/* Keep paragraph and heading text readable in constrained mobile layouts. */
+.gv-app-main :where(h1, h2, h3, h4, p, li, td, th, label, a, span, small, strong) {
+  line-break: auto;
 }
 .gv-app-main :where(pre, code) { max-width: 100%; overflow-x: auto; overflow-wrap: anywhere; }
 .gv-app-main :where(pre) { white-space: pre-wrap; }
