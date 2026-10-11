@@ -274,7 +274,7 @@ export default function TradingLiveOrderPanel() {
 
   const blocked = Boolean(control && control.blockReasons.length > 0);
   const phraseOk = confirmText === CONFIRM_PHRASE;
-  const canExecute = Boolean(prepared) && secondsLeft > 0 && phraseOk && !busy;
+  const canExecute = Boolean(prepared) && secondsLeft > 0 && phraseOk && !busy && control !== null && !blocked;
 
   return (
     <section className={styles.panel}>
