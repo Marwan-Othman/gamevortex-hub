@@ -8,6 +8,7 @@ export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLE
 
 type LiveOrderSettlementRow = LiveOrderRow & {
   settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
+  settlementError: string | null;
   exitProviderOrderId: string | null;
   exitExecutedQty: Prisma.Decimal | null;
   exitCumulativeQuoteQty: Prisma.Decimal | null;
@@ -187,6 +188,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         `);
         const current = lockedRows[0];
         if (!current) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
+        if (current.settlementStatus === "SETTLED") return current;
         if (current.ownerId !== input.ownerId) {
           return blockSettlement(tx, current.id, "SETTLEMENT_OWNER_MISMATCH");
         }
@@ -205,13 +207,24 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           blockers: [],
         };
       }
+      if (blockedOrder.settlementStatus === "BLOCKED") {
+        const persistedBlocker = blockedOrder.settlementError || blocker;
+        return {
+          order: blockedOrder,
+          status: "BLOCKED",
+          settledUsd: null,
+          settledPoints: null,
+          roundingUsd: null,
+          blockers: [persistedBlocker],
+        };
+      }
       return {
         order: blockedOrder,
-        status: blockedOrder.settlementStatus === "BLOCKED" ? "BLOCKED" : "ALREADY_SETTLED",
+        status: "BLOCKED",
         settledUsd: null,
         settledPoints: null,
         roundingUsd: null,
-        blockers: blockedOrder.settlementStatus === "BLOCKED" ? [blocker] : [],
+        blockers: ["SETTLEMENT_STATE_CHANGED_DURING_FEE_CHECK"],
       };
     }
 
