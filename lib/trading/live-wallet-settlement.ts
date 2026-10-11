@@ -184,6 +184,16 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           commission: fill.commission,
           commissionAsset: fill.commissionAsset,
         })),
+        // Base-asset fees must be valued at the price of the individual fill
+        // that charged them, not at a blended order-average price.
+        baseAssetFeeQuoteValues: fills.fills
+          .filter((fill) => fill.commissionAsset.trim().toUpperCase() === fills.baseAsset.trim().toUpperCase())
+          .map((fill) =>
+            new Prisma.Decimal(fill.commission)
+              .mul(new Prisma.Decimal(fill.quoteQty))
+              .div(new Prisma.Decimal(fill.qty))
+              .toString(),
+          ),
       });
     } catch (error) {
       // This specific error is deterministic: the exchange charged a third
