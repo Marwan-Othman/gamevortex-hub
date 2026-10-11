@@ -49,11 +49,14 @@ export type LiveSpotExitFeeAccountingInput = {
   exitFees: readonly LiveTradeFee[];
   /** Exact quote-asset value for third-asset commissions, when available. */
   thirdAssetFeeQuoteValues?: readonly string[];
+  /** Exact quote value per base-asset commission, calculated from its own fill price. */
+  baseAssetFeeQuoteValues?: readonly string[];
 };
 
 export type LiveSpotExitFeeAccountingResult = {
   exitBaseCommission: Prisma.Decimal;
   exitQuoteFees: Prisma.Decimal;
+  baseAssetFeeQuoteValue: Prisma.Decimal;
   thirdAssetFeeQuoteValue: Prisma.Decimal;
   netExitQuoteProceeds: Prisma.Decimal;
 };
@@ -79,9 +82,10 @@ function sumFees(
   fees: readonly LiveTradeFee[],
   baseAsset: string,
   quoteAsset: string,
-): { base: Prisma.Decimal; quote: Prisma.Decimal; thirdCount: number } {
+): { base: Prisma.Decimal; quote: Prisma.Decimal; baseCount: number; thirdCount: number } {
   let base = new Prisma.Decimal(0);
   let quote = new Prisma.Decimal(0);
+  let baseCount = 0;
   let thirdCount = 0;
 
   for (const fee of fees) {
@@ -90,6 +94,7 @@ function sumFees(
 
     if (commissionAsset === baseAsset) {
       base = base.add(amount);
+      baseCount += 1;
     } else if (commissionAsset === quoteAsset) {
       quote = quote.add(amount);
     } else {
@@ -97,7 +102,20 @@ function sumFees(
     }
   }
 
-  return { base, quote, thirdCount };
+  return { base, quote, baseCount, thirdCount };
+}
+
+function resolveBaseAssetFeeQuoteValue(
+  values: readonly string[] | undefined,
+  baseAssetCount: number,
+): Prisma.Decimal {
+  const baseAssetValues = (values ?? []).map((value) =>
+    decimal(value, "INVALID_BASE_ASSET_FEE_QUOTE_VALUE"),
+  );
+  if (baseAssetValues.length !== baseAssetCount) {
+    throw new Error("BASE_ASSET_FEE_QUOTE_CONVERSION_REQUIRED");
+  }
+  return baseAssetValues.reduce((total, value) => total.add(value), new Prisma.Decimal(0));
 }
 
 function resolveThirdAssetFeeValue(
@@ -136,9 +154,10 @@ export function calculateLiveSpotNetExitProceeds(
     input.thirdAssetFeeQuoteValues,
     exit.thirdCount,
   );
-
-  const exitAverageFillPrice = exitQuote.div(exitQty);
-  const exitBaseFeeQuoteValue = exit.base.mul(exitAverageFillPrice);
+  const exitBaseFeeQuoteValue = resolveBaseAssetFeeQuoteValue(
+    input.baseAssetFeeQuoteValues,
+    exit.baseCount,
+  );
   if (exit.base.greaterThanOrEqualTo(exitQty)) {
     throw new Error("EXIT_BASE_QTY_CONSUMED_BY_FEES");
   }
@@ -155,6 +174,7 @@ export function calculateLiveSpotNetExitProceeds(
   return {
     exitBaseCommission: exit.base,
     exitQuoteFees: exit.quote,
+    baseAssetFeeQuoteValue: exitBaseFeeQuoteValue,
     thirdAssetFeeQuoteValue,
     netExitQuoteProceeds,
   };
