@@ -123,7 +123,20 @@ export default function WallpaperStudioPro({ library, isVip }: { library: { id: 
     persistDesigns([design,...savedDesigns].slice(0,20)); setStatus("تم حفظ التصميم في «تصميماتي» على هذا الجهاز."); setTab("saved");
   }
   function loadDesign(design: SavedDesign) {
-    const nextTemplate=templates.find(x=>x.id===design.templateId)||templates[0]; setBackground(design.background); setLayers(JSON.parse(JSON.stringify(design.layers))); setName(design.layers.find(x=>x.kind==="name")?.text||design.name); setTemplate(nextTemplate); setEffect(design.effect); setTarget(design.target); setSelected(null); setStatus(`تم فتح «${design.name}».`); setTab("design");
+    const nextTemplate = templates.find((x) => x.id === design.templateId) || templates[0];
+    if (!isVip && (nextTemplate.vipOnly || design.effect === "vignette" || design.effect === "grain")) {
+      setStatus("هذا التصميم يحتوي على مزايا VIP. اشترك أو جدّد اشتراكك لفتحه.");
+      return;
+    }
+    setBackground(design.background);
+    setLayers(JSON.parse(JSON.stringify(design.layers)));
+    setName(design.layers.find((x) => x.kind === "name")?.text || design.name);
+    setTemplate(nextTemplate);
+    setEffect(design.effect);
+    setTarget(design.target);
+    setSelected(null);
+    setStatus(`تم فتح «${design.name}».`);
+    setTab("design");
   }
   function deleteDesign(designId:string){persistDesigns(savedDesigns.filter(x=>x.id!==designId));}
 
