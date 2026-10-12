@@ -37,7 +37,7 @@ function defaultLayers(name: string): Layer[] {
 
 const SAVED_KEY = "gamevortex:wallpaper-studio:designs:v1";
 
-export default function WallpaperStudioPro({ library, isVip }: { library: { id: string; title: string; src: string; isVip: boolean }[]; isVip: boolean }) {
+export default function WallpaperStudioPro({ library, isVip, isOwner }: { library: { id: string; title: string; src: string; isVip: boolean }[]; isVip: boolean; isOwner: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imageUrlRef = useRef<string | null>(null);
@@ -120,7 +120,7 @@ export default function WallpaperStudioPro({ library, isVip }: { library: { id: 
     if (!isVip && savedDesigns.length >= 3) { setStatus("الحساب المجاني يحفظ حتى 3 تصميمات. اشترك في VIP لحفظ حتى 20 تصميمًا."); return; }
     if (background.startsWith("blob:")) { setStatus("هذه الصورة مرفوعة من الهاتف ولا يمكن حفظها بشكل دائم في المتصفح. استخدم خلفية من مكتبة GameVortex أو نزّل التصميم."); return; }
     const design: SavedDesign = { id:id(), name:name.trim()||"GameVortex Design", background, layers:JSON.parse(JSON.stringify(layers)), templateId:template.id, effect, target, createdAt:new Date().toISOString() };
-    persistDesigns([design,...savedDesigns].slice(0,20)); setStatus("تم حفظ التصميم في «تصميماتي» على هذا الجهاز."); setTab("saved");
+    persistDesigns(isOwner ? [design,...savedDesigns] : [design,...savedDesigns].slice(0, isVip ? 20 : 3)); setStatus("تم حفظ التصميم في «تصميماتي» على هذا الجهاز."); setTab("saved");
   }
   function loadDesign(design: SavedDesign) {
     const nextTemplate = templates.find((x) => x.id === design.templateId) || templates[0];
@@ -144,7 +144,7 @@ export default function WallpaperStudioPro({ library, isVip }: { library: { id: 
   return <main className="wrap" dir="rtl" style={{maxWidth:1200,paddingBottom:36}}>
     <section className="glass hero" style={{padding:18}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"center",flexWrap:"wrap"}}>
-        <div><p className="muted" style={{margin:0}}>GAMEVORTEX WALLPAPER STUDIO</p><h1 style={{margin:"6px 0"}}>اصنع خلفيتك الخاصة</h1><p className="muted" style={{margin:0}}>قوالب Gaming + هوية اللاعب + معاينة شاشة القفل والرئيسية.</p><p className="muted" style={{margin:"6px 0 0",fontSize:13}}>{isVip ? "VIP نشط — جميع مزايا الاستوديو متاحة" : "الخطة المجانية — 3 تصميمات محفوظة وقوالب أساسية"} · <a href="/vip" style={{textDecoration:"underline"}}>مزايا VIP</a></p></div>
+        <div><p className="muted" style={{margin:0}}>GAMEVORTEX WALLPAPER STUDIO</p><h1 style={{margin:"6px 0"}}>اصنع خلفيتك الخاصة</h1><p className="muted" style={{margin:0}}>قوالب Gaming + هوية اللاعب + معاينة شاشة القفل والرئيسية.</p><p className="muted" style={{margin:"6px 0 0",fontSize:13}}>{isOwner ? "المالك — جميع المزايا دون حدّ اشتراك" : isVip ? "VIP نشط — جميع مزايا الاستوديو متاحة" : "الخطة المجانية — 3 تصميمات محفوظة وقوالب أساسية"} · <a href="/vip" style={{textDecoration:"underline"}}>مزايا VIP</a></p></div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{([['home','الرئيسية'],['lock','القفل'],['both','كلاهما']] as const).map(([v,l])=><button key={v} className={`platform-chip ${target===v?'active':''}`} onClick={()=>setTarget(v)}>{l}</button>)}<button className="btn secondary" onClick={saveDesign}>حفظ التصميم</button><button className="btn" onClick={exportImage}>تعيين / مشاركة</button></div>
       </div>
     </section>
