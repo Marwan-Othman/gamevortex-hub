@@ -5,15 +5,15 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 const W = 1080;
 const H = 1920;
 type Target = "home" | "lock" | "both";
-type Template = { id: string; name: string; description: string; overlay: string; accent: string };
+type Template = { id: string; name: string; description: string; overlay: string; accent: string; vipOnly?: boolean };
 type Layer = { id: string; kind: "clock" | "date" | "hijri" | "name" | "title"; text: string; x: number; y: number; size: number; color: string; opacity: number; visible: boolean };
 type SavedDesign = { id: string; name: string; background: string; layers: Layer[]; templateId: string; effect: "none" | "dim" | "vignette" | "grain"; target: Target; createdAt: string };
 
 const templates: Template[] = [
   { id: "cyber", name: "Cyber Neon", description: "نيون + ساعة رقمية + هوية Gaming", overlay: "rgba(20,70,150,.18)", accent: "#67e8f9" },
   { id: "minimal", name: "Minimal", description: "نظيف وهادئ للشاشة الرئيسية", overlay: "rgba(0,0,0,.12)", accent: "#ffffff" },
-  { id: "esports", name: "Esports", description: "اسم اللاعب + لقب احترافي", overlay: "rgba(130,20,50,.20)", accent: "#fb7185" },
-  { id: "islamic", name: "Hijri", description: "التاريخ الهجري بتصميم هادئ", overlay: "rgba(20,100,75,.18)", accent: "#86efac" },
+  { id: "esports", name: "Esports", description: "اسم اللاعب + لقب احترافي", overlay: "rgba(130,20,50,.20)", accent: "#fb7185", vipOnly: true },
+  { id: "islamic", name: "Hijri", description: "التاريخ الهجري بتصميم هادئ", overlay: "rgba(20,100,75,.18)", accent: "#86efac", vipOnly: true },
 ];
 
 function id() { return crypto.randomUUID(); }
@@ -37,7 +37,7 @@ function defaultLayers(name: string): Layer[] {
 
 const SAVED_KEY = "gamevortex:wallpaper-studio:designs:v1";
 
-export default function WallpaperStudioPro({ library }: { library: { id: string; title: string; src: string; isVip: boolean }[] }) {
+export default function WallpaperStudioPro({ library, isVip }: { library: { id: string; title: string; src: string; isVip: boolean }[]; isVip: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imageUrlRef = useRef<string | null>(null);
@@ -102,7 +102,7 @@ export default function WallpaperStudioPro({ library }: { library: { id: string;
   }
   useEffect(()=>{draw();},[background,layers,template,effect]);
 
-  function applyTemplate(next: Template) { setTemplate(next); setLayers(defaultLayers(name)); setStatus(`تم تطبيق قالب ${next.name}`); }
+  function applyTemplate(next: Template) { if (next.vipOnly && !isVip) { setStatus("هذا القالب حصري لمشتركي VIP. افتح صفحة VIP للاشتراك."); return; } setTemplate(next); setLayers(defaultLayers(name)); setStatus(`تم تطبيق قالب ${next.name}`); }
   function updateSelected(patch: Partial<Layer>) { if (!selected) return; setLayers(x=>x.map(l=>l.id===selected?{...l,...patch}:l)); }
   function point(e: React.PointerEvent<HTMLCanvasElement>) { const r=e.currentTarget.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H}; }
   function pick(p:{x:number;y:number}) { for(const l of [...layers].reverse()){const s=l.size*1.5;if(Math.abs(p.x-l.x)<s*2.1&&Math.abs(p.y-l.y)<s*.9)return l.id;} return null; }
@@ -117,6 +117,7 @@ export default function WallpaperStudioPro({ library }: { library: { id: string;
     catch { setStatus("تعذر حفظ التصميم. مساحة التخزين في المتصفح قد تكون ممتلئة."); }
   }
   function saveDesign() {
+    if (!isVip && savedDesigns.length >= 3) { setStatus("الحساب المجاني يحفظ حتى 3 تصميمات. اشترك في VIP لحفظ حتى 20 تصميمًا."); return; }
     if (background.startsWith("blob:")) { setStatus("هذه الصورة مرفوعة من الهاتف ولا يمكن حفظها بشكل دائم في المتصفح. استخدم خلفية من مكتبة GameVortex أو نزّل التصميم."); return; }
     const design: SavedDesign = { id:id(), name:name.trim()||"GameVortex Design", background, layers:JSON.parse(JSON.stringify(layers)), templateId:template.id, effect, target, createdAt:new Date().toISOString() };
     persistDesigns([design,...savedDesigns].slice(0,20)); setStatus("تم حفظ التصميم في «تصميماتي» على هذا الجهاز."); setTab("saved");
@@ -130,7 +131,7 @@ export default function WallpaperStudioPro({ library }: { library: { id: string;
   return <main className="wrap" dir="rtl" style={{maxWidth:1200,paddingBottom:36}}>
     <section className="glass hero" style={{padding:18}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"center",flexWrap:"wrap"}}>
-        <div><p className="muted" style={{margin:0}}>GAMEVORTEX WALLPAPER STUDIO</p><h1 style={{margin:"6px 0"}}>اصنع خلفيتك الخاصة</h1><p className="muted" style={{margin:0}}>قوالب Gaming + هوية اللاعب + معاينة شاشة القفل والرئيسية.</p></div>
+        <div><p className="muted" style={{margin:0}}>GAMEVORTEX WALLPAPER STUDIO</p><h1 style={{margin:"6px 0"}}>اصنع خلفيتك الخاصة</h1><p className="muted" style={{margin:0}}>قوالب Gaming + هوية اللاعب + معاينة شاشة القفل والرئيسية.</p><p className="muted" style={{margin:"6px 0 0",fontSize:13}}>{isVip ? "VIP نشط — جميع مزايا الاستوديو متاحة" : "الخطة المجانية — 3 تصميمات محفوظة وقوالب أساسية"} · <a href="/vip" style={{textDecoration:"underline"}}>مزايا VIP</a></p></div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{([['home','الرئيسية'],['lock','القفل'],['both','كلاهما']] as const).map(([v,l])=><button key={v} className={`platform-chip ${target===v?'active':''}`} onClick={()=>setTarget(v)}>{l}</button>)}<button className="btn secondary" onClick={saveDesign}>حفظ التصميم</button><button className="btn" onClick={exportImage}>تعيين / مشاركة</button></div>
       </div>
     </section>
@@ -143,8 +144,8 @@ export default function WallpaperStudioPro({ library }: { library: { id: string;
 
       <aside className="glass card" style={{padding:14}}>
         <div className="platform-list" style={{marginBottom:12}}>{([['templates','القوالب'],['design','التخصيص'],['saved','تصميماتي']] as const).map(([v,l])=><button key={v} className={`platform-chip ${tab===v?'active':''}`} onClick={()=>setTab(v)}>{l}</button>)}</div>
-        {tab==='templates'&&<div style={{display:"grid",gap:9}}>{templates.map(t=><button key={t.id} onClick={()=>applyTemplate(t)} style={{textAlign:"right",padding:12,borderRadius:14,border:`1px solid ${template.id===t.id?t.accent:'rgba(255,255,255,.1)'}`,background:"rgba(255,255,255,.03)",color:"inherit",cursor:"pointer"}}><strong>{t.name}</strong><div className="muted" style={{fontSize:13,marginTop:4}}>{t.description}</div></button>)}<button className="btn secondary" onClick={()=>fileRef.current?.click()}>＋ صورة من الهاتف</button><input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={upload} hidden/><div className="muted" style={{fontSize:13}}>أو اختر من مكتبة GameVortex</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7}}>{library.slice(0,9).map(x=><button key={x.id} onClick={()=>setBackground(x.src)} style={{padding:0,border:0,borderRadius:9,overflow:"hidden",background:"#111"}}><img src={x.src} alt="" loading="lazy" style={{display:"block",width:"100%",aspectRatio:"9/14",objectFit:"cover"}}/></button>)}</div></div>}
-        {tab==='design'&&<div style={{display:"grid",gap:10}}><label>اسم اللاعب<input className="input" value={name} maxLength={24} onChange={e=>{setName(e.target.value);setLayers(x=>x.map(l=>l.kind==='name'?{...l,text:e.target.value}:l));}}/></label><label>التأثير<select className="input" value={effect} onChange={e=>setEffect(e.target.value as typeof effect)}><option value="none">بدون</option><option value="dim">تعتيم</option><option value="vignette">Vignette</option><option value="grain">Grain</option></select></label>{selectedLayer?<div style={{display:"grid",gap:8,borderTop:"1px solid rgba(255,255,255,.1)",paddingTop:10}}><label>النص<input className="input" value={selectedLayer.text} onChange={e=>updateSelected({text:e.target.value})}/></label><label>الحجم<input type="range" min="20" max="220" value={selectedLayer.size} onChange={e=>updateSelected({size:Number(e.target.value)})}/></label><label>الشفافية<input type="range" min=".1" max="1" step=".05" value={selectedLayer.opacity} onChange={e=>updateSelected({opacity:Number(e.target.value)})}/></label><input type="color" value={selectedLayer.color} onChange={e=>updateSelected({color:e.target.value})}/><button className="btn secondary" onClick={()=>updateSelected({visible:!selectedLayer.visible})}>{selectedLayer.visible?'إخفاء العنصر':'إظهار العنصر'}</button></div>:<p className="muted">اضغط على الساعة أو النص داخل المعاينة لتحديده وتحريكه.</p>}<button className="btn secondary" onClick={()=>setLayers(defaultLayers(name))}>إعادة التصميم</button></div>}
+        {tab==='templates'&&<div style={{display:"grid",gap:9}}>{templates.map(t=><button key={t.id} onClick={()=>applyTemplate(t)} style={{textAlign:"right",padding:12,borderRadius:14,border:`1px solid ${template.id===t.id?t.accent:'rgba(255,255,255,.1)'}`,background:"rgba(255,255,255,.03)",color:"inherit",cursor:"pointer"}}><strong>{t.name}{t.vipOnly ? (isVip ? " · VIP" : " · 🔒 VIP") : ""}</strong><div className="muted" style={{fontSize:13,marginTop:4}}>{t.description}</div></button>)}<button className="btn secondary" onClick={()=>fileRef.current?.click()}>＋ صورة من الهاتف</button><input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={upload} hidden/><div className="muted" style={{fontSize:13}}>أو اختر من مكتبة GameVortex</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7}}>{library.slice(0,9).map(x=><button key={x.id} onClick={()=>setBackground(x.src)} style={{padding:0,border:0,borderRadius:9,overflow:"hidden",background:"#111"}}><img src={x.src} alt="" loading="lazy" style={{display:"block",width:"100%",aspectRatio:"9/14",objectFit:"cover"}}/></button>)}</div></div>}
+        {tab==='design'&&<div style={{display:"grid",gap:10}}><label>اسم اللاعب<input className="input" value={name} maxLength={24} onChange={e=>{setName(e.target.value);setLayers(x=>x.map(l=>l.kind==='name'?{...l,text:e.target.value}:l));}}/></label><label>التأثير<select className="input" value={effect} onChange={e=>{const next=e.target.value as typeof effect;if((next==="vignette"||next==="grain")&&!isVip){setStatus("هذا التأثير حصري لمشتركي VIP.");return;}setEffect(next);}}><option value="none">بدون</option><option value="dim">تعتيم</option><option value="vignette" disabled={!isVip}>Vignette{isVip ? "" : " · VIP"}</option><option value="grain" disabled={!isVip}>Grain{isVip ? "" : " · VIP"}</option></select></label>{selectedLayer?<div style={{display:"grid",gap:8,borderTop:"1px solid rgba(255,255,255,.1)",paddingTop:10}}><label>النص<input className="input" value={selectedLayer.text} onChange={e=>updateSelected({text:e.target.value})}/></label><label>الحجم<input type="range" min="20" max="220" value={selectedLayer.size} onChange={e=>updateSelected({size:Number(e.target.value)})}/></label><label>الشفافية<input type="range" min=".1" max="1" step=".05" value={selectedLayer.opacity} onChange={e=>updateSelected({opacity:Number(e.target.value)})}/></label><input type="color" value={selectedLayer.color} onChange={e=>updateSelected({color:e.target.value})}/><button className="btn secondary" onClick={()=>updateSelected({visible:!selectedLayer.visible})}>{selectedLayer.visible?'إخفاء العنصر':'إظهار العنصر'}</button></div>:<p className="muted">اضغط على الساعة أو النص داخل المعاينة لتحديده وتحريكه.</p>}<button className="btn secondary" onClick={()=>setLayers(defaultLayers(name))}>إعادة التصميم</button></div>}
         {tab==='saved'&&<div style={{display:"grid",gap:10}}><div className="badge">تصميماتي على هذا الجهاز</div>{savedDesigns.length===0?<div className="muted" style={{lineHeight:1.7}}>لا توجد تصميمات محفوظة بعد. استخدم «حفظ التصميم» بعد اختيار خلفية من مكتبة GameVortex.</div>:savedDesigns.map(d=><div key={d.id} style={{display:"grid",gridTemplateColumns:"64px minmax(0,1fr) auto",gap:10,alignItems:"center",padding:8,border:"1px solid rgba(255,255,255,.1)",borderRadius:12}}><div style={{width:64,height:88,borderRadius:8,overflow:"hidden",background:"#111"}}><img src={d.background} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div><div style={{minWidth:0}}><strong style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</strong><span className="muted" style={{fontSize:12}}>{new Date(d.createdAt).toLocaleString("ar")}</span></div><div style={{display:"grid",gap:5}}><button className="btn secondary" onClick={()=>loadDesign(d)}>فتح</button><button className="btn secondary" onClick={()=>deleteDesign(d.id)}>حذف</button></div></div>)}</div>}
         {status&&<div className="badge" style={{marginTop:12,display:"block",whiteSpace:"normal"}}>{status}</div>}
       </aside>
