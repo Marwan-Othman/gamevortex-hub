@@ -38,7 +38,7 @@ export default async function WallpaperStudioPage() {
           ✨ Smart Merge — دمج عدة صور
         </a>
       </div>
-      <WallpaperStudioPro library={library} />
+      <WallpaperStudioPro library={library} isVip={vip?.isVip ?? false} />
       <StudioMergeImport />
     </>
   );
