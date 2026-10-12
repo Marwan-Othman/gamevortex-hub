@@ -131,7 +131,6 @@ export async function generateImage(input: {
         mime_type: "image/png",
         aspect_ratio: input.aspectRatio || "1:1",
         image_size: input.imageSize || process.env.GEMINI_IMAGE_SIZE?.trim() || "1K",
-        delivery: "inline",
       },
     }),
   }, input.signal, IMAGE_TIMEOUT_MS);
