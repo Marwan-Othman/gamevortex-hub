@@ -52,7 +52,8 @@ describe("generateImage response handling", () => {
       const body = JSON.parse(String(init?.body || "{}"));
       expect(body.model).toBe("gemini-3.1-flash-image");
       expect(body.input).toEqual("cat");
-      expect(body.response_format).toMatchObject({ type: "image", aspect_ratio: "9:16", image_size: "2K", delivery: "inline" });
+      expect(body.response_format).toMatchObject({ type: "image", aspect_ratio: "9:16", image_size: "2K" });
+      expect(body.response_format.delivery).toBeUndefined();
       return json({ steps: [{ type: "model_output", content: [{ type: "image", mime_type: "image/png", data: "iVBORw0KGgo=" }] }] });
     }) as typeof fetch;
     await generateImage({ prompt: "cat", aspectRatio: "9:16", imageSize: "2K" });
