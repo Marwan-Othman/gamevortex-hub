@@ -682,7 +682,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
         setStatus({ text: "وصلت إلى الحد الأقصى للطبقات (" + STUDIO_MAX_LAYERS + "). احذف طبقة ثم أعد المحاولة.", tone: "error" });
         return;
       }
-      layers.push(makeLayer({ kind: "clock", x: 540, y: 690, fontSize: 145, align: "center", color: "#FFFFFF", shadow: 18, glow: true }));
+      layers.push(makeLayer({ kind: "clock", x: 540, y: 690, fontSize: 145, align: "center", color: "#FFFFFF", shadow: 18, glow: vipOk }));
     }
     commit({ ...current, layers });
     setTab("layers");
