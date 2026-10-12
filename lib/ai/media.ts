@@ -75,7 +75,16 @@ async function request(path: string, init: RequestInit, signal?: AbortSignal, ti
 
 function modelOutput(payload: unknown, type: "image" | "video") {
   if (!payload || typeof payload !== "object") return null;
-  const steps = (payload as { steps?: unknown }).steps;
+  const response = payload as { steps?: unknown; output_image?: unknown; output_video?: unknown };
+
+  // The Interactions API exposes generated media both in model_output steps
+  // and, for image responses, as the convenience output_image field.
+  const direct = type === "image" ? response.output_image : response.output_video;
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) {
+    return direct as Record<string, unknown>;
+  }
+
+  const steps = response.steps;
   if (!Array.isArray(steps)) return null;
 
   for (const step of steps) {
