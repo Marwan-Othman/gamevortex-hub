@@ -634,14 +634,16 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
       const blob = await response.blob();
       if (!blob.size || !blob.type.startsWith("image/")) throw new Error("INVALID_AI_IMAGE");
       let id = uid();
+      let savedLocally = true;
       try {
         id = await putLocalImage(blob);
       } catch {
         // Keep the result usable for this session even if local storage is full.
-        setStatus({ text: "اكتمل التحسين، لكن تعذر حفظ النسخة في تخزين الجهاز؛ ستبقى متاحة حتى إغلاق الصفحة.", tone: "error" });
+        savedLocally = false;
+        unpersisted.current.add(id);
       }
       sessionBlobs.current.set(id, blob);
-      unpersisted.current.delete(id);
+      if (savedLocally) unpersisted.current.delete(id);
 
       // Reflow live layers after the background edit; every element remains editable.
       let textIndex = 0;
@@ -667,7 +669,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
       commit({ ...docRef.current, layers });
       setBg({ kind: "local", localId: id });
       await refreshLocalImages();
-      setStatus({ text: "تم تحسين الإضاءة والتكوين بالذكاء الاصطناعي، وأُعيد ترتيب الساعة والنصوص. كل الطبقات ما زالت قابلة للتحريك والتعديل.", tone: "ok" });
+      setStatus({ text: savedLocally ? "تم تحسين الإضاءة والتكوين بالذكاء الاصطناعي، وأُعيد ترتيب الساعة والنصوص. كل الطبقات ما زالت قابلة للتحريك والتعديل." : "اكتمل التحسين والترتيب، لكن تخزين الجهاز ممتلئ؛ النتيجة متاحة حتى إغلاق الصفحة فقط.", tone: savedLocally ? "ok" : "error" });
     } catch {
       setStatus({ text: "تعذر إكمال التحسين. بقيت الخلفية والتصميم الحاليان كما هما.", tone: "error" });
     } finally {
@@ -1189,7 +1191,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
         .wsx label{display:grid;gap:6px;font-size:14px}
         .wsx input[type=range]{width:100%}
         .wsx .input{width:100%}
-        @media(max-width:900px){.wsx-grid{grid-template-columns:1fr}.wsx-tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding:3px 1px 8px;scrollbar-width:thin}.wsx-tabs>.platform-chip{flex:0 0 auto;white-space:nowrap}.wsx-grid>aside{min-width:0}.wsx-grid>div{min-width:0}.wsx-grid canvas{max-height:62dvh;object-fit:contain}.wsx-row .btn{min-height:42px}}
+        @media(max-width:900px){.wsx-grid{grid-template-columns:1fr}.wsx-tabs{position:sticky;top:6px;z-index:5;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding:8px 6px;background:rgba(10,15,30,.96);backdrop-filter:blur(14px);border-radius:14px;scrollbar-width:thin}.wsx-tabs>.platform-chip{flex:0 0 auto;white-space:nowrap}.wsx-grid>aside{min-width:0}.wsx-grid>div{min-width:0}.wsx-grid canvas{max-height:62dvh;object-fit:contain}.wsx-row .btn{min-height:42px}}
       `}</style>
     </main>
   );
