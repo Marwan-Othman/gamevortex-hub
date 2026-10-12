@@ -10,8 +10,8 @@ import {
 /**
  * Evaluate an asset, then in ONE transaction: upsert the asset profile and
  * append an immutable audit row. The result is what the Trading Executor must
- * trust: it already includes the policy review gate, so an unreviewed or
- * inactive policy can never yield APPROVED.
+ * trust: it already includes the policy review gate, so an unreviewed,
+ * inactive, self-reviewed, or unknown-provenance policy cannot yield APPROVED.
  */
 export async function checkAndRecordShariah(input: { actorUserId: string; asset: ShariahAssetInput }) {
   const policy = OWNER_SPOT_POLICY;
@@ -23,6 +23,7 @@ export async function checkAndRecordShariah(input: { actorUserId: string; asset:
   const decision = applyPolicyReviewGate(raw, {
     status: policyRow.status,
     reviewedAt: policyRow.reviewedAt,
+    source: policyRow.source,
   });
 
   const reason = decision.reasons.length ? decision.reasons.join(", ") : "ALL_CHECKS_PASSED";

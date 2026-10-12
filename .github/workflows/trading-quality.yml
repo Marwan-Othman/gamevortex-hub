@@ -8,6 +8,7 @@ on:
 
 env:
   DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/gamevortex_ci?schema=public
+  GAMEVORTEX_TRADING_DB_DRILLS: "true"
 
 jobs:
   trading-quality:

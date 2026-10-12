@@ -8,6 +8,7 @@ export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLE
 
 type LiveOrderSettlementRow = LiveOrderRow & {
   settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
+  settlementError: string | null;
   exitProviderOrderId: string | null;
   exitExecutedQty: Prisma.Decimal | null;
   exitCumulativeQuoteQty: Prisma.Decimal | null;
@@ -37,6 +38,19 @@ type SettlementTradeFillProvider = {
 
 const QUANTITY_TOLERANCE = new Prisma.Decimal("0.000000000001");
 
+/** Compare the persisted exit execution snapshot against the snapshot used to
+ * fetch fills and calculate net proceeds. Missing or changed values fail closed. */
+export function exitExecutionDataMatches(
+  current: { exitExecutedQty: Prisma.Decimal | null; exitCumulativeQuoteQty: Prisma.Decimal | null },
+  expected: { exitExecutedQty: Prisma.Decimal | null; exitCumulativeQuoteQty: Prisma.Decimal | null },
+): boolean {
+  if (!current.exitExecutedQty || !current.exitCumulativeQuoteQty || !expected.exitExecutedQty || !expected.exitCumulativeQuoteQty) {
+    return false;
+  }
+  return current.exitExecutedQty.sub(expected.exitExecutedQty).abs().lessThanOrEqualTo(QUANTITY_TOLERANCE)
+    && current.exitCumulativeQuoteQty.sub(expected.exitCumulativeQuoteQty).abs().lessThanOrEqualTo(QUANTITY_TOLERANCE);
+}
+
 export type LiveWalletSettlementResult = {
   order: LiveOrderRow;
   status: LiveWalletSettlementStatus;
@@ -47,19 +61,26 @@ export type LiveWalletSettlementResult = {
 };
 
 export type OwnerWalletSettlementCalculation = {
+  /** Amount credited to the USD wallet, whose database scale is two decimals. */
   returnedUsd: Prisma.Decimal;
+  /** Exact exchange proceeds minus the amount credited; positive means rounded down. */
+  roundingUsd: Prisma.Decimal;
 };
 
 export function calculateOwnerWalletSettlement(
   returnedUsdInput: Prisma.Decimal | string | number,
 ): OwnerWalletSettlementCalculation {
-  const returnedUsd = returnedUsdInput instanceof Prisma.Decimal
+  const exactProceeds = returnedUsdInput instanceof Prisma.Decimal
     ? returnedUsdInput
     : new Prisma.Decimal(returnedUsdInput);
-  if (!returnedUsd.isFinite() || returnedUsd.lessThan(0)) {
+  if (!exactProceeds.isFinite() || exactProceeds.lessThan(0)) {
     throw new Error("INVALID_SETTLEMENT_PROCEEDS");
   }
-  return { returnedUsd };
+
+  // OwnerWallet.availableUsd and OwnerLedger.usdAmount are Decimal(18,2).
+  // Round explicitly instead of letting PostgreSQL silently coerce the amount.
+  const returnedUsd = exactProceeds.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  return { returnedUsd, roundingUsd: exactProceeds.sub(returnedUsd) };
 }
 
 function assertProviderExitFillMatchesOrder(
@@ -72,9 +93,39 @@ function assertProviderExitFillMatchesOrder(
   if (!fills.baseAsset.trim() || !fills.quoteAsset.trim()) {
     throw new Error("SETTLEMENT_EXIT_ASSET_INFO_REQUIRED");
   }
+  if (fills.baseAsset.trim().toUpperCase() === fills.quoteAsset.trim().toUpperCase()) {
+    throw new Error("SETTLEMENT_EXIT_BASE_QUOTE_ASSET_MUST_DIFFER");
+  }
   if (!fills.fills.length) throw new Error("SETTLEMENT_EXIT_FILLS_REQUIRED");
   if (!order.exitExecutedQty || !order.exitCumulativeQuoteQty) {
     throw new Error("SETTLEMENT_EXIT_EXECUTION_DATA_REQUIRED");
+  }
+
+  // Never let malformed provider fill values flow into aggregate comparisons:
+  // Decimal NaN comparisons can otherwise fail open in some predicate patterns.
+  for (const fill of fills.fills) {
+    let qty: Prisma.Decimal;
+    let quoteQty: Prisma.Decimal;
+    let commission: Prisma.Decimal;
+    try {
+      qty = new Prisma.Decimal(fill.qty);
+      quoteQty = new Prisma.Decimal(fill.quoteQty);
+      commission = new Prisma.Decimal(fill.commission);
+    } catch {
+      throw new Error("SETTLEMENT_EXIT_FILL_NUMERIC_VALUE_INVALID");
+    }
+    if (!qty.isFinite() || qty.lessThanOrEqualTo(0)) {
+      throw new Error("SETTLEMENT_EXIT_FILL_QTY_INVALID");
+    }
+    if (!quoteQty.isFinite() || quoteQty.lessThanOrEqualTo(0)) {
+      throw new Error("SETTLEMENT_EXIT_FILL_QUOTE_QTY_INVALID");
+    }
+    if (!commission.isFinite() || commission.lessThan(0)) {
+      throw new Error("SETTLEMENT_EXIT_FILL_COMMISSION_INVALID");
+    }
+    if (typeof fill.commissionAsset !== "string" || !fill.commissionAsset.trim()) {
+      throw new Error("SETTLEMENT_EXIT_FILL_COMMISSION_ASSET_REQUIRED");
+    }
   }
 
   const totalQty = fills.fills.reduce(
@@ -94,8 +145,8 @@ function assertProviderExitFillMatchesOrder(
   }
 }
 
-async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, reason: string): Promise<LiveOrderRow> {
-  const rows = await tx.$queryRaw<LiveOrderRow[]>(Prisma.sql`
+async function blockSettlement(tx: Prisma.TransactionClient, orderId: string, reason: string): Promise<LiveOrderSettlementRow> {
+  const rows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
     UPDATE "TradingLiveOrder"
     SET "settlementStatus" = 'BLOCKED', "settlementError" = ${reason.slice(0, 500)}, "version" = "version" + 1
     WHERE "id" = ${orderId}
@@ -129,16 +180,85 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
 
     assertProviderExitFillMatchesOrder(inputOrder, fills);
 
-    const feeSettlement = calculateLiveSpotNetExitProceeds({
-      baseAsset: fills.baseAsset,
-      quoteAsset: fills.quoteAsset,
-      exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
-      exitQuoteQty: inputOrder.exitCumulativeQuoteQty!.toString(),
-      exitFees: fills.fills.map((fill) => ({
-        commission: fill.commission,
-        commissionAsset: fill.commissionAsset,
-      })),
-    });
+    let feeSettlement: ReturnType<typeof calculateLiveSpotNetExitProceeds>;
+    try {
+      feeSettlement = calculateLiveSpotNetExitProceeds({
+        baseAsset: fills.baseAsset,
+        quoteAsset: fills.quoteAsset,
+        exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
+        exitQuoteQty: inputOrder.exitCumulativeQuoteQty!.toString(),
+        exitFees: fills.fills.map((fill) => ({
+          commission: fill.commission,
+          commissionAsset: fill.commissionAsset,
+        })),
+        // Base-asset fees must be valued at the price of the individual fill
+        // that charged them, not at a blended order-average price.
+        baseAssetFeeQuoteValues: fills.fills
+          .filter((fill) => fill.commissionAsset.trim().toUpperCase() === fills.baseAsset.trim().toUpperCase())
+          .map((fill) =>
+            new Prisma.Decimal(fill.commission)
+              .mul(new Prisma.Decimal(fill.quoteQty))
+              .div(new Prisma.Decimal(fill.qty))
+              .toString(),
+          ),
+      });
+    } catch (error) {
+      // This specific error is deterministic: the exchange charged a third
+      // asset, but no exact quote valuation is available. Persist a fail-closed
+      // state so the closed order is visible to operators instead of silently
+      // remaining pending. Provider/network errors are outside this catch and
+      // remain retryable.
+      if (!(error instanceof Error) || error.message !== "THIRD_ASSET_FEE_CONVERSION_REQUIRED") {
+        throw error;
+      }
+      const blocker = "THIRD_ASSET_FEE_CONVERSION_REQUIRED";
+      const blockedOrder = await db.$transaction(async (tx) => {
+        const lockedRows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
+          SELECT * FROM "TradingLiveOrder" WHERE "id" = ${input.order.id} FOR UPDATE
+        `);
+        const current = lockedRows[0];
+        if (!current) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
+        // Authorize before reading or returning settlement details, including
+        // the already-settled fast path.
+        if (current.ownerId !== input.ownerId) {
+          throw new Error("SETTLEMENT_OWNER_MISMATCH");
+        }
+        if (current.settlementStatus === "SETTLED") return current;
+        if (current.status === "CLOSED" && current.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
+          return blockSettlement(tx, current.id, blocker);
+        }
+        return current;
+      });
+      if (blockedOrder.settlementStatus === "SETTLED") {
+        return {
+          order: blockedOrder,
+          status: "ALREADY_SETTLED",
+          settledUsd: blockedOrder.settledUsd?.toString() ?? null,
+          settledPoints: blockedOrder.settledPoints ?? null,
+          roundingUsd: blockedOrder.settlementRoundingUsd?.toString() ?? null,
+          blockers: [],
+        };
+      }
+      if (blockedOrder.settlementStatus === "BLOCKED") {
+        const persistedBlocker = blockedOrder.settlementError || blocker;
+        return {
+          order: blockedOrder,
+          status: "BLOCKED",
+          settledUsd: null,
+          settledPoints: null,
+          roundingUsd: null,
+          blockers: [persistedBlocker],
+        };
+      }
+      return {
+        order: blockedOrder,
+        status: "BLOCKED",
+        settledUsd: null,
+        settledPoints: null,
+        roundingUsd: null,
+        blockers: ["SETTLEMENT_STATE_CHANGED_DURING_FEE_CHECK"],
+      };
+    }
 
     netExitProceeds = feeSettlement.netExitQuoteProceeds;
   }
@@ -150,9 +270,9 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     const order = lockedRows[0];
     if (!order) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
 
+    // Reject cross-owner access without mutating another owner's order.
     if (order.ownerId !== input.ownerId) {
-      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_OWNER_MISMATCH");
-      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_OWNER_MISMATCH"] };
+      throw new Error("SETTLEMENT_OWNER_MISMATCH");
     }
 
     if (order.settlementStatus === "SETTLED") {
@@ -179,6 +299,15 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     if (order.exitProviderOrderId !== inputOrder.exitProviderOrderId) {
       const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_EXIT_PROVIDER_ORDER_CHANGED");
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_PROVIDER_ORDER_CHANGED"] };
+    }
+
+    // The provider fills and net proceeds were calculated before acquiring this
+    // row lock. Recheck every persisted exit quantity used in that calculation
+    // so a concurrent order update cannot settle stale proceeds against newer
+    // execution data.
+    if (!exitExecutionDataMatches(order, inputOrder)) {
+      const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_EXIT_EXECUTION_DATA_CHANGED");
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_EXIT_EXECUTION_DATA_CHANGED"] };
     }
 
     const allocation = await tx.tradingAllocation.findFirst({ where: { relatedTradeId: order.id, status: "ACTIVE" } });
@@ -234,7 +363,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           allocationId: allocation.id,
           returnedUsd: calculation.returnedUsd.toString(),
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
-          roundingUsd: "0",
+          roundingUsd: calculation.roundingUsd.toString(),
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
         },
@@ -246,7 +375,10 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         accountId: lockedAccount.id,
         allocationId: allocation.id,
         type: "ALLOCATION_RETURN",
-        amountUsd: calculation.returnedUsd,
+        // This ledger records the TradingAccount balance movement, which is
+        // the released allocation principal, not the (possibly different)
+        // net exchange proceeds credited to OwnerWallet.
+        amountUsd: allocation.amountUsd,
         balanceBeforeUsd: beforeBalance,
         balanceAfterUsd: afterBalance,
         relatedTradeId: order.id,
@@ -259,6 +391,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
+          roundingUsd: calculation.roundingUsd.toString(),
         },
       },
     });
@@ -270,7 +403,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         "walletSettledAt" = CURRENT_TIMESTAMP,
         "settledUsd" = ${calculation.returnedUsd.toString()}::numeric,
         "settledPoints" = 0,
-        "settlementRoundingUsd" = 0::numeric,
+        "settlementRoundingUsd" = ${calculation.roundingUsd.toString()}::numeric,
         "settlementError" = NULL,
         "version" = "version" + 1
       WHERE "id" = ${order.id} AND "status" = 'CLOSED' AND "settlementStatus" = 'EXCHANGE_CLOSED_PENDING_WALLET'
@@ -293,10 +426,18 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           realizedPnlUsd: order.realizedPnlUsd?.toString() ?? null,
           grossExitQuoteQty: order.exitCumulativeQuoteQty.toString(),
           netExitQuoteProceeds: netExitProceeds.toString(),
+          roundingUsd: calculation.roundingUsd.toString(),
         },
       },
     });
 
-    return { order: updated, status: "SETTLED", settledUsd: calculation.returnedUsd.toString(), settledPoints: 0, roundingUsd: "0", blockers: [] };
+    return {
+      order: updated,
+      status: "SETTLED",
+      settledUsd: calculation.returnedUsd.toString(),
+      settledPoints: 0,
+      roundingUsd: calculation.roundingUsd.toString(),
+      blockers: [],
+    };
   });
 }

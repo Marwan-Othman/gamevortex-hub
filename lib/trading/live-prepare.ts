@@ -33,6 +33,16 @@ import {
 const APPROVAL_TTL_SECONDS = 240;
 const STRATEGY_VERSION = "owner-manual-v1";
 
+/**
+ * Keep all new live approvals blocked until wallet/capital accounting,
+ * custody reconciliation, and the complete production settlement path are
+ * independently verified. Keep the return type void so TypeScript continues
+ * checking the legacy preflight path below; runtime execution still always throws.
+ */
+function assertLiveAccountingReady(): void {
+  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+}
+
 export type PreparedLiveOrder = {
   approvalId: string;
   opportunityId: string;
@@ -121,7 +131,8 @@ export async function prepareLiveOrder(input: {
   if (input.ackOwnerSpot !== true) throw new Error("LIVE_OWNER_ACK_REQUIRED");
 
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
-  // Keep live execution fail-closed until the migrated USD wallet has been reconciled\n  // and the full production accounting/reconciliation path has been verified.\n  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");\n
+  assertLiveAccountingReady();
+
   const direct = isLiveDirectFundingEnabled();
   if (direct) {
     throw new Error("LIVE_DIRECT_FUNDING_DISABLED");
@@ -136,11 +147,10 @@ export async function prepareLiveOrder(input: {
   if (!direct) {
     if (!Number.isInteger(amountUsd)) throw new Error("LIVE_WALLET_MODE_REQUIRES_WHOLE_USD");
     const account = await db.tradingAccount.findUnique({ where: { ownerId: input.ownerId } });
-    const allocations = account
-      ? await db.tradingAllocation.count({
-          where: { accountId: account.id, status: "ACTIVE", relatedTradeId: null, amountUsd },
-        })
-      : 0;
+    if (!account) throw new Error("TRADING_ACCOUNT_REQUIRED");
+    const allocations = await db.tradingAllocation.count({
+      where: { accountId: account.id, status: "ACTIVE", relatedTradeId: null, amountUsd },
+    });
     if (allocations === 0) throw new Error("TRADING_ALLOCATION_REQUIRED");
   }
 
@@ -150,7 +160,8 @@ export async function prepareLiveOrder(input: {
 
   // 4. Risk Manager, with the snapshot computed from the live-order table.
   const riskConfig = await getRiskConfig(input.ownerId);
-  if (!riskConfig || !riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
+  if (riskConfig === null || riskConfig === undefined) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
+  if (!riskConfig.enabled) throw new Error("LIVE_RISK_CONFIG_REQUIRED");
   const riskSnapshot = buildLiveRiskSnapshot(await loadOrdersForRisk(input.ownerId), {
     symbol,
     requestedAmountUsd: amountUsd,

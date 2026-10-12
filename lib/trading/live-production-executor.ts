@@ -382,10 +382,12 @@ async function protectFilledOrder(
 
     const updated = await markLiveOrderProtected(order.id, {
       protectionOrderId: protection.orderListId,
-      stopLossOrderId:
-        protection.orders.find((item) => item.clientOrderId === plan.stopLoss.clientOrderId)?.providerOrderId,
-      takeProfitOrderId:
-        protection.orders.find((item) => item.clientOrderId === plan.takeProfit.clientOrderId)?.providerOrderId,
+      // Settlement polls these identifiers through getProtectedExitLegStatus,
+      // whose contract is explicitly keyed by clientOrderId. Persist the
+      // deterministic client IDs here; provider IDs are returned by the
+      // adapter when a leg is queried and are used for trade-fill lookup.
+      stopLossOrderId: plan.stopLoss.clientOrderId,
+      takeProfitOrderId: plan.takeProfit.clientOrderId,
     });
 
     await audit(ownerId, "TRADING_LIVE_ORDER_PROTECTED", updated, {

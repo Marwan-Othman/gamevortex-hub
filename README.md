@@ -104,7 +104,7 @@ and `migration_lock.toml` is tracked. This is required for `prisma migrate deplo
 
 ## Complete production build
 
-The supported validation pipeline is:
+The supported application build pipeline is:
 
 ```bash
 npm ci
@@ -112,15 +112,17 @@ npm run build:production
 npm start
 ```
 
-`build:production` performs, in order:
+`build:production` validates the environment and Prisma schema, generates the Prisma client, runs tests and TypeScript type checking, builds Next.js, and performs the production smoke check. It deliberately does **not** run `prisma migrate deploy` against the production database.
 
-1. Production environment validation.
-2. `prisma validate`.
-3. `prisma generate`.
-4. `prisma migrate deploy` against the configured PostgreSQL database.
-5. TypeScript type checking.
-6. `next build`.
-7. Production smoke validation, including the generated `.next/BUILD_ID`.
+Apply database migrations as a separate, controlled release step only when the release contains migration changes:
+
+```bash
+npm run db:status
+npm run db:deploy
+npm run db:status
+```
+
+Run that step once against the intended database, not concurrently from multiple Vercel preview/production builds. Verify the migration status before and after applying it.
 
 The normal application build is also available:
 
@@ -141,7 +143,7 @@ Prisma schema validation
         ↓
 Prisma client generation
         ↓
-Prisma migrations deployed successfully
+Unit and source tests
         ↓
 TypeScript typecheck
         ↓
@@ -152,11 +154,11 @@ Smoke check + .next/BUILD_ID
 npm start
 ```
 
-A successful `next build` alone is **not** enough: it does not prove that the production database is reachable, migrations are applied, secrets are configured, payment webhooks are working, or external providers are connected.
+A successful `next build` alone is **not** enough: it does not prove that the production database is reachable, migrations are applied, secrets are configured, payment webhooks are working, or external providers are connected. Database migrations are a separate release operation and must be checked explicitly.
 
 ## Important production behavior
 
-Database-backed pages are marked `force-dynamic` where appropriate so the production build does not attempt to query a developer database while compiling the application. Database access happens at request time. This makes CI builds independent of the production database while `prisma migrate deploy` remains an explicit deployment step.
+Database-backed pages are marked `force-dynamic` where appropriate so the production build does not attempt to query a database while compiling the application. Database access happens at request time. Vercel builds must not run `prisma migrate deploy`: parallel preview and production builds can contend for PostgreSQL's Prisma advisory lock, and a preview build must never mutate the production schema. Migration application remains a separate, explicitly controlled release step.
 
 The public sitemap is also generated dynamically from the database.
 

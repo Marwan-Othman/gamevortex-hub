@@ -76,6 +76,89 @@ describe("attemptEmergencyExit", () => {
     });
   });
 
+  it("does not report SOLD if the exchange claims more was sold than requested", async () => {
+    const outcome = await attemptEmergencyExit({
+      ...base,
+      adapter: {
+        placeEmergencyMarketSell: async (request) => ({
+          accepted: true,
+          clientOrderId: request.clientOrderId,
+          providerOrderId: "79",
+          status: "FILLED",
+          executedQty: 10,
+          cumulativeQuoteQty: 1001,
+        }),
+      },
+    });
+    expect(outcome).toEqual({
+      status: "FAILED",
+      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),
+      reason: "EMERGENCY_SELL_EXECUTED_QTY_EXCEEDS_REQUESTED",
+    });
+  });
+
+  it("does not report SOLD when a FILLED response has a mismatched client order ID", async () => {
+    const outcome = await attemptEmergencyExit({
+      ...base,
+      adapter: {
+        placeEmergencyMarketSell: async () => ({
+          accepted: true,
+          clientOrderId: "unrelated-order",
+          providerOrderId: "80",
+          status: "FILLED",
+          executedQty: 9.99,
+          cumulativeQuoteQty: 1000,
+        }),
+      },
+    });
+    expect(outcome).toEqual({
+      status: "FAILED",
+      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),
+      reason: "EMERGENCY_SELL_CLIENT_ORDER_ID_MISMATCH",
+    });
+  });
+
+  it("does not report SOLD when provider order identity is missing", async () => {
+    const outcome = await attemptEmergencyExit({
+      ...base,
+      adapter: {
+        placeEmergencyMarketSell: async (request) => ({
+          accepted: true,
+          clientOrderId: request.clientOrderId,
+          status: "FILLED",
+          executedQty: 9.99,
+          cumulativeQuoteQty: 1000,
+        }),
+      },
+    });
+    expect(outcome).toEqual({
+      status: "FAILED",
+      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),
+      reason: "EMERGENCY_SELL_PROVIDER_ORDER_ID_REQUIRED",
+    });
+  });
+
+  it("does not report SOLD when a FILLED response covers less than the requested quantity", async () => {
+    const outcome = await attemptEmergencyExit({
+      ...base,
+      adapter: {
+        placeEmergencyMarketSell: async (request) => ({
+          accepted: true,
+          clientOrderId: request.clientOrderId,
+          providerOrderId: "81",
+          status: "FILLED",
+          executedQty: 9.98,
+          cumulativeQuoteQty: 999,
+        }),
+      },
+    });
+    expect(outcome).toEqual({
+      status: "FAILED",
+      clientOrderId: buildEmergencySellClientOrderId(base.entryClientOrderId),
+      reason: "EMERGENCY_SELL_EXECUTED_QTY_MISMATCH",
+    });
+  });
+
   it("reports FAILED when the adapter cannot sell or the quantity is invalid", async () => {
     expect((await attemptEmergencyExit({ ...base, adapter: {} })).status).toBe("FAILED");
     for (const quantity of ["0", "-1", "1e-7", ""]) {

@@ -62,12 +62,39 @@ export async function attemptEmergencyExit(input: {
 
     if (!placed.accepted || placed.status === "REJECTED") throw new Error("EMERGENCY_SELL_REJECTED");
     if (placed.status !== "FILLED") throw new Error("EMERGENCY_SELL_NOT_CONFIRMED");
+    if (placed.clientOrderId !== clientOrderId) {
+      throw new Error("EMERGENCY_SELL_CLIENT_ORDER_ID_MISMATCH");
+    }
+    if (typeof placed.providerOrderId !== "string" || !placed.providerOrderId.trim()) {
+      throw new Error("EMERGENCY_SELL_PROVIDER_ORDER_ID_REQUIRED");
+    }
+    if (
+      typeof placed.executedQty !== "number" ||
+      !Number.isFinite(placed.executedQty) ||
+      placed.executedQty <= 0 ||
+      typeof placed.cumulativeQuoteQty !== "number" ||
+      !Number.isFinite(placed.cumulativeQuoteQty) ||
+      placed.cumulativeQuoteQty <= 0
+    ) {
+      throw new Error("EMERGENCY_SELL_FILL_DETAILS_REQUIRED");
+    }
+    const requestedQty = Number(input.quantity);
+    if (!Number.isFinite(requestedQty) || requestedQty <= 0) {
+      throw new Error("EMERGENCY_SELL_QUANTITY_INVALID");
+    }
+    const quantityTolerance = Math.max(Number.EPSILON * Math.max(requestedQty, placed.executedQty) * 8, 1e-12);
+    if (placed.executedQty > requestedQty + quantityTolerance) {
+      throw new Error("EMERGENCY_SELL_EXECUTED_QTY_EXCEEDS_REQUESTED");
+    }
+    if (Math.abs(placed.executedQty - requestedQty) > quantityTolerance) {
+      throw new Error("EMERGENCY_SELL_EXECUTED_QTY_MISMATCH");
+    }
     return {
       status: "SOLD",
       clientOrderId,
-      providerOrderId: placed.providerOrderId ?? null,
-      executedQty: placed.executedQty ?? null,
-      cumulativeQuoteQty: placed.cumulativeQuoteQty ?? null,
+      providerOrderId: placed.providerOrderId,
+      executedQty: placed.executedQty,
+      cumulativeQuoteQty: placed.cumulativeQuoteQty,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : "EMERGENCY_SELL_FAILED";

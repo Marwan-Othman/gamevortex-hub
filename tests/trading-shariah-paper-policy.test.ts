@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SHARIAH_POLICY, PAPER_SIMULATION_SHARIAH_POLICY, evaluateShariah } from '../lib/trading/shariah';
+import {
+  DEFAULT_SHARIAH_POLICY,
+  PAPER_SIMULATION_SHARIAH_POLICY,
+  OWNER_SPOT_POLICY,
+  applyPolicyReviewGate,
+  evaluateShariah,
+  QUALIFIED_SHARIAH_REVIEW_SOURCE,
+} from '../lib/trading/shariah';
 
 const spot = {
   symbol: 'BTC/USDT',
@@ -24,16 +31,28 @@ describe('paper simulation Shariah policy', () => {
   });
 });
 
-import { OWNER_SPOT_POLICY, applyPolicyReviewGate } from '../lib/trading/shariah';
-
 describe('owner spot live policy', () => {
-  const reviewed = { status: 'ACTIVE' as const, reviewedAt: new Date() };
-  it('approves verified spot DIGITAL_ASSET only once the policy row is ACTIVE and reviewed', () => {
+  const qualifiedReviewed = {
+    status: 'ACTIVE' as const,
+    reviewedAt: new Date(),
+    source: QUALIFIED_SHARIAH_REVIEW_SOURCE,
+  };
+  it('approves verified spot DIGITAL_ASSET only with active, dated qualified review provenance', () => {
     const raw = evaluateShariah(spot, OWNER_SPOT_POLICY);
     expect(raw.status).toBe('APPROVED');
-    expect(applyPolicyReviewGate(raw, reviewed).status).toBe('APPROVED');
-    expect(applyPolicyReviewGate(raw, { status: 'INACTIVE', reviewedAt: null }).status).toBe('REVIEW');
+    expect(applyPolicyReviewGate(raw, qualifiedReviewed).status).toBe('APPROVED');
+    expect(applyPolicyReviewGate(raw, { status: 'INACTIVE', reviewedAt: null, source: QUALIFIED_SHARIAH_REVIEW_SOURCE }).status).toBe('REVIEW');
     expect(applyPolicyReviewGate(raw, null).status).toBe('REVIEW');
+  });
+  it('rejects owner self-review as insufficient authorization for real-money trading', () => {
+    const raw = evaluateShariah(spot, OWNER_SPOT_POLICY);
+    const decision = applyPolicyReviewGate(raw, {
+      status: 'ACTIVE',
+      reviewedAt: new Date(),
+      source: 'OWNER_SELF_REVIEW',
+    });
+    expect(decision.status).toBe('REVIEW');
+    expect(decision.reasons).toContain('POLICY_QUALIFIED_REVIEW_REQUIRED');
   });
   it('still blocks unverified ownership and futures', () => {
     expect(evaluateShariah({ ...spot, ownershipSettlementVerified: false }, OWNER_SPOT_POLICY).status).toBe('REVIEW');

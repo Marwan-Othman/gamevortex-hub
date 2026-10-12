@@ -53,12 +53,13 @@ const ERROR_TEXT: Record<string, string> = {
   INVALID_LIVE_ORDER_TAKE_PROFIT: "Take Profit لازم يكون بين 0.2% و50%.",
   LIVE_OWNER_ACK_REQUIRED: "لازم تؤكد الإقرار قبل التجهيز.",
   GAMEVORTEX_LIVE_TRADING_DISABLED: "التداول الحقيقي مغلق: GAMEVORTEX_LIVE_TRADING_ENABLED مش true.",
+  LIVE_TRADING_ACCOUNTING_NOT_READY: "التداول الحقيقي محظور حاليًا: مطابقة المحفظة والمحاسبة والتسوية لم تُعتمد بعد.",
   LIVE_RISK_CONFIG_REQUIRED: "احفظ إعدادات Risk Manager أولاً.",
   LIVE_MARKET_DATA_UNAVAILABLE: "ما قدرت أجيب بيانات سوق كافية لهذا الرمز.",
   LIVE_WALLET_MODE_REQUIRES_WHOLE_USD: "وضع المحفظة يحتاج مبلغ بدولارات صحيحة.",
-  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر من رصيد المنصة معطل أمنيًا؛ استخدم Trading Allocation.",
+  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر من رصيد Binance معطّل أمنيًا. لا تغيّر متغيرات الإنتاج لتجاوز هذا الحاجز.",
   TRADING_ALLOCATION_REQUIRED:
-    "ما في تخصيص من المحفظة بنفس المبلغ. إما خصّص من المحفظة، أو فعّل GAMEVORTEX_LIVE_DIRECT_FUNDING=true لاستخدام رصيدك على Binance.",
+    "ما في تخصيص فعّال من المحفظة بنفس المبلغ. أنشئ تخصيصًا صالحًا بعد اكتمال اعتماد المحاسبة؛ التداول المباشر ما زال معطّلًا أمنيًا.",
   BINANCE_LIVE_INSUFFICIENT_BALANCE: "رصيد USDT الحر على Binance أقل من مبلغ الصفقة.",
   BINANCE_LIVE_MIN_NOTIONAL: "المبلغ أقل من الحد الأدنى للصفقة عند Binance لهذا الرمز.",
   BINANCE_LIVE_API_CREDENTIALS_REQUIRED: "مفاتيح Binance الحقيقية غير مضافة.",
@@ -274,7 +275,7 @@ export default function TradingLiveOrderPanel() {
 
   const blocked = Boolean(control && control.blockReasons.length > 0);
   const phraseOk = confirmText === CONFIRM_PHRASE;
-  const canExecute = Boolean(prepared) && secondsLeft > 0 && phraseOk && !busy;
+  const canExecute = Boolean(prepared) && secondsLeft > 0 && phraseOk && !busy && control !== null && !blocked;
 
   return (
     <section className={styles.panel}>
