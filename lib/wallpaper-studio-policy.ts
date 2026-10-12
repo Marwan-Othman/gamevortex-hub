@@ -51,7 +51,7 @@ export const STUDIO_FONT_KEYS = Object.keys(STUDIO_FONTS) as [StudioFontKey, ...
 export const STUDIO_EFFECTS = {
   none: { label: "بدون", tier: "FREE" },
   dim: { label: "تعتيم", tier: "FREE" },
-  vignette: { label: "Vignette", tier: "FREE" },
+  vignette: { label: "Vignette", tier: "VIP" },
   grain: { label: "Grain", tier: "VIP" },
   blue: { label: "Blue Tone", tier: "VIP" },
   fade: { label: "تدرج سفلي", tier: "VIP" },
@@ -64,8 +64,8 @@ export const STUDIO_EFFECT_KEYS = Object.keys(STUDIO_EFFECTS) as [StudioEffectKe
 export const STUDIO_TEMPLATE_TIERS = {
   cyber: "FREE",
   minimal: "FREE",
-  esports: "FREE",
-  hijri: "FREE",
+  esports: "VIP",
+  hijri: "VIP",
   royal: "VIP",
   glitch: "VIP",
   aurora: "VIP",

@@ -113,6 +113,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const multiFileRef = useRef<HTMLInputElement>(null);
   const bgRef = useRef<{ source: ImageBitmap; width: number; height: number } | null>(null);
   const sessionBlobs = useRef(new Map<string, Blob>());
   const unpersisted = useRef(new Set<string>());
@@ -469,6 +470,87 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
   }, [refreshLocalImages]);
 
+  /**
+   * دمج عدة صور محليًا قبل إرسال المشهد المركّب إلى خدمة تحرير الصور الحالية.
+   * لا ننشئ صورة بديلة من الصفر: الصور الأصلية تدخل في لوحة واحدة أولًا.
+   */
+  async function onUploadMultiple(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (!files.length) return;
+    if (files.length < 2) {
+      setStatus({ text: "اختر صورتين أو أكثر لدمجها في مشهد واحد.", tone: "error" });
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "جارٍ تجهيز الصور ودمجها محليًا…", tone: "ok" });
+    const bitmaps: ImageBitmap[] = [];
+    try {
+      for (const file of files.slice(0, 8)) {
+        const prepared = await prepareImageFile(file);
+        bitmaps.push(prepared.bitmap);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("CANVAS_UNAVAILABLE");
+
+      // الصورة الأولى تشكل المشهد الأساسي، وبقية الصور توضع فوقها كعناصر واضحة.
+      const base = bitmaps[0];
+      const baseScale = Math.max(canvas.width / base.width, canvas.height / base.height);
+      const baseW = base.width * baseScale;
+      const baseH = base.height * baseScale;
+      ctx.drawImage(base, (canvas.width - baseW) / 2, (canvas.height - baseH) / 2, baseW, baseH);
+      ctx.fillStyle = "rgba(4, 8, 20, .18)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 1; i < bitmaps.length; i += 1) {
+        const image = bitmaps[i];
+        const maxW = i % 2 === 0 ? 610 : 680;
+        const maxH = i % 2 === 0 ? 760 : 620;
+        const scale = Math.min(maxW / image.width, maxH / image.height);
+        const w = image.width * scale;
+        const h = image.height * scale;
+        const x = i % 2 === 0 ? canvas.width - w - 54 : 54;
+        const y = Math.min(canvas.height - h - 130, 300 + (i - 1) * 245);
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,.45)";
+        ctx.shadowBlur = 34;
+        ctx.shadowOffsetY = 18;
+        ctx.drawImage(image, x, y, w, h);
+        ctx.restore();
+      }
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      if (!blob) throw new Error("COMPOSITE_FAILED");
+      const id = uid();
+      let persisted = true;
+      try {
+        const storedId = await putLocalImage(blob);
+        sessionBlobs.current.set(storedId, blob);
+        setBg({ kind: "local", localId: storedId });
+        await refreshLocalImages();
+      } catch {
+        persisted = false;
+        sessionBlobs.current.set(id, blob);
+        unpersisted.current.add(id);
+        setBg({ kind: "local", localId: id });
+      }
+      setStatus({
+        text: persisted
+          ? `تم تركيب ${bitmaps.length} صور في مشهد واحد. اضغط «تحسين ودمج بالذكاء الاصطناعي» لمواءمة الإضاءة والألوان؛ الساعة والنصوص تبقى طبقات قابلة للتعديل.`
+          : "تم تركيب الصور مؤقتًا، لكن التخزين المحلي غير متاح؛ نزّل النتيجة قبل إغلاق الصفحة.",
+        tone: persisted ? "ok" : "error",
+      });
+    } catch (error) {
+      setStatus(describeImageError(error));
+    } finally {
+      bitmaps.forEach((bitmap) => bitmap.close());
+      setBusy(false);
+    }
+  }
+
   /* ----------------------------- مكتبة الموقع ----------------------------- */
 
   useEffect(() => {
@@ -573,6 +655,38 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, exportType, 0.95));
     if (!blob) throw new Error("EXPORT_FAILED");
     return blob;
+  }
+
+  function applyClockComposition() {
+    if (bgLoading || !bgRef.current) {
+      setStatus({ text: "اختر خلفية وانتظر اكتمال تحميلها أولًا.", tone: "error" });
+      return;
+    }
+
+    // Arrange existing live layers; preserve the selected background and never call image generation.
+    const current = docRef.current;
+    let clockAdded = false;
+    const layers = current.layers.map((layer) => {
+      if (layer.kind === "clock") {
+        clockAdded = true;
+        return { ...layer, x: 540, y: 690, fontSize: Math.max(layer.fontSize, 145), align: "center" as const, shadow: Math.max(layer.shadow, 18), glow: true };
+      }
+      if (layer.kind === "gregorian") return { ...layer, x: 540, y: 850, align: "center" as const, shadow: Math.max(layer.shadow, 10) };
+      if (layer.kind === "hijri") return { ...layer, x: 540, y: 925, align: "center" as const, shadow: Math.max(layer.shadow, 12), glow: true };
+      if (layer.kind === "name") return { ...layer, x: 540, y: 1580, align: "center" as const, shadow: Math.max(layer.shadow, 14), glow: true };
+      if (layer.kind === "text") return { ...layer, x: 540, y: Math.min(1450, Math.max(1120, layer.y)), align: "center" as const, shadow: Math.max(layer.shadow, 14), glow: true };
+      return layer;
+    });
+    if (!clockAdded) {
+      if (layers.length >= STUDIO_MAX_LAYERS) {
+        setStatus({ text: "وصلت إلى الحد الأقصى للطبقات (" + STUDIO_MAX_LAYERS + "). احذف طبقة ثم أعد المحاولة.", tone: "error" });
+        return;
+      }
+      layers.push(makeLayer({ kind: "clock", x: 540, y: 690, fontSize: 145, align: "center", color: "#FFFFFF", shadow: 18, glow: true }));
+    }
+    commit({ ...current, layers });
+    setTab("layers");
+    setStatus({ text: "تم دمج الساعة بصريًا مع الخلفية الحالية. الخلفية الأصلية محفوظة، ويمكنك تحريك الساعة وتعديلها ثم تنزيل التصميم.", tone: "ok" });
   }
 
   function checkExportAllowed(): boolean {
@@ -803,7 +917,47 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
 
   return (
     <main className="wrap wsx" dir="rtl" style={{ maxWidth: 1200, paddingBottom: 36 }}>
+    <style jsx global>{`
+      .wsx { --studio-accent: #a855f7; --studio-border: rgba(168,85,247,.22); }
+      .wsx .wsx-grid { display:grid; grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:14px; align-items:start; }
+      .wsx .glass.card { border:1px solid var(--studio-border); border-radius:24px; background:linear-gradient(155deg,rgba(17,18,38,.94),rgba(7,9,20,.96)); box-shadow:0 12px 36px rgba(0,0,0,.22); }
+      .wsx .wsx-tabs { display:flex; gap:6px; overflow-x:auto; overscroll-behavior-inline:contain; scrollbar-width:none; padding:2px 0 9px; border-bottom:1px solid rgba(168,85,247,.18); }
+      .wsx .wsx-tabs::-webkit-scrollbar { display:none; }
+      .wsx .wsx-tabs .platform-chip { flex:0 0 auto; min-height:36px; padding:7px 12px; border-radius:13px; font-size:12px; font-weight:700; line-height:1.2; white-space:nowrap; }
+      .wsx .platform-chip { min-height:34px; padding:7px 12px; border-radius:14px; font-size:12px; line-height:1.2; }
+      .wsx .btn { min-height:40px; padding:9px 13px; border-radius:14px; font-size:13px; font-weight:700; }
+      .wsx .btn.secondary { border-color:rgba(168,85,247,.28); }
+      .wsx .input { min-height:40px; border-radius:13px; font-size:13px; }
+      .wsx .badge { border-radius:999px; padding:7px 10px; font-size:11px; line-height:1.35; }
+      .wsx .wsx-row { gap:7px; }
+      .wsx .wsx-thumbs { gap:8px; }
+      .wsx .wsx-thumb { border-radius:12px; overflow:hidden; }
+      .wsx .wsx-grid > .glass.card:first-child { position:sticky; top:12px; }
+      .wsx .wsx-grid > aside { min-width:0; }
+      @media (max-width: 760px) {
+        .wsx { padding-inline:10px !important; padding-top:8px !important; }
+        .wsx .hero { padding:12px !important; border-radius:20px; }
+        .wsx .hero h1 { font-size:20px; line-height:1.3; }
+        .wsx .hero .wsx-row { align-items:flex-start; flex-wrap:wrap; }
+        .wsx .hero .wsx-row > .wsx-row { width:100%; gap:6px; }
+        .wsx .hero .btn { min-height:34px; padding:7px 10px; font-size:11px; }
+        .wsx .wsx-grid { grid-template-columns:minmax(0,1fr); gap:10px; margin-top:10px !important; }
+        .wsx .wsx-grid > .glass.card:first-child { position:relative; top:auto; padding:10px !important; gap:8px !important; }
+        .wsx .wsx-grid > .glass.card:first-child > div:first-child { width:min(100%,330px) !important; padding:5px !important; border-radius:25px !important; }
+        .wsx .wsx-grid > .glass.card:first-child canvas { border-radius:20px !important; }
+        .wsx .wsx-grid > aside { padding:10px !important; border-radius:20px; }
+        .wsx .wsx-tabs { gap:5px; margin-inline:-1px; }
+        .wsx .wsx-tabs .platform-chip { min-height:34px; padding:7px 10px; font-size:11px; }
+        .wsx .wsx-grid .wsx-row { gap:6px; flex-wrap:wrap; }
+        .wsx .wsx-grid .platform-chip { min-height:32px; padding:6px 10px; font-size:11px; }
+        .wsx .wsx-grid .btn { min-height:38px; padding:8px 10px; font-size:12px; }
+        .wsx .wsx-grid .input { min-height:38px; font-size:12px; }
+        .wsx .wsx-grid .badge { font-size:10px; padding:6px 9px; }
+        .wsx .wsx-grid aside p { line-height:1.7; }
+      }
+    `}</style>
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onUpload} hidden />
+      <input ref={multiFileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onUploadMultiple} multiple hidden />
 
       <section className="glass hero" style={{ padding: 16 }}>
         <div className="wsx-row" style={{ justifyContent: "space-between" }}>
@@ -885,7 +1039,15 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
 
           {tab === "background" && (
             <div style={{ display: "grid", gap: 10 }}>
+              <button className="btn" onClick={applyClockComposition} disabled={busy || bgLoading || bg.kind === "none"}>
+                ◷ دمج الساعة مع الخلفية
+              </button>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                ينسّق الساعة والتاريخ والنصوص فوق الخلفية التي اخترتها دون إنشاء صورة جديدة أو إرسالها إلى خدمة ذكاء اصطناعي. تبقى كل العناصر قابلة للتحريك والتعديل.
+              </p>
               <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}>＋ صورة من الهاتف (خاصة بك)</button>
+              <button className="btn secondary" onClick={() => multiFileRef.current?.click()} disabled={busy}>▧ دمج صورتين أو أكثر</button>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>اختر حتى 8 صور لتركيب خلفية واحدة محليًا على جهازك، ثم أضف الساعة والنصوص ونسّقها.</p>
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>الصور التي ترفعها تبقى على جهازك ولا تُنشر في مكتبة الموقع.</p>
               {localImages.length > 0 && (
                 <div>
@@ -1082,7 +1244,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
         .wsx label{display:grid;gap:6px;font-size:14px}
         .wsx input[type=range]{width:100%}
         .wsx .input{width:100%}
-        @media(max-width:900px){.wsx-grid{grid-template-columns:1fr}}
+        @media(max-width:900px){.wsx-grid{grid-template-columns:1fr}.wsx-tabs{position:sticky;top:6px;z-index:5;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding:8px 6px;background:rgba(10,15,30,.96);backdrop-filter:blur(14px);border-radius:14px;scrollbar-width:thin}.wsx-tabs>.platform-chip{flex:0 0 auto;white-space:nowrap}.wsx-grid>aside{min-width:0}.wsx-grid>div{min-width:0}.wsx-grid canvas{max-height:62dvh;object-fit:contain}.wsx-row .btn{min-height:42px}}
       `}</style>
     </main>
   );
