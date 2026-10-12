@@ -113,6 +113,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const multiFileRef = useRef<HTMLInputElement>(null);
   const bgRef = useRef<{ source: ImageBitmap; width: number; height: number } | null>(null);
   const sessionBlobs = useRef(new Map<string, Blob>());
   const unpersisted = useRef(new Set<string>());
@@ -470,6 +471,87 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
   }, [refreshLocalImages]);
 
+  /**
+   * دمج عدة صور محليًا قبل إرسال المشهد المركّب إلى خدمة تحرير الصور الحالية.
+   * لا ننشئ صورة بديلة من الصفر: الصور الأصلية تدخل في لوحة واحدة أولًا.
+   */
+  async function onUploadMultiple(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (!files.length) return;
+    if (files.length < 2) {
+      setStatus({ text: "اختر صورتين أو أكثر لدمجها في مشهد واحد.", tone: "error" });
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "جارٍ تجهيز الصور ودمجها محليًا…", tone: "ok" });
+    const bitmaps: ImageBitmap[] = [];
+    try {
+      for (const file of files.slice(0, 8)) {
+        const prepared = await prepareImageFile(file);
+        bitmaps.push(prepared.bitmap);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("CANVAS_UNAVAILABLE");
+
+      // الصورة الأولى تشكل المشهد الأساسي، وبقية الصور توضع فوقها كعناصر واضحة.
+      const base = bitmaps[0];
+      const baseScale = Math.max(canvas.width / base.width, canvas.height / base.height);
+      const baseW = base.width * baseScale;
+      const baseH = base.height * baseScale;
+      ctx.drawImage(base, (canvas.width - baseW) / 2, (canvas.height - baseH) / 2, baseW, baseH);
+      ctx.fillStyle = "rgba(4, 8, 20, .18)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 1; i < bitmaps.length; i += 1) {
+        const image = bitmaps[i];
+        const maxW = i % 2 === 0 ? 610 : 680;
+        const maxH = i % 2 === 0 ? 760 : 620;
+        const scale = Math.min(maxW / image.width, maxH / image.height);
+        const w = image.width * scale;
+        const h = image.height * scale;
+        const x = i % 2 === 0 ? canvas.width - w - 54 : 54;
+        const y = Math.min(canvas.height - h - 130, 300 + (i - 1) * 245);
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,.45)";
+        ctx.shadowBlur = 34;
+        ctx.shadowOffsetY = 18;
+        ctx.drawImage(image, x, y, w, h);
+        ctx.restore();
+      }
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      if (!blob) throw new Error("COMPOSITE_FAILED");
+      const id = uid();
+      let persisted = true;
+      try {
+        const storedId = await putLocalImage(blob);
+        sessionBlobs.current.set(storedId, blob);
+        setBg({ kind: "local", localId: storedId });
+        await refreshLocalImages();
+      } catch {
+        persisted = false;
+        sessionBlobs.current.set(id, blob);
+        unpersisted.current.add(id);
+        setBg({ kind: "local", localId: id });
+      }
+      setStatus({
+        text: persisted
+          ? `تم تركيب ${bitmaps.length} صور في مشهد واحد. اضغط «تحسين ودمج بالذكاء الاصطناعي» لمواءمة الإضاءة والألوان؛ الساعة والنصوص تبقى طبقات قابلة للتعديل.`
+          : "تم تركيب الصور مؤقتًا، لكن التخزين المحلي غير متاح؛ نزّل النتيجة قبل إغلاق الصفحة.",
+        tone: persisted ? "ok" : "error",
+      });
+    } catch (error) {
+      setStatus(describeImageError(error));
+    } finally {
+      bitmaps.forEach((bitmap) => bitmap.close());
+      setBusy(false);
+    }
+  }
+
   /* ----------------------------- مكتبة الموقع ----------------------------- */
 
   useEffect(() => {
@@ -602,7 +684,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
       const imageData = input.toDataURL("image/jpeg", 0.82);
       const prompt = [
         "Edit the supplied image as a premium vertical 9:16 smartphone wallpaper background.",
-        "Preserve the main subject and recognizable scene. Improve cinematic lighting, depth, contrast and tonal harmony with restrained deep navy and electric blue highlights.",
+        "Preserve all recognizable subjects and major visual details already present in the supplied composite. Harmonize cinematic lighting, depth, contrast and tonal color across the existing composite with restrained deep navy and electric blue highlights. Do not replace the composite with a different scene.",
         "Create naturally integrated, uncluttered negative space in the upper-middle for a large live digital clock and in the lower-middle for elegant Arabic text.",
         "Do not draw or invent any text, letters, Arabic calligraphy, numbers, clocks, symbols, logos or watermarks. The clock and text will be rendered separately as crisp editable live layers.",
         "Avoid muddy blur, excessive glow, hard borders and artificial-looking cutouts. Keep important visual details away from the clock/text safe areas."
@@ -906,6 +988,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
   return (
     <main className="wrap wsx" dir="rtl" style={{ maxWidth: 1200, paddingBottom: 36 }}>
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onUpload} hidden />
+      <input ref={multiFileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onUploadMultiple} multiple hidden />
 
       <section className="glass hero" style={{ padding: 16 }}>
         <div className="wsx-row" style={{ justifyContent: "space-between" }}>
@@ -988,13 +1071,15 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
           {tab === "background" && (
             <div style={{ display: "grid", gap: 10 }}>
               <button className="btn" onClick={() => void applyAiComposition()} disabled={busy || aiBusy || bgLoading || bg.kind === "none" || !vipOk}>
-                {aiBusy ? "جارٍ تحسين التكوين بالذكاء الاصطناعي…" : "✦ تحسين ودمج بالذكاء الاصطناعي"}
+                {aiBusy ? "جارٍ تحسين التكوين بالذكاء الاصطناعي…" : "✦ تحسين المشهد المركّب بالذكاء الاصطناعي"}
               </button>
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-                يحسّن الذكاء الاصطناعي الخلفية والإضاءة، ثم يرتّب الساعة والنصوص كطبقات حية قابلة للتعديل. يتطلب VIP ويستهلك رصيد تعديل الصور حسب إعدادات الموقع.
+                يحسّن الذكاء الاصطناعي المشهد المركّب وإضاءته؛ ثم تبقى الساعة والتواريخ والنصوص طبقات حية قابلة للتعديل. يتطلب VIP ويستهلك رصيد تعديل الصور حسب إعدادات الموقع.
                 {!vipOk && <> <Link href="/vip" style={{ textDecoration: "underline" }}>الترقية إلى VIP</Link></>}
               </p>
               <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}>＋ صورة من الهاتف (خاصة بك)</button>
+              <button className="btn secondary" onClick={() => multiFileRef.current?.click()} disabled={busy}>▧ دمج صورتين أو أكثر</button>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>اختر حتى 8 صور. تُركّب أولًا داخل مشهد عمودي على جهازك، ثم يمكنك طلب مواءمة الإضاءة والألوان بالذكاء الاصطناعي.</p>
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>الصور التي ترفعها تبقى على جهازك ولا تُنشر في مكتبة الموقع.</p>
               {localImages.length > 0 && (
                 <div>
