@@ -43,8 +43,6 @@ describe("generateImage response handling", () => {
     });
     await expect(generateImage({ prompt: "cat", aspectRatio: "9:16", imageSize: "1K" }))
       .resolves.toEqual({ data: "iVBORw0KGgo=", mimeType: "image/png" });
-    const body = JSON.parse(String((calls[0] as unknown as { body?: string }).body || "{}"));
-    // Request shape is asserted by the mock below in the dedicated request test.
   });
 
   it("sends the documented image-generation request shape", async () => {
