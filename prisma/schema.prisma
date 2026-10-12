@@ -169,6 +169,7 @@ model User {
   wallpapers         Wallpaper[]
   wallpaperFavorites WallpaperFavorite[]
   wallpaperReports   WallpaperReport[]
+  wallpaperDesigns   WallpaperDesign[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1869,6 +1870,7 @@ model Wallpaper {
   uploadedBy User?               @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   favorites  WallpaperFavorite[]
   reports    WallpaperReport[]
+  designs    WallpaperDesign[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1894,6 +1896,32 @@ model WallpaperFavorite {
   @@unique([userId, wallpaperId])
   @@index([userId, createdAt])
   @@index([wallpaperId, createdAt])
+}
+
+/// تصميم محفوظ من GameVortex Wallpaper Studio. يخص مستخدمًا واحدًا فقط.
+/// الصور الخاصة المرفوعة من الهاتف لا تُخزَّن هنا ولا تُنشر في المكتبة العامة؛
+/// يحفظ التصميم فقط إشارة إليها داخل `document`.
+model WallpaperDesign {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+
+  /// "library" | "local" | "none"
+  backgroundKind        String  @default("none")
+  backgroundWallpaperId String?
+  /// "FREE" | "VIP" - أعلى مستوى تتطلبه عناصر التصميم، يحسبه الخادم.
+  tier                  String  @default("FREE")
+  /// الطبقات والتأثير والقالب (JSON تم التحقق منه في الخادم).
+  document              Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallpaper Wallpaper? @relation(fields: [backgroundWallpaperId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([backgroundWallpaperId])
 }
 
 model WallpaperReport {

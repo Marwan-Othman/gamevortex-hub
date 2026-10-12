@@ -1,44 +1,37 @@
-import { db } from "@/lib/prisma";
 import { getOptionalUser } from "@/lib/auth";
 import { getVipAccess } from "@/lib/vip";
+import { WALLPAPER_CATEGORIES } from "@/lib/wallpapers";
 import WallpaperStudioPro from "./WallpaperStudioPro";
 import StudioMergeImport from "./StudioMergeImport";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/**
+ * الاستوديو مفتوح للجميع (حتى غير المسجل) بالأدوات الأساسية.
+ * حالة VIP تُقرأ هنا من الخادم/قاعدة البيانات فقط وتُمرَّر للواجهة للعرض؛
+ * الحماية الفعلية للملفات والحفظ تتم في واجهات API.
+ * مكتبة الخلفيات تُحمَّل بصفحات من /api/wallpapers/studio/library.
+ */
 export default async function WallpaperStudioPage() {
   const user = await getOptionalUser();
   const vip = user ? await getVipAccess(user.id) : null;
-  const wallpapers = await db.wallpaper.findMany({
-    where: { published: true, mediaType: "IMAGE", ...(vip?.isVip ? {} : { isVip: false }) },
-    orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
-    take: 24,
-    select: {
-      id: true,
-      titleAr: true,
-      titleEn: true,
-      width: true,
-      height: true,
-      isVip: true,
-    },
-  });
 
-  const library = wallpapers.map((item) => ({
-    id: item.id,
-    title: item.titleAr || item.titleEn || "GameVortex",
-    src: `/api/wallpapers/${item.id}/media`,
-    isVip: item.isVip,
-  }));
+  const initialPlayerName = (user?.username || "PLAYER").slice(0, 24).toUpperCase();
 
   return (
     <>
       <div className="wrap" dir="rtl" style={{ maxWidth: 1200, paddingTop: 18 }}>
-        <a href="/wallpapers/merge" className="btn secondary" style={{ display: "inline-flex" }}>
+        <Link href="/wallpapers/merge" className="btn secondary" style={{ display: "inline-flex" }}>
           ✨ Smart Merge — دمج عدة صور
-        </a>
+        </Link>
       </div>
-      <WallpaperStudioPro library={library} />
+      <WallpaperStudioPro
+        access={{ loggedIn: Boolean(user), isVip: Boolean(vip?.isVip), isOwner: Boolean(vip?.isOwner) }}
+        categories={[...WALLPAPER_CATEGORIES]}
+        initialPlayerName={initialPlayerName}
+      />
       <StudioMergeImport />
     </>
   );

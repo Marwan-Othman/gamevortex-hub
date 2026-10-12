@@ -114,6 +114,7 @@ export default function ContentManager({ items, categories = [] }: { items: Cont
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
 
   const [busy, setBusy] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -409,6 +410,58 @@ export default function ContentManager({ items, categories = [] }: { items: Cont
     }
   }
 
+  const itemKey = (item: ContentListItem) => `${item.type}:${item.id}`;
+
+  function toggleSelected(item: ContentListItem) {
+    const key = itemKey(item);
+    setSelectedItems((current) => current.includes(key) ? current.filter((value) => value !== key) : [...current, key]);
+  }
+
+  function toggleSelectAll() {
+    const visibleKeys = items.map(itemKey);
+    const allSelected = visibleKeys.length > 0 && visibleKeys.every((key) => selectedItems.includes(key));
+    setSelectedItems((current) => allSelected
+      ? current.filter((key) => !visibleKeys.includes(key))
+      : [...new Set([...current, ...visibleKeys])]);
+  }
+
+  async function runBulkAction(action: "pin" | "unpin" | "delete") {
+    if (busy || selectedItems.length === 0) return;
+    const selected = items.filter((item) => selectedItems.includes(itemKey(item)));
+    if (!selected.length) {
+      setSelectedItems([]);
+      return;
+    }
+    const actionLabel = action === "delete" ? "حذف" : action === "pin" ? "تثبيت" : "إلغاء التثبيت";
+    if (!window.confirm(`${actionLabel} ${selected.length} عنصرًا محددًا؟${action === "delete" ? " قد يتعذر حذف لعبة لها مشتريات أو ملكيات سابقة." : ""}`)) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/content/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, items: selected.map(({ id, type }) => ({ id, type })) }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) throw new Error(typeof payload?.error === "string" ? payload.error : "CONTENT_BULK_FAILED");
+      const failed = Array.isArray(payload.failed) ? payload.failed as { type: string; id: string; error: string }[] : [];
+      const completed = Number(payload.completed ?? 0);
+      setSelectedItems(failed.map((item) => `${item.type}:${item.id}`));
+      if (failed.length) {
+        const purchaseBlocked = failed.some((item) => item.error === "CONTENT_HAS_PURCHASES");
+        setError(`تم تنفيذ ${completed} من ${selected.length}. تعذر تنفيذ ${failed.length} عنصرًا.${purchaseBlocked ? " بعض الألعاب لها مشتريات أو ملكيات سابقة؛ أزل نشرها بدل حذفها." : ""}`);
+      } else {
+        setMessage(action === "delete" ? `تم حذف ${completed} عنصرًا.` : action === "pin" ? `تم تثبيت ${completed} عنصرًا.` : `تم إلغاء تثبيت ${completed} عنصرًا.`);
+      }
+      router.refresh();
+    } catch (err) {
+      setError(errorText(err instanceof Error ? err.message : null));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onDelete(item: ContentListItem) {
     if (busy) return;
     const label = item.type === "game" ? "اللعبة" : "التطبيق";
@@ -619,11 +672,32 @@ export default function ContentManager({ items, categories = [] }: { items: Cont
       </section>
 
       <section className="glass card">
-        <h2 style={{ marginTop: 0 }}>المحتوى الحالي</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <h2 style={{ marginTop: 0, marginBottom: 0 }}>المحتوى الحالي</h2>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={items.length > 0 && items.every((item) => selectedItems.includes(itemKey(item)))}
+              onChange={toggleSelectAll}
+              disabled={busy || items.length === 0}
+            />
+            تحديد الكل في الصفحة ({items.length})
+          </label>
+        </div>
+        {selectedItems.length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "14px 0" }}>
+            <strong>تم تحديد {selectedItems.filter((key) => items.some((item) => itemKey(item) === key)).length} عنصرًا</strong>
+            <button type="button" className="btn" onClick={() => runBulkAction("pin")} disabled={busy}>تثبيت المحدد</button>
+            <button type="button" className="btn secondary" onClick={() => runBulkAction("unpin")} disabled={busy}>إلغاء التثبيت</button>
+            <button type="button" className="btn secondary" onClick={() => runBulkAction("delete")} disabled={busy} style={{ color: "#f87171" }}>حذف المحدد</button>
+            <button type="button" className="btn secondary" onClick={() => setSelectedItems([])} disabled={busy}>إلغاء التحديد</button>
+          </div>
+        )}
         {!items.length && <p className="muted">لا يوجد محتوى بعد.</p>}
         <div style={{ display: "grid", gap: 10 }}>
           {items.map((item) => (
-            <article key={`${item.type}-${item.id}`} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <article key={`${item.type}-${item.id}`} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: 8, borderRadius: 12, border: selectedItems.includes(itemKey(item)) ? "1px solid rgba(168,85,247,.8)" : "1px solid transparent" }}>
+              <input type="checkbox" aria-label={`تحديد ${item.name}`} checked={selectedItems.includes(itemKey(item))} onChange={() => toggleSelected(item)} disabled={busy} />
               {item.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={item.image} alt="" width={48} height={48} style={{ objectFit: "cover", borderRadius: 10 }} />

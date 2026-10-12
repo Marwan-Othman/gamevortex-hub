@@ -41,7 +41,9 @@ color: var(--ink);
 
 .sectionHead h2 svg {
 color: var(--purple-400);
-flex: none;
+width: 22px;
+height: 22px;
+flex: 0 0 22px;
 }
 
 .sectionHead a {
@@ -2055,3 +2057,157 @@ transition: none;
 .coverGlow { opacity: .42; }
 .sideVip, .sideAi { border-radius: 24px; }
 @media (max-width: 700px) { .page { padding-top: 12px; } .heroGrid { width: calc(100% - 16px); } .heroContent { width: 100%; padding: 28px 22px 150px; } .heroStats { grid-template-columns: repeat(2, 1fr); inset-inline: 14px; bottom: 14px; } .heroStat:nth-child(5) { display: none; } .hscroll { gap: 10px; } }
+
+
+/* Mobile regression fix: keep section headings from collapsing when the
+   game row shares a grid with the store card. */
+.sectionHead {
+  min-width: 0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.sectionHead h2 {
+  flex: 1 1 220px;
+  min-width: 0;
+  width: auto;
+  writing-mode: horizontal-tb;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.35;
+}
+.sectionHead > a {
+  flex: 0 0 auto;
+}
+.split,
+.split > * {
+  min-width: 0;
+}
+.split .section {
+  width: 100%;
+}
+@media (max-width: 699px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .sectionHead h2 {
+    flex-basis: 180px;
+    font-size: 18px;
+  }
+}
+
+
+/* Final mobile layout pass: stack the trending row and store banner as
+   full-width blocks, and keep Arabic section titles on one readable line. */
+@media (max-width: 699px) {
+  .split {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    width: calc(100% - 18px);
+    margin-inline: auto;
+  }
+
+  .split > .section,
+  .split .section {
+    display: block;
+    flex: 0 0 auto;
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .split .sectionHead {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 12px;
+  }
+
+  .split .sectionHead h2 {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    font-size: clamp(16px, 4.5vw, 19px);
+    line-height: 1.4;
+  }
+
+  .split .sectionHead h2 svg {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .split .sectionHead > a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .split .dealCard {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
+
+/* Targeted fix for narrow mobile viewport and Arabic titles */
+@media (max-width: 767px) {
+  .sectionHead {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+  }
+  .sectionHead h2 {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(15px, 4.3vw, 19px);
+    line-height: 1.4;
+    writing-mode: horizontal-tb;
+    word-break: normal;
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+  .sectionHead h2 svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+  .sectionHead > a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .split,
+  .split > *,
+  .split .section {
+    min-width: 0;
+    width: 100%;
+  }
+  .split {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
