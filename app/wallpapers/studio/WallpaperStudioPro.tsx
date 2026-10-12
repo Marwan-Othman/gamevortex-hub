@@ -669,12 +669,12 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
     const layers = current.layers.map((layer) => {
       if (layer.kind === "clock") {
         clockAdded = true;
-        return { ...layer, x: 540, y: 690, fontSize: Math.max(layer.fontSize, 145), align: "center" as const, shadow: Math.max(layer.shadow, 18), glow: true };
+        return { ...layer, x: 540, y: 690, fontSize: Math.max(layer.fontSize, 145), align: "center" as const, shadow: Math.max(layer.shadow, 18), glow: vipOk ? true : false };
       }
       if (layer.kind === "gregorian") return { ...layer, x: 540, y: 850, align: "center" as const, shadow: Math.max(layer.shadow, 10) };
-      if (layer.kind === "hijri") return { ...layer, x: 540, y: 925, align: "center" as const, shadow: Math.max(layer.shadow, 12), glow: true };
-      if (layer.kind === "name") return { ...layer, x: 540, y: 1580, align: "center" as const, shadow: Math.max(layer.shadow, 14), glow: true };
-      if (layer.kind === "text") return { ...layer, x: 540, y: Math.min(1450, Math.max(1120, layer.y)), align: "center" as const, shadow: Math.max(layer.shadow, 14), glow: true };
+      if (layer.kind === "hijri") return { ...layer, x: 540, y: 925, align: "center" as const, shadow: Math.max(layer.shadow, 12), glow: vipOk ? true : false };
+      if (layer.kind === "name") return { ...layer, x: 540, y: 1580, align: "center" as const, shadow: Math.max(layer.shadow, 14), glow: vipOk ? true : false };
+      if (layer.kind === "text") return { ...layer, x: 540, y: Math.min(1450, Math.max(1120, layer.y)), align: "center" as const, shadow: Math.max(layer.shadow, 14), glow: vipOk ? true : false };
       return layer;
     });
     if (!clockAdded) {
