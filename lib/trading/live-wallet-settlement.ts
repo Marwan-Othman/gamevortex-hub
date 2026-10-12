@@ -375,7 +375,10 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
         accountId: lockedAccount.id,
         allocationId: allocation.id,
         type: "ALLOCATION_RETURN",
-        amountUsd: calculation.returnedUsd,
+        // This ledger records the TradingAccount balance movement, which is
+        // the released allocation principal, not the (possibly different)
+        // net exchange proceeds credited to OwnerWallet.
+        amountUsd: allocation.amountUsd,
         balanceBeforeUsd: beforeBalance,
         balanceAfterUsd: afterBalance,
         relatedTradeId: order.id,
