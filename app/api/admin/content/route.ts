@@ -135,9 +135,9 @@ export async function POST(request: NextRequest) {
       sourceProvider = new URL(remote.finalUrl).hostname.slice(0, 120);
     }
 
-    const rawImages = Array.isArray(body.imageUrls) ? body.imageUrls.filter((value: unknown): value is string => typeof value === "string") : [];
+    const rawImages: string[] = Array.isArray(body.imageUrls) ? body.imageUrls.filter((value: unknown): value is string => typeof value === "string") : [];
     if (rawImages.length > 12) return NextResponse.json({ success: false, error: "TOO_MANY_IMAGES" }, { status: 400 });
-    const imageUrls = rawImages.map((url) => canonicalBlobUrl(url, "image")).filter((url): url is string => Boolean(url));
+    const imageUrls = rawImages.map((url: string) => canonicalBlobUrl(url, "image")).filter((url): url is string => Boolean(url));
     if (imageUrls.length !== rawImages.length) return NextResponse.json({ success: false, error: "INVALID_IMAGE" }, { status: 400 });
     uploadedImages.push(...imageUrls);
 
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
             published, featured,
             gamePlatforms: { create: platformValues.map((platform) => ({ platform })) },
             gameCategories: categoryIds.length ? { create: categoryIds.map((categoryId) => ({ categoryId })) } : undefined,
-            images: imageUrls.length ? { create: imageUrls.map((url, index) => ({ url, sortOrder: index })) } : undefined,
+            images: imageUrls.length ? { create: imageUrls.map((url: string, index: number) => ({ url, sortOrder: index })) } : undefined,
           },
         });
         await tx.auditLog.create({
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
             priceCents, discountPercent, published, featured,
             appPlatforms: { create: platformValues.map((platform) => ({ platform })) },
             appCategories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
-            images: imageUrls.length ? { create: imageUrls.map((url, index) => ({ url, sortOrder: index })) } : undefined,
+            images: imageUrls.length ? { create: imageUrls.map((url: string, index: number) => ({ url, sortOrder: index })) } : undefined,
           },
         });
         await tx.auditLog.create({
