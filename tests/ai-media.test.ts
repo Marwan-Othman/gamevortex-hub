@@ -46,6 +46,8 @@ describe("generateImage response handling", () => {
   });
 
   it("sends the documented image-generation request shape", async () => {
+    // Keep this assertion independent of deployment-specific model overrides.
+    delete process.env.GEMINI_IMAGE_MODEL;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/interactions");
