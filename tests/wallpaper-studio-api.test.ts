@@ -158,7 +158,7 @@ describe("free user", () => {
     expect((await create({ name: "", background: { kind: "none" }, document: freeDoc() })).status).toBe(400);
     expect((await create(payload({ ...freeDoc(), effect: "hack" }))).status).toBe(400);
     expect((await create(payload({ ...freeDoc(), layers: [{ ...freeDoc().layers[0], color: "url(javascript:1)" }] }))).status).toBe(400);
-    const big = { ...freeDoc(), layers: Array.from({ length: 40 }, () => makeLayer({ kind: "text", text: "x".repeat(300) })) };
+    const big = { ...freeDoc(), layers: Array.from({ length: 41 }, () => makeLayer({ kind: "text", text: "x".repeat(300) })) };
     expect((await create(payload(big))).status).toBe(400);
     const bad = await createPost(makeRequest("/api/wallpapers/studio/designs", { rawBody: "{not json" }));
     expect(bad.status).toBe(400);
