@@ -987,6 +987,45 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
 
   return (
     <main className="wrap wsx" dir="rtl" style={{ maxWidth: 1200, paddingBottom: 36 }}>
+    <style jsx global>{`
+      .wsx { --studio-accent: #a855f7; --studio-border: rgba(168,85,247,.22); }
+      .wsx .wsx-grid { display:grid; grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:14px; align-items:start; }
+      .wsx .glass.card { border:1px solid var(--studio-border); border-radius:24px; background:linear-gradient(155deg,rgba(17,18,38,.94),rgba(7,9,20,.96)); box-shadow:0 12px 36px rgba(0,0,0,.22); }
+      .wsx .wsx-tabs { display:flex; gap:6px; overflow-x:auto; overscroll-behavior-inline:contain; scrollbar-width:none; padding:2px 0 9px; border-bottom:1px solid rgba(168,85,247,.18); }
+      .wsx .wsx-tabs::-webkit-scrollbar { display:none; }
+      .wsx .wsx-tabs .platform-chip { flex:0 0 auto; min-height:36px; padding:7px 12px; border-radius:13px; font-size:12px; font-weight:700; line-height:1.2; white-space:nowrap; }
+      .wsx .platform-chip { min-height:34px; padding:7px 12px; border-radius:14px; font-size:12px; line-height:1.2; }
+      .wsx .btn { min-height:40px; padding:9px 13px; border-radius:14px; font-size:13px; font-weight:700; }
+      .wsx .btn.secondary { border-color:rgba(168,85,247,.28); }
+      .wsx .input { min-height:40px; border-radius:13px; font-size:13px; }
+      .wsx .badge { border-radius:999px; padding:7px 10px; font-size:11px; line-height:1.35; }
+      .wsx .wsx-row { gap:7px; }
+      .wsx .wsx-thumbs { gap:8px; }
+      .wsx .wsx-thumb { border-radius:12px; overflow:hidden; }
+      .wsx .wsx-grid > .glass.card:first-child { position:sticky; top:12px; }
+      .wsx .wsx-grid > aside { min-width:0; }
+      @media (max-width: 760px) {
+        .wsx { padding-inline:10px !important; padding-top:8px !important; }
+        .wsx .hero { padding:12px !important; border-radius:20px; }
+        .wsx .hero h1 { font-size:20px; line-height:1.3; }
+        .wsx .hero .wsx-row { align-items:flex-start; flex-wrap:wrap; }
+        .wsx .hero .wsx-row > .wsx-row { width:100%; gap:6px; }
+        .wsx .hero .btn { min-height:34px; padding:7px 10px; font-size:11px; }
+        .wsx .wsx-grid { grid-template-columns:minmax(0,1fr); gap:10px; margin-top:10px !important; }
+        .wsx .wsx-grid > .glass.card:first-child { position:relative; top:auto; padding:10px !important; gap:8px !important; }
+        .wsx .wsx-grid > .glass.card:first-child > div:first-child { width:min(100%,330px) !important; padding:5px !important; border-radius:25px !important; }
+        .wsx .wsx-grid > .glass.card:first-child canvas { border-radius:20px !important; }
+        .wsx .wsx-grid > aside { padding:10px !important; border-radius:20px; }
+        .wsx .wsx-tabs { gap:5px; margin-inline:-1px; }
+        .wsx .wsx-tabs .platform-chip { min-height:34px; padding:7px 10px; font-size:11px; }
+        .wsx .wsx-grid .wsx-row { gap:6px; flex-wrap:wrap; }
+        .wsx .wsx-grid .platform-chip { min-height:32px; padding:6px 10px; font-size:11px; }
+        .wsx .wsx-grid .btn { min-height:38px; padding:8px 10px; font-size:12px; }
+        .wsx .wsx-grid .input { min-height:38px; font-size:12px; }
+        .wsx .wsx-grid .badge { font-size:10px; padding:6px 9px; }
+        .wsx .wsx-grid aside p { line-height:1.7; }
+      }
+    `}</style>
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onUpload} hidden />
       <input ref={multiFileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onUploadMultiple} multiple hidden />
 
