@@ -132,6 +132,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
   const [status, setStatus] = useState<Status>(null);
   const [now, setNow] = useState(() => new Date());
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [exportType, setExportType] = useState<"image/png" | "image/jpeg">("image/png");
   const [playerName, setPlayerName] = useState(initialPlayerName);
   const [customText, setCustomText] = useState("");
@@ -575,6 +576,105 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
     return blob;
   }
 
+  async function applyAiComposition() {
+    if (!vipOk) {
+      setStatus({ text: "تحسين الخلفية بالذكاء الاصطناعي متاح لمشتركي VIP.", tone: "error", link: VIP_LINK });
+      return;
+    }
+    if (bgLoading || !bgRef.current) {
+      setStatus({ text: "اختر خلفية وانتظر اكتمال تحميلها أولًا.", tone: "error" });
+      return;
+    }
+
+    setAiBusy(true);
+    const source = bgRef.current;
+    try {
+      // Send a resized JPEG to keep the request small on mobile networks.
+      const input = document.createElement("canvas");
+      input.width = 768;
+      input.height = 1365;
+      const ctx = input.getContext("2d");
+      if (!ctx) throw new Error("CANVAS_UNAVAILABLE");
+      const scale = Math.max(input.width / source.width, input.height / source.height);
+      const width = source.width * scale;
+      const height = source.height * scale;
+      ctx.drawImage(source.source, (input.width - width) / 2, (input.height - height) / 2, width, height);
+      const imageData = input.toDataURL("image/jpeg", 0.82);
+      const prompt = [
+        "Edit the supplied image as a premium vertical 9:16 smartphone wallpaper background.",
+        "Preserve the main subject and recognizable scene. Improve cinematic lighting, depth, contrast and tonal harmony with restrained deep navy and electric blue highlights.",
+        "Create naturally integrated, uncluttered negative space in the upper-middle for a large live digital clock and in the lower-middle for elegant Arabic text.",
+        "Do not draw or invent any text, letters, Arabic calligraphy, numbers, clocks, symbols, logos or watermarks. The clock and text will be rendered separately as crisp editable live layers.",
+        "Avoid muddy blur, excessive glow, hard borders and artificial-looking cutouts. Keep important visual details away from the clock/text safe areas."
+      ].join(" ");
+
+      const response = await fetch("/api/ai/image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          imageData,
+          aspectRatio: "9:16",
+          imageSize: "1K",
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        const message =
+          data.error === "AI_CREDITS_EXHAUSTED" ? "رصيد GVC غير كافٍ لتحسين الخلفية."
+          : data.error === "AI_VIP_REQUIRED" ? "ميزة تحسين الخلفية بالذكاء الاصطناعي تتطلب VIP."
+          : data.error === "RATE_LIMITED" ? "تم طلب تحسينات كثيرة خلال وقت قصير. حاول لاحقًا."
+          : data.error === "AI_TIMEOUT" ? "تأخر مزود الذكاء الاصطناعي. لم يتغير تصميمك؛ حاول مرة أخرى."
+          : "تعذر تحسين الخلفية بالذكاء الاصطناعي. لم يتغير تصميمك.";
+        setStatus({ text: message, tone: "error", link: data.error === "AI_VIP_REQUIRED" ? VIP_LINK : undefined });
+        return;
+      }
+
+      const blob = await response.blob();
+      if (!blob.size || !blob.type.startsWith("image/")) throw new Error("INVALID_AI_IMAGE");
+      let id = uid();
+      try {
+        id = await putLocalImage(blob);
+      } catch {
+        // Keep the result usable for this session even if local storage is full.
+        setStatus({ text: "اكتمل التحسين، لكن تعذر حفظ النسخة في تخزين الجهاز؛ ستبقى متاحة حتى إغلاق الصفحة.", tone: "error" });
+      }
+      sessionBlobs.current.set(id, blob);
+      unpersisted.current.delete(id);
+
+      // Reflow live layers after the background edit; every element remains editable.
+      let textIndex = 0;
+      const layers = docRef.current.layers.map((layer) => {
+        if (layer.kind === "clock") {
+          return { ...layer, x: 540, y: 700, fontSize: Math.max(layer.fontSize, 150), color: "#FFFFFF", align: "center" as const, shadow: Math.max(layer.shadow, 22), glow: true };
+        }
+        if (layer.kind === "gregorian") {
+          return { ...layer, x: 540, y: 875, fontSize: Math.max(layer.fontSize, 36), color: "#F8FAFC", align: "center" as const, shadow: Math.max(layer.shadow, 12) };
+        }
+        if (layer.kind === "hijri") {
+          return { ...layer, x: 540, y: 965, fontSize: Math.max(layer.fontSize, 34), color: "#FFFFFF", align: "center" as const, shadow: Math.max(layer.shadow, 16), glow: true };
+        }
+        if (layer.kind === "name") {
+          return { ...layer, x: 540, y: 1600, color: "#FFFFFF", align: "center" as const, shadow: Math.max(layer.shadow, 18), glow: true };
+        }
+        if (layer.kind === "text") {
+          textIndex += 1;
+          return { ...layer, x: 540, y: textIndex === 1 ? 1150 : textIndex === 2 ? 1390 : 1530, color: "#FFFFFF", align: "center" as const, shadow: Math.max(layer.shadow, 18), glow: true };
+        }
+        return layer;
+      });
+      commit({ ...docRef.current, layers });
+      setBg({ kind: "local", localId: id });
+      await refreshLocalImages();
+      setStatus({ text: "تم تحسين الإضاءة والتكوين بالذكاء الاصطناعي، وأُعيد ترتيب الساعة والنصوص. كل الطبقات ما زالت قابلة للتحريك والتعديل.", tone: "ok" });
+    } catch {
+      setStatus({ text: "تعذر إكمال التحسين. بقيت الخلفية والتصميم الحاليان كما هما.", tone: "error" });
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   function checkExportAllowed(): boolean {
     if (lockedByVip) {
       setStatus({ text: "التصميم يحتوي على عناصر VIP وحسابك غير مشترك حاليًا. أزلها أو جدّد اشتراكك.", tone: "error", link: VIP_LINK });
@@ -885,6 +985,13 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
 
           {tab === "background" && (
             <div style={{ display: "grid", gap: 10 }}>
+              <button className="btn" onClick={() => void applyAiComposition()} disabled={busy || aiBusy || bgLoading || bg.kind === "none" || !vipOk}>
+                {aiBusy ? "جارٍ تحسين التكوين بالذكاء الاصطناعي…" : "✦ تحسين ودمج بالذكاء الاصطناعي"}
+              </button>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                يحسّن الذكاء الاصطناعي الخلفية والإضاءة، ثم يرتّب الساعة والنصوص كطبقات حية قابلة للتعديل. يتطلب VIP ويستهلك رصيد تعديل الصور حسب إعدادات الموقع.
+                {!vipOk && <> <Link href="/vip" style={{ textDecoration: "underline" }}>الترقية إلى VIP</Link></>}
+              </p>
               <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}>＋ صورة من الهاتف (خاصة بك)</button>
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>الصور التي ترفعها تبقى على جهازك ولا تُنشر في مكتبة الموقع.</p>
               {localImages.length > 0 && (
@@ -1082,7 +1189,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
         .wsx label{display:grid;gap:6px;font-size:14px}
         .wsx input[type=range]{width:100%}
         .wsx .input{width:100%}
-        @media(max-width:900px){.wsx-grid{grid-template-columns:1fr}}
+        @media(max-width:900px){.wsx-grid{grid-template-columns:1fr}.wsx-tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding:3px 1px 8px;scrollbar-width:thin}.wsx-tabs>.platform-chip{flex:0 0 auto;white-space:nowrap}.wsx-grid>aside{min-width:0}.wsx-grid>div{min-width:0}.wsx-grid canvas{max-height:62dvh;object-fit:contain}.wsx-row .btn{min-height:42px}}
       `}</style>
     </main>
   );
