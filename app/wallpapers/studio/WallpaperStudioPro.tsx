@@ -706,9 +706,15 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
         const message =
           data.error === "AI_CREDITS_EXHAUSTED" ? "رصيد GVC غير كافٍ لتحسين الخلفية."
           : data.error === "AI_VIP_REQUIRED" ? "ميزة تحسين الخلفية بالذكاء الاصطناعي تتطلب VIP."
-          : data.error === "RATE_LIMITED" ? "تم طلب تحسينات كثيرة خلال وقت قصير. حاول لاحقًا."
-          : data.error === "AI_TIMEOUT" ? "تأخر مزود الذكاء الاصطناعي. لم يتغير تصميمك؛ حاول مرة أخرى."
-          : "تعذر تحسين الخلفية بالذكاء الاصطناعي. لم يتغير تصميمك.";
+          : data.error === "UNAUTHORIZED" ? "انتهت جلسة الدخول أو لم يتم تسجيل الدخول. سجّل الدخول ثم أعد المحاولة."
+          : data.error === "NOT_CONFIGURED" ? "خدمة الصور غير مهيأة على الخادم: تحقق من إعداد GEMINI_API_KEY في بيئة النشر."
+          : data.error === "AUTH_FAILED" ? "رفض مزود الصور مفتاح الخدمة أو صلاحياته. راجع إعدادات الخادم."
+          : data.error === "RATE_LIMITED" ? "وصل مزود الصور إلى حد الطلبات. حاول لاحقًا."
+          : data.error === "TIMEOUT" || data.error === "AI_TIMEOUT" ? "انتهت مهلة استجابة مزود الصور. لم يتغير تصميمك؛ حاول مرة أخرى."
+          : data.error === "UNAVAILABLE" ? "مزود الصور غير متاح مؤقتًا. لم يتغير تصميمك."
+          : data.error === "INVALID_REQUEST" || data.error === "INVALID_IMAGE_INPUT" ? "تعذر إرسال الصورة: تحقق من صيغة الصورة وحجمها ثم أعد المحاولة."
+          : data.error === "RATE_LIMITED_USER" ? "تجاوزت حد طلبات الذكاء الاصطناعي المسموح مؤقتًا."
+          : `فشل تحسين الصورة (رمز: ${String(data.error || "UNKNOWN").slice(0, 80)}). لم يتغير تصميمك.`;
         setStatus({ text: message, tone: "error", link: data.error === "AI_VIP_REQUIRED" ? VIP_LINK : undefined });
         return;
       }
@@ -1109,7 +1115,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
 
           {tab === "background" && (
             <div style={{ display: "grid", gap: 10 }}>
-              <button className="btn" onClick={() => void applyAiComposition()} disabled={busy || aiBusy || bgLoading || bg.kind === "none" || !vipOk}>
+              <button className="btn" onClick={() => void applyAiComposition()} disabled={busy || aiBusy || bgLoading || bg.kind === "none"}>
                 {aiBusy ? "جارٍ تحسين التكوين بالذكاء الاصطناعي…" : "✦ تحسين المشهد المركّب بالذكاء الاصطناعي"}
               </button>
               <p className="muted" style={{ fontSize: 12, margin: 0 }}>
