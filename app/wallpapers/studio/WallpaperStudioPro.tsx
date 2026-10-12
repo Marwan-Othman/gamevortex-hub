@@ -711,9 +711,13 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
           : data.error === "AUTH_FAILED" ? "رفض مزود الصور مفتاح الخدمة أو صلاحياته. راجع إعدادات الخادم."
           : data.error === "RATE_LIMITED" ? "وصل مزود الصور إلى حد الطلبات. حاول لاحقًا."
           : data.error === "TIMEOUT" || data.error === "AI_TIMEOUT" ? "انتهت مهلة استجابة مزود الصور. لم يتغير تصميمك؛ حاول مرة أخرى."
-          : data.error === "UNAVAILABLE" ? "مزود الصور غير متاح مؤقتًا. لم يتغير تصميمك."
+          : data.error === "AI_SERVICE_UNAVAILABLE" ? "خدمة توليد الصور غير متاحة أو إعداد المزود غير مكتمل. لم يتغير تصميمك؛ راجع سجلات الخادم وإعداد GEMINI_API_KEY."
+          : data.error === "AI_EMPTY_RESPONSE" ? "وصل رد فارغ من مزود الصور. لم يتغير تصميمك؛ حاول مرة أخرى."
+          : data.error === "AI_REQUEST_IN_PROGRESS" ? "يوجد طلب سابق قيد المعالجة. انتظر قليلًا ثم حاول مرة أخرى."
+          : data.error === "AI_IDEMPOTENCY_KEY_CONFLICT" ? "تم رفض الطلب المكرر لحماية الرصيد. أعد المحاولة بزر التحسين مرة واحدة."
+          : data.error === "AI_TIMEOUT" ? "انتهت مهلة استجابة مزود الصور. لم يتغير تصميمك؛ حاول مرة أخرى."
           : data.error === "INVALID_REQUEST" || data.error === "INVALID_IMAGE_INPUT" ? "تعذر إرسال الصورة: تحقق من صيغة الصورة وحجمها ثم أعد المحاولة."
-          : data.error === "RATE_LIMITED_USER" ? "تجاوزت حد طلبات الذكاء الاصطناعي المسموح مؤقتًا."
+          : data.error === "RATE_LIMITED" ? "وصلت إلى حد الطلبات المسموح مؤقتًا. انتظر قليلًا ثم أعد المحاولة."
           : `فشل تحسين الصورة (رمز: ${String(data.error || "UNKNOWN").slice(0, 80)}). لم يتغير تصميمك.`;
         setStatus({ text: message, tone: "error", link: data.error === "AI_VIP_REQUIRED" ? VIP_LINK : undefined });
         return;
