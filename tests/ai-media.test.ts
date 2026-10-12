@@ -35,6 +35,31 @@ describe("generateImage response handling", () => {
     expect((await generateImage({ prompt: "cat" })).mimeType).toBe("image/png");
   });
 
+  it("supports the Interactions API output_image convenience field", async () => {
+    mockFetch((url, headers) => {
+      expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/interactions");
+      expect(headers["x-goog-api-key"]).toBe("test-key");
+      return json({ output_image: { mime_type: "image/png", data: "iVBORw0KGgo=" } });
+    });
+    await expect(generateImage({ prompt: "cat", aspectRatio: "9:16", imageSize: "1K" }))
+      .resolves.toEqual({ data: "iVBORw0KGgo=", mimeType: "image/png" });
+    const body = JSON.parse(String((calls[0] as unknown as { body?: string }).body || "{}"));
+    // Request shape is asserted by the mock below in the dedicated request test.
+  });
+
+  it("sends the documented image-generation request shape", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/interactions");
+      const body = JSON.parse(String(init?.body || "{}"));
+      expect(body.model).toBe("gemini-3.1-flash-image");
+      expect(body.input).toEqual("cat");
+      expect(body.response_format).toMatchObject({ type: "image", aspect_ratio: "9:16", image_size: "2K", delivery: "inline" });
+      return json({ steps: [{ type: "model_output", content: [{ type: "image", mime_type: "image/png", data: "iVBORw0KGgo=" }] }] });
+    }) as typeof fetch;
+    await generateImage({ prompt: "cat", aspectRatio: "9:16", imageSize: "2K" });
+  });
+
   it.each([
     ["no steps", {}],
     ["empty steps", { steps: [] }],
