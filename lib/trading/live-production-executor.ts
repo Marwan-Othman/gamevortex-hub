@@ -19,7 +19,7 @@ import {
   getBinanceLiveSymbolRules,
 } from "@/lib/trading/binance-live-symbol-rules";
 import { attemptEmergencyExit, buildEmergencySellClientOrderId } from "@/lib/trading/live-emergency-exit";
-import { computeSellableQuantity } from "@/lib/trading/live-sellable-quantity";
+import { assertEntryFillsCoverExecutedQuantity, computeSellableQuantity } from "@/lib/trading/live-sellable-quantity";
 import {
   DEFAULT_LIVE_MAX_SLIPPAGE_PERCENT,
   evaluateBuySlippage,
@@ -336,6 +336,10 @@ async function protectFilledOrder(
       adapter.getOrderTradeFills({ symbol: order.symbol, providerOrderId: order.providerOrderId }),
       getBinanceLiveSymbolRules(order.symbol),
     ]);
+    assertEntryFillsCoverExecutedQuantity({
+      executedQty: filledQuantity,
+      fills: entryFills.fills,
+    });
     const quantity = computeSellableQuantity({
       executedQty: filledQuantity,
       baseAsset: entryFills.baseAsset,
