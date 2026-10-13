@@ -18,7 +18,7 @@ import {
   assertBinanceLiveProtectedExitRules,
   getBinanceLiveSymbolRules,
 } from "@/lib/trading/binance-live-symbol-rules";
-import { attemptEmergencyExit } from "@/lib/trading/live-emergency-exit";
+import { attemptEmergencyExit, buildEmergencySellClientOrderId } from "@/lib/trading/live-emergency-exit";
 import { computeSellableQuantity } from "@/lib/trading/live-sellable-quantity";
 import {
   DEFAULT_LIVE_MAX_SLIPPAGE_PERCENT,
@@ -324,7 +324,9 @@ async function protectFilledOrder(
     });
   }
 
-  let emergencyQuantity = filledQuantity;
+  // Do not fall back to gross filled quantity: entry fees may have reduced the sellable base balance.
+  // Emergency selling stays disabled until the net quantity is verified from provider fills and symbol rules.
+  let emergencyQuantity: string | null = null;
   try {
     if (!order.providerOrderId) throw new Error("LIVE_ENTRY_PROVIDER_ORDER_ID_REQUIRED");
 
@@ -405,12 +407,18 @@ async function protectFilledOrder(
 
     // The position is filled but NOT protected: try once to flatten it. This
     // never credits a wallet; settlement of an emergency exit stays manual.
-    const emergency = await attemptEmergencyExit({
-      adapter,
-      symbol: order.symbol,
-      entryClientOrderId: order.clientOrderId,
-      quantity: emergencyQuantity,
-    });
+    const emergency = emergencyQuantity
+      ? await attemptEmergencyExit({
+          adapter,
+          symbol: order.symbol,
+          entryClientOrderId: order.clientOrderId,
+          quantity: emergencyQuantity,
+        })
+      : {
+          status: "FAILED" as const,
+          clientOrderId: buildEmergencySellClientOrderId(order.clientOrderId),
+          reason: "EMERGENCY_SELL_QUANTITY_UNVERIFIED",
+        };
     await audit(
       ownerId,
       emergency.status === "SOLD" ? "TRADING_LIVE_EMERGENCY_EXIT_SOLD" : "TRADING_LIVE_EMERGENCY_EXIT_FAILED",
