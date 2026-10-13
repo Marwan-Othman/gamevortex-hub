@@ -26,7 +26,8 @@ import {
   isObservationFresh,
   resolveMaxSlippagePercent,
 } from "@/lib/trading/live-slippage";
-import { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
+import type { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
+import { createBinanceSpotLiveAdapter } from "@/lib/trading/live-exchange";
 import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
@@ -509,12 +510,7 @@ export async function executeApprovedLiveOrder(input: {
     if (!isLiveDirectFundingEnabled()) await bindLiveOrderToAllocation({ ownerId, order });
   }
 
-  const adapter = new BinanceSpotLiveAdapter({
-    apiKey: process.env.BINANCE_LIVE_API_KEY,
-    apiSecret: process.env.BINANCE_LIVE_API_SECRET,
-    apiPrivateKeyPem: process.env.BINANCE_LIVE_API_PRIVATE_KEY,
-    liveTradingEnabled: process.env.GAMEVORTEX_LIVE_TRADING_ENABLED === "true",
-  });
+  const adapter = createBinanceSpotLiveAdapter();
 
   if (order.status === "PROTECTED" || order.status === "CLOSED") {
     const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
