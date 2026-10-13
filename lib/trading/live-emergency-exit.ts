@@ -50,7 +50,7 @@ export async function attemptEmergencyExit(input: {
   const clientOrderId = buildEmergencySellClientOrderId(input.entryClientOrderId);
   try {
     if (!input.adapter.placeEmergencyMarketSell) throw new Error("EMERGENCY_SELL_ADAPTER_REQUIRED");
-    if (!/^\\d+(\\.\\d+)?$/.test(input.quantity) || !Number.isFinite(Number(input.quantity)) || Number(input.quantity) <= 0) {
+    if (!/^\d+(\.\d+)?$/.test(input.quantity) || !Number.isFinite(Number(input.quantity)) || Number(input.quantity) <= 0) {
       throw new Error("EMERGENCY_SELL_QUANTITY_INVALID");
     }
 
@@ -64,7 +64,7 @@ export async function attemptEmergencyExit(input: {
     if (!placed.accepted || placed.status === "REJECTED") throw new Error("EMERGENCY_SELL_REJECTED");
     if (placed.status !== "FILLED") throw new Error("EMERGENCY_SELL_NOT_CONFIRMED");
     if (placed.clientOrderId !== clientOrderId) throw new Error("EMERGENCY_SELL_CLIENT_ORDER_ID_MISMATCH");
-    if (typeof placed.providerOrderId !== "string" || !/^\\d+$/.test(placed.providerOrderId) || Number(placed.providerOrderId) <= 0) {
+    if (typeof placed.providerOrderId !== "string" || !/^\d+$/.test(placed.providerOrderId) || Number(placed.providerOrderId) <= 0) {
       throw new Error("EMERGENCY_SELL_PROVIDER_ORDER_ID_REQUIRED");
     }
     if (typeof placed.executedQty !== "number" || !Number.isFinite(placed.executedQty) || placed.executedQty <= 0) {
