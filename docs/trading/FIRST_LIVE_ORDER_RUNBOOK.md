@@ -42,7 +42,7 @@ Do not execute this section automatically or as part of deployment.
 - [ ] Watch the order through confirmed fill, protective OCO verification, exit monitoring, fill/commission reconciliation, and final settlement. Never treat a submitted order as a fill or gross proceeds as net proceeds.
 - [ ] Compare GameVortex's order state, entry/exit fills, commissions, protective orders, realized P/L, and ledger settlement with Binance's actual records.
 - [ ] If any mismatch, timeout, missing protection, or uncertain state occurs, stop new entries, keep the circuit breaker engaged, and reconcile against Binance before proceeding. Do not retry a potentially submitted order with a new client order ID.
-- [ ] After the controlled review, return the live flag to `false` unless the owner separately decides to continue. Record the commit, deployment, order identifiers, reconciliation result, and explicit go/no-go decision.
+- [ ] After the controlled review, block any further entries through the owner TradingControl/emergency-stop control while leaving the live flag enabled for monitoring of existing positions. **Do not set `GAMEVORTEX_LIVE_TRADING_ENABLED=false` while any live order is unresolved or any position remains open**: the current adapter gate also blocks signed order-status, fill, protection, and settlement calls when the flag is false. Set the flag to `false` only after every live order is terminal, protection/exit state is reconciled, and wallet settlement is verified. Record the commit, deployment, order identifiers, reconciliation result, and explicit go/no-go decision.
 
 ## Immediate NO-GO conditions
 
