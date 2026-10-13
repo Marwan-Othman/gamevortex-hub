@@ -108,45 +108,12 @@ describe("POST /api/ai/chat", () => {
 });
 
 describe("POST /api/ai/image", () => {
-  const body = { prompt: "a cat", idempotencyKey: KEY };
-
-  it("returns raw image bytes (AiMediaClient reads response.blob())", async () => {
-    m.generateImage.mockResolvedValue({ data: Buffer.from("png-bytes").toString("base64"), mimeType: "image/png" });
-    const response = await imagePost(req(body));
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("image/png");
-    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe("png-bytes");
-    expect(m.refundAiCredit).not.toHaveBeenCalled();
-  });
-
-  it("refunds the reservation when generation fails, and reports a usable error code", async () => {
-    m.generateImage.mockRejectedValue(new AiProviderError({ provider: "gemini", code: "EMPTY_RESPONSE" }));
-    const response = await imagePost(req(body));
-    expect(response.status).toBe(502);
-    expect((await response.json()).error).toBe("AI_EMPTY_RESPONSE");
-    expect(m.refundAiCredit).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not spend anything on invalid input", async () => {
-    expect((await imagePost(req({ ...body, imageSize: "99K" }))).status).toBe(400);
-    expect((await imagePost(req({ ...body, imageData: "data:image/gif;base64,AAAAAAAAAAAAAAAAAAAA" }))).status).toBe(400);
-    expect((await imagePost(req({ ...body, idempotencyKey: "x" }))).status).toBe(400);
-    expect(m.consumeAiCredit).not.toHaveBeenCalled();
-  });
-
-  it("refuses a replayed key instead of generating for free, and does not refund the first request", async () => {
-    m.consumeAiCredit.mockResolvedValue({ consumed: true, alreadyApplied: true, amount: 10 });
-    const response = await imagePost(req(body));
-    expect(response.status).toBe(409);
+  it("is disabled and directs users to the wallpaper library", async () => {
+    const response = await imagePost(req({ prompt: "a cat", idempotencyKey: KEY }));
+    expect(response.status).toBe(410);
+    expect((await response.json()).error).toBe("AI_IMAGE_DISABLED");
     expect(m.generateImage).not.toHaveBeenCalled();
-    expect(m.refundAiCredit).not.toHaveBeenCalled();
-  });
-
-  it("answers 402 when the balance is too low and 403 for non-VIP", async () => {
-    m.consumeAiCredit.mockRejectedValue(new Error("AI_CREDITS_EXHAUSTED"));
-    expect((await imagePost(req(body))).status).toBe(402);
-    m.getVipAccess.mockResolvedValue({ isVip: false, isOwner: false });
-    expect((await imagePost(req(body))).status).toBe(403);
+    expect(m.consumeAiCredit).not.toHaveBeenCalled();
   });
 });
 
