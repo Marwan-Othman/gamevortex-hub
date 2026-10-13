@@ -34,7 +34,7 @@ describe("live failure drills", () => {
       adapter: {
         placeEmergencyMarketSell: async (request) => {
           sold = request.quantity;
-          return { accepted: true, clientOrderId: request.clientOrderId, status: "FILLED" };
+          return { accepted: true, clientOrderId: request.clientOrderId, providerOrderId: "77", status: "FILLED", executedQty: 9.99, cumulativeQuoteQty: 1000 };
         },
       },
     });
