@@ -21,6 +21,8 @@ After a confirmed fill the executor places the protective OCO for the **net sell
 3. writes `TRADING_LIVE_EMERGENCY_EXIT_SOLD` or `TRADING_LIVE_EMERGENCY_EXIT_FAILED` to the audit log;
 4. never credits the wallet. Settlement of an emergency exit is manual and must be verified against Binance.
 
+Before computing a sell quantity, the executor also requires a non-empty provider fill list whose summed trade quantity exactly matches the confirmed entry execution. If fills are empty, truncated, malformed, or inconsistent, it deliberately does **not** send an emergency MARKET SELL because the net sellable quantity cannot be proven. The position remains a protection failure, the circuit breaker is tripped, and an operator must urgently reconcile the live Binance balance and open orders by hand.
+
 If the OCO request timed out but actually reached Binance, the coins are locked by the OCO and the emergency sell will be rejected. That is intentional; check Binance and reconcile by hand.
 
 ## Exit settlement fix
