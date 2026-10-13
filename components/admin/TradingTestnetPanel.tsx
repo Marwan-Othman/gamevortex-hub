@@ -93,8 +93,9 @@ export default function TradingTestnetPanel() {
     <section className="ownerCard">
       <div className="ownerCardName">Binance Spot Testnet</div>
       <p className="muted">
-        فحص اتصال بيئة الاختبار فقط. لا يرسل أموالًا حقيقية ولا يسمح بالسحب.
-        مفاتيح API تبقى على الخادم ولا تظهر في المتصفح.
+        هذا الفحص يقرأ حالة حساب Binance Spot Testnet فقط ولا يرسل أي أمر.
+        أموال Testnet افتراضية، ومفاتيح API تبقى على الخادم ولا تظهر في المتصفح.
+        لا تعتبر نتيجة الفحص إذنًا بالتنفيذ؛ زر تنفيذ أمر Testnet غير موصول حاليًا حتى تكتمل حماية منع التكرار.
       </p>
 
       <button type="button" className="primaryButton" onClick={checkStatus} disabled={loading}>
@@ -104,7 +105,7 @@ export default function TradingTestnetPanel() {
       {result && (
         <div className="muted" style={{ marginTop: 16 }}>
           {result.ok && result.readyForTestnetOrder ? (
-            <strong>جاهز لاختبار أمر Testnet.</strong>
+            <strong>الحساب اجتاز فحص الصلاحيات فقط؛ لم يُرسل أي أمر، والتنفيذ من الواجهة غير متاح حاليًا.</strong>
           ) : (
             <strong>{getSafeErrorMessage(result.error)}</strong>
           )}
