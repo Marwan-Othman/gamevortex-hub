@@ -107,7 +107,7 @@ function describeImageError(error: unknown): Status {
 /* المكوّن الرئيسي                                                              */
 /* -------------------------------------------------------------------------- */
 
-export default function WallpaperStudioPro({ access, categories, initialPlayerName }: { access: StudioAccessProps; categories: string[]; initialPlayerName: string }) {
+export default function WallpaperStudioPro({ access, categories, initialPlayerName, initialWallpaperId }: { access: StudioAccessProps; categories: string[]; initialPlayerName: string; initialWallpaperId?: string | null }) {
   const vipOk = access.isVip || access.isOwner;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -125,11 +125,11 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
   const lastCoalesce = useRef<{ key: string; t: number } | null>(null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
 
-  const [bg, setBg] = useState<StudioBackground>({ kind: "none" });
+  const [bg, setBg] = useState<StudioBackground>(() => (initialWallpaperId ? { kind: "library", wallpaperId: initialWallpaperId } : { kind: "none" }));
   const [bgVersion, setBgVersion] = useState(0);
   const [bgLoading, setBgLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("background");
+  const [tab, setTab] = useState<Tab>(initialWallpaperId ? "layers" : "background");
   const [status, setStatus] = useState<Status>(null);
   const [now, setNow] = useState(() => new Date());
   const [busy, setBusy] = useState(false);
