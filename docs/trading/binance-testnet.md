@@ -28,6 +28,12 @@ It is restricted to the existing trading owner guard and returns only permission
 
 **Important:** `canWithdraw` is returned for visibility, but it is not a Testnet readiness gate. Binance Spot Testnet balances are virtual/non-transferable, and the Testnet environment does not provide the same withdrawal-restriction control as a production API key. Do not use this Testnet field to infer production withdrawal restrictions. Production live preflight independently checks the real API key's restrictions and must confirm withdrawals are disabled.
 
+## Current wiring status
+
+The repository contains the guarded Testnet BUY function in `lib/trading/testnet-execution.ts`, but it is not currently called by a Testnet execution API route or by the owner panel. The panel's status action is read-only. It must not report that an order is ready to execute just because account permissions look valid.
+
+Do not wire an order-submission route until durable idempotency is added for the Testnet path. A browser retry, timeout after provider acceptance, or concurrent request must not submit a second BUY for the same approval. The execution flow also needs a recoverable state/reconciliation strategy for ambiguous provider outcomes and audit-write failures.
+
 ## What Testnet execution currently proves
 
 The guarded Testnet execution path validates the existing owner approval, pre-trade risk/policy plan, and Spot Testnet account before submitting a **market BUY** to the official Spot Testnet endpoint. It records a Testnet fill audit event and does not mutate the GameVortex wallet.
