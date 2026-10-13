@@ -29,9 +29,9 @@ export type EmergencyExitOutcome =
   | {
       status: "SOLD";
       clientOrderId: string;
-      providerOrderId: string | null;
-      executedQty: number | null;
-      cumulativeQuoteQty: number | null;
+      providerOrderId: string;
+      executedQty: number;
+      cumulativeQuoteQty: number;
     }
   | { status: "FAILED"; clientOrderId: string; reason: string };
 
@@ -50,10 +50,11 @@ export async function attemptEmergencyExit(input: {
   const clientOrderId = buildEmergencySellClientOrderId(input.entryClientOrderId);
   try {
     if (!input.adapter.placeEmergencyMarketSell) throw new Error("EMERGENCY_SELL_ADAPTER_REQUIRED");
-    if (!/^\d+(\.\d+)?$/.test(input.quantity) || Number(input.quantity) <= 0) {
+    if (!/^\\d+(\\.\\d+)?$/.test(input.quantity) || !Number.isFinite(Number(input.quantity)) || Number(input.quantity) <= 0) {
       throw new Error("EMERGENCY_SELL_QUANTITY_INVALID");
     }
 
+    const requestedQty = Number(input.quantity);
     const placed = await input.adapter.placeEmergencyMarketSell({
       clientOrderId,
       symbol: input.symbol,
@@ -62,12 +63,27 @@ export async function attemptEmergencyExit(input: {
 
     if (!placed.accepted || placed.status === "REJECTED") throw new Error("EMERGENCY_SELL_REJECTED");
     if (placed.status !== "FILLED") throw new Error("EMERGENCY_SELL_NOT_CONFIRMED");
+    if (placed.clientOrderId !== clientOrderId) throw new Error("EMERGENCY_SELL_CLIENT_ORDER_ID_MISMATCH");
+    if (typeof placed.providerOrderId !== "string" || !/^\\d+$/.test(placed.providerOrderId) || Number(placed.providerOrderId) <= 0) {
+      throw new Error("EMERGENCY_SELL_PROVIDER_ORDER_ID_REQUIRED");
+    }
+    if (typeof placed.executedQty !== "number" || !Number.isFinite(placed.executedQty) || placed.executedQty <= 0) {
+      throw new Error("EMERGENCY_SELL_EXECUTED_QUANTITY_REQUIRED");
+    }
+    if (typeof placed.cumulativeQuoteQty !== "number" || !Number.isFinite(placed.cumulativeQuoteQty) || placed.cumulativeQuoteQty <= 0) {
+      throw new Error("EMERGENCY_SELL_QUOTE_QUANTITY_REQUIRED");
+    }
+    const quantityTolerance = Math.max(1e-12, requestedQty * 1e-8);
+    if (Math.abs(placed.executedQty - requestedQty) > quantityTolerance) {
+      throw new Error("EMERGENCY_SELL_EXECUTED_QUANTITY_MISMATCH");
+    }
+
     return {
       status: "SOLD",
       clientOrderId,
-      providerOrderId: placed.providerOrderId ?? null,
-      executedQty: placed.executedQty ?? null,
-      cumulativeQuoteQty: placed.cumulativeQuoteQty ?? null,
+      providerOrderId: placed.providerOrderId,
+      executedQty: placed.executedQty,
+      cumulativeQuoteQty: placed.cumulativeQuoteQty,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : "EMERGENCY_SELL_FAILED";
