@@ -512,6 +512,7 @@ export async function executeApprovedLiveOrder(input: {
   const adapter = new BinanceSpotLiveAdapter({
     apiKey: process.env.BINANCE_LIVE_API_KEY,
     apiSecret: process.env.BINANCE_LIVE_API_SECRET,
+    apiPrivateKeyPem: process.env.BINANCE_LIVE_API_PRIVATE_KEY,
     liveTradingEnabled: process.env.GAMEVORTEX_LIVE_TRADING_ENABLED === "true",
   });
 
