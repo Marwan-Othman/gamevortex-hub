@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSellableQuantity } from "./live-sellable-quantity";
+import { assertEntryFillsCoverExecutedQuantity, computeSellableQuantity } from "./live-sellable-quantity";
 
 describe("computeSellableQuantity", () => {
   it("subtracts a base-asset entry commission", () => {
@@ -74,6 +74,30 @@ describe("computeSellableQuantity", () => {
     expect(() =>
       computeSellableQuantity({ executedQty: "0.0004", baseAsset: "BTC", fees: [], stepSize: "0.001" }),
     ).toThrow("LIVE_SELLABLE_QUANTITY_NOT_POSITIVE");
+  });
+
+  it("rejects an empty provider fill response", () => {
+    expect(() =>
+      assertEntryFillsCoverExecutedQuantity({ executedQty: "1.25", fills: [] }),
+    ).toThrow("LIVE_ENTRY_TRADE_FILLS_REQUIRED");
+  });
+
+  it("rejects trade fills that do not cover the confirmed executed quantity", () => {
+    expect(() =>
+      assertEntryFillsCoverExecutedQuantity({
+        executedQty: "1.25",
+        fills: [{ qty: "1.00" }, { qty: "0.20" }],
+      }),
+    ).toThrow("LIVE_ENTRY_TRADE_FILLS_QUANTITY_MISMATCH");
+  });
+
+  it("accepts complete provider fills with exact decimal matching", () => {
+    expect(() =>
+      assertEntryFillsCoverExecutedQuantity({
+        executedQty: "1.250",
+        fills: [{ qty: "0.75" }, { qty: "0.500" }],
+      }),
+    ).not.toThrow();
   });
 
   it("rejects exponent notation and garbage instead of guessing", () => {
