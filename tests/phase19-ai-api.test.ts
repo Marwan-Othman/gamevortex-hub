@@ -86,7 +86,6 @@ afterEach(() => {
 /* ================================================================== */
 describe.each([
   ["chat", chat, { prompt: "hi", conversationId: "c1", idempotencyKey: KEY }],
-  ["image", image, { prompt: "a cat", idempotencyKey: KEY }],
   ["video", video, { prompt: "a cat running", idempotencyKey: KEY }],
 ] as const)("POST /api/ai/%s: common failure matrix", (_name, call, validBody) => {
   it("unauthorized: not signed in -> 401 and nothing is spent or generated", async () => {
@@ -148,6 +147,16 @@ describe.each([
     expect(json.error).toBe("AI_SERVICE_UNAVAILABLE");
     expect(json.requestId).toBeDefined();
     expect(JSON.stringify(json)).not.toContain("db.internal");
+    expect(m.consumeAiCredit).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/ai/image: disabled feature", () => {
+  it("returns 410 without provider calls or credit changes", async () => {
+    const response = await image({ prompt: "a cat", idempotencyKey: KEY });
+    expect(response.status).toBe(410);
+    expect((await response.json()).error).toBe("AI_IMAGE_DISABLED");
+    expect(m.generateImage).not.toHaveBeenCalled();
     expect(m.consumeAiCredit).not.toHaveBeenCalled();
   });
 });
