@@ -62,7 +62,6 @@ export default async function Wallpapers({ searchParams }: { searchParams: Promi
         <p className="muted"><LocaleText as="span" ar="خلفيات مجانية، خلفيات VIP، ومحتوى أصلي قابل للتوسع إلى آلاف الصور." en="Free wallpapers, VIP wallpapers, and original content built to scale to thousands of images." /></p>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
-          <Link href="/wallpapers/studio" className="btn">🎨 افتح استوديو التصميم</Link>
           <Link href="/wallpapers/favorites" className="btn secondary">❤️ خلفياتي المحفوظة</Link>
         </div>
 
