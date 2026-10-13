@@ -23,6 +23,29 @@ function parseDecimal(value: string, code: string): bigint {
   return BigInt(whole) * SCALE + BigInt(padded);
 }
 
+/**
+ * Fail closed unless provider trade fills account for the entire confirmed
+ * executed quantity. An empty/truncated fill response must never be mistaken
+ * for zero commission and therefore the gross quantity being sellable.
+ */
+export function assertEntryFillsCoverExecutedQuantity(input: {
+  executedQty: string;
+  fills: readonly { qty: string }[];
+}): void {
+  const expected = parseDecimal(input.executedQty, "INVALID_EXECUTED_QTY");
+  if (expected <= 0n) throw new Error("INVALID_EXECUTED_QTY");
+  if (input.fills.length === 0) throw new Error("LIVE_ENTRY_TRADE_FILLS_REQUIRED");
+
+  let actual = 0n;
+  for (const fill of input.fills) {
+    const quantity = parseDecimal(fill.qty, "INVALID_ENTRY_TRADE_FILL_QTY");
+    if (quantity <= 0n) throw new Error("INVALID_ENTRY_TRADE_FILL_QTY");
+    actual += quantity;
+  }
+
+  if (actual !== expected) throw new Error("LIVE_ENTRY_TRADE_FILLS_QUANTITY_MISMATCH");
+}
+
 function formatDecimal(value: bigint): string {
   const whole = value / SCALE;
   const fraction = (value % SCALE).toString().padStart(SCALE_DIGITS, "0").replace(/0+$/, "");
