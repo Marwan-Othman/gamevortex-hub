@@ -6,6 +6,10 @@ import { guardRead, logRouteError } from "@/lib/api";
 export const dynamic = "force-dynamic";
 
 function configurationStatus() {
+  const distributedRateLimitConfigured =
+    process.env.RATE_LIMIT_STORE === "upstash" &&
+    Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+
   return {
     database: true,
     auth: Boolean(process.env.AUTH_SECRET && process.env.AUTH_SECRET.length >= 32),
@@ -13,9 +17,13 @@ function configurationStatus() {
     payments: Boolean(process.env.PAYMENT_PROVIDER && (process.env.STRIPE_SECRET_KEY || process.env.PAYMENT_PROVIDER_BASE_URL || process.env.PAYPAL_CLIENT_ID)),
     email: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM),
     quran: true,
-    rateLimit: process.env.RATE_LIMIT_STORE === "upstash"
-      ? Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
-      : true,
+    // On Vercel, per-instance memory is not a distributed rate limit. Report
+    // this as degraded instead of claiming the production control is healthy.
+    rateLimit: process.env.VERCEL
+      ? distributedRateLimitConfigured
+      : process.env.RATE_LIMIT_STORE === "upstash"
+        ? distributedRateLimitConfigured
+        : true,
   };
 }
 
