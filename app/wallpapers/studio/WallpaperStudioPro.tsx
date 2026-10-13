@@ -539,7 +539,7 @@ export default function WallpaperStudioPro({ access, categories, initialPlayerNa
       }
       setStatus({
         text: persisted
-          ? `تم تركيب ${bitmaps.length} صور في مشهد واحد. اضغط «تحسين ودمج بالذكاء الاصطناعي» لمواءمة الإضاءة والألوان؛ الساعة والنصوص تبقى طبقات قابلة للتعديل.`
+          ? `تم تركيب ${bitmaps.length} صور في خلفية واحدة. أضف الساعة والنصوص ونسّقها ثم نزّل التصميم.`
           : "تم تركيب الصور مؤقتًا، لكن التخزين المحلي غير متاح؛ نزّل النتيجة قبل إغلاق الصفحة.",
         tone: persisted ? "ok" : "error",
       });
