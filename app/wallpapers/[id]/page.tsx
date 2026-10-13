@@ -80,9 +80,6 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
             ) : (
               <Link href="/vip" className="btn">💎 افتح VIP للتحميل</Link>
             )}
-            {canViewMedia && wallpaper.mediaType !== "VIDEO" && (
-              <Link href={`/wallpapers/studio?wallpaper=${encodeURIComponent(wallpaper.id)}`} className="btn">🎨 أدوات: ساعة وتاريخ ونص</Link>
-            )}
             <Link href="/wallpapers" className="btn secondary">استكشف المزيد</Link>
           </div>
 
