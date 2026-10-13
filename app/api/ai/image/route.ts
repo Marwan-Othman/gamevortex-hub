@@ -9,16 +9,30 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const user = await getOptionalUser();
-    if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    if (!user) {
+      return NextResponse.json(
+        { error: "UNAUTHORIZED" },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
-    const blocked = await guardMutation(request);
+    const blocked = await guardMutation(request, "ai-image-disabled");
     if (blocked) return blocked;
 
     return NextResponse.json(
-      { error: "AI_IMAGE_DISABLED", message: "إنشاء الصور بالذكاء الاصطناعي متوقف. يمكنك استخدام خلفيات GameVortex وتعديلها." },
+      {
+        error: "AI_IMAGE_DISABLED",
+        message: "إنشاء الصور بالذكاء الاصطناعي متوقف. يمكنك استخدام خلفيات GameVortex وتعديلها.",
+      },
       { status: 410, headers: { "Cache-Control": "no-store" } },
     );
   } catch {
-    return NextResponse.json({ error: "AI_SERVICE_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "5" } });
+    return NextResponse.json(
+      { error: "AI_SERVICE_UNAVAILABLE" },
+      {
+        status: 503,
+        headers: { "Cache-Control": "no-store", "Retry-After": "5" },
+      },
+    );
   }
 }
