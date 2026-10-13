@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { aiErrorMessage, formatBalance, loadAiUsage, readApiError, type AiUsageSummary } from "@/components/ai/ai-errors";
 
-type Mode = "image" | "video";
+type Mode = "video";
 
 const MAX_IMAGE_BYTES = 2.8 * 1024 * 1024; // base64 + data-URL prefix must stay under the API's 4,000,000 character limit
 const MAX_IMAGE_DATA_CHARS = 4_000_000;
@@ -21,12 +21,11 @@ function writePendingVideo(token: string) {
 }
 
 export default function AiMediaClient() {
-  const [mode, setMode] = useState<Mode>("image");
+  const mode: Mode = "video";
   const [prompt, setPrompt] = useState("");
   const [imageData, setImageData] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [pendingToken, setPendingToken] = useState("");
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
@@ -125,43 +124,11 @@ export default function AiMediaClient() {
     if (!text || busy) return;
 
     setBusy(true);
-    setStatus(mode === "image" ? "جاري إنشاء الصورة..." : "جاري بدء إنشاء الفيديو...");
-    setImageUrl("");
+    setStatus("جاري بدء إنشاء الفيديو...");
     setVideoUrl("");
 
     try {
-      if (mode === "image") {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), IMAGE_CLIENT_TIMEOUT_MS);
-        try {
-          const response = await fetch("/api/ai/image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              prompt: text,
-              imageData: imageData || undefined,
-              aspectRatio: "16:9",
-              imageSize: "1K",
-              idempotencyKey: crypto.randomUUID(),
-            }),
-            signal: controller.signal,
-          });
-          if (!response.ok) throw new Error(await readApiError(response));
-          const blob = await response.blob();
-          if (!blob.size || !blob.type.startsWith("image/")) throw new Error("AI_EMPTY_RESPONSE");
-          const url = URL.createObjectURL(blob);
-          if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-          objectUrlRef.current = url;
-          setImageUrl(url);
-          setStatus("اكتملت الصورة.");
-        } catch (error) {
-          if (controller.signal.aborted) throw new Error("CLIENT_TIMEOUT");
-          throw error;
-        } finally {
-          clearTimeout(timer);
-        }
-      } else {
-        const response = await fetch("/api/ai/video", {
+      const response = await fetch("/api/ai/video", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -181,7 +148,6 @@ export default function AiMediaClient() {
         setPendingToken(token);
         setStatus("تم بدء إنشاء الفيديو. انتظر حتى يكتمل...");
         await pollVideo(token);
-      }
     } catch (error) {
       if (mountedRef.current) setStatus(aiErrorMessage(error instanceof Error ? error.message : ""));
     } finally {
@@ -210,44 +176,29 @@ export default function AiMediaClient() {
       <div style={{ maxWidth: 1050, margin: "0 auto" }}>
         <div style={{ marginBottom: 22 }}>
           <div style={{ opacity: .6, fontSize: 13 }}>GameVortex AI</div>
-          <h1 style={{ fontSize: 38, margin: "6px 0" }}>إنشاء الصور والفيديو</h1>
-          <p style={{ opacity: .7, margin: 0 }}>توليد حقيقي عبر Gemini مع حماية المفاتيح والرصيد من جهة الخادم. {formatBalance(usage)}</p>
+          <h1 style={{ fontSize: 38, margin: "6px 0" }}>إنشاء الفيديو</h1>
+          <p style={{ opacity: .7, margin: 0 }}>إنشاء الفيديو مع حماية المفاتيح والرصيد من جهة الخادم. {formatBalance(usage)}</p>
         </div>
 
         <section style={{ background: "#111113", border: "1px solid #27272a", borderRadius: 20, padding: 18 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            {(["image", "video"] as Mode[]).map(item => (
-              <button key={item} type="button" onClick={() => setMode(item)} disabled={busy}
-                style={{ border: "1px solid #3f3f46", borderRadius: 10, padding: "9px 14px", cursor: "pointer", background: mode === item ? "#27272a" : "transparent", color: "#fff" }}>
-                {item === "image" ? "صورة" : "فيديو"}
-              </button>
-            ))}
-          </div>
-
           <textarea value={prompt} onChange={e => setPrompt(e.target.value)} disabled={busy}
-            placeholder={mode === "image" ? "صف الصورة التي تريد إنشاءها..." : "صف الفيديو والحركة والمشهد والكاميرا..."}
+            placeholder="صف الفيديو والحركة والمشهد والكاميرا..."
             style={{ width: "100%", minHeight: 130, borderRadius: 14, border: "1px solid #3f3f46", background: "#09090b", color: "#fff", padding: 14, resize: "vertical" }} />
 
           <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <label style={{ border: "1px solid #3f3f46", borderRadius: 10, padding: "9px 12px", cursor: "pointer" }}>
-              {imageData ? "تم اختيار صورة مرجعية" : mode === "image" ? "اختياري: تعديل صورة" : "اختياري: صورة إلى فيديو"}
+              {imageData ? "تم اختيار صورة مرجعية" : "اختياري: صورة إلى فيديو"}
               <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e => void chooseImage(e.target.files?.[0])} />
             </label>
             <button type="button" onClick={() => void generate()} disabled={busy || !prompt.trim()}
               style={{ border: 0, borderRadius: 10, padding: "10px 18px", cursor: "pointer" }}>
-              {busy ? "جاري التنفيذ..." : mode === "image" ? "إنشاء الصورة" : "إنشاء الفيديو"}
+              {busy ? "جاري التنفيذ..." : "إنشاء الفيديو"}
             </button>
             {pendingToken && !busy && <button type="button" onClick={() => void resumeVideo()} style={{ border: "1px solid #3f3f46", borderRadius: 10, padding: "9px 14px", cursor: "pointer", background: "transparent", color: "#fff" }}>متابعة الانتظار</button>}
             {imageData && <button type="button" onClick={() => setImageData("")} disabled={busy} style={{ border: 0, background: "transparent", color: "#aaa", cursor: "pointer" }}>إزالة الصورة المرجعية</button>}
           </div>
 
           {status && <div role="status" style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "#18181b", color: "#d4d4d8" }}>{status}</div>}
-
-          {imageUrl && (
-            <div style={{ marginTop: 18 }}>
-              <img src={imageUrl} alt="Generated by GameVortex AI" style={{ width: "100%", borderRadius: 16, display: "block" }} />
-            </div>
-          )}
 
           {videoUrl && (
             <div style={{ marginTop: 18 }}>
