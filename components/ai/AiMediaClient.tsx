@@ -3,11 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { aiErrorMessage, formatBalance, loadAiUsage, readApiError, type AiUsageSummary } from "@/components/ai/ai-errors";
 
-type Mode = "video";
-
 const MAX_IMAGE_BYTES = 2.8 * 1024 * 1024; // base64 + data-URL prefix must stay under the API's 4,000,000 character limit
 const MAX_IMAGE_DATA_CHARS = 4_000_000;
-const IMAGE_CLIENT_TIMEOUT_MS = 150_000;
 const POLL_INTERVAL_MS = 3_000;
 const POLL_ATTEMPTS = 120;
 const MAX_CONSECUTIVE_POLL_ERRORS = 5;
@@ -21,7 +18,6 @@ function writePendingVideo(token: string) {
 }
 
 export default function AiMediaClient() {
-  const mode: Mode = "video";
   const [prompt, setPrompt] = useState("");
   const [imageData, setImageData] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,7 +25,6 @@ export default function AiMediaClient() {
   const [videoUrl, setVideoUrl] = useState("");
   const [pendingToken, setPendingToken] = useState("");
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
-  const objectUrlRef = useRef("");
   const mountedRef = useRef(true);
 
   async function refreshUsage() {
@@ -43,13 +38,11 @@ export default function AiMediaClient() {
     // A video that was started before a reload / tab close can still be collected.
     const saved = readPendingVideo();
     if (saved) {
-      setMode("video");
       setPendingToken(saved);
       setStatus("لديك فيديو قيد المعالجة. اضغط «متابعة الانتظار» لاستكماله دون خصم جديد.");
     }
     return () => {
       mountedRef.current = false;
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
 
