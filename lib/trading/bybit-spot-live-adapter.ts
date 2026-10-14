@@ -243,6 +243,47 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     return parseResponse(response);
   }
 
+  /** Read-only account/API-key preflight. This never submits or changes an order. */
+  async getLiveReadiness(quoteAssetInput = "USDT"): Promise<{
+    accountMode: number;
+    marginMode: string;
+    quoteAsset: string;
+    quoteFreeBalance: number;
+    blockers: string[];
+  }> {
+    const quoteAsset = quoteAssetInput.trim().toUpperCase();
+    if (!/^[A-Z0-9]{2,12}$/.test(quoteAsset)) throw new Error("BYBIT_LIVE_INVALID_QUOTE_ASSET");
+    const keyResult = objectResult(await this.request("GET", "/v5/user/query-api", {}), "BYBIT_LIVE_API_KEY_INFO_REQUIRED");
+    if (typeof keyResult.apiKey !== "string" || keyResult.apiKey !== this.apiKey) throw new Error("BYBIT_LIVE_API_KEY_IDENTITY_MISMATCH");
+    if (keyResult.readOnly !== 0 || !keyResult.permissions || typeof keyResult.permissions !== "object" || Array.isArray(keyResult.permissions)) throw new Error("BYBIT_LIVE_API_KEY_NOT_TRADING_ENABLED");
+    const permissions = keyResult.permissions as Record<string, unknown>;
+    const requiredArray = (name: string): string[] => {
+      const value = permissions[name];
+      if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error("BYBIT_LIVE_API_PERMISSIONS_INVALID");
+      return value as string[];
+    };
+    if (!requiredArray("Spot").includes("SpotTrade")) throw new Error("BYBIT_LIVE_SPOT_PERMISSION_REQUIRED");
+    const walletPermissions = requiredArray("Wallet");
+    if (walletPermissions.some((permission) => ["Withdraw", "AccountTransfer", "SubMemberTransfer"].includes(permission))) throw new Error("BYBIT_LIVE_WITHDRAW_OR_TRANSFER_PERMISSION_FORBIDDEN");
+    if (requiredArray("ContractTrade").length || requiredArray("Options").length || requiredArray("Derivatives").length) throw new Error("BYBIT_LIVE_NON_SPOT_PERMISSION_FORBIDDEN");
+    const accountResult = objectResult(await this.request("GET", "/v5/account/info", {}), "BYBIT_LIVE_ACCOUNT_INFO_REQUIRED");
+    const accountMode = accountResult.unifiedMarginStatus;
+    const marginMode = typeof accountResult.marginMode === "string" ? accountResult.marginMode : "";
+    if (typeof accountMode !== "number" || ![1, 3, 4, 5, 6].includes(accountMode) || !marginMode) throw new Error("BYBIT_LIVE_ACCOUNT_MODE_UNVERIFIED");
+    const walletResult = objectResult(await this.request("GET", "/v5/account/wallet-balance", { accountType: "UNIFIED", coin: quoteAsset }), "BYBIT_LIVE_WALLET_BALANCE_REQUIRED");
+    if (!Array.isArray(walletResult.list) || walletResult.list.length !== 1 || !walletResult.list[0] || typeof walletResult.list[0] !== "object") throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
+    const account = walletResult.list[0] as Record<string, unknown>;
+    if (account.accountType !== "UNIFIED" || !Array.isArray(account.coin)) throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
+    const coin = account.coin.find((item) => item && typeof item === "object" && (item as Record<string, unknown>).coin === quoteAsset) as Record<string, unknown> | undefined;
+    if (!coin) return { accountMode, marginMode, quoteAsset, quoteFreeBalance: 0, blockers: ["BYBIT_LIVE_QUOTE_BALANCE_ZERO"] };
+    const walletBalance = Number(coin.walletBalance);
+    const locked = Number(coin.locked);
+    const spotBorrow = Number(coin.spotBorrow ?? "0");
+    if (![walletBalance, locked, spotBorrow].every((value) => Number.isFinite(value) && value >= 0)) throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
+    if (spotBorrow > 0) throw new Error("BYBIT_LIVE_SPOT_BORROW_DETECTED");
+    const quoteFreeBalance = Math.max(0, walletBalance - locked);
+    return { accountMode, marginMode, quoteAsset, quoteFreeBalance, blockers: quoteFreeBalance > 0 ? [] : ["BYBIT_LIVE_QUOTE_BALANCE_ZERO"] };
+  }
   async getSpotSymbolRules(symbolInput: string): Promise<{
     symbol: string;
     baseAsset: string;
