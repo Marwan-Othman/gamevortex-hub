@@ -105,7 +105,7 @@ export default function WalletClient() {
       <section className="glass hero">
         <p className="muted">MONEY WALLET</p>
         <h1>المحفظة المالية</h1>
-        <p>رصيد الأموال منفصل عن نقاط GameVortex. لا يتم زيادة الرصيد من المتصفح، بل بعد تأكيد Webhook من مزود الدفع.</p>
+        <p>رصيد الأموال منفصل عن نقاط GameVortex. يُضاف الرصيد من الخادم فقط بعد التحقق من اكتمال الدفع لدى مزود الدفع، مع استخدام Webhook للتحديثات والاستردادات.</p>
       </section>
 
       <section className="grid gv-wallet-grid">
