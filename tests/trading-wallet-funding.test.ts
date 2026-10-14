@@ -117,7 +117,7 @@ function request(method: "GET" | "POST", body?: unknown, key?: string) {
 
 beforeEach(() => {
   h.state.owner = { id: "owner-1", role: "SUPER_ADMIN" };
-  h.state.wallet = { id: "wallet-1", userId: "owner-1", balance: money(1), pendingBalance: money(0) };
+  h.state.wallet = { id: "wallet-1", userId: "owner-1", balance: h.money(1), pendingBalance: h.money(0) };
   h.state.ownerWallet = null;
   h.state.transactions = new Map();
   h.state.ledger = [];
@@ -132,9 +132,9 @@ describe("trading wallet funding route", () => {
     const response = await GET(request("GET"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      sourceWalletAvailableUsd: "1",
-      sourceWalletPendingUsd: "0",
-      ownerWalletAvailableUsd: "0",
+      sourceWalletAvailableUsd: "1.00",
+      sourceWalletPendingUsd: "0.00",
+      ownerWalletAvailableUsd: "0.00",
     });
     expect(h.db.$transaction).not.toHaveBeenCalled();
   });
