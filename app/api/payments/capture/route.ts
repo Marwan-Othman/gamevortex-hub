@@ -422,8 +422,12 @@ export async function POST(
             depositStatus: "COMPLETED",
           });
         }
-        // Legacy/inconsistent completed rows with no ledger transaction are
-        // verified against PayPal below before any reconciliation takes place.
+        // Do not auto-credit a row marked completed without a ledger entry:
+        // its balance history is ambiguous and must be reconciled explicitly.
+        return NextResponse.json(
+          { error: "WALLET_DEPOSIT_LEDGER_INCONSISTENT" },
+          { status: 409 },
+        );
       }
 
       const captured = await provider.capturePayment(
