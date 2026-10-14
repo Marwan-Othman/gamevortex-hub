@@ -198,8 +198,10 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     // Do not credit the GameVortex USD wallet until an independently verified transfer
     // and reconciliation record are implemented.
     const transferBlocker = getExchangeProceedsTransferBlocker();
-    const transferBlocked = await blockSettlement(tx, order.id, transferBlocker);
-    return { order: transferBlocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [transferBlocker] };
+    if (transferBlocker) {
+      const transferBlocked = await blockSettlement(tx, order.id, transferBlocker);
+      return { order: transferBlocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [transferBlocker] };
+    }
 
     if (settlementCurrencyBlocker) {
       const blocked = await blockSettlement(tx, order.id, settlementCurrencyBlocker);
