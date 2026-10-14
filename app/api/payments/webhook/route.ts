@@ -881,7 +881,13 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
         });
       }
 
-      await transaction.walletDeposit.update({ where: { id: deposit.id }, data: { status: "COMPLETED", providerPaymentId: event.paymentId } });
+      // providerPaymentId is the PayPal ORDER ID created at checkout.
+      // Keep it stable for mapping/retries; the capture ID is stored only in
+      // WalletTransaction.idempotencyKey and metadata.
+      await transaction.walletDeposit.update({
+        where: { id: deposit.id },
+        data: { status: "COMPLETED" },
+      });
       await transaction.notification.create({
         data: {
           userId: deposit.userId,
