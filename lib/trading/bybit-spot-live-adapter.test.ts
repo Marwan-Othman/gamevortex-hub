@@ -15,6 +15,32 @@ describe("BybitSpotLiveAdapter", () => {
     await expect(adapter.placeSpotBuy({ clientOrderId: "gv-test-1", symbol: "BTCUSDT", side: "BUY", amountUsd: 10, entryPrice: 100, stopLossPrice: 95, takeProfitPrice: 110 })).rejects.toThrow("LIVE_TRADING_DISABLED");
   });
 
+  it("reads strict Spot market rules from the public instruments endpoint", async () => {
+    const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
+      expect(String(url)).toContain("/v5/market/instruments-info?");
+      return response({ retCode: 0, result: { list: [{
+        symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+        lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+        priceFilter: { tickSize: "0.01" },
+      }] } });
+    } });
+    await expect(adapter.getSpotSymbolRules!("BTCUSDT")).resolves.toEqual({
+      symbol: "BTCUSDT", baseAsset: "BTC", quoteAsset: "USDT", minOrderQty: "0.00001",
+      maxOrderQty: "900", qtyStep: "0.00001", minOrderAmount: "5", tickSize: "0.01",
+    });
+  });
+
+  it("fails closed when Bybit market rules are missing or invalid", async () => {
+    const missing = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [] } }) });
+    await expect(missing.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_MISSING");
+    const invalid = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0.01" },
+    }] } }) });
+    await expect(invalid.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+  });
+
   it("normalizes reverse-ordered Bybit klines", async () => {
     const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
       expect(String(url)).toContain("/v5/market/kline?");
