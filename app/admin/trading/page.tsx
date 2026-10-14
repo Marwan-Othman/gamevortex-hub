@@ -4,6 +4,7 @@ import { getTradingSummary } from "@/lib/trading/allocation";
 import { tradingMaxAllocationUsd, TRADING_MIN_ALLOCATION_USD } from "@/lib/trading/money";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import TradingAllocationPanel from "@/components/admin/TradingAllocationPanel";
+import TradingWalletFundingPanel from "@/components/admin/TradingWalletFundingPanel";
 import TradingRiskConfigPanel from "@/components/admin/TradingRiskConfigPanel";
 import TradingBacktestPanel from "@/components/admin/TradingBacktestPanel";
 import TradingPaperPanel from "@/components/admin/TradingPaperPanel";
@@ -53,6 +54,14 @@ export default async function TradingPage() {
           <strong>${summary.tradingBalanceUsd}</strong>
           <span className={styles.label}>رصيد التداول المخصّص (USD)</span>
         </div>
+      </section>
+
+      <section className={styles.panel}>
+        <div className={styles.panelHead}>
+          <span>قبل الخطوة 1 — نقل الرصيد إلى محفظة المالك</span>
+          <span className="muted">لا ينفّذ صفقة ولا يودع في Binance</span>
+        </div>
+        <TradingWalletFundingPanel />
       </section>
 
       <section className={styles.panel}>
