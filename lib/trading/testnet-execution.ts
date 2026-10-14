@@ -10,6 +10,8 @@
  * works. It is not evidence that LIVE trading is safe or enabled.
  */
 
+import { createHash, randomBytes } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { getBinanceSpotTestnetAdapter } from "@/lib/trading/binance-spot-testnet-config";
 import { buildOwnerPaperOpportunityFromApproval } from "@/lib/trading/opportunity-service";
@@ -41,6 +43,78 @@ export type TestnetExecutionResult = {
   symbol: string;
   amountUsd: number;
 };
+
+type TestnetOrderRow = {
+  id: string;
+  ownerId: string;
+  approvalId: string;
+  opportunityId: string;
+  idempotencyKey: string;
+  clientOrderId: string;
+  providerOrderId: string | null;
+  symbol: string;
+  amountUsd: Prisma.Decimal;
+  status: string;
+  lastError: string | null;
+};
+
+function testnetIdempotencyKey(approvalId: string): string {
+  return "testnet-approval-" + createHash("sha256").update(approvalId, "utf8").digest("hex").slice(0, 32);
+}
+
+async function claimTestnetOrder(input: {
+  ownerId: string;
+  approvalId: string;
+  opportunityId: string;
+  clientOrderId: string;
+  symbol: string;
+  amountUsd: number;
+}): Promise<void> {
+  const idempotencyKey = testnetIdempotencyKey(input.approvalId);
+  const id = randomBytes(18).toString("base64url");
+  const inserted = await db.$queryRaw<TestnetOrderRow[]>(Prisma.sql`
+    INSERT INTO "TradingTestnetOrder" (
+      "id", "ownerId", "approvalId", "opportunityId", "idempotencyKey",
+      "clientOrderId", "symbol", "amountUsd", "status"
+    ) VALUES (
+      ${id}, ${input.ownerId}, ${input.approvalId}, ${input.opportunityId},
+      ${idempotencyKey}, ${input.clientOrderId}, ${input.symbol},
+      ${input.amountUsd.toFixed(2)}::numeric, 'INTENT_CREATED'
+    )
+    ON CONFLICT ("approvalId") DO NOTHING
+    RETURNING *
+  `);
+
+  let order = inserted[0];
+  if (!order) {
+    const existing = await db.$queryRaw<TestnetOrderRow[]>(Prisma.sql`
+      SELECT * FROM "TradingTestnetOrder" WHERE "approvalId" = ${input.approvalId} LIMIT 1
+    `);
+    order = existing[0];
+    if (!order) throw new Error("TESTNET_ORDER_IDEMPOTENCY_LOOKUP_FAILED");
+
+    const mismatches: string[] = [];
+    if (order.ownerId !== input.ownerId) mismatches.push("OWNER_ID_MISMATCH");
+    if (order.opportunityId !== input.opportunityId) mismatches.push("OPPORTUNITY_ID_MISMATCH");
+    if (order.clientOrderId !== input.clientOrderId) mismatches.push("CLIENT_ORDER_ID_MISMATCH");
+    if (order.symbol !== input.symbol) mismatches.push("SYMBOL_MISMATCH");
+    if (!new Prisma.Decimal(order.amountUsd).eq(input.amountUsd)) mismatches.push("AMOUNT_MISMATCH");
+    if (mismatches.length) {
+      throw new Error("TESTNET_ORDER_IDEMPOTENCY_CONFLICT:" + mismatches.join(","));
+    }
+  }
+
+  // The CAS claim is the single-writer boundary. Once SUBMITTING is persisted,
+  // no request may submit another BUY for this approval, even after a timeout.
+  const claimed = await db.$queryRaw<TestnetOrderRow[]>(Prisma.sql`
+    UPDATE "TradingTestnetOrder"
+    SET "status" = 'SUBMITTING', "submittedAt" = CURRENT_TIMESTAMP,
+        "updatedAt" = CURRENT_TIMESTAMP, "lastError" = NULL
+    WHERE "approvalId" = ${input.approvalId} AND "status" = 'INTENT_CREATED'
+    RETURNING *
+  `);
+  if (!claimed[0]) throw new Error("TESTNET_ORDER_ALREADY_CLAIMED_OR_TERMINAL");
+}
 
 function positiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
@@ -86,43 +160,104 @@ export async function executeOwnerBinanceSpotTestnetBuy(
   // Spot Testnet keys cannot disable the withdraw flag and its funds are virtual (non-transferable), so this check is not applied to Testnet. It is still enforced for live trading (binance-live-preflight / live-execution-gate).
   if (!hasSpotPermission) throw new Error("BINANCE_TESTNET_SPOT_PERMISSION_REQUIRED");
 
-  const order = await adapter.placeSpotBuy({
+  await claimTestnetOrder({
+    ownerId: input.ownerId.trim(),
+    approvalId: input.approvalId.trim(),
+    opportunityId: input.opportunityId.trim(),
     clientOrderId: plan.clientOrderId,
     symbol: plan.symbol,
-    side: "BUY",
     amountUsd: plan.amountUsd,
-    entryPrice: plan.entryPrice,
-    stopLossPrice: plan.stopLossPrice,
-    takeProfitPrice: plan.takeProfitPrice,
   });
 
+  let order: Awaited<ReturnType<typeof adapter.placeSpotBuy>>;
+  try {
+    order = await adapter.placeSpotBuy({
+      clientOrderId: plan.clientOrderId,
+      symbol: plan.symbol,
+      side: "BUY",
+      amountUsd: plan.amountUsd,
+      entryPrice: plan.entryPrice,
+      stopLossPrice: plan.stopLossPrice,
+      takeProfitPrice: plan.takeProfitPrice,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? "TESTNET_PROVIDER_ERROR" : "TESTNET_PROVIDER_OUTCOME_UNKNOWN";
+    await db.$executeRaw(Prisma.sql`
+      UPDATE "TradingTestnetOrder"
+      SET "status" = 'UNKNOWN', "lastError" = ${reason}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "approvalId" = ${input.approvalId.trim()} AND "status" = 'SUBMITTING'
+    `);
+    // Never retry an ambiguous provider outcome with a new submission.
+    throw new Error("TESTNET_ORDER_OUTCOME_UNKNOWN");
+  }
+
   if (!order.accepted || order.status !== "FILLED" || !order.providerOrderId) {
+    await db.$executeRaw(Prisma.sql`
+      UPDATE "TradingTestnetOrder"
+      SET "status" = 'UNKNOWN', "lastError" = 'BINANCE_TESTNET_ORDER_NOT_CONFIRMED',
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "approvalId" = ${input.approvalId.trim()} AND "status" = 'SUBMITTING'
+    `);
     throw new Error("BINANCE_TESTNET_ORDER_NOT_CONFIRMED");
   }
 
-  await db.auditLog.create({
-    data: {
-      actorUserId: input.ownerId.trim(),
-      action: "TRADING_TESTNET_ORDER_FILLED",
-      entityType: "TradingApproval",
-      entityId: input.approvalId.trim(),
-      metadata: {
-        venue: "BINANCE_SPOT_TESTNET",
-        realMoney: false,
-        opportunityId: input.opportunityId.trim(),
-        clientOrderId: order.clientOrderId,
-        providerOrderId: order.providerOrderId,
-        symbol: plan.symbol,
-        amountUsd: plan.amountUsd,
-        side: "BUY",
-        orderType: "SPOT_MARKET",
-        withdrawalPermission: false,
-        leverage: 1,
-        margin: false,
-        short: false,
+  const persisted = await db.$queryRaw<TestnetOrderRow[]>(Prisma.sql`
+    UPDATE "TradingTestnetOrder"
+    SET "status" = 'FILLED', "providerOrderId" = ${order.providerOrderId},
+        "auditStatus" = 'PENDING', "updatedAt" = CURRENT_TIMESTAMP,
+        "lastError" = NULL, "confirmedAt" = CURRENT_TIMESTAMP
+    WHERE "approvalId" = ${input.approvalId.trim()} AND "status" = 'SUBMITTING'
+    RETURNING *
+  `);
+  if (!persisted[0]) {
+    // Provider accepted the order but durable confirmation failed. Keep the
+    // intent non-retryable and require manual/provider reconciliation.
+    throw new Error("TESTNET_ORDER_PERSISTENCE_UNCERTAIN");
+  }
+
+  try {
+    await db.auditLog.create({
+      data: {
+        actorUserId: input.ownerId.trim(),
+        action: "TRADING_TESTNET_ORDER_FILLED",
+        entityType: "TradingApproval",
+        entityId: input.approvalId.trim(),
+        metadata: {
+          venue: "BINANCE_SPOT_TESTNET",
+          realMoney: false,
+          opportunityId: input.opportunityId.trim(),
+          clientOrderId: order.clientOrderId,
+          providerOrderId: order.providerOrderId,
+          symbol: plan.symbol,
+          amountUsd: plan.amountUsd,
+          side: "BUY",
+          orderType: "SPOT_MARKET",
+          withdrawalPermission: false,
+          leverage: 1,
+          margin: false,
+          short: false,
+        },
       },
-    },
-  });
+    });
+  } catch {
+    await db.$executeRaw(Prisma.sql`
+      UPDATE "TradingTestnetOrder"
+      SET "auditStatus" = 'FAILED', "lastError" = 'AUDIT_WRITE_FAILED',
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "approvalId" = ${input.approvalId.trim()} AND "status" = 'FILLED'
+    `);
+    throw new Error("TESTNET_ORDER_AUDIT_WRITE_FAILED");
+  }
+
+  const auditRecorded = await db.$executeRaw(Prisma.sql`
+    UPDATE "TradingTestnetOrder"
+    SET "auditStatus" = 'RECORDED', "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "approvalId" = ${input.approvalId.trim()}
+      AND "status" = 'FILLED' AND "auditStatus" = 'PENDING'
+  `);
+  if (auditRecorded !== 1) {
+    throw new Error("TESTNET_ORDER_AUDIT_STATE_UNCERTAIN");
+  }
 
   return {
     venue: "BINANCE_SPOT_TESTNET",
