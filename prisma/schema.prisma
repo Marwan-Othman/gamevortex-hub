@@ -2140,6 +2140,7 @@ model TradingTestnetOrder {
   symbol         String
   amountUsd      Decimal  @db.Decimal(18, 2)
   status         String   @default("INTENT_CREATED")
+  auditStatus    String   @default("NOT_REQUIRED")
   lastError      String?
   submittedAt    DateTime?
   confirmedAt    DateTime?
