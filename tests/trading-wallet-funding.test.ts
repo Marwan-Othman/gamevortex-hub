@@ -205,7 +205,7 @@ describe("trading wallet funding route", () => {
     expect(replay.status).toBe(200);
     expect((await replay.json()).replayed).toBe(true);
     expect(Number(h.state.wallet.balance)).toBe(0);
-    expect(h.state.ownerWallet.availableUsd).toBe(1);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
     expect(h.state.transactions.size).toBe(1);
     expect(h.state.ledger).toHaveLength(1);
   });
@@ -216,7 +216,7 @@ describe("trading wallet funding route", () => {
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("IDEMPOTENCY_KEY_CONFLICT");
     expect(Number(h.state.wallet.balance)).toBe(0);
-    expect(h.state.ownerWallet.availableUsd).toBe(1);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
   });
 
   it("does not expose database error details to the client", async () => {
