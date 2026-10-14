@@ -581,7 +581,41 @@ export class ConfiguredPaymentProvider
         throw new Error(
           String(
             data?.error ||
-              "PAYMENT  async capturePayment(
+              "PAYMENT_PROVIDER_ERROR",
+          ),
+        );
+      }
+
+      if (
+        typeof data.paymentId !== "string"
+      ) {
+        throw new Error(
+          "PAYMENT_PROVIDER_ERROR",
+        );
+      }
+
+      return {
+        provider: "hmac",
+        paymentId:
+          data.paymentId,
+        checkoutUrl:
+          typeof data.checkoutUrl ===
+          "string"
+            ? data.checkoutUrl
+            : undefined,
+        status:
+          data.status === "CREATED"
+            ? "CREATED"
+            : "REQUIRES_ACTION",
+      };
+    }
+
+    throw new Error(
+      "PAYMENT_PROVIDER_NOT_CONFIGURED",
+    );
+  }
+
+  async capturePayment(
     paymentId: string,
     idempotencyKey?: string,
   ): Promise<{
@@ -605,16 +639,10 @@ export class ConfiguredPaymentProvider
     let data: Record<string, unknown>;
 
     try {
-      // Normal first attempt: ask PayPal to capture the approved order.
-      data = await paypalRequest(
-        `${path}/capture`,
-        {},
-        idempotencyKey,
-      );
+      data = await paypalRequest(`${path}/capture`, {}, idempotencyKey);
     } catch (captureError) {
-      // A previous request may have captured the payment while the browser or
-      // network lost its response. Re-read the same PayPal order before failing.
-      // This is read-only and lets a retry safely settle the local wallet.
+      // The provider may have completed capture even when the first response
+      // was lost. Confirm the existing order with a read-only GET before failing.
       try {
         const existingOrder = await paypalGet(path);
         if (String(existingOrder.status) !== "COMPLETED") {
@@ -673,44 +701,6 @@ export class ConfiguredPaymentProvider
       captureId,
       ...(customId ? { customId } : {}),
       ...(referenceId ? { referenceId } : {}),
-    };
-  }
-
-    throw new Error(
-        "INVALID_PAYMENT_ID",
-      );
-    }
-
-    if (
-      this.name !== "paypal"
-    ) {
-      throw new Error(
-        "PAYMENT_CAPTURE_NOT_SUPPORTED",
-      );
-    }
-
-    const data =
-      await paypalRequest(
-        `/v2/checkout/orders/${encodeURIComponent(
-          paymentId,
-        )}/capture`,
-        {},
-        idempotencyKey,
-      );
-
-    if (
-      String(data.status) !==
-      "COMPLETED"
-    ) {
-      throw new Error(
-        "PAYPAL_CAPTURE_NOT_COMPLETED",
-      );
-    }
-
-    return {
-      provider: "paypal",
-      paymentId,
-      status: "SUCCEEDED",
     };
   }
 
