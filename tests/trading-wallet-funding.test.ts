@@ -99,7 +99,7 @@ vi.mock("@/lib/api", () => ({
   guardRead: vi.fn(async () => null),
   guardMutation: vi.fn(async () => null),
   internalError: vi.fn((_scope: string, _error: unknown, code: string) =>
-    Response.json({ error: code }, { status: 500 }),
+    Response.json({ error: code }, { status: 500 })),
 }));
 
 import { GET, POST } from "@/app/api/admin/trading/wallet-funding/route";
