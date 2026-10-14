@@ -13,6 +13,8 @@ export type LiveExecutionReadinessInput = {
   riskApproved: boolean;
   emergencyStopActive: boolean;
   withdrawalsDisabled: boolean;
+  /** True only after real funding, exchange reconciliation, and wallet settlement are verified. */
+  walletAccountingReady: boolean;
   amountUsd: number;
   symbol: string;
   entryPrice: number;
@@ -56,6 +58,7 @@ export function evaluateLiveExecutionReadiness(
     withdrawalsDisabled: input.withdrawalsDisabled,
   });
   reasons.push(...gate.reasons);
+  if (!input.walletAccountingReady) reasons.push("LIVE_TRADING_ACCOUNTING_NOT_READY");
 
   let protectedExit: ProtectedExitPlan | null = null;
   if (gate.allowed && reasons.length === 0) {
