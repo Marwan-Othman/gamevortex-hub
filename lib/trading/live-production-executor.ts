@@ -26,8 +26,7 @@ import {
   isObservationFresh,
   resolveMaxSlippagePercent,
 } from "@/lib/trading/live-slippage";
-import type { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
-import { createLiveExchangeAdapter } from "@/lib/trading/live-exchange";
+import { createLiveExchangeAdapter, type LiveExchangeAdapter } from "@/lib/trading/live-exchange";
 import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
@@ -223,7 +222,7 @@ async function failUnknown(ownerId: string, order: LiveOrderRow, error: unknown)
 async function reconcileExitIfNeeded(
   ownerId: string,
   order: LiveOrderRow,
-  adapter: BinanceSpotLiveAdapter,
+  adapter: LiveExchangeAdapter,
 ): Promise<{ order: LiveOrderRow; settlementStatus: LiveExecutionResult["settlementStatus"]; blockers: string[] }> {
   if (order.status !== "PROTECTED" && order.status !== "CLOSED") {
     return { order, settlementStatus: "NOT_SETTLED", blockers: [] };
