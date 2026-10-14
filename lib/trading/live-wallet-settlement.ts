@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { calculateLiveSpotNetExitProceeds } from "@/lib/trading/live-fee-accounting";
-import { createBinanceSpotLiveAdapter } from "@/lib/trading/live-exchange";
+import { createLiveExchangeAdapter } from "@/lib/trading/live-exchange";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
 
 export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLED";
@@ -116,7 +116,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
   if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
     if (!inputOrder.exitProviderOrderId) throw new Error("SETTLEMENT_EXIT_PROVIDER_ORDER_ID_REQUIRED");
 
-    const tradeFillProvider = input.tradeFillProvider ?? createBinanceSpotLiveAdapter();
+    const tradeFillProvider = input.tradeFillProvider ?? createLiveExchangeAdapter();
 
     const fills = await tradeFillProvider.getOrderTradeFills({
       symbol: inputOrder.symbol,
