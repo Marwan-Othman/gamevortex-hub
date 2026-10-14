@@ -59,6 +59,15 @@ export function getSettlementCurrencyBlocker(quoteAssetInput: string): string | 
   return quoteAsset === "USD" ? null : "SETTLEMENT_QUOTE_CURRENCY_REQUIRES_VERIFIED_USD_CONVERSION";
 }
 
+/**
+ * Exchange fills prove a trade occurred, not that proceeds reached GameVortex.
+ * Keep wallet credit blocked until a verified exchange-to-wallet funding rail
+ * and reconciliation record exist.
+ */
+export function getExchangeProceedsTransferBlocker(): string {
+  return "EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED";
+}
+
 export function calculateOwnerWalletSettlement(
   returnedUsdInput: Prisma.Decimal | string | number,
 ): OwnerWalletSettlementCalculation {
@@ -184,6 +193,13 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       const blocked = await blockSettlement(tx, order.id, "LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT");
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"] };
     }
+
+    // Provider fills are not proof that the proceeds were transferred out of the exchange.
+    // Do not credit the GameVortex USD wallet until an independently verified transfer
+    // and reconciliation record are implemented.
+    const transferBlocker = getExchangeProceedsTransferBlocker();
+    const transferBlocked = await blockSettlement(tx, order.id, transferBlocker);
+    return { order: transferBlocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [transferBlocker] };
 
     if (settlementCurrencyBlocker) {
       const blocked = await blockSettlement(tx, order.id, settlementCurrencyBlocker);
