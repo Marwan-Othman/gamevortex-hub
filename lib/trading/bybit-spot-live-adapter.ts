@@ -243,6 +243,52 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     return parseResponse(response);
   }
 
+  async getSpotSymbolRules(symbolInput: string): Promise<{
+    symbol: string;
+    baseAsset: string;
+    quoteAsset: string;
+    minOrderQty: string;
+    maxOrderQty: string;
+    qtyStep: string;
+    minOrderAmount: string;
+    tickSize: string;
+  }> {
+    const symbol = normalizeSymbol(symbolInput, this.symbolMap);
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        `${this.baseUrl}/v5/market/instruments-info?${encodeQuery({ category: "spot", symbol })}`,
+        { method: "GET", headers: { Accept: "application/json" } },
+      );
+    } catch {
+      throw new Error("BYBIT_LIVE_SYMBOL_RULES_NETWORK_ERROR");
+    }
+    const payload = await parseResponse(response);
+    const result = objectResult(payload, "BYBIT_LIVE_INVALID_INSTRUMENT_RESPONSE");
+    if (!Array.isArray(result.list) || result.list.length !== 1 || !result.list[0] || typeof result.list[0] !== "object") {
+      throw new Error("BYBIT_LIVE_SYMBOL_RULES_MISSING");
+    }
+    const instrument = result.list[0] as Record<string, unknown>;
+    const lot = instrument.lotSizeFilter;
+    const price = instrument.priceFilter;
+    if (instrument.symbol !== symbol || instrument.status !== "Trading" || typeof instrument.baseCoin !== "string" || typeof instrument.quoteCoin !== "string" || !lot || typeof lot !== "object" || !price || typeof price !== "object") {
+      throw new Error("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    }
+    const lotFilter = lot as Record<string, unknown>;
+    const priceFilter = price as Record<string, unknown>;
+    const baseAsset = instrument.baseCoin.trim().toUpperCase();
+    const quoteAsset = instrument.quoteCoin.trim().toUpperCase();
+    const minOrderQty = typeof lotFilter.minOrderQty === "string" ? lotFilter.minOrderQty : "";
+    const maxOrderQty = typeof lotFilter.maxOrderQty === "string" ? lotFilter.maxOrderQty : "";
+    const qtyStep = typeof lotFilter.qtyStep === "string" ? lotFilter.qtyStep : "";
+    const minOrderAmount = typeof lotFilter.minOrderAmt === "string" ? lotFilter.minOrderAmt : "";
+    const tickSize = typeof priceFilter.tickSize === "string" ? priceFilter.tickSize : "";
+    for (const value of [minOrderQty, maxOrderQty, qtyStep, tickSize]) positive(value, "BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    nonNegative(minOrderAmount, "BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    if (!baseAsset || !quoteAsset || Number(maxOrderQty) < Number(minOrderQty)) throw new Error("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    return { symbol, baseAsset, quoteAsset, minOrderQty, maxOrderQty, qtyStep, minOrderAmount, tickSize };
+  }
+
   async getMarketData(request: ExchangeMarketDataRequest): Promise<ExchangeMarketDataResponse> {
     validateExchangeMarketDataRequest(request);
     if (request.limit > MAX_MARKET_DATA_LIMIT) throw new Error("INVALID_MARKET_DATA_LIMIT");
