@@ -34,6 +34,11 @@ describe("Binance Spot Testnet durable idempotency safety contract", () => {
   it("marks ambiguous provider outcomes non-retryable and persists fills before audit", () => {
     expect(executor).toContain('SET "status" = \'UNKNOWN\'');
     expect(executor).toContain('throw new Error("TESTNET_ORDER_OUTCOME_UNKNOWN")');
+    expect(executor).toContain('"auditStatus" = \'PENDING\'');
+    expect(executor).toContain('"auditStatus" = \'RECORDED\'');
+    expect(executor).toContain('"auditStatus" = \'FAILED\'');
+    expect(executor).toContain('throw new Error("TESTNET_ORDER_AUDIT_WRITE_FAILED")');
+    expect(executor).toContain('"TESTNET_PROVIDER_ERROR"');
     expect(executor.indexOf('SET "status" = \'FILLED\'')).toBeLessThan(
       executor.indexOf('action: "TRADING_TESTNET_ORDER_FILLED"'),
     );
