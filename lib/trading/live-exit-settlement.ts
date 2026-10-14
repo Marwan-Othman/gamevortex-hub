@@ -194,6 +194,10 @@ async function resolveEntryCoverageQuantity(
   const fillAdapter = adapter as TradeFillAdapter;
   if (!fillAdapter.getOrderTradeFills || !order.providerOrderId) throw new Error("LIVE_TRADE_FILL_ADAPTER_REQUIRED");
 
+  // Binance exchangeInfo filters are not valid for Bybit. Block reconciliation rather than
+  // calculating a sellable quantity or settlement coverage with another venue\x27s rules.
+  if (adapter.id === "bybit-spot-live") throw new Error("BYBIT_LIVE_SYMBOL_RULES_NOT_IMPLEMENTED");
+
   const [fills, rules] = await Promise.all([
     fillAdapter.getOrderTradeFills({ symbol: order.symbol, providerOrderId: order.providerOrderId }),
     getBinanceLiveSymbolRules(order.symbol),
