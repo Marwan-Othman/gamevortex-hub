@@ -15,6 +15,34 @@ describe("BybitSpotLiveAdapter", () => {
     await expect(adapter.placeSpotBuy({ clientOrderId: "gv-test-1", symbol: "BTCUSDT", side: "BUY", amountUsd: 10, entryPrice: 100, stopLossPrice: 95, takeProfitPrice: 110 })).rejects.toThrow("LIVE_TRADING_DISABLED");
   });
 
+  it("checks API permissions, account mode, and quote balance using read-only endpoints", async () => {
+    const calls: string[] = [];
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", fetcher: async (url) => {
+      const path = new URL(String(url)).pathname;
+      calls.push(path);
+      if (path === "/v5/user/query-api") return response({ retCode: 0, result: { apiKey: "key", readOnly: 0, permissions: { Spot: ["SpotTrade"], Wallet: [], ContractTrade: [], Options: [], Derivatives: [] } } });
+      if (path === "/v5/account/info") return response({ retCode: 0, result: { unifiedMarginStatus: 5, marginMode: "REGULAR_MARGIN", spotHedgingStatus: "OFF" } });
+      if (path === "/v5/account/wallet-balance") return response({ retCode: 0, result: { list: [{ accountType: "UNIFIED", coin: [{ coin: "USDT", walletBalance: "12.5", locked: "2", spotBorrow: "0" }] }] } });
+      throw new Error("unexpected endpoint");
+    } });
+    await expect(adapter.getLiveReadiness()).resolves.toEqual({ accountMode: 5, marginMode: "REGULAR_MARGIN", quoteAsset: "USDT", quoteFreeBalance: 10.5, blockers: [] });
+    expect(calls).toEqual(["/v5/user/query-api", "/v5/account/info", "/v5/account/wallet-balance"]);
+  });
+
+  it("rejects Bybit API keys with withdrawal/transfer permissions", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", fetcher: async () => response({ retCode: 0, result: { apiKey: "key", readOnly: 0, permissions: { Spot: ["SpotTrade"], Wallet: ["Withdraw"], ContractTrade: [], Options: [], Derivatives: [] } } }) });
+    await expect(adapter.getLiveReadiness()).rejects.toThrow("BYBIT_LIVE_WITHDRAW_OR_TRANSFER_PERMISSION_FORBIDDEN");
+  });
+
+  it("rejects Bybit accounts with outstanding Spot borrow", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", fetcher: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/v5/user/query-api") return response({ retCode: 0, result: { apiKey: "key", readOnly: 0, permissions: { Spot: ["SpotTrade"], Wallet: [], ContractTrade: [], Options: [], Derivatives: [] } } });
+      if (path === "/v5/account/info") return response({ retCode: 0, result: { unifiedMarginStatus: 5, marginMode: "REGULAR_MARGIN" } });
+      return response({ retCode: 0, result: { list: [{ accountType: "UNIFIED", coin: [{ coin: "USDT", walletBalance: "12.5", locked: "0", spotBorrow: "1" }] }] } });
+    } });
+    await expect(adapter.getLiveReadiness()).rejects.toThrow("BYBIT_LIVE_SPOT_BORROW_DETECTED");
+  });
   it("reads strict Spot market rules from the public instruments endpoint", async () => {
     const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
       expect(String(url)).toContain("/v5/market/instruments-info?");
