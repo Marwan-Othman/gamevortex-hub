@@ -464,6 +464,12 @@ export async function executeApprovedLiveOrder(input: {
   if (!ownerId || !approvalId || !opportunityId) throw new Error("INVALID_LIVE_EXECUTION_INPUT");
 
   if (!monitorOnly) {
+    // Defense in depth: block new live orders even if an old approval exists.
+    // Monitoring remains enabled so already-open positions can still be reconciled.
+    throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+  }
+
+  if (!monitorOnly) {
     const controlResult = await getTradingControl(ownerId);
     const blockers = controlBlockReasons(controlResult.control);
     if (blockers.length > 0) throw new Error(`TRADING_CONTROL_BLOCKED:${blockers.join(",")}`);
