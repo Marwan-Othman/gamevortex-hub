@@ -71,6 +71,31 @@ describe("BybitSpotLiveAdapter", () => {
     await expect(adapter.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_NETWORK_ERROR");
   });
 
+  it("does not submit independent full-size Bybit exit legs as if they were an atomic OCO", async () => {
+    let requests = 0;
+    const adapter = new BybitSpotLiveAdapter({
+      apiKey: "key",
+      apiSecret: "secret",
+      liveTradingEnabled: true,
+      fetcher: async () => {
+        requests += 1;
+        return response({ retCode: 0, result: { orderId: "unexpected" } });
+      },
+    });
+
+    await expect(adapter.placeProtectedExitOco!({
+      symbol: "BTCUSDT",
+      quantity: "0.01",
+      entryPrice: "100",
+      takeProfitClientOrderId: "gv-exit-tp-test",
+      takeProfitPrice: "110",
+      stopLossClientOrderId: "gv-exit-sl-test",
+      stopLossPrice: "95",
+      stopLimitPrice: "94.9",
+    })).rejects.toThrow("BYBIT_NATIVE_LINKED_PROTECTION_NOT_IMPLEMENTED");
+    expect(requests).toBe(0);
+  });
+
   it("normalizes reverse-ordered Bybit klines", async () => {
     const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
       expect(String(url)).toContain("/v5/market/kline?");
