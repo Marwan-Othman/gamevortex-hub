@@ -24,7 +24,7 @@ describe("Binance Spot Testnet durable idempotency safety contract", () => {
 
   it("claims each approval with a single compare-and-set before provider submission", () => {
     expect(executor).toContain('ON CONFLICT ("approvalId") DO NOTHING');
-    expect(executor).toContain('AND "status" = ${"INTENT_CREATED"}');
+    expect(executor).toContain('AND "status" = \'INTENT_CREATED\'');
     expect(executor).toContain('throw new Error("TESTNET_ORDER_ALREADY_CLAIMED_OR_TERMINAL")');
     expect(executor.indexOf("claimTestnetOrder({")).toBeLessThan(
       executor.indexOf("order = await adapter.placeSpotBuy({"),
