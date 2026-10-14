@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const h = vi.hoisted(() => {
+  const money = (value: number) => ({ value, toString: () => value.toFixed(2), toNumber: () => value, valueOf: () => value, sub: (other: any) => money(value - Number(other)) });
   const state: any = {
     owner: { id: "owner-1", role: "SUPER_ADMIN" },
-    wallet: { id: "wallet-1", userId: "owner-1", balance: 1, pendingBalance: 0 },
+    wallet: { id: "wallet-1", userId: "owner-1", balance: money(1), pendingBalance: money(0) },
     ownerWallet: null as any,
     transactions: new Map<string, any>(),
     ledger: [] as any[],
@@ -26,20 +27,20 @@ const h = vi.hoisted(() => {
       findUnique: vi.fn(async () => state.wallet ? { ...state.wallet } : null),
       findUniqueOrThrow: vi.fn(async () => ({ ...state.wallet })),
       updateMany: vi.fn(async ({ where, data }: any) => {
-        if (!state.wallet || state.wallet.id !== where.id || state.wallet.balance < Number(where.balance.gte)) return { count: 0 };
-        state.wallet.balance += Number(data.balance.decrement) * -1;
+        if (!state.wallet || state.wallet.id !== where.id || Number(state.wallet.balance) < Number(where.balance.gte)) return { count: 0 };
+        state.wallet.balance = money(Number(state.wallet.balance) - Number(data.balance.decrement));
         return { count: 1 };
       }),
     },
     ownerWallet: {
       findUnique: vi.fn(async () => state.ownerWallet ? { ...state.ownerWallet } : null),
       upsert: vi.fn(async ({ where, create }: any) => {
-        if (!state.ownerWallet) state.ownerWallet = { id: "owner-wallet-1", ownerId: where.ownerId, availableUsd: 0 };
+        if (!state.ownerWallet) state.ownerWallet = { id: "owner-wallet-1", ownerId: where.ownerId, availableUsd: money(0) };
         return { ...state.ownerWallet };
       }),
       findUniqueOrThrow: vi.fn(async () => ({ ...state.ownerWallet })),
       update: vi.fn(async ({ data }: any) => {
-        state.ownerWallet.availableUsd += Number(data.availableUsd.increment);
+        state.ownerWallet.availableUsd = money(Number(state.ownerWallet.availableUsd) + Number(data.availableUsd.increment));
         return { ...state.ownerWallet };
       }),
     },
@@ -82,7 +83,7 @@ const h = vi.hoisted(() => {
       }
     }),
   };
-  return { state, tx, db };
+  return { state, tx, db, money };
 });
 
 vi.mock("@/lib/prisma", () => ({ db: h.db }));
@@ -116,7 +117,7 @@ function request(method: "GET" | "POST", body?: unknown, key?: string) {
 
 beforeEach(() => {
   h.state.owner = { id: "owner-1", role: "SUPER_ADMIN" };
-  h.state.wallet = { id: "wallet-1", userId: "owner-1", balance: 1, pendingBalance: 0 };
+  h.state.wallet = { id: "wallet-1", userId: "owner-1", balance: money(1), pendingBalance: money(0) };
   h.state.ownerWallet = null;
   h.state.transactions = new Map();
   h.state.ledger = [];
@@ -142,7 +143,7 @@ describe("trading wallet funding route", () => {
     h.state.owner = { id: "staff-1", role: "STAFF" };
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     expect(response.status).toBe(403);
-    expect(h.state.wallet.balance).toBe(1);
+    expect(Number(h.state.wallet.balance)).toBe(1);
   });
 
   it.each([0, -1, 1.5, 1001, "1", null])("rejects invalid amount %s", async (amountUsd) => {
@@ -159,8 +160,8 @@ describe("trading wallet funding route", () => {
   it("moves funds atomically and records both ledgers and audit", async () => {
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     expect(response.status).toBe(201);
-    expect(h.state.wallet.balance).toBe(0);
-    expect(h.state.ownerWallet.availableUsd).toBe(1);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
     expect(h.state.transactions.size).toBe(1);
     expect(h.state.ledger).toHaveLength(1);
     expect(h.state.audits).toHaveLength(1);
