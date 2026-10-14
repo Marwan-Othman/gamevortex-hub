@@ -289,9 +289,20 @@ async function protectFilledOrder(
   if (order.status === "PROTECTED" && order.protectionStatus === "PROTECTED") return order;
   if (order.status !== "PROTECTION_PENDING") throw new Error("LIVE_ORDER_NOT_READY_FOR_PROTECTION");
 
-  // Bybit uses different market filters and TP/SL semantics. Never apply Binance filters to it.
-  // Until provider-specific symbol-rule validation and preflight are implemented, fail closed.
-  if (adapter.id === "bybit-spot-live") throw new Error("BYBIT_LIVE_SYMBOL_RULES_PREFLIGHT_NOT_IMPLEMENTED");
+  // Bybit's native linked protection is not implemented. Record the filled-but-
+  // unprotected position and trip the circuit breaker before stopping; do not
+  // submit an emergency SELL with an unverified sellable quantity.
+  if (adapter.id === "bybit-spot-live") {
+    const reason = "BYBIT_NATIVE_LINKED_PROTECTION_NOT_IMPLEMENTED";
+    const failed = await markLiveOrderProtectionFailed(order.id, reason).catch(() => order);
+    await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: reason }).catch(() => undefined);
+    await audit(ownerId, "TRADING_LIVE_PROTECTION_FAILED", failed, {
+      reason,
+      manualReviewRequired: true,
+      emergencyExitAttempted: false,
+    }).catch(() => undefined);
+    throw new Error(`LIVE_PROTECTION_FAILED:${reason}:EMERGENCY_EXIT_SKIPPED_UNVERIFIED_QUANTITY:MANUAL_REVIEW_REQUIRED`);
+  }
 
   const fillPrice = order.averageFillPrice?.toNumber() ?? order.entryPrice.toNumber();
   const filledQuantity = order.executedQty?.toFixed();
