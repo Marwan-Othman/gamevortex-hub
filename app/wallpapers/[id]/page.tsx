@@ -8,6 +8,7 @@ import { getVipAccess } from "../../../lib/vip";
 import LocaleText from "@/components/ui/LocaleText";
 import WallpaperViewTracker from "./WallpaperViewTracker";
 import FavoriteButton from "../FavoriteButton";
+import WallpaperViewer from "./WallpaperViewer";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -57,11 +58,13 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
                   style={{ display: "block", width: "100%", maxHeight: "82dvh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
                 />
               ) : (
-                <img
+                <WallpaperViewer
+                  wallpaperId={wallpaper.id}
+                  title={wallpaper.titleEn}
                   src={`/api/wallpapers/${wallpaper.id}/media`}
-                  alt={wallpaper.titleEn}
-                  fetchPriority="high"
-                  style={{ display: "block", width: "100%", maxHeight: "82dvh", objectFit: "contain", borderRadius: 16, background: "rgba(0,0,0,.25)" }}
+                  width={wallpaper.width}
+                  height={wallpaper.height}
+                  canDownload={canDownload}
                 />
               )
             ) : (
@@ -81,7 +84,7 @@ export default async function WallpaperDetails({ params }: { params: Promise<{ i
               <Link href="/vip" className="btn">💎 افتح VIP للتحميل</Link>
             )}
             {canViewMedia && wallpaper.mediaType !== "VIDEO" && (
-              <Link href={`/wallpapers/studio?wallpaper=${encodeURIComponent(wallpaper.id)}`} className="btn">🎨 أدوات: ساعة وتاريخ ونص</Link>
+              <Link href={`/wallpapers/studio?wallpaper=${encodeURIComponent(wallpaper.id)}`} className="btn">🎨 الاستوديو المتقدم</Link>
             )}
             <Link href="/wallpapers" className="btn secondary">استكشف المزيد</Link>
           </div>
