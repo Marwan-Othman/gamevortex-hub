@@ -112,6 +112,7 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
 }): Promise<LiveWalletSettlementResult> {
   const inputOrder = input.order as LiveOrderSettlementRow;
   let netExitProceeds: Prisma.Decimal | null = null;
+  let settlementCurrencyBlocker: string | null = null;
 
   if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
     if (!inputOrder.exitProviderOrderId) throw new Error("SETTLEMENT_EXIT_PROVIDER_ORDER_ID_REQUIRED");
@@ -125,7 +126,13 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
 
     assertProviderExitFillMatchesOrder(inputOrder, fills);
 
-    const feeSettlement = calculateLiveSpotNetExitProceeds({
+    // Quote proceeds are not USD merely because the internal ledger is denominated in USD.
+    // Until a verified, timestamped FX conversion is implemented, only USD quote markets
+    // may credit the USD owner wallet. In particular, do not silently equate USDT/USDC to USD.
+    if (fills.quoteAsset.trim().toUpperCase() !== "USD") {
+      settlementCurrencyBlocker = "SETTLEMENT_QUOTE_CURRENCY_REQUIRES_VERIFIED_USD_CONVERSION";
+    } else {
+      const feeSettlement = calculateLiveSpotNetExitProceeds({
       baseAsset: fills.baseAsset,
       quoteAsset: fills.quoteAsset,
       exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
@@ -136,7 +143,8 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       })),
     });
 
-    netExitProceeds = feeSettlement.netExitQuoteProceeds;
+      netExitProceeds = feeSettlement.netExitQuoteProceeds;
+    }
   }
 
   return db.$transaction(async (tx) => {
@@ -165,6 +173,11 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     if (order.status !== "CLOSED" || order.settlementStatus !== "EXCHANGE_CLOSED_PENDING_WALLET") {
       const blocked = await blockSettlement(tx, order.id, "LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT");
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"] };
+    }
+
+    if (settlementCurrencyBlocker) {
+      const blocked = await blockSettlement(tx, order.id, settlementCurrencyBlocker);
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [settlementCurrencyBlocker] };
     }
 
     if (!order.exitCumulativeQuoteQty || !order.exitExecutedQty || !netExitProceeds) {
