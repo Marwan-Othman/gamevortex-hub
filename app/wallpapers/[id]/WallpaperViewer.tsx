@@ -97,13 +97,14 @@ let segmenterPromise: Promise<InteractiveSegmenter> | null = null;
 
 function getInteractiveSegmenter(): Promise<InteractiveSegmenter> {
   if (!segmenterPromise) {
-    segmenterPromise = (async () => {
+    segmenterPromise = (async (): Promise<InteractiveSegmenter> => {
       const { FilesetResolver, InteractiveSegmenter, BrushMode } = await import("@mediapipe/tasks-vision");
       const vision = await FilesetResolver.forVisionTasks(SEGMENTER_WASM);
       const instance = await InteractiveSegmenter.createFromOptions(vision, { baseOptions: { modelAssetPath: INTERACTIVE_SEGMENTER_MODEL } });
       return {
         setImage: (image: HTMLImageElement) => instance.setImage(image),
-        segment: (strokes) => instance.segment(strokes.map((s) => ({ ...s, brushMode: BrushMode.POSITIVE }))) as unknown as ConfidenceMask,
+        segment: (strokes: Array<{ brushMode: number; point: Array<{ x: number; y: number }>; isCompleted: boolean }>) =>
+          instance.segment(strokes.map((stroke) => ({ ...stroke, brushMode: BrushMode.POSITIVE }))) as unknown as ConfidenceMask,
       };
     })().catch((error) => { segmenterPromise = null; throw error; });
   }
