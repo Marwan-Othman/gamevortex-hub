@@ -1140,6 +1140,15 @@ async function processApiAccessPaymentWebhook(event: NormalizedEvent) {
 const MAX_WEBHOOK_BYTES = 1_000_000;
 
 export async function POST(request: NextRequest) {
+  // Safe diagnostics: never log the payload, signature values, or credentials.
+  // This confirms whether PayPal actually reaches the deployed route.
+  console.info("[payments:webhook] request received", {
+    hasPaypalTransmissionId: request.headers.has("paypal-transmission-id"),
+    hasPaypalTransmissionSig: request.headers.has("paypal-transmission-sig"),
+    hasStripeSignature: request.headers.has("stripe-signature"),
+    contentLength: request.headers.get("content-length") ?? null,
+  });
+
   /*
    * Payment provider webhooks are server-to-server requests.
    * They do not use the browser CSRF flow.
@@ -1194,6 +1203,15 @@ export async function POST(request: NextRequest) {
     ),
   );
 
+  console.info("[payments:webhook] verification started", {
+    provider: provider.name,
+    paypalEnvironment: process.env.PAYPAL_ENVIRONMENT || "unset",
+    paypalWebhookIdConfigured: Boolean(process.env.PAYPAL_WEBHOOK_ID),
+    paypalClientIdConfigured: Boolean(process.env.PAYPAL_CLIENT_ID),
+    paypalClientSecretConfigured: Boolean(process.env.PAYPAL_CLIENT_SECRET),
+    paypalHeaderCount: Object.keys(webhookHeaders).length,
+  });
+
   let signatureValid = false;
   try {
     signatureValid = await provider.verifyWebhook(
@@ -1209,6 +1227,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (!signatureValid) {
+    console.warn("[payments:webhook] signature rejected", {
+      provider: provider.name,
+      paypalEnvironment: process.env.PAYPAL_ENVIRONMENT || "unset",
+      paypalWebhookIdConfigured: Boolean(process.env.PAYPAL_WEBHOOK_ID),
+      paypalHeaderNames: Object.keys(webhookHeaders),
+    });
     return NextResponse.json(
       {
         error: "INVALID_SIGNATURE",
