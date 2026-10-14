@@ -382,7 +382,7 @@ export async function POST(
 
     const walletDeposit = await db.walletDeposit.findFirst({
       where: { id: body.referenceId, userId: user.id },
-      select: { id: true, provider: true, providerPaymentId: true, status: true, amountCents: true },
+      select: { id: true, provider: true, providerPaymentId: true, status: true, amountCents: true, currency: true },
     });
 
     if (walletDeposit) {
