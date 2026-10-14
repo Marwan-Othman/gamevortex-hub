@@ -289,6 +289,10 @@ async function protectFilledOrder(
   if (order.status === "PROTECTED" && order.protectionStatus === "PROTECTED") return order;
   if (order.status !== "PROTECTION_PENDING") throw new Error("LIVE_ORDER_NOT_READY_FOR_PROTECTION");
 
+  // Bybit uses different market filters and TP/SL semantics. Never apply Binance filters to it.
+  // Until provider-specific symbol-rule validation and preflight are implemented, fail closed.
+  if (adapter.id === "bybit-spot-live") throw new Error("BYBIT_LIVE_SYMBOL_RULES_PREFLIGHT_NOT_IMPLEMENTED");
+
   const fillPrice = order.averageFillPrice?.toNumber() ?? order.entryPrice.toNumber();
   const filledQuantity = order.executedQty?.toFixed();
   if (!filledQuantity || Number(filledQuantity) <= 0) throw new Error("LIVE_FILLED_QUANTITY_REQUIRED");
@@ -470,6 +474,11 @@ export async function executeApprovedLiveOrder(input: {
     const controlResult = await getTradingControl(ownerId);
     const blockers = controlBlockReasons(controlResult.control);
     if (blockers.length > 0) throw new Error(`TRADING_CONTROL_BLOCKED:${blockers.join(",")}`);
+
+    const selectedAdapter = createLiveExchangeAdapter();
+    if (selectedAdapter.id === "bybit-spot-live") {
+      throw new Error("BYBIT_LIVE_PREFLIGHT_NOT_IMPLEMENTED");
+    }
 
     const preflight = await getBinanceLivePreflight();
     if (!preflight.readyForLiveExecution) {
