@@ -2100,9 +2100,11 @@ model SupportMessage {
 /**
  * =========================================================
  * TRADING TABLES MANAGED OUTSIDE THE GENERATED CLIENT
- * Created by migrations 20261001210000 .. 20261003120000 and accessed via
- * parameterized SQL. @@ignore keeps them out of the client while keeping
- * migrate diff aware of them. Do NOT query these through prisma.<model>.
+ * TradingApproval / TradingLiveOrder are created by migrations
+ * 20261001210000 .. 20261003120000; TradingTestnetOrder is created by
+ * 20261014080000. All are accessed via parameterized SQL. @@ignore keeps
+ * them out of the client while keeping migrate diff aware of them.
+ * Do NOT query these through prisma.<model>.
  * =========================================================
  */
 
