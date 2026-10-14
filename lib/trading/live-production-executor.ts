@@ -27,7 +27,7 @@ import {
   resolveMaxSlippagePercent,
 } from "@/lib/trading/live-slippage";
 import type { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
-import { createBinanceSpotLiveAdapter } from "@/lib/trading/live-exchange";
+import { createLiveExchangeAdapter } from "@/lib/trading/live-exchange";
 import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
@@ -526,7 +526,7 @@ export async function executeApprovedLiveOrder(input: {
     await bindLiveOrderToAllocation({ ownerId, order });
   }
 
-  const adapter = createBinanceSpotLiveAdapter();
+  const adapter = createLiveExchangeAdapter();
 
   if (order.status === "PROTECTED" || order.status === "CLOSED") {
     const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
