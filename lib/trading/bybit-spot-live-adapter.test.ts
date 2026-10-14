@@ -41,6 +41,36 @@ describe("BybitSpotLiveAdapter", () => {
     await expect(invalid.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
   });
 
+  it("rejects instruments that are not actively trading", async () => {
+    const adapter = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Settled", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0.01" },
+    }] } }) });
+    await expect(adapter.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+  });
+
+  it("rejects malformed quantity increments and zero tick sizes", async () => {
+    const invalidQuantityStep = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0.01" },
+    }] } }) });
+    await expect(invalidQuantityStep.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+
+    const invalidTickSize = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0" },
+    }] } }) });
+    await expect(invalidTickSize.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+  });
+
+  it("fails closed on public instrument endpoint network errors", async () => {
+    const adapter = new BybitSpotLiveAdapter({ fetcher: async () => { throw new Error("network details should not leak"); } });
+    await expect(adapter.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_NETWORK_ERROR");
+  });
+
   it("normalizes reverse-ordered Bybit klines", async () => {
     const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
       expect(String(url)).toContain("/v5/market/kline?");
