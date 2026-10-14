@@ -269,7 +269,7 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     const accountResult = objectResult(await this.request("GET", "/v5/account/info", {}), "BYBIT_LIVE_ACCOUNT_INFO_REQUIRED");
     const accountMode = accountResult.unifiedMarginStatus;
     const marginMode = typeof accountResult.marginMode === "string" ? accountResult.marginMode : "";
-    if (typeof accountMode !== "number" || ![1, 3, 4, 5, 6].includes(accountMode) || !marginMode) throw new Error("BYBIT_LIVE_ACCOUNT_MODE_UNVERIFIED");
+    if (typeof accountMode !== "number" || ![3, 4, 5, 6].includes(accountMode) || !marginMode) throw new Error("BYBIT_LIVE_ACCOUNT_MODE_UNVERIFIED");
     const walletResult = objectResult(await this.request("GET", "/v5/account/wallet-balance", { accountType: "UNIFIED", coin: quoteAsset }), "BYBIT_LIVE_WALLET_BALANCE_REQUIRED");
     if (!Array.isArray(walletResult.list) || walletResult.list.length !== 1 || !walletResult.list[0] || typeof walletResult.list[0] !== "object") throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
     const account = walletResult.list[0] as Record<string, unknown>;
