@@ -59,7 +59,7 @@ const ERROR_TEXT: Record<string, string> = {
   LIVE_RISK_CONFIG_REQUIRED: "احفظ إعدادات Risk Manager أولاً.",
   LIVE_MARKET_DATA_UNAVAILABLE: "ما قدرت أجيب بيانات سوق كافية لهذا الرمز.",
   LIVE_WALLET_MODE_REQUIRES_WHOLE_USD: "وضع المحفظة يحتاج مبلغ بدولارات صحيحة.",
-  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر من رصيد المنصة معطل أمنيًا؛ استخدم Trading Allocation.",
+  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر معطل أمنيًا. تخصيص المحفظة وحده لا يسمح بالتداول؛ بوابة المحاسبة ما زالت تمنع التنفيذ حتى التحقق من التمويل والتسوية.",
   TRADING_ALLOCATION_REQUIRED:
     "لا يوجد تخصيص داخلي مطابق لمبلغ الصفقة. التخصيص وحده لا يمول Binance؛ يلزم إثبات مسار التمويل والتسوية قبل السماح بالتداول الحقيقي.",
   BINANCE_LIVE_INSUFFICIENT_BALANCE: "رصيد USDT الحر على Binance أقل من مبلغ الصفقة.",
