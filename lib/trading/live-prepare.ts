@@ -31,6 +31,11 @@ import {
 } from "@/lib/trading/live-prepare-math";
 
 const APPROVAL_TTL_SECONDS = 240;
+
+// Remains blocked until a real funding rail and end-to-end settlement are verified.
+function liveAccountingReadinessBlocker(): string | null {
+  return "LIVE_TRADING_ACCOUNTING_NOT_READY";
+}
 const STRATEGY_VERSION = "owner-manual-v1";
 
 export type PreparedLiveOrder = {
@@ -123,7 +128,8 @@ export async function prepareLiveOrder(input: {
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
   // Keep live execution fail-closed until the migrated USD wallet has been reconciled.
   // The full production accounting and reconciliation path is not yet verified.
-  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+  const accountingBlocker = liveAccountingReadinessBlocker();
+  if (accountingBlocker) throw new Error(accountingBlocker);
 
   const direct = isLiveDirectFundingEnabled();
   if (direct) {
