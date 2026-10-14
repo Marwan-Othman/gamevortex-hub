@@ -149,7 +149,7 @@ describe("trading wallet funding route", () => {
   it.each([0, -1, 1.5, 1001, "1", null])("rejects invalid amount %s", async (amountUsd) => {
     const response = await POST(request("POST", { amountUsd }, "funding-key-001"));
     expect(response.status).toBe(400);
-    expect(h.state.wallet.balance).toBe(1);
+    expect(Number(h.state.wallet.balance)).toBe(1);
   });
 
   it("requires an idempotency key", async () => {
@@ -171,7 +171,7 @@ describe("trading wallet funding route", () => {
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("INSUFFICIENT_WALLET_BALANCE");
-    expect(h.state.wallet.balance).toBe(1);
+    expect(Number(h.state.wallet.balance)).toBe(1);
     expect(h.state.ownerWallet).toBeNull();
     expect(h.state.transactions.size).toBe(0);
   });
@@ -180,7 +180,7 @@ describe("trading wallet funding route", () => {
     h.state.failLedger = true;
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     expect(response.status).toBe(500);
-    expect(h.state.wallet.balance).toBe(1);
+    expect(Number(h.state.wallet.balance)).toBe(1);
     expect(h.state.ownerWallet).toBeNull();
     expect(h.state.transactions.size).toBe(0);
     expect(h.state.ledger).toHaveLength(0);
@@ -191,7 +191,7 @@ describe("trading wallet funding route", () => {
     h.state.failAudit = true;
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     expect(response.status).toBe(500);
-    expect(h.state.wallet.balance).toBe(1);
+    expect(Number(h.state.wallet.balance)).toBe(1);
     expect(h.state.ownerWallet).toBeNull();
     expect(h.state.transactions.size).toBe(0);
     expect(h.state.ledger).toHaveLength(0);
@@ -204,7 +204,7 @@ describe("trading wallet funding route", () => {
     const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     expect(replay.status).toBe(200);
     expect((await replay.json()).replayed).toBe(true);
-    expect(h.state.wallet.balance).toBe(0);
+    expect(Number(h.state.wallet.balance)).toBe(0);
     expect(h.state.ownerWallet.availableUsd).toBe(1);
     expect(h.state.transactions.size).toBe(1);
     expect(h.state.ledger).toHaveLength(1);
@@ -215,7 +215,7 @@ describe("trading wallet funding route", () => {
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("IDEMPOTENCY_KEY_CONFLICT");
-    expect(h.state.wallet.balance).toBe(0);
+    expect(Number(h.state.wallet.balance)).toBe(0);
     expect(h.state.ownerWallet.availableUsd).toBe(1);
   });
 
