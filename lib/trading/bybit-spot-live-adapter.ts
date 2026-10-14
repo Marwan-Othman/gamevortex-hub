@@ -384,31 +384,15 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     return { symbol, baseAsset, quoteAsset, fills };
   }
 
-  async placeProtectedExitOco(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult> {
+  async placeProtectedExitOco(_request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult> {
     this.requireLive();
-    const symbol = normalizeSymbol(request.symbol, this.symbolMap);
-    const quantity = decimal(request.quantity, "INVALID_BYBIT_LIVE_EXIT_QUANTITY", false);
-    const entryPrice = positive(request.entryPrice, "INVALID_BYBIT_LIVE_ENTRY_PRICE");
-    const takeProfitPrice = positive(request.takeProfitPrice, "INVALID_BYBIT_LIVE_EXIT_TAKE_PROFIT");
-    const stopLossPrice = positive(request.stopLossPrice, "INVALID_BYBIT_LIVE_EXIT_STOP_LOSS");
-    const stopLimitPrice = positive(request.stopLimitPrice, "INVALID_BYBIT_LIVE_EXIT_STOP_LIMIT");
-    const takeProfitClientOrderId = normalizeClientOrderId(request.takeProfitClientOrderId, "INVALID_BYBIT_LIVE_TP_CLIENT_ORDER_ID");
-    const stopLossClientOrderId = normalizeClientOrderId(request.stopLossClientOrderId, "INVALID_BYBIT_LIVE_SL_CLIENT_ORDER_ID");
-    if (!(takeProfitPrice > entryPrice && entryPrice > stopLossPrice && stopLossPrice > stopLimitPrice)) throw new Error("INVALID_BYBIT_LIVE_PROTECTED_EXIT_PRICE_ORDER");
 
-    // Bybit Spot exposes TP/SL as two linked conditional orders rather than
-    // Binance's single OCO list. Both are submitted as server-side orders;
-    // if the second request fails, the caller must execute its emergency exit.
-    const common = { category: "spot", symbol, side: "Sell", orderType: "Limit", qty: quantity, timeInForce: "GTC", isLeverage: 0, orderFilter: "tpslOrder" };
-    const tp = await this.request("POST", "/v5/order/create", { ...common, price: takeProfitPrice.toString(), triggerPrice: takeProfitPrice.toString(), orderLinkId: takeProfitClientOrderId, tpOrderType: "Limit", tpLimitPrice: takeProfitPrice.toString() });
-    const tpResult = objectResult(tp, "BYBIT_LIVE_TP_SUBMISSION_FAILED");
-    const tpId = typeof tpResult.orderId === "string" ? tpResult.orderId : "";
-    if (!tpId) throw new Error("BYBIT_LIVE_TP_ORDER_ID_REQUIRED");
-    const sl = await this.request("POST", "/v5/order/create", { ...common, price: stopLimitPrice.toString(), triggerPrice: stopLossPrice.toString(), orderLinkId: stopLossClientOrderId, slOrderType: "Limit", slLimitPrice: stopLimitPrice.toString() });
-    const slResult = objectResult(sl, "BYBIT_LIVE_SL_SUBMISSION_FAILED");
-    const slId = typeof slResult.orderId === "string" ? slResult.orderId : "";
-    if (!slId) throw new Error("BYBIT_LIVE_SL_ORDER_ID_REQUIRED");
-    return { accepted: true, orderListId: `bybit-pair:${tpId}:${slId}`, listClientOrderId: request.listClientOrderId ?? `bybit-pair:${takeProfitClientOrderId}`, orders: [{ providerOrderId: tpId, clientOrderId: takeProfitClientOrderId }, { providerOrderId: slId, clientOrderId: stopLossClientOrderId }], status: "New" };
+    // The current Bybit implementation would submit two independent full-size
+    // conditional SELL orders. They are not an atomic OCO pair, so one leg
+    // filling may leave the other leg active and create an unintended short/
+    // rejected oversell attempt. Do not submit either leg until a verified
+    // provider-native linked TP/SL implementation and reconciliation exist.
+    throw new Error("BYBIT_NATIVE_LINKED_PROTECTION_NOT_IMPLEMENTED");
   }
 
   async getProtectedExitLegStatus(request: ExchangeProtectedExitLegStatusRequest): Promise<ExchangeProtectedExitLegStatusResult> {
