@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { guardMutation, guardRead } from "@/lib/api";
+import { guardMutation, guardRead, internalError } from "@/lib/api";
 import { requireTradingOwner, tradingForbidden } from "@/lib/trading/access";
 import { db } from "@/lib/prisma";
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === "FORBIDDEN") return tradingForbidden();
-    return errorResponse("FUNDING_BALANCE_READ_FAILED", 500);
+    return internalError("admin:trading:wallet-funding:read", error, "FUNDING_BALANCE_READ_FAILED");
   }
 }
 
@@ -156,6 +156,9 @@ export async function POST(request: NextRequest) {
     if (code === "IDEMPOTENCY_KEY_CONFLICT") return errorResponse(code, 409);
     if (code === "SOURCE_WALLET_NOT_FOUND") return errorResponse(code, 404);
     if (code === "INSUFFICIENT_WALLET_BALANCE") return errorResponse(code, 409);
-    return errorResponse("TRADING_WALLET_FUNDING_FAILED", 500);
+    const prismaCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+    if (prismaCode === "P2002") return errorResponse("IDEMPOTENCY_KEY_IN_PROGRESS", 409);
+    if (prismaCode === "P2034") return errorResponse("FUNDING_CONCURRENT_UPDATE", 409);
+    return internalError("admin:trading:wallet-funding:write", error, "TRADING_WALLET_FUNDING_FAILED");
   }
 }
