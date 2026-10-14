@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
-import { calculateOwnerWalletSettlement, getSettlementCurrencyBlocker } from "./live-wallet-settlement";
+import { calculateOwnerWalletSettlement, getExchangeProceedsTransferBlocker, getSettlementCurrencyBlocker } from "./live-wallet-settlement";
 
 describe("calculateOwnerWalletSettlement", () => {
   it("returns exact USD proceeds without point conversion or rounding", () => {
@@ -22,6 +22,12 @@ describe("calculateOwnerWalletSettlement", () => {
     expect(() => calculateOwnerWalletSettlement(new Prisma.Decimal("-1"))).toThrow(
       "INVALID_SETTLEMENT_PROCEEDS",
     );
+  });
+});
+
+describe("getExchangeProceedsTransferBlocker", () => {
+  it("blocks wallet credit because exchange fills do not prove proceeds were transferred to GameVortex", () => {
+    expect(getExchangeProceedsTransferBlocker()).toBe("EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED");
   });
 });
 
