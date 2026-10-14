@@ -181,7 +181,7 @@ export async function executeOwnerBinanceSpotTestnetBuy(
       takeProfitPrice: plan.takeProfitPrice,
     });
   } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 500) : "TESTNET_PROVIDER_OUTCOME_UNKNOWN";
+    const reason = error instanceof Error ? "TESTNET_PROVIDER_ERROR" : "TESTNET_PROVIDER_OUTCOME_UNKNOWN";
     await db.$executeRaw(Prisma.sql`
       UPDATE "TradingTestnetOrder"
       SET "status" = 'UNKNOWN', "lastError" = ${reason}, "updatedAt" = CURRENT_TIMESTAMP
@@ -204,7 +204,8 @@ export async function executeOwnerBinanceSpotTestnetBuy(
   const persisted = await db.$queryRaw<TestnetOrderRow[]>(Prisma.sql`
     UPDATE "TradingTestnetOrder"
     SET "status" = 'FILLED', "providerOrderId" = ${order.providerOrderId},
-        "updatedAt" = CURRENT_TIMESTAMP, "lastError" = NULL, "confirmedAt" = CURRENT_TIMESTAMP
+        "auditStatus" = 'PENDING', "updatedAt" = CURRENT_TIMESTAMP,
+        "lastError" = NULL, "confirmedAt" = CURRENT_TIMESTAMP
     WHERE "approvalId" = ${input.approvalId.trim()} AND "status" = 'SUBMITTING'
     RETURNING *
   `);
@@ -214,29 +215,49 @@ export async function executeOwnerBinanceSpotTestnetBuy(
     throw new Error("TESTNET_ORDER_PERSISTENCE_UNCERTAIN");
   }
 
-  await db.auditLog.create({
-    data: {
-      actorUserId: input.ownerId.trim(),
-      action: "TRADING_TESTNET_ORDER_FILLED",
-      entityType: "TradingApproval",
-      entityId: input.approvalId.trim(),
-      metadata: {
-        venue: "BINANCE_SPOT_TESTNET",
-        realMoney: false,
-        opportunityId: input.opportunityId.trim(),
-        clientOrderId: order.clientOrderId,
-        providerOrderId: order.providerOrderId,
-        symbol: plan.symbol,
-        amountUsd: plan.amountUsd,
-        side: "BUY",
-        orderType: "SPOT_MARKET",
-        withdrawalPermission: false,
-        leverage: 1,
-        margin: false,
-        short: false,
+  try {
+    await db.auditLog.create({
+      data: {
+        actorUserId: input.ownerId.trim(),
+        action: "TRADING_TESTNET_ORDER_FILLED",
+        entityType: "TradingApproval",
+        entityId: input.approvalId.trim(),
+        metadata: {
+          venue: "BINANCE_SPOT_TESTNET",
+          realMoney: false,
+          opportunityId: input.opportunityId.trim(),
+          clientOrderId: order.clientOrderId,
+          providerOrderId: order.providerOrderId,
+          symbol: plan.symbol,
+          amountUsd: plan.amountUsd,
+          side: "BUY",
+          orderType: "SPOT_MARKET",
+          withdrawalPermission: false,
+          leverage: 1,
+          margin: false,
+          short: false,
+        },
       },
-    },
-  });
+    });
+  } catch {
+    await db.$executeRaw(Prisma.sql`
+      UPDATE "TradingTestnetOrder"
+      SET "auditStatus" = 'FAILED', "lastError" = 'AUDIT_WRITE_FAILED',
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "approvalId" = ${input.approvalId.trim()} AND "status" = 'FILLED'
+    `);
+    throw new Error("TESTNET_ORDER_AUDIT_WRITE_FAILED");
+  }
+
+  const auditRecorded = await db.$executeRaw(Prisma.sql`
+    UPDATE "TradingTestnetOrder"
+    SET "auditStatus" = 'RECORDED', "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "approvalId" = ${input.approvalId.trim()}
+      AND "status" = 'FILLED' AND "auditStatus" = 'PENDING'
+  `);
+  if (auditRecorded !== 1) {
+    throw new Error("TESTNET_ORDER_AUDIT_STATE_UNCERTAIN");
+  }
 
   return {
     venue: "BINANCE_SPOT_TESTNET",
