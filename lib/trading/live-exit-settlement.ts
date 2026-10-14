@@ -194,20 +194,37 @@ async function resolveEntryCoverageQuantity(
   const fillAdapter = adapter as TradeFillAdapter;
   if (!fillAdapter.getOrderTradeFills || !order.providerOrderId) throw new Error("LIVE_TRADE_FILL_ADAPTER_REQUIRED");
 
-  // Binance exchangeInfo filters are not valid for Bybit. Block reconciliation rather than
-  // calculating a sellable quantity or settlement coverage with another venue\x27s rules.
-  if (adapter.id === "bybit-spot-live") throw new Error("BYBIT_LIVE_SYMBOL_RULES_NOT_IMPLEMENTED");
+  const fills = await fillAdapter.getOrderTradeFills({
+    symbol: order.symbol,
+    providerOrderId: order.providerOrderId,
+  });
 
-  const [fills, rules] = await Promise.all([
-    fillAdapter.getOrderTradeFills({ symbol: order.symbol, providerOrderId: order.providerOrderId }),
-    getBinanceLiveSymbolRules(order.symbol),
-  ]);
+  // Use the selected venue's own quantity increment. Never apply Binance
+  // exchangeInfo filters to Bybit, and never guess if an adapter lacks rules.
+  let stepSize: string | null;
+  if (adapter.id === "bybit-spot-live") {
+    if (!adapter.getSpotSymbolRules) throw new Error("LIVE_SPOT_SYMBOL_RULES_ADAPTER_REQUIRED");
+    const rules = await adapter.getSpotSymbolRules(order.symbol);
+    if (rules.symbol.trim().toUpperCase() !== order.symbol.trim().toUpperCase()) {
+      throw new Error("LIVE_SPOT_SYMBOL_RULES_SYMBOL_MISMATCH");
+    }
+    if (rules.baseAsset.trim().toUpperCase() !== fills.baseAsset.trim().toUpperCase()) {
+      throw new Error("LIVE_SPOT_SYMBOL_RULES_BASE_ASSET_MISMATCH");
+    }
+    if (rules.quoteAsset.trim().toUpperCase() !== fills.quoteAsset.trim().toUpperCase()) {
+      throw new Error("LIVE_SPOT_SYMBOL_RULES_QUOTE_ASSET_MISMATCH");
+    }
+    stepSize = rules.qtyStep;
+  } else {
+    const rules = await getBinanceLiveSymbolRules(order.symbol);
+    stepSize = rules.stepSize === null ? null : rules.stepSize.toFixed(12);
+  }
 
   const net = computeSellableQuantity({
     executedQty: entryQty.toFixed(),
     baseAsset: fills.baseAsset,
     fees: fills.fills.map((fill) => ({ commission: fill.commission, commissionAsset: fill.commissionAsset })),
-    stepSize: rules.stepSize === null ? null : rules.stepSize.toFixed(12),
+    stepSize,
   });
   return new Prisma.Decimal(net);
 }
