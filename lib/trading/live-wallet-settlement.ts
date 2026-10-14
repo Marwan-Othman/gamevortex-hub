@@ -50,6 +50,15 @@ export type OwnerWalletSettlementCalculation = {
   returnedUsd: Prisma.Decimal;
 };
 
+/** Only explicitly USD-denominated proceeds may credit the USD wallet.
+ * Stablecoins must not be treated as USD without a verified FX conversion.
+ */
+export function getSettlementCurrencyBlocker(quoteAssetInput: string): string | null {
+  const quoteAsset = quoteAssetInput.trim().toUpperCase();
+  if (!quoteAsset) throw new Error("SETTLEMENT_EXIT_ASSET_INFO_REQUIRED");
+  return quoteAsset === "USD" ? null : "SETTLEMENT_QUOTE_CURRENCY_REQUIRES_VERIFIED_USD_CONVERSION";
+}
+
 export function calculateOwnerWalletSettlement(
   returnedUsdInput: Prisma.Decimal | string | number,
 ): OwnerWalletSettlementCalculation {
@@ -129,8 +138,9 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     // Quote proceeds are not USD merely because the internal ledger is denominated in USD.
     // Until a verified, timestamped FX conversion is implemented, only USD quote markets
     // may credit the USD owner wallet. In particular, do not silently equate USDT/USDC to USD.
-    if (fills.quoteAsset.trim().toUpperCase() !== "USD") {
-      settlementCurrencyBlocker = "SETTLEMENT_QUOTE_CURRENCY_REQUIRES_VERIFIED_USD_CONVERSION";
+    settlementCurrencyBlocker = getSettlementCurrencyBlocker(fills.quoteAsset);
+    if (settlementCurrencyBlocker) {
+      // No FX provider/rate verification exists yet, so do not credit the USD ledger.
     } else {
       const feeSettlement = calculateLiveSpotNetExitProceeds({
       baseAsset: fills.baseAsset,
