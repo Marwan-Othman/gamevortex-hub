@@ -37,6 +37,11 @@ export interface PaymentProvider {
     provider: string;
     paymentId: string;
     status: "SUCCEEDED";
+    amountCents: number;
+    currency: string;
+    captureId: string;
+    customId?: string;
+    referenceId?: string;
   }>;
 }
 
@@ -336,6 +341,27 @@ async function paypalRequest(
   return data;
 }
 
+async function paypalGet(path: string) {
+  const token = await paypalAccessToken();
+  const response = await fetchWithTimeout(
+    `${paypalBase()}${path}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  const data = (await readJsonSafe(response)) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(buildPayPalErrorMessage(data));
+  }
+  return data;
+}
+
 export class ConfiguredPaymentProvider
   implements PaymentProvider
 {
@@ -555,53 +581,102 @@ export class ConfiguredPaymentProvider
         throw new Error(
           String(
             data?.error ||
-              "PAYMENT_PROVIDER_ERROR",
-          ),
-        );
-      }
-
-      if (
-        typeof data.paymentId !== "string"
-      ) {
-        throw new Error(
-          "PAYMENT_PROVIDER_ERROR",
-        );
-      }
-
-      return {
-        provider: "hmac",
-        paymentId:
-          data.paymentId,
-        checkoutUrl:
-          typeof data.checkoutUrl ===
-          "string"
-            ? data.checkoutUrl
-            : undefined,
-        status:
-          data.status === "CREATED"
-            ? "CREATED"
-            : "REQUIRES_ACTION",
-      };
-    }
-
-    throw new Error(
-      "PAYMENT_PROVIDER_NOT_CONFIGURED",
-    );
-  }
-
-  async capturePayment(
+              "PAYMENT  async capturePayment(
     paymentId: string,
     idempotencyKey?: string,
   ): Promise<{
     provider: string;
     paymentId: string;
     status: "SUCCEEDED";
+    amountCents: number;
+    currency: string;
+    captureId: string;
+    customId?: string;
+    referenceId?: string;
   }> {
+    if (!paymentId || paymentId.trim().length === 0) {
+      throw new Error("INVALID_PAYMENT_ID");
+    }
+    if (this.name !== "paypal") {
+      throw new Error("PAYMENT_CAPTURE_NOT_SUPPORTED");
+    }
+
+    const path = `/v2/checkout/orders/${encodeURIComponent(paymentId)}`;
+    let data: Record<string, unknown>;
+
+    try {
+      // Normal first attempt: ask PayPal to capture the approved order.
+      data = await paypalRequest(
+        `${path}/capture`,
+        {},
+        idempotencyKey,
+      );
+    } catch (captureError) {
+      // A previous request may have captured the payment while the browser or
+      // network lost its response. Re-read the same PayPal order before failing.
+      // This is read-only and lets a retry safely settle the local wallet.
+      try {
+        const existingOrder = await paypalGet(path);
+        if (String(existingOrder.status) !== "COMPLETED") {
+          throw captureError;
+        }
+        data = existingOrder;
+      } catch {
+        throw captureError;
+      }
+    }
+
     if (
-      !paymentId ||
-      paymentId.trim().length === 0
+      String(data.status) !== "COMPLETED" ||
+      String(data.id || paymentId) !== paymentId
     ) {
-      throw new Error(
+      throw new Error("PAYPAL_CAPTURE_NOT_COMPLETED");
+    }
+
+    const units = Array.isArray(data.purchase_units) ? data.purchase_units : [];
+    const unit = units.find((value) => value && typeof value === "object") as Record<string, unknown> | undefined;
+    const payments = unit?.payments && typeof unit.payments === "object"
+      ? unit.payments as Record<string, unknown>
+      : null;
+    const captures = Array.isArray(payments?.captures) ? payments.captures : [];
+    const capture = captures.find((value) =>
+      value && typeof value === "object" &&
+      String((value as Record<string, unknown>).status) === "COMPLETED"
+    ) as Record<string, unknown> | undefined;
+    const amount = capture?.amount && typeof capture.amount === "object"
+      ? capture.amount as Record<string, unknown>
+      : null;
+    const rawAmount = Number(amount?.value);
+    const amountCents = Math.round(rawAmount * 100);
+    const currency = String(amount?.currency_code || "").toUpperCase();
+    const captureId = String(capture?.id || "");
+
+    if (
+      !capture ||
+      !captureId ||
+      !Number.isSafeInteger(amountCents) ||
+      amountCents <= 0 ||
+      !currency
+    ) {
+      throw new Error("PAYPAL_CAPTURE_DETAILS_INVALID");
+    }
+
+    const customId = typeof unit?.custom_id === "string" ? unit.custom_id : undefined;
+    const referenceId = typeof unit?.reference_id === "string" ? unit.reference_id : undefined;
+
+    return {
+      provider: "paypal",
+      paymentId,
+      status: "SUCCEEDED",
+      amountCents,
+      currency,
+      captureId,
+      ...(customId ? { customId } : {}),
+      ...(referenceId ? { referenceId } : {}),
+    };
+  }
+
+    throw new Error(
         "INVALID_PAYMENT_ID",
       );
     }
