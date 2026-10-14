@@ -32,6 +32,7 @@ export default function TradingWalletFundingPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<{ key: string; amount: number } | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -52,6 +53,12 @@ export default function TradingWalletFundingPanel() {
 
   async function transfer() {
     if (busy || amount < 1 || amount > 1000) return;
+    const confirmed = window.confirm(`تأكيد نقل ${amount.toFixed(2)} من المحفظة المالية إلى محفظة المالك؟ لن تُرسل الأموال إلى Binance ولن تُنفّذ صفقة.`);
+    if (!confirmed) return;
+    const operation = pendingOperation?.amount === amount
+      ? pendingOperation
+      : { key: crypto.randomUUID(), amount };
+    setPendingOperation(operation);
     setBusy(true);
     setMessage(null);
     setError(false);
@@ -60,7 +67,7 @@ export default function TradingWalletFundingPanel() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": operation.key,
         },
         body: JSON.stringify({ amountUsd: amount }),
       });
@@ -71,9 +78,10 @@ export default function TradingWalletFundingPanel() {
         sourceWalletPendingUsd: balances?.sourceWalletPendingUsd ?? "0.00",
         ownerWalletAvailableUsd: data.ownerWalletAvailableUsd,
       });
+      setPendingOperation(null);
       setMessage(data.replayed
         ? "تم التحقق من العملية السابقة؛ لم يُخصم المبلغ مرة أخرى."
-        : `تم نقل $${amount.toFixed(2)} داخليًا إلى محفظة المالك. لم تُرسل أموال إلى Binance ولم تُنفّذ صفقة.`);
+        : `تم نقل ${amount.toFixed(2)} داخليًا إلى محفظة المالك. لم تُرسل أموال إلى Binance ولم تُنفّذ صفقة.`);
     } catch (cause) {
       setError(true);
       setMessage(ERRORS[cause instanceof Error ? cause.message : ""] || "تعذّر إتمام التحويل الداخلي.");
