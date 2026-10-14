@@ -202,7 +202,9 @@ export async function prepareLiveOrder(input: {
     const rules = await adapter.getSpotSymbolRules(symbol);
     if (rules.quoteAsset !== "USDT") throw new Error("BYBIT_LIVE_QUOTE_ASSET_NOT_SUPPORTED");
     if (amountUsd < Number(rules.minOrderAmount) || amountUsd < 1) throw new Error("BYBIT_LIVE_ORDER_BELOW_MINIMUM");
-    if (amountUsd > Number(rules.maxOrderQty) * snapshot.price) throw new Error("BYBIT_LIVE_ORDER_ABOVE_MARKET_MAXIMUM");
+    const estimatedBaseQty = amountUsd / snapshot.price;
+    if (estimatedBaseQty < Number(rules.minOrderQty)) throw new Error("BYBIT_LIVE_ORDER_BELOW_MINIMUM_QUANTITY");
+    if (estimatedBaseQty > Number(rules.maxOrderQty)) throw new Error("BYBIT_LIVE_ORDER_ABOVE_MAXIMUM_QUANTITY");
     const readiness = await bybit.getLiveReadiness(rules.quoteAsset);
     if (readiness.blockers.length) throw new Error(`BYBIT_LIVE_PREFLIGHT_BLOCKED:${readiness.blockers.join(",")}`);
     quoteFreeBalanceUsd = readiness.quoteFreeBalance;
