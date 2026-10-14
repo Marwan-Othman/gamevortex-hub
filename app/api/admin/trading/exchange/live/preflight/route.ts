@@ -67,6 +67,11 @@ export async function GET() {
       readOnly: true,
       realMoney: false,
       ...preflight,
+      // Exchange/API checks alone do not prove that GameVortex wallet funding,
+      // custody reconciliation, and proceeds settlement are production-ready.
+      // Keep this false until the accounting readiness gate is independently verified.
+      readyForLiveExecution: false,
+      blockers: [...new Set([...preflight.blockers, "LIVE_TRADING_ACCOUNTING_NOT_READY"])],
     });
   } catch (error) {
     return tradingRouteError(error, "admin:trading:exchange:live:preflight:get", ownerId);
