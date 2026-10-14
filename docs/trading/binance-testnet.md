@@ -32,7 +32,9 @@ It is restricted to the existing trading owner guard and returns only permission
 
 The repository contains the guarded Testnet BUY function in `lib/trading/testnet-execution.ts`, but it is not currently called by a Testnet execution API route or by the owner panel. The panel's status action is read-only. It must not report that an order is ready to execute just because account permissions look valid.
 
-Do not wire an order-submission route until durable idempotency is added for the Testnet path. A browser retry, timeout after provider acceptance, or concurrent request must not submit a second BUY for the same approval. The execution flow also needs a recoverable state/reconciliation strategy for ambiguous provider outcomes and audit-write failures.
+A dedicated `TradingTestnetOrder` table and migration now persist a separate Testnet intent, with a unique approval constraint and a compare-and-set transition from `INTENT_CREATED` to `SUBMITTING`. This is deliberately separate from production `TradingLiveOrder` records. The execution function refuses to submit again once the approval is claimed; provider errors or unconfirmed responses become `UNKNOWN`, and a confirmed fill is persisted before writing the audit event.
+
+This is a duplicate-submission guard, not yet a complete recovery workflow. An order stuck in `SUBMITTING` or `UNKNOWN`, or a confirmed fill whose audit write failed, requires provider-side reconciliation before any further action. Do not automatically retry it, and do not wire an order-submission route or UI button until reconciliation and failure-drill tests are in place.
 
 ## What Testnet execution currently proves
 
