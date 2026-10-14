@@ -2127,6 +2127,28 @@ model TradingApproval {
   @@ignore
 }
 
+model TradingTestnetOrder {
+  id             String   @id
+  ownerId        String
+  approvalId     String   @unique
+  opportunityId  String
+  idempotencyKey String   @unique
+  clientOrderId  String   @unique
+  providerOrderId String? @unique
+  symbol         String
+  amountUsd      Decimal  @db.Decimal(18, 2)
+  status         String   @default("INTENT_CREATED")
+  lastError      String?
+  submittedAt    DateTime?
+  confirmedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  @@index([ownerId, createdAt])
+  @@index([status, updatedAt])
+  @@ignore
+}
+
 model TradingLiveOrder {
   id                    String    @id
   ownerId               String
