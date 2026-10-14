@@ -57,6 +57,11 @@ import {
 } from "@/lib/trading/live-direct-funding";
 
 const LIVE_IDEMPOTENCY_PREFIX = "live-approval:";
+
+// Keep new live orders disabled until funding, wallet settlement, and reconciliation are verified.
+function liveAccountingReadinessBlocker(): string | null {
+  return "LIVE_TRADING_ACCOUNTING_NOT_READY";
+}
 const STOP_LIMIT_BUFFER = 0.001;
 
 type ExecutionSnapshot = {
@@ -466,7 +471,8 @@ export async function executeApprovedLiveOrder(input: {
   if (!monitorOnly) {
     // Defense in depth: block new live orders even if an old approval exists.
     // Monitoring remains enabled so already-open positions can still be reconciled.
-    throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");
+    const accountingBlocker = liveAccountingReadinessBlocker();
+    if (accountingBlocker) throw new Error(accountingBlocker);
   }
 
   if (!monitorOnly) {
