@@ -284,7 +284,7 @@ async function protectFilledOrder(
   ownerId: string,
   order: LiveOrderRow,
   snapshot: ExecutionSnapshot,
-  adapter: BinanceSpotLiveAdapter,
+  adapter: LiveExchangeAdapter,
 ): Promise<LiveOrderRow> {
   if (order.status === "PROTECTED" && order.protectionStatus === "PROTECTED") return order;
   if (order.status !== "PROTECTION_PENDING") throw new Error("LIVE_ORDER_NOT_READY_FOR_PROTECTION");
