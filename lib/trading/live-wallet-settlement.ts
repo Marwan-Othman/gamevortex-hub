@@ -64,7 +64,7 @@ export function getSettlementCurrencyBlocker(quoteAssetInput: string): string | 
  * Keep wallet credit blocked until a verified exchange-to-wallet funding rail
  * and reconciliation record exist.
  */
-export function getExchangeProceedsTransferBlocker(): string {
+export function getExchangeProceedsTransferBlocker(): string | null {
   return "EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED";
 }
 
