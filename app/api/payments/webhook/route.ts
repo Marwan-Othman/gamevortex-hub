@@ -791,10 +791,15 @@ async function processWalletDepositWebhook(event: NormalizedEvent) {
     // Success events use the payment/order identifier created at checkout.
     // Refund events may legitimately carry a different provider transaction
     // identifier (for example a Stripe charge/refund identifier).
+    const expectedProviderPaymentId =
+      event.provider === "paypal" && event.providerOrderId
+        ? event.providerOrderId
+        : event.paymentId;
+
     if (
       event.status === "SUCCEEDED" &&
       deposit.providerPaymentId &&
-      deposit.providerPaymentId !== event.paymentId
+      deposit.providerPaymentId !== expectedProviderPaymentId
     ) {
       throw new Error("PAYMENT_ID_MISMATCH");
     }
@@ -1241,6 +1246,29 @@ export async function POST(request: NextRequest) {
           ...event,
           orderId: resolvedReference,
         };
+      }
+    }
+
+    // PayPal capture webhooks commonly identify the PayPal order in
+    // supplementary_data.related_ids.order_id, while wallet deposits are
+    // keyed by our internal WalletDeposit.id. Resolve that provider order ID
+    // to the local deposit before dispatching the event.
+    if (event && provider.name === "paypal" && event.orderId) {
+      const localDeposit = await db.walletDeposit.findUnique({
+        where: { id: event.orderId },
+        select: { id: true },
+      });
+      if (!localDeposit) {
+        const providerDeposit = await db.walletDeposit.findFirst({
+          where: {
+            provider: "paypal",
+            providerPaymentId: event.orderId,
+          },
+          select: { id: true },
+        });
+        if (providerDeposit) {
+          event = { ...event, orderId: providerDeposit.id };
+        }
       }
     }
 
