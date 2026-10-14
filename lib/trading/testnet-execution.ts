@@ -69,7 +69,7 @@ async function claimTestnetOrder(input: {
   clientOrderId: string;
   symbol: string;
   amountUsd: number;
-}): Promise<string> {
+}): Promise<void> {
   const idempotencyKey = testnetIdempotencyKey(input.approvalId);
   const id = randomBytes(18).toString("base64url");
   const inserted = await db.$queryRaw<TestnetOrderRow[]>(Prisma.sql`
@@ -114,7 +114,6 @@ async function claimTestnetOrder(input: {
     RETURNING *
   `);
   if (!claimed[0]) throw new Error("TESTNET_ORDER_ALREADY_CLAIMED_OR_TERMINAL");
-  return idempotencyKey;
 }
 
 function positiveFinite(value: number): boolean {
@@ -170,7 +169,7 @@ export async function executeOwnerBinanceSpotTestnetBuy(
     amountUsd: plan.amountUsd,
   });
 
-  let order;
+  let order: Awaited<ReturnType<typeof adapter.placeSpotBuy>>;
   try {
     order = await adapter.placeSpotBuy({
       clientOrderId: plan.clientOrderId,
