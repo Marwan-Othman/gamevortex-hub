@@ -9,6 +9,7 @@ const h = vi.hoisted(() => {
     ownerWallet: null as any,
     transactions: new Map<string, any>(),
     nonUsdTransactions: 0,
+    nonUsdCompletedDeposits: 0,
     ledger: [] as any[],
     audits: [] as any[],
     failLedger: false,
@@ -24,6 +25,10 @@ const h = vi.hoisted(() => {
         state.transactions.set(data.idempotencyKey, row);
         return row;
       }),
+    },
+    walletDeposit: {
+      count: vi.fn(async ({ where }: any) =>
+        where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0),
     },
     wallet: {
       findUnique: vi.fn(async () => state.wallet ? { ...state.wallet } : null),
@@ -123,6 +128,7 @@ beforeEach(() => {
   h.state.ownerWallet = null;
   h.state.transactions = new Map();
   h.state.nonUsdTransactions = 0;
+  h.state.nonUsdCompletedDeposits = 0;
   h.state.ledger = [];
   h.state.audits = [];
   h.state.failLedger = false;
@@ -173,6 +179,16 @@ describe("trading wallet funding route", () => {
   it("blocks funding when source wallet history includes unconverted non-USD currency", async () => {
     h.state.nonUsdTransactions = 1;
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-foreign"));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
+    expect(h.state.transactions.size).toBe(0);
+  });
+
+  it("blocks funding when completed deposit history contains non-USD currency even if transaction history does not", async () => {
+    h.state.nonUsdCompletedDeposits = 1;
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-foreign-deposit"));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
     expect(Number(h.state.wallet.balance)).toBe(1);
