@@ -70,6 +70,9 @@ const h = vi.hoisted(() => {
   const db: any = {
     wallet: { findUnique: vi.fn(async () => state.wallet ? { balance: state.wallet.balance, pendingBalance: state.wallet.pendingBalance } : null) },
     ownerWallet: { findUnique: vi.fn(async () => state.ownerWallet ? { availableUsd: state.ownerWallet.availableUsd } : null) },
+    walletTransaction: { count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0) },
+    walletDeposit: { count: vi.fn(async ({ where }: any) =>
+      where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0) },
     $transaction: vi.fn(async (work: any) => {
       const snapshot = {
         wallet: state.wallet && { ...state.wallet },
