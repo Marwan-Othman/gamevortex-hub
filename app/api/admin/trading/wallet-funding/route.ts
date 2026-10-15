@@ -7,6 +7,14 @@ import { db } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isZeroAmount(value: { toString(): string } | null | undefined) {
+  return !value || Number(value.toString()) === 0;
+}
+
+function amountsEqual(left: { toString(): string } | null | undefined, right: { toString(): string } | null | undefined) {
+  return Boolean(left && right && Number(left.toString()) === Number(right.toString()));
+}
+
 function errorResponse(code: string, status: number) {
   return NextResponse.json({ error: code }, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -26,9 +34,9 @@ export async function GET(request: NextRequest) {
     ]);
     // Absence of non-USD rows is not proof that a legacy/current balance is USD.
     // Require a latest USD ledger row that reconciles exactly to the displayed balance.
-    const balanceLedgerReconciles = !wallet || wallet.balance.isZero()
+    const balanceLedgerReconciles = !wallet || isZeroAmount(wallet.balance)
       ? true
-      : Boolean(latestTransaction && latestTransaction.currency === "USD" && latestTransaction.balanceAfter.equals(wallet.balance));
+      : Boolean(latestTransaction && latestTransaction.currency === "USD" && amountsEqual(latestTransaction.balanceAfter, wallet.balance));
     const sourceCurrencyVerified = nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0 && balanceLedgerReconciles;
     return NextResponse.json({
       ok: true,
@@ -95,9 +103,9 @@ export async function POST(request: NextRequest) {
         tx.walletTransaction.findFirst({ where: { userId: ownerId }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true, currency: true } }),
       ]);
       const sourceWalletSnapshot = await tx.wallet.findUnique({ where: { userId: ownerId }, select: { balance: true } });
-      const balanceLedgerReconciles = !sourceWalletSnapshot || sourceWalletSnapshot.balance.isZero()
+      const balanceLedgerReconciles = !sourceWalletSnapshot || isZeroAmount(sourceWalletSnapshot.balance)
         ? true
-        : Boolean(latestTransaction && latestTransaction.currency === "USD" && latestTransaction.balanceAfter.equals(sourceWalletSnapshot.balance));
+        : Boolean(latestTransaction && latestTransaction.currency === "USD" && amountsEqual(latestTransaction.balanceAfter, sourceWalletSnapshot.balance));
       if (nonUsdTransactions > 0 || nonUsdCompletedDeposits > 0 || !balanceLedgerReconciles) {
         throw new Error("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
       }
