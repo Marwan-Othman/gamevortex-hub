@@ -175,14 +175,14 @@ describe("trading wallet funding route", () => {
   });
 
   it("marks a nonzero legacy balance unverified when no USD ledger row reconciles it", async () => {
-    h.state.hasLatestTransaction = false;
+    h.state.ledgerMatchesBalance = false;
     const response = await GET(request("GET"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ sourceCurrencyVerified: false, sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED" });
   });
 
   it("refuses funding when a nonzero balance has no reconciled USD ledger row", async () => {
-    h.state.hasLatestTransaction = false;
+    h.state.ledgerMatchesBalance = false;
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-unreconciled"));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
