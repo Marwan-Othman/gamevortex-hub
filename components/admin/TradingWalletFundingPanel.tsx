@@ -112,7 +112,7 @@ export default function TradingWalletFundingPanel() {
       ) : null}
       <div className={styles.statGrid} aria-live="polite">
         <div className={styles.statTile}>
-          <strong>{loading ? "…" : `$${usd(balances?.sourceWalletAvailableUsd)}`}</strong>
+          <strong>{loading ? "…" : !balances?.sourceCurrencyVerified ? "غير متحقق" : `${usd(balances?.sourceWalletAvailableUsd)}`}</strong>
           <span className={styles.label}>المتاح في المحفظة المالية</span>
         </div>
         <div className={styles.statTile}>
@@ -137,7 +137,7 @@ export default function TradingWalletFundingPanel() {
         {busy ? "جارٍ تسجيل التحويل…" : `نقل $${amount.toFixed(2)} إلى محفظة المالك`}
       </button>
       {message ? <p role="status" style={{ marginTop: 10, overflowWrap: "anywhere" }} className={error ? "muted" : undefined}>{message}</p> : null}
-      {balances && Number(balances.sourceWalletAvailableUsd) < 1 ? <p className="muted">لا يوجد دولار متاح للتحويل. إذا كان الرصيد ظاهرًا في صفحة أخرى، لا تكرر الدفع؛ نحتاج مراجعة حالة التسوية ومصدر الرصيد.</p> : null}
+      {balances?.sourceCurrencyVerified && Number(balances.sourceWalletAvailableUsd) < 1 ? <p className="muted">لا يوجد دولار متاح للتحويل. إذا كان الرصيد ظاهرًا في صفحة أخرى، لا تكرر الدفع؛ نحتاج مراجعة حالة التسوية ومصدر الرصيد.</p> : null}
       <button type="button" className="btn" style={{ marginInlineStart: 8, marginTop: 8 }} disabled={busy || loading} onClick={() => void refresh()}>
         تحديث الأرصدة
       </button>
