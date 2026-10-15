@@ -8,6 +8,7 @@ const h = vi.hoisted(() => {
     wallet: { id: "wallet-1", userId: "owner-1", balance: money(1), pendingBalance: money(0) },
     ownerWallet: null as any,
     transactions: new Map<string, any>(),
+    nonUsdTransactions: 0,
     ledger: [] as any[],
     audits: [] as any[],
     failLedger: false,
@@ -16,6 +17,7 @@ const h = vi.hoisted(() => {
   const tx: any = {
     walletTransaction: {
       findUnique: vi.fn(async ({ where }: any) => state.transactions.get(where.idempotencyKey) ?? null),
+      count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
       create: vi.fn(async ({ data }: any) => {
         if (state.transactions.has(data.idempotencyKey)) throw Object.assign(new Error("duplicate"), { code: "P2002" });
         const row = { id: "tx-1", ...data };
@@ -120,6 +122,7 @@ beforeEach(() => {
   h.state.wallet = { id: "wallet-1", userId: "owner-1", balance: h.money(1), pendingBalance: h.money(0) };
   h.state.ownerWallet = null;
   h.state.transactions = new Map();
+  h.state.nonUsdTransactions = 0;
   h.state.ledger = [];
   h.state.audits = [];
   h.state.failLedger = false;
@@ -165,6 +168,16 @@ describe("trading wallet funding route", () => {
     expect(h.state.transactions.size).toBe(1);
     expect(h.state.ledger).toHaveLength(1);
     expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("blocks funding when source wallet history includes unconverted non-USD currency", async () => {
+    h.state.nonUsdTransactions = 1;
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-foreign"));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
+    expect(h.state.transactions.size).toBe(0);
   });
 
   it("refuses insufficient available balance without touching owner wallet", async () => {
