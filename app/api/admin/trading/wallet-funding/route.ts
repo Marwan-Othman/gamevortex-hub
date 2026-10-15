@@ -76,10 +76,17 @@ export async function POST(request: NextRequest) {
 
       // Wallet has no single-currency field, while deposits and transactions may be USD, EUR, GBP, or ILS.
       // Never label an unconverted mixed-currency balance as USD trading capital.
-      const nonUsdTransactions = await tx.walletTransaction.count({
-        where: { userId: ownerId, currency: { not: "USD" } },
-      });
-      if (nonUsdTransactions > 0) throw new Error("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+      const [nonUsdTransactions, nonUsdCompletedDeposits] = await Promise.all([
+        tx.walletTransaction.count({
+          where: { userId: ownerId, currency: { not: "USD" } },
+        }),
+        tx.walletDeposit.count({
+          where: { userId: ownerId, status: "COMPLETED", currency: { not: "USD" } },
+        }),
+      ]);
+      if (nonUsdTransactions > 0 || nonUsdCompletedDeposits > 0) {
+        throw new Error("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+      }
 
       const wallet = await tx.wallet.findUnique({ where: { userId: ownerId } });
       if (!wallet) throw new Error("SOURCE_WALLET_NOT_FOUND");
