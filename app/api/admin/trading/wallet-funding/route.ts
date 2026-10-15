@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 function normalizeDecimal(value: { toString(): string } | null | undefined): string | null {
   if (!value) return null;
   const raw = value.toString().trim();
-  const match = /^([+-]?)(\d+)(?:\\.(\d+))?$/.exec(raw);
+  const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(raw);
   if (!match) return null;
   const sign = match[1] === "-" ? "-" : "";
   const integer = match[2].replace(/^0+(?=\d)/, "");
   const fraction = (match[3] ?? "").replace(/0+$/, "");
   const normalized = fraction ? `${integer}.${fraction}` : integer;
-  return /^0(?:\\.0*)?$/.test(normalized) ? "0" : `${sign}${normalized}`;
+  return /^0(?:\.0*)?$/.test(normalized) ? "0" : `${sign}${normalized}`;
 }
 
 function isZeroAmount(value: { toString(): string } | null | undefined) {
