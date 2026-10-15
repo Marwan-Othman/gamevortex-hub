@@ -7,6 +7,8 @@ type Balances = {
   sourceWalletAvailableUsd: string;
   sourceWalletPendingUsd: string;
   ownerWalletAvailableUsd: string;
+  sourceCurrencyVerified: boolean;
+  sourceCurrencyBlocker: string | null;
 };
 
 const ERRORS: Record<string, string> = {
@@ -18,6 +20,7 @@ const ERRORS: Record<string, string> = {
   INVALID_FUNDING_AMOUNT: "اختر مبلغًا صحيحًا بين 1 و1000 دولار.",
   TRADING_WALLET_FUNDING_FAILED: "فشل التحويل الداخلي. لم يتم تأكيد نجاحه؛ افحص الأرصدة قبل إعادة المحاولة.",
   FUNDING_BALANCE_READ_FAILED: "تعذّر قراءة الأرصدة من الخادم.",
+  TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED: "تم إيقاف التحويل: سجل المحفظة يحتوي عملات غير الدولار ولم تتم مطابقتها أو تحويلها بسجل موثّق. لن نعتبر الرصيد دولارًا دون تحقق.",
 };
 
 function usd(value: string | number | undefined) {
@@ -77,6 +80,8 @@ export default function TradingWalletFundingPanel() {
         sourceWalletAvailableUsd: data.sourceWalletAvailableUsd,
         sourceWalletPendingUsd: balances?.sourceWalletPendingUsd ?? "0.00",
         ownerWalletAvailableUsd: data.ownerWalletAvailableUsd,
+        sourceCurrencyVerified: data.sourceCurrencyVerified === true,
+        sourceCurrencyBlocker: data.sourceCurrencyBlocker ?? null,
       });
       setPendingOperation(null);
       setMessage(data.replayed
@@ -100,6 +105,11 @@ export default function TradingWalletFundingPanel() {
       <p className="muted">
         هذا الإجراء ينقل رصيدًا متاحًا من محفظة الموقع إلى محفظة المالك التي يعتمد عليها تخصيص التداول. لا يسحب أموالًا من Binance ولا ينفّذ أي صفقة. الرصيد المعلّق غير قابل للتحويل.
       </p>
+      {balances && !balances.sourceCurrencyVerified ? (
+        <p role="alert" className="muted">
+          لا يمكن اعتبار الرصيد المعروض دولارًا صالحًا للتداول: توجد سجلات بعملات غير USD. يلزم تدقيق التحويلات التاريخية ومطابقتها قبل إتاحة التحويل الداخلي.
+        </p>
+      ) : null}
       <div className={styles.statGrid} aria-live="polite">
         <div className={styles.statTile}>
           <strong>{loading ? "…" : `$${usd(balances?.sourceWalletAvailableUsd)}`}</strong>
@@ -121,7 +131,7 @@ export default function TradingWalletFundingPanel() {
       <button
         type="button"
         className="btn"
-        disabled={busy || loading || !balances || Number(balances.sourceWalletAvailableUsd) < amount}
+        disabled={busy || loading || !balances || !balances.sourceCurrencyVerified || Number(balances.sourceWalletAvailableUsd) < amount}
         onClick={() => void transfer()}
       >
         {busy ? "جارٍ تسجيل التحويل…" : `نقل $${amount.toFixed(2)} إلى محفظة المالك`}
