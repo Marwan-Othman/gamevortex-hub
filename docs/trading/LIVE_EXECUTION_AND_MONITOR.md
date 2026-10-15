@@ -16,6 +16,8 @@ The owner trading panel's `POST /api/admin/trading/wallet-funding` route perform
 
 This operation does **not** send money to Binance or Bybit, does not fund an exchange account, and does not prove that funds are held by an exchange. Likewise, exchange trade fills prove execution, not that net proceeds were transferred back to GameVortex.
 
+The source wallet has no single-currency column, and the payment system supports multiple currencies. The funding route therefore rejects a new transfer when the owner's wallet transaction history contains any non-USD currency (`TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED`). This is intentionally conservative: historical non-USD entries must be reconciled or converted through a verified, auditable process before that wallet can fund USD trading capital. The guard does not itself perform currency conversion.
+
 ## Settlement and readiness blockers
 
 - `LIVE_TRADING_ACCOUNTING_NOT_READY` blocks preparation and new execution until a real funding/custody path, reconciliation, and end-to-end settlement are implemented and verified.
