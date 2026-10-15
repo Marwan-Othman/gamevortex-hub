@@ -7,12 +7,27 @@ import { db } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function normalizeDecimal(value: { toString(): string } | null | undefined): string | null {
+  if (!value) return null;
+  const raw = value.toString().trim();
+  const match = /^([+-]?)(\\d+)(?:\\.(\\d+))?$/.exec(raw);
+  if (!match) return null;
+  const sign = match[1] === "-" ? "-" : "";
+  const integer = match[2].replace(/^0+(?=\\d)/, "");
+  const fraction = (match[3] ?? "").replace(/0+$/, "");
+  const normalized = fraction ? `${integer}.${fraction}` : integer;
+  return /^0(?:\\.0*)?$/.test(normalized) ? "0" : `${sign}${normalized}`;
+}
+
 function isZeroAmount(value: { toString(): string } | null | undefined) {
-  return !value || Number(value.toString()) === 0;
+  const normalized = normalizeDecimal(value);
+  return normalized === null || normalized === "0";
 }
 
 function amountsEqual(left: { toString(): string } | null | undefined, right: { toString(): string } | null | undefined) {
-  return Boolean(left && right && Number(left.toString()) === Number(right.toString()));
+  const normalizedLeft = normalizeDecimal(left);
+  const normalizedRight = normalizeDecimal(right);
+  return normalizedLeft !== null && normalizedRight !== null && normalizedLeft === normalizedRight;
 }
 
 function errorResponse(code: string, status: number) {
@@ -84,14 +99,24 @@ export async function POST(request: NextRequest) {
           existing.referenceType !== "TRADING_FUNDING" ||
           existing.amount.toNumber() !== -amountUsd
         ) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
-        const currentOwnerWallet = await tx.ownerWallet.findUnique({ where: { ownerId } });
+        const [currentOwnerWallet, currentSourceWallet, nonUsdTransactions, nonUsdCompletedDeposits, latestTransaction] = await Promise.all([
+          tx.ownerWallet.findUnique({ where: { ownerId } }),
+          tx.wallet.findUnique({ where: { userId: ownerId }, select: { balance: true } }),
+          tx.walletTransaction.count({ where: { userId: ownerId, currency: { not: "USD" } } }),
+          tx.walletDeposit.count({ where: { userId: ownerId, status: "COMPLETED", currency: { not: "USD" } } }),
+          tx.walletTransaction.findFirst({ where: { userId: ownerId }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true, currency: true } }),
+        ]);
+        const balanceLedgerReconciles = !currentSourceWallet || isZeroAmount(currentSourceWallet.balance)
+          ? true
+          : Boolean(latestTransaction && latestTransaction.currency === "USD" && amountsEqual(latestTransaction.balanceAfter, currentSourceWallet.balance));
+        const sourceCurrencyVerified = nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0 && balanceLedgerReconciles;
         return {
           replayed: true,
           amountUsd,
-          sourceWalletAvailableUsd: (await tx.wallet.findUnique({ where: { userId: ownerId } }))?.balance.toString() ?? "0.00",
+          sourceWalletAvailableUsd: currentSourceWallet?.balance.toString() ?? "0.00",
           ownerWalletAvailableUsd: currentOwnerWallet?.availableUsd.toString() ?? "0.00",
-          sourceCurrencyVerified: true,
-          sourceCurrencyBlocker: null,
+          sourceCurrencyVerified,
+          sourceCurrencyBlocker: sourceCurrencyVerified ? null : "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
         };
       }
 
