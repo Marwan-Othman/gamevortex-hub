@@ -17,15 +17,20 @@ export async function GET(request: NextRequest) {
 
   try {
     const owner = await requireTradingOwner();
-    const [wallet, ownerWallet] = await Promise.all([
+    const [wallet, ownerWallet, nonUsdTransactions, nonUsdCompletedDeposits] = await Promise.all([
       db.wallet.findUnique({ where: { userId: owner.id }, select: { balance: true, pendingBalance: true } }),
       db.ownerWallet.findUnique({ where: { ownerId: owner.id }, select: { availableUsd: true } }),
+      db.walletTransaction.count({ where: { userId: owner.id, currency: { not: "USD" } } }),
+      db.walletDeposit.count({ where: { userId: owner.id, status: "COMPLETED", currency: { not: "USD" } } }),
     ]);
+    const sourceCurrencyVerified = nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0;
     return NextResponse.json({
       ok: true,
       sourceWalletAvailableUsd: wallet?.balance.toString() ?? "0.00",
       sourceWalletPendingUsd: wallet?.pendingBalance.toString() ?? "0.00",
       ownerWalletAvailableUsd: ownerWallet?.availableUsd.toString() ?? "0.00",
+      sourceCurrencyVerified,
+      sourceCurrencyBlocker: sourceCurrencyVerified ? null : "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === "FORBIDDEN") return tradingForbidden();
@@ -71,6 +76,8 @@ export async function POST(request: NextRequest) {
           amountUsd,
           sourceWalletAvailableUsd: (await tx.wallet.findUnique({ where: { userId: ownerId } }))?.balance.toString() ?? "0.00",
           ownerWalletAvailableUsd: currentOwnerWallet?.availableUsd.toString() ?? "0.00",
+          sourceCurrencyVerified: true,
+          sourceCurrencyBlocker: null,
         };
       }
 
@@ -161,6 +168,8 @@ export async function POST(request: NextRequest) {
         amountUsd,
         sourceWalletAvailableUsd: lockedWallet.balance.sub(amount).toString(),
         ownerWalletAvailableUsd: credited.availableUsd.toString(),
+        sourceCurrencyVerified: true,
+        sourceCurrencyBlocker: null,
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
