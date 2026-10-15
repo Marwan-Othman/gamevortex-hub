@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const h = vi.hoisted(() => {
-  const money = (value: number) => ({ value, toString: () => value.toFixed(2), toNumber: () => value, valueOf: () => value, sub: (other: any) => money(value - Number(other)) });
+  const money = (value: number) => ({ value, toString: () => value.toFixed(2), toNumber: () => value, valueOf: () => value, isZero: () => value === 0, equals: (other: any) => value === Number(other), sub: (other: any) => money(value - Number(other)) });
   const state: any = {
     owner: { id: "owner-1", role: "SUPER_ADMIN" },
     wallet: { id: "wallet-1", userId: "owner-1", balance: money(1), pendingBalance: money(0) },
@@ -10,6 +10,7 @@ const h = vi.hoisted(() => {
     transactions: new Map<string, any>(),
     nonUsdTransactions: 0,
     nonUsdCompletedDeposits: 0,
+    hasLatestTransaction: true,
     ledger: [] as any[],
     audits: [] as any[],
     failLedger: false,
@@ -19,6 +20,7 @@ const h = vi.hoisted(() => {
     walletTransaction: {
       findUnique: vi.fn(async ({ where }: any) => state.transactions.get(where.idempotencyKey) ?? null),
       count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
+      findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
       create: vi.fn(async ({ data }: any) => {
         if (state.transactions.has(data.idempotencyKey)) throw Object.assign(new Error("duplicate"), { code: "P2002" });
         const row = { id: "tx-1", ...data };
@@ -70,7 +72,10 @@ const h = vi.hoisted(() => {
   const db: any = {
     wallet: { findUnique: vi.fn(async () => state.wallet ? { balance: state.wallet.balance, pendingBalance: state.wallet.pendingBalance } : null) },
     ownerWallet: { findUnique: vi.fn(async () => state.ownerWallet ? { availableUsd: state.ownerWallet.availableUsd } : null) },
-    walletTransaction: { count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0) },
+    walletTransaction: {
+      count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
+      findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
+    },
     walletDeposit: { count: vi.fn(async ({ where }: any) =>
       where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0) },
     $transaction: vi.fn(async (work: any) => {
@@ -132,6 +137,7 @@ beforeEach(() => {
   h.state.transactions = new Map();
   h.state.nonUsdTransactions = 0;
   h.state.nonUsdCompletedDeposits = 0;
+  h.state.hasLatestTransaction = true;
   h.state.ledger = [];
   h.state.audits = [];
   h.state.failLedger = false;
@@ -162,6 +168,22 @@ describe("trading wallet funding route", () => {
       sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
     });
     expect(h.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("marks a nonzero legacy balance unverified when no USD ledger row reconciles it", async () => {
+    h.state.hasLatestTransaction = false;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ sourceCurrencyVerified: false, sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED" });
+  });
+
+  it("refuses funding when a nonzero balance has no reconciled USD ledger row", async () => {
+    h.state.hasLatestTransaction = false;
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-unreconciled"));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
   });
 
   it("refuses non-owner access", async () => {
