@@ -11,6 +11,7 @@ const h = vi.hoisted(() => {
     nonUsdTransactions: 0,
     nonUsdCompletedDeposits: 0,
     hasLatestTransaction: true,
+    ledgerMatchesBalance: true,
     ledger: [] as any[],
     audits: [] as any[],
     failLedger: false,
@@ -21,6 +22,7 @@ const h = vi.hoisted(() => {
       findUnique: vi.fn(async ({ where }: any) => state.transactions.get(where.idempotencyKey) ?? null),
       count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
       findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
+      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
       create: vi.fn(async ({ data }: any) => {
         if (state.transactions.has(data.idempotencyKey)) throw Object.assign(new Error("duplicate"), { code: "P2002" });
         const row = { id: "tx-1", ...data };
@@ -75,6 +77,7 @@ const h = vi.hoisted(() => {
     walletTransaction: {
       count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
       findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
+      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
     },
     walletDeposit: { count: vi.fn(async ({ where }: any) =>
       where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0) },
@@ -138,6 +141,7 @@ beforeEach(() => {
   h.state.nonUsdTransactions = 0;
   h.state.nonUsdCompletedDeposits = 0;
   h.state.hasLatestTransaction = true;
+  h.state.ledgerMatchesBalance = true;
   h.state.ledger = [];
   h.state.audits = [];
   h.state.failLedger = false;
@@ -182,6 +186,22 @@ describe("trading wallet funding route", () => {
     const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-unreconciled"));
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
+  });
+
+  it("blocks a latest USD ledger row when the complete USD ledger total does not reconcile", async () => {
+    // Simulate a misleading latest row: the full historical ledger is still short of the wallet balance.
+    h.state.ledgerMatchesBalance = false;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    const funding = await POST(request("POST", { amountUsd: 1 }, "funding-key-ledger-total"));
+    expect(funding.status).toBe(409);
+    expect((await funding.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
     expect(Number(h.state.wallet.balance)).toBe(1);
     expect(h.state.ownerWallet).toBeNull();
   });
