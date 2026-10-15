@@ -40,18 +40,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const owner = await requireTradingOwner();
-    const [wallet, ownerWallet, nonUsdTransactions, nonUsdCompletedDeposits, latestTransaction] = await Promise.all([
+    const [wallet, ownerWallet, nonUsdTransactions, nonUsdCompletedDeposits, usdLedgerTotals] = await Promise.all([
       db.wallet.findUnique({ where: { userId: owner.id }, select: { balance: true, pendingBalance: true } }),
       db.ownerWallet.findUnique({ where: { ownerId: owner.id }, select: { availableUsd: true } }),
       db.walletTransaction.count({ where: { userId: owner.id, currency: { not: "USD" } } }),
       db.walletDeposit.count({ where: { userId: owner.id, status: "COMPLETED", currency: { not: "USD" } } }),
-      db.walletTransaction.findFirst({ where: { userId: owner.id }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true, currency: true } }),
+      db.walletTransaction.aggregate({ where: { userId: owner.id, currency: "USD" }, _sum: { amount: true } }),
     ]);
-    // Absence of non-USD rows is not proof that a legacy/current balance is USD.
-    // Require a latest USD ledger row that reconciles exactly to the displayed balance.
+    // A latest-row match can hide an unreconciled legacy balance. Require the sum
+    // of the complete USD transaction ledger to equal the current wallet balance.
+    const usdLedgerTotal = usdLedgerTotals._sum.amount;
     const balanceLedgerReconciles = !wallet || isZeroAmount(wallet.balance)
       ? true
-      : Boolean(latestTransaction && latestTransaction.currency === "USD" && amountsEqual(latestTransaction.balanceAfter, wallet.balance));
+      : amountsEqual(usdLedgerTotal, wallet.balance);
     const sourceCurrencyVerified = nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0 && balanceLedgerReconciles;
     return NextResponse.json({
       ok: true,
@@ -99,16 +100,16 @@ export async function POST(request: NextRequest) {
           existing.referenceType !== "TRADING_FUNDING" ||
           existing.amount.toNumber() !== -amountUsd
         ) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
-        const [currentOwnerWallet, currentSourceWallet, nonUsdTransactions, nonUsdCompletedDeposits, latestTransaction] = await Promise.all([
+        const [currentOwnerWallet, currentSourceWallet, nonUsdTransactions, nonUsdCompletedDeposits, usdLedgerTotals] = await Promise.all([
           tx.ownerWallet.findUnique({ where: { ownerId } }),
           tx.wallet.findUnique({ where: { userId: ownerId }, select: { balance: true } }),
           tx.walletTransaction.count({ where: { userId: ownerId, currency: { not: "USD" } } }),
           tx.walletDeposit.count({ where: { userId: ownerId, status: "COMPLETED", currency: { not: "USD" } } }),
-          tx.walletTransaction.findFirst({ where: { userId: ownerId }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true, currency: true } }),
+          tx.walletTransaction.aggregate({ where: { userId: ownerId, currency: "USD" }, _sum: { amount: true } }),
         ]);
         const balanceLedgerReconciles = !currentSourceWallet || isZeroAmount(currentSourceWallet.balance)
           ? true
-          : Boolean(latestTransaction && latestTransaction.currency === "USD" && amountsEqual(latestTransaction.balanceAfter, currentSourceWallet.balance));
+          : amountsEqual(usdLedgerTotals._sum.amount, currentSourceWallet.balance);
         const sourceCurrencyVerified = nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0 && balanceLedgerReconciles;
         return {
           replayed: true,
@@ -122,15 +123,15 @@ export async function POST(request: NextRequest) {
 
       // Wallet has no single-currency field, while deposits and transactions may be USD, EUR, GBP, or ILS.
       // Never label an unconverted mixed-currency balance as USD trading capital.
-      const [nonUsdTransactions, nonUsdCompletedDeposits, latestTransaction] = await Promise.all([
+      const [nonUsdTransactions, nonUsdCompletedDeposits, usdLedgerTotals] = await Promise.all([
         tx.walletTransaction.count({ where: { userId: ownerId, currency: { not: "USD" } } }),
         tx.walletDeposit.count({ where: { userId: ownerId, status: "COMPLETED", currency: { not: "USD" } } }),
-        tx.walletTransaction.findFirst({ where: { userId: ownerId }, orderBy: { createdAt: "desc" }, select: { balanceAfter: true, currency: true } }),
+        tx.walletTransaction.aggregate({ where: { userId: ownerId, currency: "USD" }, _sum: { amount: true } }),
       ]);
       const sourceWalletSnapshot = await tx.wallet.findUnique({ where: { userId: ownerId }, select: { balance: true } });
       const balanceLedgerReconciles = !sourceWalletSnapshot || isZeroAmount(sourceWalletSnapshot.balance)
         ? true
-        : Boolean(latestTransaction && latestTransaction.currency === "USD" && amountsEqual(latestTransaction.balanceAfter, sourceWalletSnapshot.balance));
+        : amountsEqual(usdLedgerTotals._sum.amount, sourceWalletSnapshot.balance);
       if (nonUsdTransactions > 0 || nonUsdCompletedDeposits > 0 || !balanceLedgerReconciles) {
         throw new Error("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
       }
