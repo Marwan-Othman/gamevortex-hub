@@ -137,13 +137,26 @@ beforeEach(() => {
 });
 
 describe("trading wallet funding route", () => {
-  it("returns available balances without writing", async () => {
+  it("returns balances and explicitly reports verified USD source currency without writing", async () => {
     const response = await GET(request("GET"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       sourceWalletAvailableUsd: "1.00",
       sourceWalletPendingUsd: "0.00",
       ownerWalletAvailableUsd: "0.00",
+      sourceCurrencyVerified: true,
+      sourceCurrencyBlocker: null,
+    });
+    expect(h.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("marks source currency unverified in the balance response when non-USD history exists", async () => {
+    h.state.nonUsdTransactions = 1;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
     });
     expect(h.db.$transaction).not.toHaveBeenCalled();
   });
