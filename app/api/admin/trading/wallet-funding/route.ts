@@ -74,6 +74,13 @@ export async function POST(request: NextRequest) {
         };
       }
 
+      // Wallet has no single-currency field, while deposits and transactions may be USD, EUR, GBP, or ILS.
+      // Never label an unconverted mixed-currency balance as USD trading capital.
+      const nonUsdTransactions = await tx.walletTransaction.count({
+        where: { userId: ownerId, currency: { not: "USD" } },
+      });
+      if (nonUsdTransactions > 0) throw new Error("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+
       const wallet = await tx.wallet.findUnique({ where: { userId: ownerId } });
       if (!wallet) throw new Error("SOURCE_WALLET_NOT_FOUND");
       await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`);
@@ -156,6 +163,7 @@ export async function POST(request: NextRequest) {
     if (code === "IDEMPOTENCY_KEY_CONFLICT") return errorResponse(code, 409);
     if (code === "SOURCE_WALLET_NOT_FOUND") return errorResponse(code, 404);
     if (code === "INSUFFICIENT_WALLET_BALANCE") return errorResponse(code, 409);
+    if (code === "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED") return errorResponse(code, 409);
     const prismaCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
     if (prismaCode === "P2002") return errorResponse("IDEMPOTENCY_KEY_IN_PROGRESS", 409);
     if (prismaCode === "P2034") return errorResponse("FUNDING_CONCURRENT_UPDATE", 409);
