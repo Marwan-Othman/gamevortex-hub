@@ -189,6 +189,29 @@ describe("settleClosedLiveOrderToOwnerWallet", () => {
     expect(mocks.queryRaw).toHaveBeenCalledOnce();
   });
 
+  it("uses the locked database state when the caller passes a stale pending order", async () => {
+    const settledOrder = closedPendingOrder({
+      settlementStatus: "SETTLED",
+      settledUsd: new Prisma.Decimal("11"),
+      settledPoints: 0,
+      settlementRoundingUsd: new Prisma.Decimal("0"),
+    });
+    mocks.queryRaw.mockResolvedValueOnce([settledOrder]);
+
+    const result = await settleClosedLiveOrderToOwnerWallet({
+      ownerId: "owner-1",
+      order: closedPendingOrder() as never,
+      tradeFillProvider: { getOrderTradeFills: mocks.providerFills },
+    });
+
+    expect(result.status).toBe("ALREADY_SETTLED");
+    expect(result.settledUsd).toBe("11");
+    expect(result.blockers).toEqual([]);
+    expect(mocks.providerFills).not.toHaveBeenCalled();
+    expect(mocks.createAdapter).not.toHaveBeenCalled();
+    expect(mocks.queryRaw).toHaveBeenCalledOnce();
+  });
+
   it("rejects an owner mismatch without calling the exchange provider", async () => {
     const order = closedPendingOrder();
     const blockedOrder = {
