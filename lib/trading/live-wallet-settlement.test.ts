@@ -135,6 +135,25 @@ describe("settleClosedLiveOrderToOwnerWallet", () => {
     expect(mocks.transaction).toHaveBeenCalledOnce();
   });
 
+  it("preserves the original transfer blocker on a retry after settlement was blocked", async () => {
+    const blockedOrder = closedPendingOrder({
+      settlementStatus: "BLOCKED",
+      settlementError: "EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED",
+    });
+    mocks.queryRaw.mockResolvedValueOnce([blockedOrder]);
+
+    const result = await settleClosedLiveOrderToOwnerWallet({
+      ownerId: "owner-1",
+      order: closedPendingOrder() as never,
+      tradeFillProvider: { getOrderTradeFills: mocks.providerFills },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toEqual(["EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED"]);
+    expect(mocks.providerFills).not.toHaveBeenCalled();
+    expect(mocks.queryRaw).toHaveBeenCalledOnce();
+  });
+
   it("does not block or mutate a settled order on idempotent retry", async () => {
     const settledOrder = closedPendingOrder({
       settlementStatus: "SETTLED",
