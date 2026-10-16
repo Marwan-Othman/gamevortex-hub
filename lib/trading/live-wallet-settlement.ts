@@ -129,6 +129,44 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
   tradeFillProvider?: SettlementTradeFillProvider;
 }): Promise<LiveWalletSettlementResult> {
   const inputOrder = input.order as LiveOrderSettlementRow;
+
+  // Fail closed before making an exchange API request: until an independently
+  // verified proceeds-transfer rail exists, provider fills cannot make settlement
+  // eligible. Keep the database state transition and owner/state checks atomic.
+  if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
+    return db.$transaction(async (tx) => {
+      const lockedRows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
+        SELECT * FROM "TradingLiveOrder" WHERE "id" = ${input.order.id} FOR UPDATE
+      `);
+      const order = lockedRows[0];
+      if (!order) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
+
+      if (order.ownerId !== input.ownerId) {
+        const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_OWNER_MISMATCH");
+        return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_OWNER_MISMATCH"] };
+      }
+
+      if (order.settlementStatus === "SETTLED") {
+        return {
+          order,
+          status: "ALREADY_SETTLED",
+          settledUsd: order.settledUsd?.toString() ?? null,
+          settledPoints: order.settledPoints ?? null,
+          roundingUsd: order.settlementRoundingUsd?.toString() ?? null,
+          blockers: [],
+        };
+      }
+
+      if (order.status !== "CLOSED" || order.settlementStatus !== "EXCHANGE_CLOSED_PENDING_WALLET") {
+        const blocked = await blockSettlement(tx, order.id, "LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT");
+        return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"] };
+      }
+
+      const transferBlocker = getExchangeProceedsTransferBlocker();
+      const blocked = await blockSettlement(tx, order.id, transferBlocker!);
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [transferBlocker!] };
+    });
+  }
   let netExitProceeds: Prisma.Decimal | null = null;
   let settlementCurrencyBlocker: string | null = null;
 
