@@ -12,6 +12,7 @@ const h = vi.hoisted(() => {
     nonUsdCompletedDeposits: 0,
     hasLatestTransaction: true,
     ledgerMatchesBalance: true,
+    ledgerTotalOverride: null as number | null,
     ledger: [] as any[],
     audits: [] as any[],
     failLedger: false,
@@ -22,7 +23,7 @@ const h = vi.hoisted(() => {
       findUnique: vi.fn(async ({ where }: any) => state.transactions.get(where.idempotencyKey) ?? null),
       count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
       findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
-      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
+      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerTotalOverride !== null ? h.money(h.state.ledgerTotalOverride) : h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
       create: vi.fn(async ({ data }: any) => {
         if (state.transactions.has(data.idempotencyKey)) throw Object.assign(new Error("duplicate"), { code: "P2002" });
         const row = { id: "tx-1", ...data };
@@ -77,7 +78,7 @@ const h = vi.hoisted(() => {
     walletTransaction: {
       count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
       findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
-      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
+      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerTotalOverride !== null ? h.money(h.state.ledgerTotalOverride) : h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
     },
     walletDeposit: { count: vi.fn(async ({ where }: any) =>
       where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0) },
@@ -142,6 +143,7 @@ beforeEach(() => {
   h.state.nonUsdCompletedDeposits = 0;
   h.state.hasLatestTransaction = true;
   h.state.ledgerMatchesBalance = true;
+  h.state.ledgerTotalOverride = null;
   h.state.ledger = [];
   h.state.audits = [];
   h.state.failLedger = false;
@@ -179,6 +181,22 @@ describe("trading wallet funding route", () => {
     const response = await GET(request("GET"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ sourceCurrencyVerified: false, sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED" });
+  });
+
+  it("does not treat a zero wallet balance as reconciled when the USD ledger has a nonzero total", async () => {
+    h.state.wallet.balance = h.money(0);
+    h.state.ledgerTotalOverride = 1;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    const funding = await POST(request("POST", { amountUsd: 1 }, "funding-key-zero-mismatch"));
+    expect(funding.status).toBe(409);
+    expect((await funding.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(h.state.ownerWallet).toBeNull();
   });
 
   it("refuses funding when a nonzero balance has no reconciled USD ledger row", async () => {
