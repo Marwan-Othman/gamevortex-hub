@@ -212,6 +212,39 @@ describe("settleClosedLiveOrderToOwnerWallet", () => {
     expect(mocks.queryRaw).toHaveBeenCalledOnce();
   });
 
+  it("blocks when the locked database state is no longer eligible, even if the caller is stale", async () => {
+    const changedOrder = closedPendingOrder({
+      status: "OPEN",
+      providerStatus: "PARTIALLY_FILLED",
+      settlementStatus: "NOT_SETTLED",
+      settledUsd: null,
+      settledPoints: null,
+      settlementRoundingUsd: null,
+    });
+    const blockedOrder = {
+      ...changedOrder,
+      settlementStatus: "BLOCKED",
+      settlementError: "LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT",
+      version: 2,
+    };
+    mocks.queryRaw
+      .mockResolvedValueOnce([changedOrder])
+      .mockResolvedValueOnce([blockedOrder]);
+
+    const result = await settleClosedLiveOrderToOwnerWallet({
+      ownerId: "owner-1",
+      order: closedPendingOrder() as never,
+      tradeFillProvider: { getOrderTradeFills: mocks.providerFills },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toEqual(["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"]);
+    expect(result.settledUsd).toBeNull();
+    expect(mocks.providerFills).not.toHaveBeenCalled();
+    expect(mocks.createAdapter).not.toHaveBeenCalled();
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects an owner mismatch without calling the exchange provider", async () => {
     const order = closedPendingOrder();
     const blockedOrder = {
