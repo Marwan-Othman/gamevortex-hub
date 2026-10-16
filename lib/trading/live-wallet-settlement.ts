@@ -8,6 +8,7 @@ export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLE
 
 type LiveOrderSettlementRow = LiveOrderRow & {
   settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
+  settlementError: string | null;
   exitProviderOrderId: string | null;
   exitExecutedQty: Prisma.Decimal | null;
   exitCumulativeQuoteQty: Prisma.Decimal | null;
@@ -155,6 +156,11 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
           roundingUsd: order.settlementRoundingUsd?.toString() ?? null,
           blockers: [],
         };
+      }
+
+      if (order.settlementStatus === "BLOCKED") {
+        const reason = order.settlementError || "LIVE_WALLET_SETTLEMENT_BLOCKED";
+        return { order, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [reason] };
       }
 
       if (order.status !== "CLOSED" || order.settlementStatus !== "EXCHANGE_CLOSED_PENDING_WALLET") {
