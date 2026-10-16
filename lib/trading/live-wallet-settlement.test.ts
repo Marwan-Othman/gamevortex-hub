@@ -135,6 +135,20 @@ describe("settleClosedLiveOrderToOwnerWallet", () => {
     expect(mocks.transaction).toHaveBeenCalledOnce();
   });
 
+  it("fails closed when the database order is missing and never queries exchange fills", async () => {
+    mocks.queryRaw.mockResolvedValueOnce([]);
+
+    await expect(settleClosedLiveOrderToOwnerWallet({
+      ownerId: "owner-1",
+      order: closedPendingOrder() as never,
+      tradeFillProvider: { getOrderTradeFills: mocks.providerFills },
+    })).rejects.toThrow("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
+
+    expect(mocks.providerFills).not.toHaveBeenCalled();
+    expect(mocks.createAdapter).not.toHaveBeenCalled();
+    expect(mocks.queryRaw).toHaveBeenCalledOnce();
+  });
+
   it("preserves the original transfer blocker on a retry after settlement was blocked", async () => {
     const blockedOrder = closedPendingOrder({
       settlementStatus: "BLOCKED",
