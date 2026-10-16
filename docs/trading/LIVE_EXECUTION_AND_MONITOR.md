@@ -22,6 +22,7 @@ The source wallet has no single-currency column, and the payment system supports
 
 - `LIVE_TRADING_ACCOUNTING_NOT_READY` blocks preparation and new execution until a real funding/custody path, reconciliation, and end-to-end settlement are implemented and verified.
 - `EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED` blocks crediting exchange proceeds to `OwnerWallet` without independently verified transfer evidence.
+- For orders in `CLOSED` / `EXCHANGE_CLOSED_PENDING_WALLET`, the settlement function now checks the transfer blocker inside a locked database transaction **before querying exchange trade fills**. It records the order as blocked and returns without crediting either wallet or trading ledger. This is a fail-closed guard, not a completed proceeds-transfer rail.
 - The USD owner wallet does not treat USDT or USDC as USD. A verified conversion with a traceable rate and timestamp is required before those proceeds could be credited as USD.
 - Bybit's native linked protective exit/OCO implementation is not complete; the executor must not send an unprotected live order through that path.
 - The inspected executor still has provider-specific Binance execution checks. The existence of a Bybit adapter does not establish complete Bybit execution, protection, and settlement support.
