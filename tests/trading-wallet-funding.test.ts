@@ -381,6 +381,23 @@ describe("trading wallet funding route", () => {
     expect(h.state.audits).toHaveLength(1);
   });
 
+  it("rejects an idempotency key created by a different owner without exposing or changing balances", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.owner = { id: "owner-2", role: "SUPER_ADMIN" };
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(replay.status).toBe(409);
+    expect(await replay.json()).toMatchObject({ error: "IDEMPOTENCY_KEY_CONFLICT" });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
   it("rejects reuse of a key for a different amount", async () => {
     await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
