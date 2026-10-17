@@ -430,8 +430,8 @@ describe("trading wallet funding route", () => {
     expect(await replay.json()).toMatchObject({
       replayed: true,
       sourceWalletAvailableUsd: "0.00",
-      sourceCurrencyVerified: true,
-      sourceCurrencyBlocker: null,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
     });
     expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
     expect(h.state.transactions.size).toBe(1);
