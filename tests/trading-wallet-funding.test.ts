@@ -315,6 +315,28 @@ describe("trading wallet funding route", () => {
     expect(h.state.ledger).toHaveLength(1);
   });
 
+  it("reports an idempotent replay as unverified if source-currency history becomes unsafe later", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-replay-check"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    // A later legacy/non-USD transaction means the wallet can no longer be treated as verified USD capital.
+    h.state.nonUsdTransactions = 1;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-replay-check"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
   it("rejects reuse of a key for a different amount", async () => {
     await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
