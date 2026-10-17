@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
           tx.walletTransaction.aggregate({ where: { userId: ownerId, currency: "USD" }, _sum: { amount: true } }),
         ]);
         const balanceLedgerReconciles = currentSourceWallet !== null && amountsEqual(usdLedgerTotals._sum.amount, currentSourceWallet.balance);
-        const sourceCurrencyVerified = nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0 && balanceLedgerReconciles;
+        const sourceCurrencyVerified = currentOwnerWallet !== null && nonUsdTransactions === 0 && nonUsdCompletedDeposits === 0 && balanceLedgerReconciles;
         return {
           replayed: true,
           amountUsd,
