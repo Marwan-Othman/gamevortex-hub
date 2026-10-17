@@ -159,8 +159,8 @@ describe("trading wallet funding route", () => {
       sourceWalletAvailableUsd: "1.00",
       sourceWalletPendingUsd: "0.00",
       ownerWalletAvailableUsd: "0.00",
-      sourceCurrencyVerified: false,
-      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+      sourceCurrencyVerified: true,
+      sourceCurrencyBlocker: null,
     });
     expect(h.db.$transaction).not.toHaveBeenCalled();
   });
@@ -451,8 +451,8 @@ describe("trading wallet funding route", () => {
     expect(await replay.json()).toMatchObject({
       replayed: true,
       ownerWalletAvailableUsd: "0.00",
-      sourceCurrencyVerified: true,
-      sourceCurrencyBlocker: null,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
     });
     expect(Number(h.state.wallet.balance)).toBe(0);
     expect(h.state.ownerWallet).toBeNull();
