@@ -159,8 +159,8 @@ describe("trading wallet funding route", () => {
       sourceWalletAvailableUsd: "1.00",
       sourceWalletPendingUsd: "0.00",
       ownerWalletAvailableUsd: "0.00",
-      sourceCurrencyVerified: true,
-      sourceCurrencyBlocker: null,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
     });
     expect(h.db.$transaction).not.toHaveBeenCalled();
   });
@@ -439,7 +439,7 @@ describe("trading wallet funding route", () => {
     expect(h.state.audits).toHaveLength(1);
   });
 
-  it("rejects a replay if the owner wallet disappeared after the original funding", async () => {
+  it("reports an idempotent replay as unverified if the owner wallet disappeared after the original funding", async () => {
     const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-wallet-missing"));
     expect(first.status).toBe(201);
     expect(Number(h.state.wallet.balance)).toBe(0);
