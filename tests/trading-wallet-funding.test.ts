@@ -359,6 +359,28 @@ describe("trading wallet funding route", () => {
     expect(h.state.audits).toHaveLength(1);
   });
 
+  it("rejects replay when the same idempotency key belongs to a different owner", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.owner = { id: "owner-2", role: "SUPER_ADMIN" };
+    h.state.wallet = { id: "wallet-2", userId: "owner-2", balance: h.money(5), pendingBalance: h.money(0) };
+    h.state.ownerWallet = { id: "owner-wallet-2", ownerId: "owner-2", availableUsd: h.money(0) };
+    h.state.ledgerMatchesBalance = true;
+    h.state.ledgerTotalOverride = null;
+
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(replay.status).toBe(409);
+    expect(await replay.json()).toMatchObject({ error: "IDEMPOTENCY_KEY_CONFLICT" });
+    expect(Number(h.state.wallet.balance)).toBe(5);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(0);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
   it("rejects reuse of a key for a different amount", async () => {
     await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
