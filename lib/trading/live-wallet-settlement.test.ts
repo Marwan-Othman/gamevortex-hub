@@ -245,6 +245,31 @@ describe("settleClosedLiveOrderToOwnerWallet", () => {
     expect(mocks.queryRaw).toHaveBeenCalledTimes(2);
   });
 
+  it("rejects a stale caller owner when the locked database order belongs to someone else", async () => {
+    const otherOwnersOrder = closedPendingOrder({ ownerId: "owner-2" });
+    const blockedOrder = {
+      ...otherOwnersOrder,
+      settlementStatus: "BLOCKED",
+      settlementError: "SETTLEMENT_OWNER_MISMATCH",
+      version: 2,
+    };
+    mocks.queryRaw
+      .mockResolvedValueOnce([otherOwnersOrder])
+      .mockResolvedValueOnce([blockedOrder]);
+
+    const result = await settleClosedLiveOrderToOwnerWallet({
+      ownerId: "owner-1",
+      order: closedPendingOrder({ ownerId: "owner-1" }) as never,
+      tradeFillProvider: { getOrderTradeFills: mocks.providerFills },
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.blockers).toEqual(["SETTLEMENT_OWNER_MISMATCH"]);
+    expect(mocks.providerFills).not.toHaveBeenCalled();
+    expect(mocks.createAdapter).not.toHaveBeenCalled();
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects an owner mismatch without calling the exchange provider", async () => {
     const order = closedPendingOrder();
     const blockedOrder = {
