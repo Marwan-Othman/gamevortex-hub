@@ -3,45 +3,41 @@
 ## Endpoints
 
 ### `POST /api/admin/trading/live/execute` (owner only)
-Body: `{ "approvalId": "...", "opportunityId": "...", "confirm": "EXECUTE LIVE ORDER" }`
 
-- Requires `GAMEVORTEX_LIVE_TRADING_ENABLED=true`, a consumed owner approval, a clean emergency-stop/circuit-breaker state, a clean Binance production preflight, a current Risk Manager pass and an APPROVED (reviewed) Shariah decision.
-- Submits at most one BUY per approval (idempotent). Calling it again only reconciles the same order.
-- Before any exchange call it checks the current 1m price against the approved price (`TRADING_LIVE_MAX_SLIPPAGE_PERCENT`, default 0.5%) and that the market data is fresh. A blocked order stays `INTENT_CREATED` and nothing is sent to Binance.
+The route is owner-only and has layered checks for the live flag, consumed owner approval, emergency stop/circuit breaker, provider preflight, risk, Shariah policy, fresh market data, and slippage. Those checks do **not** mean the current system is ready for real orders: the independent accounting readiness guard deliberately rejects new live execution with `LIVE_TRADING_ACCOUNTING_NOT_READY`.
 
 ### `GET /api/cron/trading-live-monitor` (secret protected)
-Needs `Authorization: Bearer $CRON_SECRET` (Vercel Cron sends it when `CRON_SECRET` is set). Runs the executor in **monitor** mode for open orders: reconcile, protect, settle. Monitor mode can never submit a BUY, and keeps working while the circuit breaker is tripped and after the approval window has ended. It does nothing while the live flag is false.
 
-`vercel.json` ships a **daily** schedule because Vercel Hobby only allows daily crons (a more frequent schedule fails the deployment on Hobby). On Vercel Pro change it to `*/5 * * * *`. On Hobby you can instead call the URL every few minutes from an external scheduler with the Bearer header.
+Needs `Authorization: Bearer $CRON_SECRET`. Monitor mode is intended to reconcile already-existing orders without submitting a new BUY. It may still query the configured exchange, update order state, and attempt settlement; keep the cron secret server-side and configure it consistently in GitHub Actions and Vercel.
 
-## Protection and emergency exit
-After a confirmed fill the executor places the protective OCO for the **net sellable quantity** (executed quantity minus any base-asset commission, floored to the symbol step). If protection cannot be confirmed it:
-1. marks the order `PROTECTION_FAILED` and trips the circuit breaker;
-2. tries one emergency MARKET SELL of the same net quantity (deterministic client id, so it cannot double-sell);
-3. writes `TRADING_LIVE_EMERGENCY_EXIT_SOLD` or `TRADING_LIVE_EMERGENCY_EXIT_FAILED` to the audit log;
-4. never credits the wallet. Settlement of an emergency exit is manual and must be verified against Binance.
+## Wallet funding boundary
 
-Before computing a sell quantity, the executor also requires a non-empty provider fill list whose summed trade quantity exactly matches the confirmed entry execution. If fills are empty, truncated, malformed, or inconsistent, it deliberately does **not** send an emergency MARKET SELL because the net sellable quantity cannot be proven. The position remains a protection failure, the circuit breaker is tripped, and an operator must urgently reconcile the live Binance balance and open orders by hand.
+The owner trading panel's `POST /api/admin/trading/wallet-funding` route performs an **internal database transfer only** from the site's money wallet to `OwnerWallet`. It debits and credits internal balances in one transaction and records wallet, owner-ledger, and audit rows. Its idempotency key prevents a retry from debiting the same transfer twice.
 
-If the OCO request timed out but actually reached Binance, the coins are locked by the OCO and the emergency sell will be rejected. That is intentional; check Binance and reconcile by hand.
+This operation does **not** send money to Binance or Bybit, does not fund an exchange account, and does not prove that funds are held by an exchange. Likewise, exchange trade fills prove execution, not that net proceeds were transferred back to GameVortex.
 
-## Exit settlement fix
-The exit-settlement check "exit quantity covers entry quantity" now compares against the same net sellable quantity. Before, a BUY fee charged in the base asset made a correct exit look like an unsettled position.
+The source wallet has no single-currency column, and the payment system supports multiple currencies. The funding route therefore rejects a new transfer when either the owner's wallet transaction history contains any non-USD currency or a completed wallet deposit is recorded in a non-USD currency (`TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED`). Checking both records prevents a foreign-currency deposit from being missed when transaction history is incomplete. This is intentionally conservative: historical non-USD entries must be reconciled or converted through a verified, auditable process before that wallet can fund USD trading capital. The guard does not itself perform currency conversion.
 
-## Still manual / not covered
-- The Shariah policy v1.0 is seeded `INACTIVE` and unreviewed. It must be reviewed by a qualified scholar and activated before any order can be APPROVED.
-- Emergency-exit wallet accounting.
-- Executor-level failure drills that need a database.
+## Settlement and readiness blockers
 
+- `LIVE_TRADING_ACCOUNTING_NOT_READY` blocks preparation and new execution until a real funding/custody path, reconciliation, and end-to-end settlement are implemented and verified.
+- `EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED` blocks crediting exchange proceeds to `OwnerWallet` without independently verified transfer evidence.
+- For orders in `CLOSED` / `EXCHANGE_CLOSED_PENDING_WALLET`, the settlement function now checks the transfer blocker inside a locked database transaction **before querying exchange trade fills**. It records the order as blocked and returns without crediting either wallet or trading ledger. This is a fail-closed guard, not a completed proceeds-transfer rail.
+- The USD owner wallet does not treat USDT or USDC as USD. A verified conversion with a traceable rate and timestamp is required before those proceeds could be credited as USD.
+- Bybit's native linked protective exit/OCO implementation is not complete; the executor must not send an unprotected live order through that path.
+- The inspected executor still has provider-specific Binance execution checks. The existence of a Bybit adapter does not establish complete Bybit execution, protection, and settlement support.
+- Existing orders that cannot be reconciled safely may require manual review. Do not mark proceeds settled merely because an exchange order is closed.
 
-## Direct funding mode (owner trades own Binance balance)
+## Protection and emergency handling
 
-By default a live order needs an ACTIVE Owner Wallet allocation with exactly the order amount, and the result is credited back to the wallet ledger.
+For an already-existing position, reconcile provider order state and fills before any accounting action. Never infer sellable quantity from gross executed quantity when fees may have been charged in the base asset. If protection or quantity cannot be verified, keep the order blocked, trip the circuit breaker as appropriate, and require manual review rather than inventing a quantity or crediting the wallet.
 
-Setting `GAMEVORTEX_LIVE_DIRECT_FUNDING=true` switches to direct funding:
+## Still required before live trading
 
-- no allocation is bound, and no wallet/ledger/trading-account row is changed;
-- when the protected exit has closed on Binance the order is marked `SETTLED` and a `TRADING_LIVE_DIRECT_SETTLED` audit row records the realized P/L;
-- all other gates are unchanged: Shariah, Risk Manager, emergency stop / circuit breaker, per-trade owner approval, typed `EXECUTE LIVE ORDER`, Binance preflight, slippage guard, minimum notional, protective OCO.
+1. Implement and verify the actual site-wallet-to-exchange funding/custody path, including exchange-side transfer evidence and reconciliation.
+2. Implement return-of-proceeds transfer evidence and idempotent reconciliation back to the site wallet.
+3. Run isolated database drills for partial fills, duplicate events, timeouts, retries, transfer mismatches, and settlement conflicts.
+4. Complete qualified Shariah review and resolve provider/account eligibility before considering any live activation.
+5. Re-run CI and deployment checks after each code change.
 
-The admin "Live Order" panel (`/admin/trading`) uses `POST /api/admin/trading/live/prepare` (checks + short-lived approval, never sends an order), then the existing approval-consume and `/live/execute` routes. `GET/POST /api/admin/trading/live/orders` lists orders and refreshes one in monitor mode.
+Do not enable live execution or remove the accounting guards based only on a successful build or test run. No real order, exchange transfer, or production balance change is performed by these documentation steps.

@@ -243,6 +243,93 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     return parseResponse(response);
   }
 
+  /** Read-only account/API-key preflight. This never submits or changes an order. */
+  async getLiveReadiness(quoteAssetInput = "USDT"): Promise<{
+    accountMode: number;
+    marginMode: string;
+    quoteAsset: string;
+    quoteFreeBalance: number;
+    blockers: string[];
+  }> {
+    const quoteAsset = quoteAssetInput.trim().toUpperCase();
+    if (!/^[A-Z0-9]{2,12}$/.test(quoteAsset)) throw new Error("BYBIT_LIVE_INVALID_QUOTE_ASSET");
+    const keyResult = objectResult(await this.request("GET", "/v5/user/query-api", {}), "BYBIT_LIVE_API_KEY_INFO_REQUIRED");
+    if (typeof keyResult.apiKey !== "string" || keyResult.apiKey !== this.apiKey) throw new Error("BYBIT_LIVE_API_KEY_IDENTITY_MISMATCH");
+    if (keyResult.readOnly !== 0 || !keyResult.permissions || typeof keyResult.permissions !== "object" || Array.isArray(keyResult.permissions)) throw new Error("BYBIT_LIVE_API_KEY_NOT_TRADING_ENABLED");
+    const permissions = keyResult.permissions as Record<string, unknown>;
+    const requiredArray = (name: string): string[] => {
+      const value = permissions[name];
+      if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error("BYBIT_LIVE_API_PERMISSIONS_INVALID");
+      return value as string[];
+    };
+    if (!requiredArray("Spot").includes("SpotTrade")) throw new Error("BYBIT_LIVE_SPOT_PERMISSION_REQUIRED");
+    const walletPermissions = requiredArray("Wallet");
+    if (walletPermissions.some((permission) => ["Withdraw", "AccountTransfer", "SubMemberTransfer"].includes(permission))) throw new Error("BYBIT_LIVE_WITHDRAW_OR_TRANSFER_PERMISSION_FORBIDDEN");
+    if (requiredArray("ContractTrade").length || requiredArray("Options").length || requiredArray("Derivatives").length) throw new Error("BYBIT_LIVE_NON_SPOT_PERMISSION_FORBIDDEN");
+    const accountResult = objectResult(await this.request("GET", "/v5/account/info", {}), "BYBIT_LIVE_ACCOUNT_INFO_REQUIRED");
+    const accountMode = accountResult.unifiedMarginStatus;
+    const marginMode = typeof accountResult.marginMode === "string" ? accountResult.marginMode : "";
+    if (typeof accountMode !== "number" || ![3, 4, 5, 6].includes(accountMode) || !marginMode) throw new Error("BYBIT_LIVE_ACCOUNT_MODE_UNVERIFIED");
+    const walletResult = objectResult(await this.request("GET", "/v5/account/wallet-balance", { accountType: "UNIFIED", coin: quoteAsset }), "BYBIT_LIVE_WALLET_BALANCE_REQUIRED");
+    if (!Array.isArray(walletResult.list) || walletResult.list.length !== 1 || !walletResult.list[0] || typeof walletResult.list[0] !== "object") throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
+    const account = walletResult.list[0] as Record<string, unknown>;
+    if (account.accountType !== "UNIFIED" || !Array.isArray(account.coin)) throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
+    const coin = account.coin.find((item) => item && typeof item === "object" && (item as Record<string, unknown>).coin === quoteAsset) as Record<string, unknown> | undefined;
+    if (!coin) return { accountMode, marginMode, quoteAsset, quoteFreeBalance: 0, blockers: ["BYBIT_LIVE_QUOTE_BALANCE_ZERO"] };
+    const walletBalance = Number(coin.walletBalance);
+    const locked = Number(coin.locked);
+    const spotBorrow = Number(coin.spotBorrow ?? "0");
+    if (![walletBalance, locked, spotBorrow].every((value) => Number.isFinite(value) && value >= 0)) throw new Error("BYBIT_LIVE_WALLET_BALANCE_INVALID");
+    if (spotBorrow > 0) throw new Error("BYBIT_LIVE_SPOT_BORROW_DETECTED");
+    const quoteFreeBalance = Math.max(0, walletBalance - locked);
+    return { accountMode, marginMode, quoteAsset, quoteFreeBalance, blockers: quoteFreeBalance > 0 ? [] : ["BYBIT_LIVE_QUOTE_BALANCE_ZERO"] };
+  }
+  async getSpotSymbolRules(symbolInput: string): Promise<{
+    symbol: string;
+    baseAsset: string;
+    quoteAsset: string;
+    minOrderQty: string;
+    maxOrderQty: string;
+    qtyStep: string;
+    minOrderAmount: string;
+    tickSize: string;
+  }> {
+    const symbol = normalizeSymbol(symbolInput, this.symbolMap);
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        `${this.baseUrl}/v5/market/instruments-info?${encodeQuery({ category: "spot", symbol })}`,
+        { method: "GET", headers: { Accept: "application/json" } },
+      );
+    } catch {
+      throw new Error("BYBIT_LIVE_SYMBOL_RULES_NETWORK_ERROR");
+    }
+    const payload = await parseResponse(response);
+    const result = objectResult(payload, "BYBIT_LIVE_INVALID_INSTRUMENT_RESPONSE");
+    if (!Array.isArray(result.list) || result.list.length !== 1 || !result.list[0] || typeof result.list[0] !== "object") {
+      throw new Error("BYBIT_LIVE_SYMBOL_RULES_MISSING");
+    }
+    const instrument = result.list[0] as Record<string, unknown>;
+    const lot = instrument.lotSizeFilter;
+    const price = instrument.priceFilter;
+    if (instrument.symbol !== symbol || instrument.status !== "Trading" || typeof instrument.baseCoin !== "string" || typeof instrument.quoteCoin !== "string" || !lot || typeof lot !== "object" || !price || typeof price !== "object") {
+      throw new Error("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    }
+    const lotFilter = lot as Record<string, unknown>;
+    const priceFilter = price as Record<string, unknown>;
+    const baseAsset = instrument.baseCoin.trim().toUpperCase();
+    const quoteAsset = instrument.quoteCoin.trim().toUpperCase();
+    const minOrderQty = typeof lotFilter.minOrderQty === "string" ? lotFilter.minOrderQty : "";
+    const maxOrderQty = typeof lotFilter.maxOrderQty === "string" ? lotFilter.maxOrderQty : "";
+    const qtyStep = typeof lotFilter.qtyStep === "string" ? lotFilter.qtyStep : "";
+    const minOrderAmount = typeof lotFilter.minOrderAmt === "string" ? lotFilter.minOrderAmt : "";
+    const tickSize = typeof priceFilter.tickSize === "string" ? priceFilter.tickSize : "";
+    for (const value of [minOrderQty, maxOrderQty, qtyStep, tickSize]) positive(value, "BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    nonNegative(minOrderAmount, "BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    if (!baseAsset || !quoteAsset || Number(maxOrderQty) < Number(minOrderQty)) throw new Error("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+    return { symbol, baseAsset, quoteAsset, minOrderQty, maxOrderQty, qtyStep, minOrderAmount, tickSize };
+  }
+
   async getMarketData(request: ExchangeMarketDataRequest): Promise<ExchangeMarketDataResponse> {
     validateExchangeMarketDataRequest(request);
     if (request.limit > MAX_MARKET_DATA_LIMIT) throw new Error("INVALID_MARKET_DATA_LIMIT");
@@ -338,31 +425,15 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     return { symbol, baseAsset, quoteAsset, fills };
   }
 
-  async placeProtectedExitOco(request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult> {
+  async placeProtectedExitOco(_request: ExchangeProtectedExitRequest): Promise<ExchangeProtectedExitResult> {
     this.requireLive();
-    const symbol = normalizeSymbol(request.symbol, this.symbolMap);
-    const quantity = decimal(request.quantity, "INVALID_BYBIT_LIVE_EXIT_QUANTITY", false);
-    const entryPrice = positive(request.entryPrice, "INVALID_BYBIT_LIVE_ENTRY_PRICE");
-    const takeProfitPrice = positive(request.takeProfitPrice, "INVALID_BYBIT_LIVE_EXIT_TAKE_PROFIT");
-    const stopLossPrice = positive(request.stopLossPrice, "INVALID_BYBIT_LIVE_EXIT_STOP_LOSS");
-    const stopLimitPrice = positive(request.stopLimitPrice, "INVALID_BYBIT_LIVE_EXIT_STOP_LIMIT");
-    const takeProfitClientOrderId = normalizeClientOrderId(request.takeProfitClientOrderId, "INVALID_BYBIT_LIVE_TP_CLIENT_ORDER_ID");
-    const stopLossClientOrderId = normalizeClientOrderId(request.stopLossClientOrderId, "INVALID_BYBIT_LIVE_SL_CLIENT_ORDER_ID");
-    if (!(takeProfitPrice > entryPrice && entryPrice > stopLossPrice && stopLossPrice > stopLimitPrice)) throw new Error("INVALID_BYBIT_LIVE_PROTECTED_EXIT_PRICE_ORDER");
 
-    // Bybit Spot exposes TP/SL as two linked conditional orders rather than
-    // Binance's single OCO list. Both are submitted as server-side orders;
-    // if the second request fails, the caller must execute its emergency exit.
-    const common = { category: "spot", symbol, side: "Sell", orderType: "Limit", qty: quantity, timeInForce: "GTC", isLeverage: 0, orderFilter: "tpslOrder" };
-    const tp = await this.request("POST", "/v5/order/create", { ...common, price: takeProfitPrice.toString(), triggerPrice: takeProfitPrice.toString(), orderLinkId: takeProfitClientOrderId, tpOrderType: "Limit", tpLimitPrice: takeProfitPrice.toString() });
-    const tpResult = objectResult(tp, "BYBIT_LIVE_TP_SUBMISSION_FAILED");
-    const tpId = typeof tpResult.orderId === "string" ? tpResult.orderId : "";
-    if (!tpId) throw new Error("BYBIT_LIVE_TP_ORDER_ID_REQUIRED");
-    const sl = await this.request("POST", "/v5/order/create", { ...common, price: stopLimitPrice.toString(), triggerPrice: stopLossPrice.toString(), orderLinkId: stopLossClientOrderId, slOrderType: "Limit", slLimitPrice: stopLimitPrice.toString() });
-    const slResult = objectResult(sl, "BYBIT_LIVE_SL_SUBMISSION_FAILED");
-    const slId = typeof slResult.orderId === "string" ? slResult.orderId : "";
-    if (!slId) throw new Error("BYBIT_LIVE_SL_ORDER_ID_REQUIRED");
-    return { accepted: true, orderListId: `bybit-pair:${tpId}:${slId}`, listClientOrderId: request.listClientOrderId ?? `bybit-pair:${takeProfitClientOrderId}`, orders: [{ providerOrderId: tpId, clientOrderId: takeProfitClientOrderId }, { providerOrderId: slId, clientOrderId: stopLossClientOrderId }], status: "New" };
+    // The current Bybit implementation would submit two independent full-size
+    // conditional SELL orders. They are not an atomic OCO pair, so one leg
+    // filling may leave the other leg active and create an unintended short/
+    // rejected oversell attempt. Do not submit either leg until a verified
+    // provider-native linked TP/SL implementation and reconciliation exist.
+    throw new Error("BYBIT_NATIVE_LINKED_PROTECTION_NOT_IMPLEMENTED");
   }
 
   async getProtectedExitLegStatus(request: ExchangeProtectedExitLegStatusRequest): Promise<ExchangeProtectedExitLegStatusResult> {

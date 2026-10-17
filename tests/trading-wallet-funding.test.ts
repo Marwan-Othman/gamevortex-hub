@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const h = vi.hoisted(() => {
-  const money = (value: number) => ({ value, toString: () => value.toFixed(2), toNumber: () => value, valueOf: () => value, sub: (other: any) => money(value - Number(other)) });
+  const money = (value: number) => ({ value, toString: () => value.toFixed(2), toNumber: () => value, valueOf: () => value, isZero: () => value === 0, equals: (other: any) => value === Number(other), sub: (other: any) => money(value - Number(other)) });
   const state: any = {
     owner: { id: "owner-1", role: "SUPER_ADMIN" },
     wallet: { id: "wallet-1", userId: "owner-1", balance: money(1), pendingBalance: money(0) },
     ownerWallet: null as any,
     transactions: new Map<string, any>(),
+    nonUsdTransactions: 0,
+    nonUsdCompletedDeposits: 0,
+    hasLatestTransaction: true,
+    ledgerMatchesBalance: true,
+    ledgerTotalOverride: null as number | null,
     ledger: [] as any[],
     audits: [] as any[],
     failLedger: false,
@@ -16,12 +21,19 @@ const h = vi.hoisted(() => {
   const tx: any = {
     walletTransaction: {
       findUnique: vi.fn(async ({ where }: any) => state.transactions.get(where.idempotencyKey) ?? null),
+      count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
+      findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
+      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerTotalOverride !== null ? h.money(h.state.ledgerTotalOverride) : h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
       create: vi.fn(async ({ data }: any) => {
         if (state.transactions.has(data.idempotencyKey)) throw Object.assign(new Error("duplicate"), { code: "P2002" });
         const row = { id: "tx-1", ...data };
         state.transactions.set(data.idempotencyKey, row);
         return row;
       }),
+    },
+    walletDeposit: {
+      count: vi.fn(async ({ where }: any) =>
+        where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0),
     },
     wallet: {
       findUnique: vi.fn(async () => state.wallet ? { ...state.wallet } : null),
@@ -63,6 +75,13 @@ const h = vi.hoisted(() => {
   const db: any = {
     wallet: { findUnique: vi.fn(async () => state.wallet ? { balance: state.wallet.balance, pendingBalance: state.wallet.pendingBalance } : null) },
     ownerWallet: { findUnique: vi.fn(async () => state.ownerWallet ? { availableUsd: state.ownerWallet.availableUsd } : null) },
+    walletTransaction: {
+      count: vi.fn(async ({ where }: any) => where.currency?.not === "USD" ? h.state.nonUsdTransactions : 0),
+      findFirst: vi.fn(async () => h.state.hasLatestTransaction && h.state.wallet ? { balanceAfter: h.state.wallet.balance, currency: "USD" } : null),
+      aggregate: vi.fn(async () => ({ _sum: { amount: h.state.ledgerTotalOverride !== null ? h.money(h.state.ledgerTotalOverride) : h.state.ledgerMatchesBalance && h.state.wallet ? h.state.wallet.balance : h.money(0) } })),
+    },
+    walletDeposit: { count: vi.fn(async ({ where }: any) =>
+      where.status === "COMPLETED" && where.currency?.not === "USD" ? h.state.nonUsdCompletedDeposits : 0) },
     $transaction: vi.fn(async (work: any) => {
       const snapshot = {
         wallet: state.wallet && { ...state.wallet },
@@ -120,6 +139,11 @@ beforeEach(() => {
   h.state.wallet = { id: "wallet-1", userId: "owner-1", balance: h.money(1), pendingBalance: h.money(0) };
   h.state.ownerWallet = null;
   h.state.transactions = new Map();
+  h.state.nonUsdTransactions = 0;
+  h.state.nonUsdCompletedDeposits = 0;
+  h.state.hasLatestTransaction = true;
+  h.state.ledgerMatchesBalance = true;
+  h.state.ledgerTotalOverride = null;
   h.state.ledger = [];
   h.state.audits = [];
   h.state.failLedger = false;
@@ -128,15 +152,76 @@ beforeEach(() => {
 });
 
 describe("trading wallet funding route", () => {
-  it("returns available balances without writing", async () => {
+  it("returns balances and explicitly reports verified USD source currency without writing", async () => {
     const response = await GET(request("GET"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       sourceWalletAvailableUsd: "1.00",
       sourceWalletPendingUsd: "0.00",
       ownerWalletAvailableUsd: "0.00",
+      sourceCurrencyVerified: true,
+      sourceCurrencyBlocker: null,
     });
     expect(h.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("marks source currency unverified in the balance response when non-USD history exists", async () => {
+    h.state.nonUsdTransactions = 1;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(h.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("marks a nonzero legacy balance unverified when no USD ledger row reconciles it", async () => {
+    h.state.ledgerMatchesBalance = false;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ sourceCurrencyVerified: false, sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED" });
+  });
+
+  it("does not treat a zero wallet balance as reconciled when the USD ledger has a nonzero total", async () => {
+    h.state.wallet.balance = h.money(0);
+    h.state.ledgerTotalOverride = 1;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    const funding = await POST(request("POST", { amountUsd: 1 }, "funding-key-zero-mismatch"));
+    expect(funding.status).toBe(409);
+    expect((await funding.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(h.state.ownerWallet).toBeNull();
+  });
+
+  it("refuses funding when a nonzero balance has no reconciled USD ledger row", async () => {
+    h.state.ledgerMatchesBalance = false;
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-unreconciled"));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
+  });
+
+  it("blocks a latest USD ledger row when the complete USD ledger total does not reconcile", async () => {
+    // Simulate a misleading latest row: the full historical ledger is still short of the wallet balance.
+    h.state.ledgerMatchesBalance = false;
+    const response = await GET(request("GET"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    const funding = await POST(request("POST", { amountUsd: 1 }, "funding-key-ledger-total"));
+    expect(funding.status).toBe(409);
+    expect((await funding.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
   });
 
   it("refuses non-owner access", async () => {
@@ -165,6 +250,26 @@ describe("trading wallet funding route", () => {
     expect(h.state.transactions.size).toBe(1);
     expect(h.state.ledger).toHaveLength(1);
     expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("blocks funding when source wallet history includes unconverted non-USD currency", async () => {
+    h.state.nonUsdTransactions = 1;
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-foreign"));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
+    expect(h.state.transactions.size).toBe(0);
+  });
+
+  it("blocks funding when completed deposit history contains non-USD currency even if transaction history does not", async () => {
+    h.state.nonUsdCompletedDeposits = 1;
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-foreign-deposit"));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED");
+    expect(Number(h.state.wallet.balance)).toBe(1);
+    expect(h.state.ownerWallet).toBeNull();
+    expect(h.state.transactions.size).toBe(0);
   });
 
   it("refuses insufficient available balance without touching owner wallet", async () => {
@@ -208,6 +313,152 @@ describe("trading wallet funding route", () => {
     expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
     expect(h.state.transactions.size).toBe(1);
     expect(h.state.ledger).toHaveLength(1);
+  });
+
+  it("reports an idempotent replay as unverified if source-currency history becomes unsafe later", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-replay-check"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    // A later legacy/non-USD transaction means the wallet can no longer be treated as verified USD capital.
+    h.state.nonUsdTransactions = 1;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-replay-check"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("reports an idempotent replay as unverified when the USD ledger no longer reconciles", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-ledger-replay"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    // Simulate a later ledger inconsistency; replay must report it without repeating the transfer.
+    h.state.ledgerTotalOverride = 2;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-ledger-replay"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("rejects replay when the same idempotency key belongs to a different owner", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.owner = { id: "owner-2", role: "SUPER_ADMIN" };
+    h.state.wallet = { id: "wallet-2", userId: "owner-2", balance: h.money(5), pendingBalance: h.money(0) };
+    h.state.ownerWallet = { id: "owner-wallet-2", ownerId: "owner-2", availableUsd: h.money(0) };
+    h.state.ledgerMatchesBalance = true;
+    h.state.ledgerTotalOverride = null;
+
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(replay.status).toBe(409);
+    expect(await replay.json()).toMatchObject({ error: "IDEMPOTENCY_KEY_CONFLICT" });
+    expect(Number(h.state.wallet.balance)).toBe(5);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(0);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("rejects an idempotency key created by a different owner without exposing or changing balances", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.owner = { id: "owner-2", role: "SUPER_ADMIN" };
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-scope"));
+    expect(replay.status).toBe(409);
+    expect(await replay.json()).toMatchObject({ error: "IDEMPOTENCY_KEY_CONFLICT" });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("reports replay as unverified if a completed non-USD deposit appears after funding", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-deposit-replay"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.nonUsdCompletedDeposits = 1;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-deposit-replay"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("reports replay as unverified if the source wallet disappears after the original funding", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-wallet-missing"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.wallet = null;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-wallet-missing"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      sourceWalletAvailableUsd: "0.00",
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
+  it("reports an idempotent replay as unverified if the owner wallet disappeared after the original funding", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-wallet-missing"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    h.state.ownerWallet = null;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-owner-wallet-missing"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      ownerWalletAvailableUsd: "0.00",
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(h.state.ownerWallet).toBeNull();
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
   });
 
   it("rejects reuse of a key for a different amount", async () => {

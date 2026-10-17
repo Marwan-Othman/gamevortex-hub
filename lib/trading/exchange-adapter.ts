@@ -139,6 +139,18 @@ export interface ExchangeAdapter {
 
   getMarketData(request: ExchangeMarketDataRequest): Promise<ExchangeMarketDataResponse>;
 
+  /** Optional provider-native Spot market constraints. Missing support must block live order validation. */
+  getSpotSymbolRules?(symbol: string): Promise<{
+    symbol: string;
+    baseAsset: string;
+    quoteAsset: string;
+    minOrderQty: string;
+    maxOrderQty: string;
+    qtyStep: string;
+    minOrderAmount: string;
+    tickSize: string;
+  }>;
+
   placeSpotBuy?(request: ExchangeOrderRequest): Promise<ExchangeOrderResult>;
 
   /**

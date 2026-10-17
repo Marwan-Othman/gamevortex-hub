@@ -15,6 +15,115 @@ describe("BybitSpotLiveAdapter", () => {
     await expect(adapter.placeSpotBuy({ clientOrderId: "gv-test-1", symbol: "BTCUSDT", side: "BUY", amountUsd: 10, entryPrice: 100, stopLossPrice: 95, takeProfitPrice: 110 })).rejects.toThrow("LIVE_TRADING_DISABLED");
   });
 
+  it("checks API permissions, account mode, and quote balance using read-only endpoints", async () => {
+    const calls: string[] = [];
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", fetcher: async (url) => {
+      const path = new URL(String(url)).pathname;
+      calls.push(path);
+      if (path === "/v5/user/query-api") return response({ retCode: 0, result: { apiKey: "key", readOnly: 0, permissions: { Spot: ["SpotTrade"], Wallet: [], ContractTrade: [], Options: [], Derivatives: [] } } });
+      if (path === "/v5/account/info") return response({ retCode: 0, result: { unifiedMarginStatus: 5, marginMode: "REGULAR_MARGIN", spotHedgingStatus: "OFF" } });
+      if (path === "/v5/account/wallet-balance") return response({ retCode: 0, result: { list: [{ accountType: "UNIFIED", coin: [{ coin: "USDT", walletBalance: "12.5", locked: "2", spotBorrow: "0" }] }] } });
+      throw new Error("unexpected endpoint");
+    } });
+    await expect(adapter.getLiveReadiness()).resolves.toEqual({ accountMode: 5, marginMode: "REGULAR_MARGIN", quoteAsset: "USDT", quoteFreeBalance: 10.5, blockers: [] });
+    expect(calls).toEqual(["/v5/user/query-api", "/v5/account/info", "/v5/account/wallet-balance"]);
+  });
+
+  it("rejects Bybit API keys with withdrawal/transfer permissions", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", fetcher: async () => response({ retCode: 0, result: { apiKey: "key", readOnly: 0, permissions: { Spot: ["SpotTrade"], Wallet: ["Withdraw"], ContractTrade: [], Options: [], Derivatives: [] } } }) });
+    await expect(adapter.getLiveReadiness()).rejects.toThrow("BYBIT_LIVE_WITHDRAW_OR_TRANSFER_PERMISSION_FORBIDDEN");
+  });
+
+  it("rejects Bybit accounts with outstanding Spot borrow", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", fetcher: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/v5/user/query-api") return response({ retCode: 0, result: { apiKey: "key", readOnly: 0, permissions: { Spot: ["SpotTrade"], Wallet: [], ContractTrade: [], Options: [], Derivatives: [] } } });
+      if (path === "/v5/account/info") return response({ retCode: 0, result: { unifiedMarginStatus: 5, marginMode: "REGULAR_MARGIN" } });
+      return response({ retCode: 0, result: { list: [{ accountType: "UNIFIED", coin: [{ coin: "USDT", walletBalance: "12.5", locked: "0", spotBorrow: "1" }] }] } });
+    } });
+    await expect(adapter.getLiveReadiness()).rejects.toThrow("BYBIT_LIVE_SPOT_BORROW_DETECTED");
+  });
+  it("reads strict Spot market rules from the public instruments endpoint", async () => {
+    const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
+      expect(String(url)).toContain("/v5/market/instruments-info?");
+      return response({ retCode: 0, result: { list: [{
+        symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+        lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+        priceFilter: { tickSize: "0.01" },
+      }] } });
+    } });
+    await expect(adapter.getSpotSymbolRules!("BTCUSDT")).resolves.toEqual({
+      symbol: "BTCUSDT", baseAsset: "BTC", quoteAsset: "USDT", minOrderQty: "0.00001",
+      maxOrderQty: "900", qtyStep: "0.00001", minOrderAmount: "5", tickSize: "0.01",
+    });
+  });
+
+  it("fails closed when Bybit market rules are missing or invalid", async () => {
+    const missing = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [] } }) });
+    await expect(missing.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_MISSING");
+    const invalid = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0.01" },
+    }] } }) });
+    await expect(invalid.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+  });
+
+  it("rejects instruments that are not actively trading", async () => {
+    const adapter = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Settled", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0.01" },
+    }] } }) });
+    await expect(adapter.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+  });
+
+  it("rejects malformed quantity increments and zero tick sizes", async () => {
+    const invalidQuantityStep = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0.01" },
+    }] } }) });
+    await expect(invalidQuantityStep.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+
+    const invalidTickSize = new BybitSpotLiveAdapter({ fetcher: async () => response({ retCode: 0, result: { list: [{
+      symbol: "BTCUSDT", status: "Trading", baseCoin: "BTC", quoteCoin: "USDT",
+      lotSizeFilter: { minOrderQty: "0.00001", maxOrderQty: "900", qtyStep: "0.00001", minOrderAmt: "5" },
+      priceFilter: { tickSize: "0" },
+    }] } }) });
+    await expect(invalidTickSize.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_INVALID");
+  });
+
+  it("fails closed on public instrument endpoint network errors", async () => {
+    const adapter = new BybitSpotLiveAdapter({ fetcher: async () => { throw new Error("network details should not leak"); } });
+    await expect(adapter.getSpotSymbolRules!("BTCUSDT")).rejects.toThrow("BYBIT_LIVE_SYMBOL_RULES_NETWORK_ERROR");
+  });
+
+  it("does not submit independent full-size Bybit exit legs as if they were an atomic OCO", async () => {
+    let requests = 0;
+    const adapter = new BybitSpotLiveAdapter({
+      apiKey: "key",
+      apiSecret: "secret",
+      liveTradingEnabled: true,
+      fetcher: async () => {
+        requests += 1;
+        return response({ retCode: 0, result: { orderId: "unexpected" } });
+      },
+    });
+
+    await expect(adapter.placeProtectedExitOco!({
+      symbol: "BTCUSDT",
+      quantity: "0.01",
+      entryPrice: "100",
+      takeProfitClientOrderId: "gv-exit-tp-test",
+      takeProfitPrice: "110",
+      stopLossClientOrderId: "gv-exit-sl-test",
+      stopLossPrice: "95",
+      stopLimitPrice: "94.9",
+    })).rejects.toThrow("BYBIT_NATIVE_LINKED_PROTECTION_NOT_IMPLEMENTED");
+    expect(requests).toBe(0);
+  });
+
   it("normalizes reverse-ordered Bybit klines", async () => {
     const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
       expect(String(url)).toContain("/v5/market/kline?");

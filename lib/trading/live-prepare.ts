@@ -17,6 +17,7 @@ import { getRiskConfig } from "@/lib/trading/risk-config-service";
 import { evaluateRisk } from "@/lib/trading/risk";
 import { checkAndRecordShariah } from "@/lib/trading/shariah-service";
 import { assertBinanceLiveBuyRules } from "@/lib/trading/binance-live-symbol-rules";
+import { createLiveExchangeAdapter, getConfiguredLiveExchange } from "@/lib/trading/live-exchange";
 import { createOwnerApproval, type OwnerExecutionSnapshot } from "@/lib/trading/approval-store";
 import { fetchPublicKlines } from "@/lib/trading/binance-public-market-data";
 import { hasBinanceSigningCredential, signBinancePayload } from "@/lib/trading/binance-signer";
@@ -31,6 +32,11 @@ import {
 } from "@/lib/trading/live-prepare-math";
 
 const APPROVAL_TTL_SECONDS = 240;
+
+// Remains blocked until a real funding rail and end-to-end settlement are verified.
+function liveAccountingReadinessBlocker(): string | null {
+  return "LIVE_TRADING_ACCOUNTING_NOT_READY";
+}
 const STRATEGY_VERSION = "owner-manual-v1";
 
 export type PreparedLiveOrder = {
@@ -121,7 +127,11 @@ export async function prepareLiveOrder(input: {
   if (input.ackOwnerSpot !== true) throw new Error("LIVE_OWNER_ACK_REQUIRED");
 
   if (process.env.GAMEVORTEX_LIVE_TRADING_ENABLED !== "true") throw new Error("GAMEVORTEX_LIVE_TRADING_DISABLED");
-  // Keep live execution fail-closed until the migrated USD wallet has been reconciled\n  // and the full production accounting/reconciliation path has been verified.\n  throw new Error("LIVE_TRADING_ACCOUNTING_NOT_READY");\n
+  // Keep live execution fail-closed until the migrated USD wallet has been reconciled.
+  // The full production accounting and reconciliation path is not yet verified.
+  const accountingBlocker = liveAccountingReadinessBlocker();
+  if (accountingBlocker) throw new Error(accountingBlocker);
+
   const direct = isLiveDirectFundingEnabled();
   if (direct) {
     throw new Error("LIVE_DIRECT_FUNDING_DISABLED");
@@ -176,10 +186,34 @@ export async function prepareLiveOrder(input: {
     throw new Error(`LIVE_SHARIAH_BLOCKED:${shariah.decision.reasons.join(",")}`);
   }
 
-  // 6. Exchange minimum order size and available quote balance.
-  await assertBinanceLiveBuyRules({ symbol, amountUsd, entryPrice: snapshot.price });
-  const quoteFreeBalanceUsd = await fetchUsdtFreeBalance();
-  if (quoteFreeBalanceUsd < amountUsd) throw new Error("BINANCE_LIVE_INSUFFICIENT_BALANCE");
+  // 6. Provider-specific Spot rules and read-only account readiness.
+  // Accounting is still globally blocked above; this branch is deliberately
+  // unreachable for live orders until funding and wallet settlement are verified.
+  const exchange = getConfiguredLiveExchange();
+  let quoteFreeBalanceUsd: number;
+  if (exchange === "BYBIT") {
+    const adapter = createLiveExchangeAdapter();
+    if (adapter.id !== "bybit-spot-live" || !adapter.getSpotSymbolRules || typeof (adapter as { getLiveReadiness?: unknown }).getLiveReadiness !== "function") {
+      throw new Error("BYBIT_LIVE_PREFLIGHT_NOT_IMPLEMENTED");
+    }
+    const bybit = adapter as typeof adapter & {
+      getLiveReadiness: (quoteAsset?: string) => Promise<{ quoteAsset: string; quoteFreeBalance: number; blockers: string[] }>;
+    };
+    const rules = await adapter.getSpotSymbolRules(symbol);
+    if (rules.quoteAsset !== "USDT") throw new Error("BYBIT_LIVE_QUOTE_ASSET_NOT_SUPPORTED");
+    if (amountUsd < Number(rules.minOrderAmount) || amountUsd < 1) throw new Error("BYBIT_LIVE_ORDER_BELOW_MINIMUM");
+    const estimatedBaseQty = amountUsd / snapshot.price;
+    if (estimatedBaseQty < Number(rules.minOrderQty)) throw new Error("BYBIT_LIVE_ORDER_BELOW_MINIMUM_QUANTITY");
+    if (estimatedBaseQty > Number(rules.maxOrderQty)) throw new Error("BYBIT_LIVE_ORDER_ABOVE_MAXIMUM_QUANTITY");
+    const readiness = await bybit.getLiveReadiness(rules.quoteAsset);
+    if (readiness.blockers.length) throw new Error(`BYBIT_LIVE_PREFLIGHT_BLOCKED:${readiness.blockers.join(",")}`);
+    quoteFreeBalanceUsd = readiness.quoteFreeBalance;
+    if (quoteFreeBalanceUsd < amountUsd) throw new Error("BYBIT_LIVE_INSUFFICIENT_BALANCE");
+  } else {
+    await assertBinanceLiveBuyRules({ symbol, amountUsd, entryPrice: snapshot.price });
+    quoteFreeBalanceUsd = await fetchUsdtFreeBalance();
+    if (quoteFreeBalanceUsd < amountUsd) throw new Error("BINANCE_LIVE_INSUFFICIENT_BALANCE");
+  }
 
   // 7. Short-lived owner approval. The BUY still needs consume + typed phrase.
   const opportunityId = `manual-${randomUUID()}`;

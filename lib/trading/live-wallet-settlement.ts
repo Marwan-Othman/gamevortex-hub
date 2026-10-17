@@ -1,13 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/prisma";
 import { calculateLiveSpotNetExitProceeds } from "@/lib/trading/live-fee-accounting";
-import { createBinanceSpotLiveAdapter } from "@/lib/trading/live-exchange";
+import { createLiveExchangeAdapter } from "@/lib/trading/live-exchange";
 import type { LiveOrderRow } from "@/lib/trading/live-order-state";
 
 export type LiveWalletSettlementStatus = "SETTLED" | "BLOCKED" | "ALREADY_SETTLED";
 
 type LiveOrderSettlementRow = LiveOrderRow & {
   settlementStatus: "NOT_SETTLED" | "EXCHANGE_CLOSED_PENDING_WALLET" | "SETTLED" | "BLOCKED";
+  settlementError: string | null;
   exitProviderOrderId: string | null;
   exitExecutedQty: Prisma.Decimal | null;
   exitCumulativeQuoteQty: Prisma.Decimal | null;
@@ -49,6 +50,24 @@ export type LiveWalletSettlementResult = {
 export type OwnerWalletSettlementCalculation = {
   returnedUsd: Prisma.Decimal;
 };
+
+/** Only explicitly USD-denominated proceeds may credit the USD wallet.
+ * Stablecoins must not be treated as USD without a verified FX conversion.
+ */
+export function getSettlementCurrencyBlocker(quoteAssetInput: string): string | null {
+  const quoteAsset = quoteAssetInput.trim().toUpperCase();
+  if (!quoteAsset) throw new Error("SETTLEMENT_EXIT_ASSET_INFO_REQUIRED");
+  return quoteAsset === "USD" ? null : "SETTLEMENT_QUOTE_CURRENCY_REQUIRES_VERIFIED_USD_CONVERSION";
+}
+
+/**
+ * Exchange fills prove a trade occurred, not that proceeds reached GameVortex.
+ * Keep wallet credit blocked until a verified exchange-to-wallet funding rail
+ * and reconciliation record exist.
+ */
+export function getExchangeProceedsTransferBlocker(): string | null {
+  return "EXCHANGE_PROCEEDS_TRANSFER_NOT_VERIFIED";
+}
 
 export function calculateOwnerWalletSettlement(
   returnedUsdInput: Prisma.Decimal | string | number,
@@ -111,12 +130,56 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
   tradeFillProvider?: SettlementTradeFillProvider;
 }): Promise<LiveWalletSettlementResult> {
   const inputOrder = input.order as LiveOrderSettlementRow;
+
+  // Fail closed before making an exchange API request: until an independently
+  // verified proceeds-transfer rail exists, provider fills cannot make settlement
+  // eligible. Keep the database state transition and owner/state checks atomic.
+  if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
+    return db.$transaction(async (tx) => {
+      const lockedRows = await tx.$queryRaw<LiveOrderSettlementRow[]>(Prisma.sql`
+        SELECT * FROM "TradingLiveOrder" WHERE "id" = ${input.order.id} FOR UPDATE
+      `);
+      const order = lockedRows[0];
+      if (!order) throw new Error("LIVE_ORDER_NOT_FOUND_FOR_WALLET_SETTLEMENT");
+
+      if (order.ownerId !== input.ownerId) {
+        const blocked = await blockSettlement(tx, order.id, "SETTLEMENT_OWNER_MISMATCH");
+        return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["SETTLEMENT_OWNER_MISMATCH"] };
+      }
+
+      if (order.settlementStatus === "SETTLED") {
+        return {
+          order,
+          status: "ALREADY_SETTLED",
+          settledUsd: order.settledUsd?.toString() ?? null,
+          settledPoints: order.settledPoints ?? null,
+          roundingUsd: order.settlementRoundingUsd?.toString() ?? null,
+          blockers: [],
+        };
+      }
+
+      if (order.settlementStatus === "BLOCKED") {
+        const reason = order.settlementError || "LIVE_WALLET_SETTLEMENT_BLOCKED";
+        return { order, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [reason] };
+      }
+
+      if (order.status !== "CLOSED" || order.settlementStatus !== "EXCHANGE_CLOSED_PENDING_WALLET") {
+        const blocked = await blockSettlement(tx, order.id, "LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT");
+        return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"] };
+      }
+
+      const transferBlocker = getExchangeProceedsTransferBlocker();
+      const blocked = await blockSettlement(tx, order.id, transferBlocker!);
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [transferBlocker!] };
+    });
+  }
   let netExitProceeds: Prisma.Decimal | null = null;
+  let settlementCurrencyBlocker: string | null = null;
 
   if (inputOrder.status === "CLOSED" && inputOrder.settlementStatus === "EXCHANGE_CLOSED_PENDING_WALLET") {
     if (!inputOrder.exitProviderOrderId) throw new Error("SETTLEMENT_EXIT_PROVIDER_ORDER_ID_REQUIRED");
 
-    const tradeFillProvider = input.tradeFillProvider ?? createBinanceSpotLiveAdapter();
+    const tradeFillProvider = input.tradeFillProvider ?? createLiveExchangeAdapter();
 
     const fills = await tradeFillProvider.getOrderTradeFills({
       symbol: inputOrder.symbol,
@@ -125,7 +188,14 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
 
     assertProviderExitFillMatchesOrder(inputOrder, fills);
 
-    const feeSettlement = calculateLiveSpotNetExitProceeds({
+    // Quote proceeds are not USD merely because the internal ledger is denominated in USD.
+    // Until a verified, timestamped FX conversion is implemented, only USD quote markets
+    // may credit the USD owner wallet. In particular, do not silently equate USDT/USDC to USD.
+    settlementCurrencyBlocker = getSettlementCurrencyBlocker(fills.quoteAsset);
+    if (settlementCurrencyBlocker) {
+      // No FX provider/rate verification exists yet, so do not credit the USD ledger.
+    } else {
+      const feeSettlement = calculateLiveSpotNetExitProceeds({
       baseAsset: fills.baseAsset,
       quoteAsset: fills.quoteAsset,
       exitExecutedQty: inputOrder.exitExecutedQty!.toString(),
@@ -136,7 +206,8 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
       })),
     });
 
-    netExitProceeds = feeSettlement.netExitQuoteProceeds;
+      netExitProceeds = feeSettlement.netExitQuoteProceeds;
+    }
   }
 
   return db.$transaction(async (tx) => {
@@ -165,6 +236,20 @@ export async function settleClosedLiveOrderToOwnerWallet(input: {
     if (order.status !== "CLOSED" || order.settlementStatus !== "EXCHANGE_CLOSED_PENDING_WALLET") {
       const blocked = await blockSettlement(tx, order.id, "LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT");
       return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: ["LIVE_ORDER_NOT_READY_FOR_WALLET_SETTLEMENT"] };
+    }
+
+    // Provider fills are not proof that the proceeds were transferred out of the exchange.
+    // Do not credit the GameVortex USD wallet until an independently verified transfer
+    // and reconciliation record are implemented.
+    const transferBlocker = getExchangeProceedsTransferBlocker();
+    if (transferBlocker) {
+      const transferBlocked = await blockSettlement(tx, order.id, transferBlocker);
+      return { order: transferBlocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [transferBlocker] };
+    }
+
+    if (settlementCurrencyBlocker) {
+      const blocked = await blockSettlement(tx, order.id, settlementCurrencyBlocker);
+      return { order: blocked, status: "BLOCKED", settledUsd: null, settledPoints: null, roundingUsd: null, blockers: [settlementCurrencyBlocker] };
     }
 
     if (!order.exitCumulativeQuoteQty || !order.exitExecutedQty || !netExitProceeds) {

@@ -26,8 +26,7 @@ import {
   isObservationFresh,
   resolveMaxSlippagePercent,
 } from "@/lib/trading/live-slippage";
-import type { BinanceSpotLiveAdapter } from "@/lib/trading/binance-spot-live-adapter";
-import { createBinanceSpotLiveAdapter } from "@/lib/trading/live-exchange";
+import { createLiveExchangeAdapter, type LiveExchangeAdapter } from "@/lib/trading/live-exchange";
 import { getTradingControl, tripCircuitBreaker } from "@/lib/trading/control-service";
 import { controlBlockReasons } from "@/lib/trading/control";
 import { getRiskConfig } from "@/lib/trading/risk-config-service";
@@ -50,13 +49,13 @@ import { reconcileProtectedExitSettlement } from "@/lib/trading/live-exit-settle
 import { bindLiveOrderToAllocation } from "@/lib/trading/live-allocation-binding";
 import { settleClosedLiveOrderToOwnerWallet } from "@/lib/trading/live-wallet-settlement";
 import { releaseUnfilledLiveAllocation } from "@/lib/trading/live-unfilled-allocation-release";
-import {
-  isLiveDirectFundingEnabled,
-  releaseUnfilledLiveOrderDirect,
-  settleClosedLiveOrderDirect,
-} from "@/lib/trading/live-direct-funding";
 
 const LIVE_IDEMPOTENCY_PREFIX = "live-approval:";
+
+// Keep new live orders disabled until funding, wallet settlement, and reconciliation are verified.
+function liveAccountingReadinessBlocker(): string | null {
+  return "LIVE_TRADING_ACCOUNTING_NOT_READY";
+}
 const STOP_LIMIT_BUFFER = 0.001;
 
 type ExecutionSnapshot = {
@@ -223,7 +222,7 @@ async function failUnknown(ownerId: string, order: LiveOrderRow, error: unknown)
 async function reconcileExitIfNeeded(
   ownerId: string,
   order: LiveOrderRow,
-  adapter: BinanceSpotLiveAdapter,
+  adapter: LiveExchangeAdapter,
 ): Promise<{ order: LiveOrderRow; settlementStatus: LiveExecutionResult["settlementStatus"]; blockers: string[] }> {
   if (order.status !== "PROTECTED" && order.status !== "CLOSED") {
     return { order, settlementStatus: "NOT_SETTLED", blockers: [] };
@@ -249,13 +248,13 @@ async function reconcileExitIfNeeded(
       settlementStatus: exchangeSettlement.status,
     });
 
-    const directFunding = isLiveDirectFundingEnabled();
-    const walletSettlement = directFunding
-      ? await settleClosedLiveOrderDirect({ ownerId, order: exchangeSettlement.order })
-      : await settleClosedLiveOrderToOwnerWallet({
-          ownerId,
-          order: exchangeSettlement.order,
-        });
+    // A closed exchange order is never considered settled unless the owner-wallet
+    // ledger is updated atomically. Direct settlement without wallet movement is
+    // incompatible with the GameVortex wallet accounting contract.
+    const walletSettlement = await settleClosedLiveOrderToOwnerWallet({
+      ownerId,
+      order: exchangeSettlement.order,
+    });
 
     if (walletSettlement.status === "BLOCKED") {
       await tripCircuitBreaker({
@@ -269,14 +268,11 @@ async function reconcileExitIfNeeded(
       return { order: walletSettlement.order, settlementStatus: "BLOCKED", blockers: walletSettlement.blockers };
     }
 
-    // Direct funding writes its own TRADING_LIVE_DIRECT_SETTLED audit row.
-    if (!directFunding) {
-      await audit(ownerId, "TRADING_LIVE_WALLET_SETTLED", walletSettlement.order, {
-        settledUsd: walletSettlement.settledUsd,
-        settledPoints: walletSettlement.settledPoints,
-        roundingUsd: walletSettlement.roundingUsd,
-      });
-    }
+    await audit(ownerId, "TRADING_LIVE_WALLET_SETTLED", walletSettlement.order, {
+      settledUsd: walletSettlement.settledUsd,
+      settledPoints: walletSettlement.settledPoints,
+      roundingUsd: walletSettlement.roundingUsd,
+    });
 
     return { order: walletSettlement.order, settlementStatus: "SETTLED", blockers: [] };
   }
@@ -288,10 +284,25 @@ async function protectFilledOrder(
   ownerId: string,
   order: LiveOrderRow,
   snapshot: ExecutionSnapshot,
-  adapter: BinanceSpotLiveAdapter,
+  adapter: LiveExchangeAdapter,
 ): Promise<LiveOrderRow> {
   if (order.status === "PROTECTED" && order.protectionStatus === "PROTECTED") return order;
   if (order.status !== "PROTECTION_PENDING") throw new Error("LIVE_ORDER_NOT_READY_FOR_PROTECTION");
+
+  // Bybit's native linked protection is not implemented. Record the filled-but-
+  // unprotected position and trip the circuit breaker before stopping; do not
+  // submit an emergency SELL with an unverified sellable quantity.
+  if (adapter.id === "bybit-spot-live") {
+    const reason = "BYBIT_NATIVE_LINKED_PROTECTION_NOT_IMPLEMENTED";
+    const failed = await markLiveOrderProtectionFailed(order.id, reason).catch(() => order);
+    await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: reason }).catch(() => undefined);
+    await audit(ownerId, "TRADING_LIVE_PROTECTION_FAILED", failed, {
+      reason,
+      manualReviewRequired: true,
+      emergencyExitAttempted: false,
+    }).catch(() => undefined);
+    throw new Error(`LIVE_PROTECTION_FAILED:${reason}:EMERGENCY_EXIT_SKIPPED_UNVERIFIED_QUANTITY:MANUAL_REVIEW_REQUIRED`);
+  }
 
   const fillPrice = order.averageFillPrice?.toNumber() ?? order.entryPrice.toNumber();
   const filledQuantity = order.executedQty?.toFixed();
@@ -464,9 +475,21 @@ export async function executeApprovedLiveOrder(input: {
   if (!ownerId || !approvalId || !opportunityId) throw new Error("INVALID_LIVE_EXECUTION_INPUT");
 
   if (!monitorOnly) {
+    // Defense in depth: block new live orders even if an old approval exists.
+    // Monitoring remains enabled so already-open positions can still be reconciled.
+    const accountingBlocker = liveAccountingReadinessBlocker();
+    if (accountingBlocker) throw new Error(accountingBlocker);
+  }
+
+  if (!monitorOnly) {
     const controlResult = await getTradingControl(ownerId);
     const blockers = controlBlockReasons(controlResult.control);
     if (blockers.length > 0) throw new Error(`TRADING_CONTROL_BLOCKED:${blockers.join(",")}`);
+
+    const selectedAdapter = createLiveExchangeAdapter();
+    if (selectedAdapter.id === "bybit-spot-live") {
+      throw new Error("BYBIT_LIVE_PREFLIGHT_NOT_IMPLEMENTED");
+    }
 
     const preflight = await getBinanceLivePreflight();
     if (!preflight.readyForLiveExecution) {
@@ -519,10 +542,10 @@ export async function executeApprovedLiveOrder(input: {
   if (order.status === "RECONCILIATION_MISMATCH") throw new Error("LIVE_RECONCILIATION_MISMATCH_REQUIRES_MANUAL_REVIEW");
 
   if (["INTENT_CREATED", "SUBMITTING", "SUBMITTED", "PARTIALLY_FILLED", "UNKNOWN", "PROTECTION_PENDING", "PROTECTED", "CLOSED"].includes(order.status)) {
-    if (!isLiveDirectFundingEnabled()) await bindLiveOrderToAllocation({ ownerId, order });
+    await bindLiveOrderToAllocation({ ownerId, order });
   }
 
-  const adapter = createBinanceSpotLiveAdapter();
+  const adapter = createLiveExchangeAdapter();
 
   if (order.status === "PROTECTED" || order.status === "CLOSED") {
     const reconciledExit = await reconcileExitIfNeeded(ownerId, order, adapter);
@@ -555,7 +578,7 @@ export async function executeApprovedLiveOrder(input: {
         return result(reconciledExit.order, reconciledExit.settlementStatus, reconciledExit.blockers);
       }
       if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
-        const released = await (isLiveDirectFundingEnabled() ? releaseUnfilledLiveOrderDirect : releaseUnfilledLiveAllocation)({ ownerId, order });
+        const released = await releaseUnfilledLiveAllocation({ ownerId, order });
         return result(released.order, released.released ? "SETTLED" : "NOT_SETTLED");
       }
       return result(order);
@@ -652,7 +675,7 @@ export async function executeApprovedLiveOrder(input: {
     }
 
     if (order.status === "REJECTED" || order.status === "CANCELED" || order.status === "EXPIRED") {
-      const released = await (isLiveDirectFundingEnabled() ? releaseUnfilledLiveOrderDirect : releaseUnfilledLiveAllocation)({ ownerId, order });
+      const released = await releaseUnfilledLiveAllocation({ ownerId, order });
       if (released.released) return result(released.order, "SETTLED");
       await tripCircuitBreaker({ ownerId, reason: "ORDER_FAILURE", detail: order.status }).catch(() => undefined);
     }
