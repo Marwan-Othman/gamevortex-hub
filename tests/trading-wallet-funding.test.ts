@@ -337,6 +337,28 @@ describe("trading wallet funding route", () => {
     expect(h.state.audits).toHaveLength(1);
   });
 
+  it("reports an idempotent replay as unverified when the USD ledger no longer reconciles", async () => {
+    const first = await POST(request("POST", { amountUsd: 1 }, "funding-key-ledger-replay"));
+    expect(first.status).toBe(201);
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+
+    // Simulate a later ledger inconsistency; replay must report it without repeating the transfer.
+    h.state.ledgerTotalOverride = 2;
+    const replay = await POST(request("POST", { amountUsd: 1 }, "funding-key-ledger-replay"));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      replayed: true,
+      sourceCurrencyVerified: false,
+      sourceCurrencyBlocker: "TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED",
+    });
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.ownerWallet.availableUsd)).toBe(1);
+    expect(h.state.transactions.size).toBe(1);
+    expect(h.state.ledger).toHaveLength(1);
+    expect(h.state.audits).toHaveLength(1);
+  });
+
   it("rejects reuse of a key for a different amount", async () => {
     await POST(request("POST", { amountUsd: 1 }, "funding-key-001"));
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
