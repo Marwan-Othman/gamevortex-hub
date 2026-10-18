@@ -18,6 +18,12 @@ This operation does **not** send money to Binance or Bybit, does not fund an exc
 
 The source wallet has no single-currency column, and the payment system supports multiple currencies. The funding route therefore rejects a new transfer when either the owner's wallet transaction history contains any non-USD currency or a completed wallet deposit is recorded in a non-USD currency (`TRADING_FUNDING_SOURCE_CURRENCY_NOT_VERIFIED`). Checking both records prevents a foreign-currency deposit from being missed when transaction history is incomplete. This is intentionally conservative: historical non-USD entries must be reconciled or converted through a verified, auditable process before that wallet can fund USD trading capital. The guard does not itself perform currency conversion.
 
+## Direct exchange-balance mode is unsupported
+
+Do not set `GAMEVORTEX_LIVE_DIRECT_FUNDING=true`. The former direct-funding design bypassed the site-wallet allocation and relied on exchange balance without a verified site-ledger funding and return-of-proceeds path. It is not a supported production mode. The live preparation and execution accounting guards must remain enabled regardless of the configured exchange balance or API preflight result.
+
+The presence of an existing direct-funding helper or historical order metadata is not proof that this mode is safe or operational. Treat any legacy direct-funded order as requiring reconciliation and manual review; never mark it settled or credit profit based only on exchange order closure.
+
 ## Settlement and readiness blockers
 
 - `LIVE_TRADING_ACCOUNTING_NOT_READY` blocks preparation and new execution until a real funding/custody path, reconciliation, and end-to-end settlement are implemented and verified.
