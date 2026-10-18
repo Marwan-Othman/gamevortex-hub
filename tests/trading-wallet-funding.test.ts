@@ -272,6 +272,26 @@ describe("trading wallet funding route", () => {
     expect(h.state.transactions.size).toBe(0);
   });
 
+  it("does not treat pending wallet funds as available trading capital", async () => {
+    h.state.wallet = {
+      id: "wallet-1",
+      userId: "owner-1",
+      balance: h.money(0),
+      pendingBalance: h.money(5),
+    };
+
+    const response = await POST(request("POST", { amountUsd: 1 }, "funding-key-pending"));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("INSUFFICIENT_WALLET_BALANCE");
+    expect(Number(h.state.wallet.balance)).toBe(0);
+    expect(Number(h.state.wallet.pendingBalance)).toBe(5);
+    expect(h.state.ownerWallet).toBeNull();
+    expect(h.state.transactions.size).toBe(0);
+    expect(h.state.ledger).toHaveLength(0);
+    expect(h.state.audits).toHaveLength(0);
+  });
+
   it("refuses insufficient available balance without touching owner wallet", async () => {
     const response = await POST(request("POST", { amountUsd: 5 }, "funding-key-001"));
     expect(response.status).toBe(409);
