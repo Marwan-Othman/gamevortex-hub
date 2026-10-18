@@ -8,12 +8,12 @@ The owner's site wallet is the source ledger. The trading allocation is a reserv
 
 After a position is fully closed and the exchange's fills and fees are reconciled, GameVortex must credit the net settled proceeds to the site's owner wallet exactly once. An order must not be marked settled before all required ledger writes commit.
 
-## Current implementation found in main
+## Current implementation in this branch
 
 - `app/api/admin/trading/wallet-funding/route.ts` transfers value from the site's internal user wallet to `OwnerWallet`; it does not call Binance.
 - `lib/trading/allocation.ts` moves funds internally from `OwnerWallet` to `TradingAccount`; it does not fund an exchange account.
-- `lib/trading/live-prepare.ts` currently fails closed with `LIVE_TRADING_ACCOUNTING_NOT_READY`. Keep this guard in place.
-- `lib/trading/live-wallet-settlement.ts` already contains an allocation-backed settlement path that credits net exit proceeds to `OwnerWallet` after confirmed exit fills and fee calculation.
+- `lib/trading/live-prepare.ts` and `lib/trading/live-production-executor.ts` fail closed with `LIVE_TRADING_ACCOUNTING_NOT_READY`. Keep both independent gates in place so a previously issued approval cannot bypass the accounting block.
+- `lib/trading/live-wallet-settlement.ts` currently blocks wallet credit before querying exchange fills because no independently verified exchange-to-site proceeds-transfer rail exists. The downstream fee/ledger settlement code is not evidence that end-to-end settlement is available; it must remain unreachable until the transfer proof and reconciliation are implemented.
 - The read-only Binance preflight validates credentials and account/API-key restrictions. It is not a funding transfer and does not prove that site-ledger money is held at Binance.
 
 ## Why an automatic transfer cannot be fabricated from a database balance
