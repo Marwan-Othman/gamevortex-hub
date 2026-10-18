@@ -61,7 +61,7 @@ const ERROR_TEXT: Record<string, string> = {
   LIVE_WALLET_MODE_REQUIRES_WHOLE_USD: "وضع المحفظة يحتاج مبلغ بدولارات صحيحة.",
   LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر معطل أمنيًا. تخصيص المحفظة وحده لا يسمح بالتداول؛ بوابة المحاسبة ما زالت تمنع التنفيذ حتى التحقق من التمويل والتسوية.",
   TRADING_ALLOCATION_REQUIRED:
-    "لا يوجد تخصيص داخلي مطابق لمبلغ الصفقة. التخصيص وحده لا يمول Binance؛ يلزم إثبات مسار التمويل والتسوية قبل السماح بالتداول الحقيقي.",
+    "لا يوجد تخصيص داخلي مطابق لمبلغ الصفقة. لا تستخدم رصيد Binance المباشر لتجاوز هذا الشرط؛ التداول الحقيقي موقوف حتى اكتمال جسر التمويل والتسوية والتحقق منهما.",
   BINANCE_LIVE_INSUFFICIENT_BALANCE: "رصيد USDT الحر على Binance أقل من مبلغ الصفقة.",
   BINANCE_LIVE_MIN_NOTIONAL: "المبلغ أقل من الحد الأدنى للصفقة عند Binance لهذا الرمز.",
   BINANCE_LIVE_API_CREDENTIALS_REQUIRED: "مفاتيح Binance الحقيقية غير مضافة.",
