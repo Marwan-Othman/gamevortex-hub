@@ -100,12 +100,22 @@ const getCachedHomeData = unstable_cache(loadHomeData, ["home-data-v1"], {
 
 const EMPTY: HomeData = { newest: [], rated: [], played: [], apps: [], gamesCount: 0, appsCount: 0 };
 
-/** Never throws: an unavailable database renders empty rails instead of a 500. */
+/** Never throws: an unavailable database renders empty rails instead of a 500.
+ *
+ * A brief retry helps with transient cold-start / connection-pool failures without
+ * multiplying the six catalog queries on every request. Only one retry is allowed.
+ */
 export async function getHomeData(): Promise<HomeData> {
-  try {
-    return await getCachedHomeData();
-  } catch (error) {
-    console.error("Home data load failed", error instanceof Error ? error.message : "unknown");
-    return EMPTY;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await getCachedHomeData();
+    } catch (error) {
+      // Do not expose connection details, hosts, or Prisma metadata in public output.
+      if (attempt === 0) continue;
+      console.error("Home catalog temporarily unavailable", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
   }
+  return EMPTY;
 }
