@@ -171,6 +171,25 @@ describe("BybitSpotLiveAdapter", () => {
     expect(JSON.parse(String(capturedInit?.body))).toMatchObject({ category: "spot", side: "Buy", orderType: "Market", qty: "10.00000000", marketUnit: "quoteCoin", orderLinkId: "gv-test-1", isLeverage: 0 });
   });
 
+  it("rejects an order-status response for a different symbol", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{
+      orderId: "bybit-order-1", orderLinkId: "gv-test-1", symbol: "ETHUSDT", side: "Buy", orderStatus: "Filled", avgPrice: "100.5", cumExecQty: "0.1", cumExecValue: "10.05", updatedTime: "1700000000000",
+    }] } }) });
+    await expect(adapter.getOrderStatus({ symbol: "BTCUSDT", clientOrderId: "gv-test-1" })).rejects.toThrow("BYBIT_LIVE_ORDER_SYMBOL_MISMATCH");
+  });
+
+  it("rejects an order-status response for a different client order id", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{
+      orderId: "bybit-order-1", orderLinkId: "gv-other-order", symbol: "BTCUSDT", side: "Buy", orderStatus: "Filled", avgPrice: "100.5", cumExecQty: "0.1", cumExecValue: "10.05", updatedTime: "1700000000000",
+    }] } }) });
+    await expect(adapter.getOrderStatus({ symbol: "BTCUSDT", clientOrderId: "gv-test-1" })).rejects.toThrow("BYBIT_LIVE_ORDER_CLIENT_ID_MISMATCH");
+  });
+
+  it("rejects a BUY submission response with a mismatched client order id", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { orderId: "bybit-order-1", orderLinkId: "gv-other-order" } }) });
+    await expect(adapter.placeSpotBuy({ clientOrderId: "gv-test-1", symbol: "BTCUSDT", side: "BUY", amountUsd: 10, entryPrice: 100, stopLossPrice: 95, takeProfitPrice: 110 })).rejects.toThrow("BYBIT_LIVE_CLIENT_ORDER_ID_MISMATCH");
+  });
+
   it("reconciles a filled order by orderLinkId", async () => {
     const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{ orderId: "bybit-order-1", orderLinkId: "gv-test-1", symbol: "BTCUSDT", side: "Buy", orderStatus: "Filled", avgPrice: "100.5", cumExecQty: "0.1", cumExecValue: "10.05", updatedTime: "1700000000000" }] } }) });
     const result = await adapter.getOrderStatus({ symbol: "BTCUSDT", clientOrderId: "gv-test-1" });
