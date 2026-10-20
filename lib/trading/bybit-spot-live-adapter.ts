@@ -445,7 +445,10 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     const list = result.list;
     if (!Array.isArray(list) || !list[0] || typeof list[0] !== "object") throw new Error("BYBIT_LIVE_EXIT_ORDER_NOT_FOUND");
     const order = list[0] as BybitOrder;
-    if (typeof order.orderId !== "string" || typeof order.orderLinkId !== "string" || typeof order.symbol !== "string" || typeof order.orderStatus !== "string") throw new Error("BYBIT_LIVE_INVALID_EXIT_STATUS_RESPONSE");
+    if (typeof order.orderId !== "string" || typeof order.orderLinkId !== "string" || typeof order.symbol !== "string" || typeof order.side !== "string" || typeof order.orderStatus !== "string") throw new Error("BYBIT_LIVE_INVALID_EXIT_STATUS_RESPONSE");
+    if (order.symbol.trim().toUpperCase() !== symbol) throw new Error("BYBIT_LIVE_EXIT_SYMBOL_MISMATCH");
+    if (order.orderLinkId !== clientOrderId) throw new Error("BYBIT_LIVE_EXIT_CLIENT_ORDER_ID_MISMATCH");
+    if (order.side !== "Sell") throw new Error("BYBIT_LIVE_EXIT_SIDE_MISMATCH");
     const updatedAt = Number(order.updatedTime ?? order.createdTime);
     if (!Number.isSafeInteger(updatedAt) || updatedAt <= 0) throw new Error("BYBIT_LIVE_INVALID_EXIT_UPDATE_TIME");
     return { symbol: order.symbol, clientOrderId: order.orderLinkId, providerOrderId: order.orderId, orderListId: null, side: "SELL", status: mapExitStatus(order.orderStatus), executedQty: typeof order.cumExecQty === "string" ? decimal(order.cumExecQty, "BYBIT_LIVE_INVALID_EXIT_EXECUTED_QTY") : "0", cumulativeQuoteQty: typeof order.cumExecValue === "string" ? decimal(order.cumExecValue, "BYBIT_LIVE_INVALID_EXIT_CUMULATIVE_QUOTE_QTY") : "0", averageFillPrice: typeof order.avgPrice === "string" && Number(order.avgPrice) > 0 ? order.avgPrice : null, updatedAt: new Date(updatedAt) };
