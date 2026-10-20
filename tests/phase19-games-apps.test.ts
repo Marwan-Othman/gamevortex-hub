@@ -339,11 +339,12 @@ describe("GET /api/apps", () => {
     expect(h.db.app.findMany.mock.calls[0][0].where.OR[0].nameAr.contains.length).toBe(80);
   });
 
-  it("database failure: JSON 500 with a fixed message and no internals", async () => {
+  it("database failure: retryable JSON 503 with a fixed message and no internals", async () => {
     h.db.app.findMany.mockRejectedValue(new Error("password authentication failed for user admin"));
     const response = await list();
     const text = await response.text();
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
+    expect(text).toContain("APP_CATALOG_UNAVAILABLE");
     expect(text).not.toContain("password authentication");
   });
 });
