@@ -353,8 +353,9 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     });
     const result = objectResult(payload, "BYBIT_LIVE_INVALID_ORDER_RESPONSE");
     const orderId = typeof result.orderId === "string" ? result.orderId : "";
-    const returnedLinkId = typeof result.orderLinkId === "string" && result.orderLinkId ? result.orderLinkId : clientOrderId;
+    const returnedLinkId = typeof result.orderLinkId === "string" ? result.orderLinkId : "";
     if (!orderId) throw new Error("BYBIT_LIVE_PROVIDER_ORDER_ID_REQUIRED");
+    if (returnedLinkId !== clientOrderId) throw new Error("BYBIT_LIVE_CLIENT_ORDER_ID_MISMATCH");
     return { accepted: true, clientOrderId: returnedLinkId, providerOrderId: orderId, status: "SUBMITTED" };
   }
 
@@ -382,11 +383,13 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     if (!Array.isArray(list) || !list[0] || typeof list[0] !== "object") throw new Error("BYBIT_LIVE_ORDER_NOT_FOUND");
     const order = list[0] as BybitOrder;
     if (typeof order.orderId !== "string" || typeof order.orderLinkId !== "string" || typeof order.symbol !== "string" || typeof order.side !== "string" || typeof order.orderStatus !== "string") throw new Error("BYBIT_LIVE_INVALID_ORDER_STATUS_RESPONSE");
+    if (order.orderLinkId !== clientOrderId) throw new Error("BYBIT_LIVE_ORDER_CLIENT_ID_MISMATCH");
+    if (normalizeSymbol(order.symbol, this.symbolMap) !== symbol) throw new Error("BYBIT_LIVE_ORDER_SYMBOL_MISMATCH");
+    if (order.side !== "Buy") throw new Error("BYBIT_LIVE_ORDER_SIDE_MISMATCH");
     const executedQty = typeof order.cumExecQty === "string" ? nonNegative(order.cumExecQty, "BYBIT_LIVE_INVALID_EXECUTED_QTY") : 0;
     const cumulativeQuoteQty = typeof order.cumExecValue === "string" ? nonNegative(order.cumExecValue, "BYBIT_LIVE_INVALID_CUMULATIVE_QUOTE_QTY") : 0;
     const updatedAt = Number(order.updatedTime ?? order.createdTime);
     if (!Number.isSafeInteger(updatedAt) || updatedAt <= 0) throw new Error("BYBIT_LIVE_INVALID_ORDER_UPDATE_TIME");
-    if (order.side !== "Buy") throw new Error("BYBIT_LIVE_ORDER_SIDE_MISMATCH");
     return { observation: { clientOrderId: order.orderLinkId, providerOrderId: order.orderId, symbol: order.symbol, side: "BUY", status: mapStatus(order.orderStatus), executedQty, cumulativeQuoteQty, averageFillPrice: typeof order.avgPrice === "string" && Number(order.avgPrice) > 0 ? Number(order.avgPrice) : undefined, updatedAt } };
   }
 
