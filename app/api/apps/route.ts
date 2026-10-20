@@ -39,7 +39,14 @@ export async function GET(request: NextRequest) {
     ]);
     return NextResponse.json({ success: true, data: data.map(toPublicContent), pagination: { page, limit, total, pages: Math.ceil(total / limit), sort } });
   } catch (error) {
-    console.error("GET /api/apps", error);
-    return NextResponse.json({ success: false, error: "Failed to load apps" }, { status: 500 });
+    // Keep response details generic; database hosts and Prisma internals belong in
+    // server-side telemetry only. A failed catalog request should be diagnosable.
+    console.error("GET /api/apps failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return NextResponse.json(
+      { success: false, error: "APP_CATALOG_UNAVAILABLE" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }
