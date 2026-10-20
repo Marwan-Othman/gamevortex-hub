@@ -124,6 +124,27 @@ describe("BybitSpotLiveAdapter", () => {
     expect(requests).toBe(0);
   });
 
+  it("rejects a Bybit exit-status response for the wrong side", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{
+      orderId: "12345678", orderLinkId: "gv-exit-sl-test", symbol: "BTCUSDT", side: "Buy", orderStatus: "Filled", cumExecQty: "0.01", cumExecValue: "1", updatedTime: "1700000000000",
+    }] } }) });
+    await expect(adapter.getProtectedExitLegStatus!({ symbol: "BTCUSDT", clientOrderId: "gv-exit-sl-test" })).rejects.toThrow("BYBIT_LIVE_EXIT_SIDE_MISMATCH");
+  });
+
+  it("rejects a Bybit exit-status response for a different symbol", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{
+      orderId: "12345678", orderLinkId: "gv-exit-sl-test", symbol: "ETHUSDT", side: "Sell", orderStatus: "Filled", cumExecQty: "0.01", cumExecValue: "1", updatedTime: "1700000000000",
+    }] } }) });
+    await expect(adapter.getProtectedExitLegStatus!({ symbol: "BTCUSDT", clientOrderId: "gv-exit-sl-test" })).rejects.toThrow("BYBIT_LIVE_EXIT_SYMBOL_MISMATCH");
+  });
+
+  it("rejects a Bybit exit-status response for a different client order id", async () => {
+    const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{
+      orderId: "12345678", orderLinkId: "gv-another-exit", symbol: "BTCUSDT", side: "Sell", orderStatus: "Filled", cumExecQty: "0.01", cumExecValue: "1", updatedTime: "1700000000000",
+    }] } }) });
+    await expect(adapter.getProtectedExitLegStatus!({ symbol: "BTCUSDT", clientOrderId: "gv-exit-sl-test" })).rejects.toThrow("BYBIT_LIVE_EXIT_CLIENT_ORDER_ID_MISMATCH");
+  });
+
   it("normalizes reverse-ordered Bybit klines", async () => {
     const adapter = new BybitSpotLiveAdapter({ fetcher: async (url) => {
       expect(String(url)).toContain("/v5/market/kline?");
