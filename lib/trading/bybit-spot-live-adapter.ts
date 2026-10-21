@@ -407,17 +407,36 @@ export class BybitSpotLiveAdapter implements ExchangeAdapter {
     const instrumentPayload = await parseResponse(instrumentResponse);
     const instrumentResult = objectResult(instrumentPayload, "BYBIT_LIVE_INVALID_INSTRUMENT_RESPONSE");
     const instruments = instrumentResult.list;
-    const instrument = Array.isArray(instruments) && instruments[0] && typeof instruments[0] === "object" ? instruments[0] as Record<string, unknown> : undefined;
-    const baseAsset = typeof instrument?.baseCoin === "string" ? instrument.baseCoin.trim().toUpperCase() : "";
-    const quoteAsset = typeof instrument?.quoteCoin === "string" ? instrument.quoteCoin.trim().toUpperCase() : "";
+    if (!Array.isArray(instruments) || instruments.length !== 1 || !instruments[0] || typeof instruments[0] !== "object") {
+      throw new Error("BYBIT_LIVE_SYMBOL_ASSET_INFO_REQUIRED");
+    }
+    const instrument = instruments[0] as Record<string, unknown>;
+    if (instrument.symbol !== symbol || typeof instrument.baseCoin !== "string" || typeof instrument.quoteCoin !== "string") {
+      throw new Error("BYBIT_LIVE_SYMBOL_ASSET_INFO_REQUIRED");
+    }
+    const baseAsset = instrument.baseCoin.trim().toUpperCase();
+    const quoteAsset = instrument.quoteCoin.trim().toUpperCase();
     if (!baseAsset || !quoteAsset) throw new Error("BYBIT_LIVE_SYMBOL_ASSET_INFO_REQUIRED");
     const payload = await this.request("GET", "/v5/execution/list", { category: "spot", orderId, limit: 100 });
     const result = objectResult(payload, "BYBIT_LIVE_INVALID_TRADE_FILLS_RESPONSE");
     const list = result.list;
     if (!Array.isArray(list) || list.length === 0) throw new Error("BYBIT_LIVE_TRADE_FILLS_REQUIRED");
+    // Never settle from a truncated execution history: every fill and fee must be accounted for.
+    if (typeof result.nextPageCursor === "string" && result.nextPageCursor.length > 0) {
+      throw new Error("BYBIT_LIVE_TRADE_FILLS_PAGINATION_REQUIRED");
+    }
+    const seenExecutionIds = new Set<string>();
     const fills = list.map((item) => {
       if (!item || typeof item !== "object") throw new Error("BYBIT_LIVE_INVALID_TRADE_FILL");
       const fill = item as Record<string, unknown>;
+      if (fill.symbol !== symbol) throw new Error("BYBIT_LIVE_TRADE_FILL_SYMBOL_MISMATCH");
+      if (fill.orderId !== orderId) throw new Error("BYBIT_LIVE_TRADE_FILL_ORDER_ID_MISMATCH");
+      if (fill.side !== "Buy" && fill.side !== "Sell") throw new Error("BYBIT_LIVE_TRADE_FILL_SIDE_INVALID");
+      if (typeof fill.execId !== "string" || !/^[A-Za-z0-9._:-]{1,100}$/.test(fill.execId)) {
+        throw new Error("BYBIT_LIVE_TRADE_FILL_ID_REQUIRED");
+      }
+      if (seenExecutionIds.has(fill.execId)) throw new Error("BYBIT_LIVE_TRADE_FILL_ID_DUPLICATE");
+      seenExecutionIds.add(fill.execId);
       const qty = typeof fill.execQty === "string" ? decimal(fill.execQty, "BYBIT_LIVE_INVALID_TRADE_QTY", false) : "";
       const quoteQty = typeof fill.execValue === "string" ? decimal(fill.execValue, "BYBIT_LIVE_INVALID_TRADE_QUOTE_QTY", false) : "";
       const commission = typeof fill.execFee === "string" ? decimal(fill.execFee, "BYBIT_LIVE_INVALID_TRADE_COMMISSION") : "";
