@@ -99,7 +99,7 @@ button { touch-action: manipulation; }
 /* Home: sharper hero, cleaner category chips and more intentional game cards. */
 .gv-app-main .home-module__hero,
 .gv-app-main [class*="heroGrid"] { gap:16px; }
-.gv-app-main [class*="hero"] { --gv-hero-radius:26px; }
+.gv-app-main [class*="heroGrid"] > [class*="hero"] { --gv-hero-radius:26px; }
 .gv-app-main [class*="heroContent"] { text-wrap:balance; }
 .gv-app-main [class*="heroCta"] {
   border:1px solid rgba(255,232,153,.45);
@@ -150,7 +150,7 @@ button { touch-action: manipulation; }
   .gv-app-main :where(input:not([type=checkbox]):not([type=radio]),select,textarea,button) { max-width:100%; }
   .gv-app-main :where(input:not([type=checkbox]):not([type=radio]),select,textarea) { font-size:16px; }
   .gv-app-main [class*="heroGrid"] { grid-template-columns:minmax(0,1fr) !important; }
-  .gv-app-main [class*="hero"] { border-radius:20px; }
+  .gv-app-main [class*="heroGrid"] > [class*="hero"] { border-radius:20px; }
   .gv-app-main [class*="heroContent"] { width:100%; padding:clamp(22px,6vw,34px); }
   .gv-app-main [class*="heroTitle"] { font-size:clamp(34px,10vw,56px); line-height:1.02; overflow-wrap:anywhere; }
   .gv-app-main [class*="heroActions"] { gap:9px; }
