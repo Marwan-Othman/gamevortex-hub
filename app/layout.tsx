@@ -10,6 +10,7 @@ import "./theme.css";
 import "./redesign.css";
 import "./public-ui.css";
 import "./mobile.css";
+import "./refresh-2026.css";
 
 const fontBody = IBM_Plex_Sans_Arabic({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-body", display: "swap" });
 
