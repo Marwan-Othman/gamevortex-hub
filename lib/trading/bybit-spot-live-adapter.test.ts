@@ -190,6 +190,32 @@ describe("BybitSpotLiveAdapter", () => {
     await expect(adapter.placeSpotBuy({ clientOrderId: "gv-test-1", symbol: "BTCUSDT", side: "BUY", amountUsd: 10, entryPrice: 100, stopLossPrice: 95, takeProfitPrice: 110 })).rejects.toThrow("BYBIT_LIVE_CLIENT_ORDER_ID_MISMATCH");
   });
 
+  it("rejects Bybit execution fills for a different order or symbol", async () => {
+    for (const mismatch of [
+      { symbol: "ETHUSDT", orderId: "bybit-order-1", error: "BYBIT_LIVE_TRADE_FILL_SYMBOL_MISMATCH" },
+      { symbol: "BTCUSDT", orderId: "another-order", error: "BYBIT_LIVE_TRADE_FILL_ORDER_ID_MISMATCH" },
+    ]) {
+      const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async (url) => {
+        if (String(url).includes("/v5/market/instruments-info?")) return response({ retCode: 0, result: { list: [{ symbol: "BTCUSDT", baseCoin: "BTC", quoteCoin: "USDT" }] } });
+        return response({ retCode: 0, result: { list: [{ execId: "fill-1", symbol: mismatch.symbol, orderId: mismatch.orderId, side: "Buy", execQty: "0.1", execValue: "10", execFee: "0.01", feeCurrency: "USDT" }] } });
+      } });
+      await expect(adapter.getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "bybit-order-1" })).rejects.toThrow(mismatch.error);
+    }
+  });
+
+  it("rejects incomplete, duplicate, or paginated Bybit execution history", async () => {
+    const makeAdapter = (result: Record<string, unknown>) => new BybitSpotLiveAdapter({
+      apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async (url) => {
+        if (String(url).includes("/v5/market/instruments-info?")) return response({ retCode: 0, result: { list: [{ symbol: "BTCUSDT", baseCoin: "BTC", quoteCoin: "USDT" }] } });
+        return response({ retCode: 0, result });
+      },
+    });
+    const fill = { execId: "fill-1", symbol: "BTCUSDT", orderId: "bybit-order-1", side: "Buy", execQty: "0.1", execValue: "10", execFee: "0.01", feeCurrency: "USDT" };
+    await expect(makeAdapter({ list: [{ ...fill, side: "Unknown" }] }).getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "bybit-order-1" })).rejects.toThrow("BYBIT_LIVE_TRADE_FILL_SIDE_INVALID");
+    await expect(makeAdapter({ list: [fill, fill] }).getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "bybit-order-1" })).rejects.toThrow("BYBIT_LIVE_TRADE_FILL_ID_DUPLICATE");
+    await expect(makeAdapter({ list: [fill], nextPageCursor: "more-results" }).getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "bybit-order-1" })).rejects.toThrow("BYBIT_LIVE_TRADE_FILLS_PAGINATION_REQUIRED");
+  });
+
   it("reconciles a filled order by orderLinkId", async () => {
     const adapter = new BybitSpotLiveAdapter({ apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async () => response({ retCode: 0, result: { list: [{ orderId: "bybit-order-1", orderLinkId: "gv-test-1", symbol: "BTCUSDT", side: "Buy", orderStatus: "Filled", avgPrice: "100.5", cumExecQty: "0.1", cumExecValue: "10.05", updatedTime: "1700000000000" }] } }) });
     const result = await adapter.getOrderStatus({ symbol: "BTCUSDT", clientOrderId: "gv-test-1" });
