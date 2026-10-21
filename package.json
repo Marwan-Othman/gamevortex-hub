@@ -45,7 +45,7 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.0.1",
-    "@prisma/client": "6.12.0",
+    "@prisma/client": "7.10.1",
     "@vercel/blob": "2.4.0",
     "next": "16.4.2",
     "react": "19.1.8",
