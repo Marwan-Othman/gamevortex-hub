@@ -192,7 +192,7 @@ async function deliverGameKeys(
 ) {
   for (const item of order.items) {
     if (
-      item.product.kind !== ProductKind.GAME_KEY ||
+      (item.product.kind !== ProductKind.GAME_KEY && item.product.kind !== ProductKind.GIFT_CARD) ||
       item.product.deliveryType !== DeliveryType.CODE
     ) {
       throw new Error("UNSUPPORTED_DELIVERY_TYPE");
@@ -248,22 +248,24 @@ async function deliverGameKeys(
       },
     });
 
-    await transaction.entitlement.upsert({
-      where: {
-        userId_gameId: {
+    if (item.product.kind === ProductKind.GAME_KEY) {
+      await transaction.entitlement.upsert({
+        where: {
+          userId_gameId: {
+            userId: order.userId,
+            gameId: item.product.gameId,
+          },
+        },
+        create: {
           userId: order.userId,
           gameId: item.product.gameId,
+          orderItemId: item.id,
         },
-      },
-      create: {
-        userId: order.userId,
-        gameId: item.product.gameId,
-        orderItemId: item.id,
-      },
-      update: {
-        revokedAt: null,
-      },
-    });
+        update: {
+          revokedAt: null,
+        },
+      });
+    }
   }
 }
 

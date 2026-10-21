@@ -107,8 +107,8 @@ function isSellableGameKey(
   return (
     product.active &&
     product.supplierVerified &&
-    product.kind ===
-      ProductKind.GAME_KEY &&
+    (product.kind === ProductKind.GAME_KEY ||
+      product.kind === ProductKind.GIFT_CARD) &&
     product.deliveryType ===
       DeliveryType.CODE &&
     product.game.published &&
@@ -341,10 +341,7 @@ export async function POST(
       await ownedGameIds(
         db,
         user.id,
-        order.items.map(
-          (item) =>
-            item.product.gameId,
-        ),
+        order.items.filter((item) => item.product.kind === ProductKind.GAME_KEY).map((item) => item.product.gameId),
       );
 
     if (alreadyOwned.size > 0) {

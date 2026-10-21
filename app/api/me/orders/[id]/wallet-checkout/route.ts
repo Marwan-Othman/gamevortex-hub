@@ -18,7 +18,7 @@ type OrderWithItems = Prisma.OrderGetPayload<{
 
 async function deliverGameKeys(tx: Prisma.TransactionClient, order: OrderWithItems) {
   for (const item of order.items) {
-    if (item.product.kind !== ProductKind.GAME_KEY || item.product.deliveryType !== DeliveryType.CODE) {
+    if ((item.product.kind !== ProductKind.GAME_KEY && item.product.kind !== ProductKind.GIFT_CARD) || item.product.deliveryType !== DeliveryType.CODE) {
       throw new Error("UNSUPPORTED_DELIVERY_TYPE");
     }
     // Lock the keys we intend to claim. SKIP LOCKED makes concurrent checkouts
@@ -43,11 +43,13 @@ async function deliverGameKeys(tx: Prisma.TransactionClient, order: OrderWithIte
       where: { id: item.productId },
       data: { inventory: remaining },
     });
-    await tx.entitlement.upsert({
-      where: { userId_gameId: { userId: order.userId, gameId: item.product.gameId } },
-      create: { userId: order.userId, gameId: item.product.gameId, orderItemId: item.id },
-      update: { revokedAt: null },
-    });
+    if (item.product.kind === ProductKind.GAME_KEY) {
+      await tx.entitlement.upsert({
+        where: { userId_gameId: { userId: order.userId, gameId: item.product.gameId } },
+        create: { userId: order.userId, gameId: item.product.gameId, orderItemId: item.id },
+        update: { revokedAt: null },
+      });
+    }
   }
 }
 
@@ -192,7 +194,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // same price, and the user must not already own the game (no double purchase of the same key).
       const saleProblem = orderSaleProblem(order.items, order.currency);
       if (saleProblem) throw new Error(saleProblem);
-      const alreadyOwned = await ownedGameIds(tx, order.userId, order.items.map((item) => item.product.gameId));
+      const alreadyOwned = await ownedGameIds(tx, order.userId, order.items.filter((item) => item.product.kind === ProductKind.GAME_KEY).map((item) => item.product.gameId));
       if (alreadyOwned.size > 0) throw new Error("ALREADY_OWNED");
 
       const wallet = await tx.wallet.findUnique({ where: { userId: user.id } });

@@ -261,8 +261,7 @@ export async function POST(
           supplierVerified:
             true,
 
-          kind:
-            ProductKind.GAME_KEY,
+          kind: { in: [ProductKind.GAME_KEY, ProductKind.GIFT_CARD] },
 
           deliveryType:
             "CODE",
@@ -478,7 +477,7 @@ export async function POST(
           const owned = await ownedGameIds(
             transaction,
             user.id,
-            products.map((product) => product.gameId),
+            products.filter((product) => product.kind === ProductKind.GAME_KEY).map((product) => product.gameId),
           );
           if (owned.size > 0) throw new Error("ALREADY_OWNED");
 
@@ -576,11 +575,13 @@ export async function POST(
               });
               if (delivered.count !== item.quantity) throw new Error("DIGITAL_KEYS_OUT_OF_STOCK");
 
-              await transaction.entitlement.upsert({
-                where: { userId_gameId: { userId: user.id, gameId: product.gameId } },
-                create: { userId: user.id, gameId: product.gameId, orderItemId: item.id },
-                update: { revokedAt: null },
-              });
+              if (product.kind === ProductKind.GAME_KEY) {
+                await transaction.entitlement.upsert({
+                  where: { userId_gameId: { userId: user.id, gameId: product.gameId } },
+                  create: { userId: user.id, gameId: product.gameId, orderItemId: item.id },
+                  update: { revokedAt: null },
+                });
+              }
             }
 
             const baseRewardPoints = calculateProductRewardPoints(created.items.map((item) => {
