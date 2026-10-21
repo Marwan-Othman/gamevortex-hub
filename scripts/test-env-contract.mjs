@@ -22,7 +22,8 @@ function walk(dir) {
 
 for (const dir of sourceRoots) walk(path.join(root, dir));
 
-const ignoredRuntimeVars = new Set(['VERCEL_URL', 'VERCEL']);
+// These are platform-provided Vercel runtime variables, not app-managed secrets.
+const ignoredRuntimeVars = new Set(['VERCEL_URL', 'VERCEL', 'VERCEL_ENV']);
 const failures = [];
 
 for (const envFile of envFiles) {
