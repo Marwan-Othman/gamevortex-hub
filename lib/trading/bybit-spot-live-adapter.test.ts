@@ -203,6 +203,19 @@ describe("BybitSpotLiveAdapter", () => {
     }
   });
 
+  it("rejects Bybit fill metadata when the instrument identity or execution id is missing", async () => {
+    const makeAdapter = (instrument: Record<string, unknown>, fill: Record<string, unknown>) => new BybitSpotLiveAdapter({
+      apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async (url) => {
+        if (String(url).includes("/v5/market/instruments-info?")) return response({ retCode: 0, result: { list: [instrument] } });
+        return response({ retCode: 0, result: { list: [fill] } });
+      },
+    });
+    const validFill = { symbol: "BTCUSDT", orderId: "bybit-order-1", side: "Buy", execId: "fill-1", execQty: "0.1", execValue: "10", execFee: "0.01", feeCurrency: "USDT" };
+    await expect(makeAdapter({ symbol: "ETHUSDT", baseCoin: "ETH", quoteCoin: "USDT" }, validFill).getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "bybit-order-1" })).rejects.toThrow("BYBIT_LIVE_SYMBOL_ASSET_INFO_REQUIRED");
+    const { execId: _omitted, ...withoutId } = validFill;
+    await expect(makeAdapter({ symbol: "BTCUSDT", baseCoin: "BTC", quoteCoin: "USDT" }, withoutId).getOrderTradeFills({ symbol: "BTCUSDT", providerOrderId: "bybit-order-1" })).rejects.toThrow("BYBIT_LIVE_TRADE_FILL_ID_REQUIRED");
+  });
+
   it("rejects incomplete, duplicate, or paginated Bybit execution history", async () => {
     const makeAdapter = (result: Record<string, unknown>) => new BybitSpotLiveAdapter({
       apiKey: "key", apiSecret: "secret", liveTradingEnabled: true, fetcher: async (url) => {
