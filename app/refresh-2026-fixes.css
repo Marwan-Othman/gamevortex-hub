@@ -1,0 +1,17 @@
+/* Keep the mobile radius on hero containers, not nested text or controls. */
+@media (max-width: 760px) {
+  .gv-app-main [class*="heroContent"],
+  .gv-app-main [class*="heroTitle"],
+  .gv-app-main [class*="heroSubtitle"],
+  .gv-app-main [class*="heroActions"],
+  .gv-app-main [class*="heroCta"],
+  .gv-app-main [class*="heroGhost"] {
+    border-radius: initial;
+  }
+
+  .gv-app-main [class*="heroGrid"],
+  .gv-app-main [class*="heroCard"],
+  .gv-app-main [class*="heroSlide"] {
+    border-radius: 20px;
+  }
+}
