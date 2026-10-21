@@ -1,0 +1,165 @@
+/* GameVortex Hub — 2026 visual refresh
+   A layered, responsive visual system. Keeps existing routes, data, forms and permissions intact. */
+:root {
+  --gv-refresh-bg: #07070c;
+  --gv-refresh-panel: rgba(18, 16, 28, .82);
+  --gv-refresh-border: rgba(176, 139, 255, .18);
+  --gv-refresh-purple: #a78bfa;
+  --gv-refresh-gold: #f6d37a;
+  --gv-refresh-radius: 20px;
+}
+html { scroll-padding-top: 100px; }
+body {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(124,58,237,.17), transparent 38%),
+    radial-gradient(ellipse at 92% 10%, rgba(244,201,93,.07), transparent 31%),
+    linear-gradient(180deg,#07070c 0%,#0a0911 48%,#07070c 100%) !important;
+}
+::selection { color:#100b1d; background:#c4b5fd; }
+a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+a { transition: color .18s ease, border-color .18s ease, background-color .18s ease, transform .18s ease; }
+button, input, select, textarea { font: inherit; }
+button { touch-action: manipulation; }
+:where(input:not([type=checkbox]):not([type=radio]),select,textarea) {
+  border-radius: 13px;
+  border-color: rgba(167,139,250,.25);
+  background-color: rgba(9,8,16,.92);
+  color: var(--gv-text,#f8f7fb);
+}
+:where(input:not([type=checkbox]):not([type=radio]),select,textarea):focus {
+  outline: none;
+  border-color: rgba(196,181,253,.78);
+  box-shadow: 0 0 0 3px rgba(139,92,246,.14);
+}
+:where(button,[role=button],a).disabled,
+:where(button,[role=button],a)[aria-disabled=true] { opacity:.55; cursor:not-allowed; }
+
+/* Main navigation: compact, glassy and consistent across every route. */
+.gv-header {
+  background: rgba(7,7,12,.84) !important;
+  border-bottom: 1px solid rgba(167,139,250,.17) !important;
+  box-shadow: 0 12px 35px rgba(0,0,0,.2);
+  backdrop-filter: blur(22px) saturate(145%) !important;
+}
+.gv-header-inner { min-height: 76px !important; gap: clamp(8px,1.3vw,20px) !important; }
+.gv-brand { gap: 11px !important; flex-shrink:0; }
+.gv-brand-mark {
+  border-radius: 14px !important;
+  border: 1px solid rgba(196,181,253,.45) !important;
+  background: linear-gradient(145deg,rgba(139,92,246,.24),rgba(244,201,93,.1)) !important;
+  box-shadow: 0 0 24px rgba(139,92,246,.15), inset 0 1px rgba(255,255,255,.08) !important;
+}
+.gv-brand-name { letter-spacing: -.035em; }
+.gv-nav-link {
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  transition: background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease !important;
+}
+.gv-nav-link:hover,.gv-nav-link.is-active {
+  background: rgba(139,92,246,.12) !important;
+  border-color: rgba(167,139,250,.2) !important;
+  color: #e9ddff !important;
+}
+.gv-nav-link:hover { transform: translateY(-1px); }
+.gv-icon-button,.gv-profile-button,.gv-menu-button {
+  border-radius: 13px !important;
+  border-color: rgba(167,139,250,.18) !important;
+}
+.gv-auth-signup,.gv-logout-button {
+  border-radius: 999px !important;
+  box-shadow: 0 7px 22px rgba(244,201,93,.12);
+}
+.gv-mobile-tabs {
+  scrollbar-width:none;
+  border-top-color: rgba(167,139,250,.12) !important;
+}
+.gv-mobile-tabs::-webkit-scrollbar { display:none; }
+.gv-mobile-tabs a { border-radius: 999px !important; }
+.gv-mobile-tabs a.is-active { background: rgba(139,92,246,.18) !important; }
+
+/* Shared page rhythm and surface language. */
+.gv-app-main { isolation:isolate; }
+.gv-app-main :where(.card,.panel,.surface,.stat-card,.dashboard-card,.settings-card,.feature-card,.tool-card,.wallet-card,.vip-card,.ai-panel) {
+  border-color: var(--gv-refresh-border);
+  border-radius: var(--gv-refresh-radius);
+}
+.gv-app-main :where(.card,.panel,.surface,.stat-card,.dashboard-card,.settings-card,.feature-card,.tool-card) {
+  box-shadow: 0 14px 38px rgba(0,0,0,.16);
+}
+.gv-app-main :where(h1,h2,h3) { text-wrap: balance; letter-spacing: -.025em; }
+.gv-app-main :where(p,li) { text-wrap: pretty; }
+.gv-app-main :where(button,.button,[role=button],a.button) { transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
+.gv-app-main :where(button:not(:disabled),[role=button],a.button):active { transform: translateY(1px) scale(.99); }
+.gv-app-main :where(button:disabled) { cursor:not-allowed; opacity:.58; }
+.gv-app-main :where(table) { border-collapse: separate; border-spacing:0; }
+.gv-app-main :where(th) { color:#d9c9ff; background:rgba(139,92,246,.09); }
+.gv-app-main :where(td,th) { border-color:rgba(167,139,250,.12); }
+.gv-app-main :where(hr) { border:0; border-top:1px solid rgba(167,139,250,.16); }
+
+/* Home: sharper hero, cleaner category chips and more intentional game cards. */
+.gv-app-main .home-module__hero,
+.gv-app-main [class*="heroGrid"] { gap:16px; }
+.gv-app-main [class*="hero"] { --gv-hero-radius:26px; }
+.gv-app-main [class*="heroContent"] { text-wrap:balance; }
+.gv-app-main [class*="heroCta"] {
+  border:1px solid rgba(255,232,153,.45);
+  box-shadow: 0 10px 30px rgba(244,201,93,.17);
+}
+.gv-app-main [class*="heroGhost"] {
+  border:1px solid rgba(196,181,253,.3);
+  background:rgba(13,11,23,.62);
+  backdrop-filter:blur(10px);
+}
+.gv-app-main [class*="pillRow"] { gap:9px; }
+.gv-app-main [class*="pill"] {
+  border-radius:999px;
+  border-color:rgba(167,139,250,.17);
+  background:rgba(18,16,28,.72);
+  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+}
+.gv-app-main [class*="pill"]:hover {
+  transform:translateY(-2px);
+  border-color:rgba(196,181,253,.5);
+  background:rgba(139,92,246,.13);
+}
+.gv-app-main [class*="gameCard"] {
+  overflow:hidden;
+  border:1px solid rgba(167,139,250,.16);
+  border-radius:18px;
+  background:linear-gradient(155deg,rgba(25,22,39,.96),rgba(11,10,17,.98));
+  box-shadow:0 12px 30px rgba(0,0,0,.2);
+  transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;
+}
+.gv-app-main [class*="gameCard"]:hover {
+  transform:translateY(-4px);
+  border-color:rgba(196,181,253,.48);
+  box-shadow:0 18px 36px rgba(0,0,0,.34),0 0 22px rgba(139,92,246,.1);
+}
+.gv-app-main [class*="gameCoverWrap"] { background:#100e19; }
+.gv-app-main [class*="dealCard"] {
+  border:1px solid rgba(244,201,93,.22);
+  border-radius:22px;
+  background:radial-gradient(ellipse at 100% 0%,rgba(244,201,93,.1),transparent 55%),linear-gradient(145deg,rgba(24,20,35,.95),rgba(10,9,15,.98));
+}
+
+/* Mobile-first guardrails: prevent clipping, preserve readable controls and safe areas. */
+@media (max-width: 760px) {
+  .gv-header-inner { min-height:64px !important; padding-inline:12px !important; }
+  .gv-brand-name { font-size:clamp(17px,4.8vw,21px); }
+  .gv-app-main { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .gv-app-main :where(input:not([type=checkbox]):not([type=radio]),select,textarea,button) { max-width:100%; }
+  .gv-app-main :where(input:not([type=checkbox]):not([type=radio]),select,textarea) { font-size:16px; }
+  .gv-app-main [class*="heroGrid"] { grid-template-columns:minmax(0,1fr) !important; }
+  .gv-app-main [class*="hero"] { border-radius:20px; }
+  .gv-app-main [class*="heroContent"] { width:100%; padding:clamp(22px,6vw,34px); }
+  .gv-app-main [class*="heroTitle"] { font-size:clamp(34px,10vw,56px); line-height:1.02; overflow-wrap:anywhere; }
+  .gv-app-main [class*="heroActions"] { gap:9px; }
+  .gv-app-main [class*="heroCta"],.gv-app-main [class*="heroGhost"] { min-height:46px; padding-inline:18px; }
+  .gv-app-main [class*="section"] { margin-top:22px; }
+  .gv-app-main [class*="pillRow"] { padding-bottom:5px; }
+  .gv-app-main [class*="gameCard"] { border-radius:15px; }
+  .gv-app-main :where(.gv-table-scroll) { max-width:100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
