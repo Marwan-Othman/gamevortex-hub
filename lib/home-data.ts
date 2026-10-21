@@ -100,24 +100,25 @@ const getCachedHomeData = unstable_cache(loadHomeData, ["home-data-v1"], {
 
 const EMPTY: HomeData = { newest: [], rated: [], played: [], apps: [], gamesCount: 0, appsCount: 0 };
 
-/** Never throws: an unavailable database renders empty rails instead of a 500.
+/**
+ * Never throws: an unavailable database renders the page shell and empty
+ * catalog rails instead of turning every homepage request into a 500.
  *
- * A single bounded retry gives transient pool-acquisition failures a chance to
- * recover. The static fallback is returned only after both attempts fail.
- * The retry is deliberately sequential: it must not double the six concurrent
- * catalog queries while the database is already under pressure.
+ * Important: do not blindly retry an unstable_cache miss. Next's cache wrapper
+ * can reject after the underlying Prisma load fails; retrying six parallel
+ * queries immediately adds pressure to the same exhausted connection pool.
+ * The cache remains the first attempt; on failure we log only a safe error
+ * name and return the static fallback. Recovery is naturally retried by the
+ * next request after the cache miss has settled.
  */
 export async function getHomeData(): Promise<HomeData> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      return await getCachedHomeData();
-    } catch (error) {
-      if (attempt === 0) continue;
-      // Public output must not disclose database hosts or Prisma internals.
-      console.error("Home catalog temporarily unavailable", {
-        errorName: error instanceof Error ? error.name : "UnknownError",
-      });
-    }
+  try {
+    return await getCachedHomeData();
+  } catch (error) {
+    // Public output must not disclose database hosts, SQL, or Prisma internals.
+    console.error("Home catalog temporarily unavailable", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return EMPTY;
   }
-  return EMPTY;
 }
