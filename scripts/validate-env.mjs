@@ -34,6 +34,17 @@ if (process.env.APP_ORIGIN) {
     if (production && url.protocol !== 'https:') errors.push('APP_ORIGIN must use HTTPS in production.');
   } catch { errors.push('APP_ORIGIN must be a valid URL.'); }
 }
+if (production && (!process.env.DIRECT_URL || String(process.env.DIRECT_URL).trim() === '')) {
+  errors.push('DIRECT_URL is required in production so Prisma migrations use a direct database connection.');
+}
+if (process.env.DIRECT_URL) {
+  try {
+    const url = new URL(process.env.DIRECT_URL);
+    if (!['postgres:', 'postgresql:'].includes(url.protocol)) errors.push('DIRECT_URL must be a PostgreSQL connection URL.');
+    if (production && ['localhost', '127.0.0.1', '::1'].includes(url.hostname)) errors.push('DIRECT_URL must not point to localhost in production.');
+    if (production && /-pooler\.|pooler\./i.test(url.hostname)) errors.push('DIRECT_URL must use a direct PostgreSQL endpoint, not a pooled endpoint.');
+  } catch { errors.push('DIRECT_URL must be a valid PostgreSQL URL.'); }
+}
 if (process.env.DATABASE_URL) {
   try {
     const url = new URL(process.env.DATABASE_URL);
