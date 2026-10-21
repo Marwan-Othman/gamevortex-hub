@@ -97,7 +97,7 @@ export default function PaymentReturnClient({
         window.setTimeout(
           () => {
             window.location.replace(
-              target === "api" ? "/api-access?checkout=complete" : target === "vip" ? "/vip?checkout=complete" : target === "wallet" ? "/wallet?checkout=complete" : "/orders?checkout=complete",
+              target === "api" ? "/api-access?checkout=complete" : target === "vip" ? "/vip?checkout=complete" : target === "wallet" ? `/wallet?checkout=complete${referenceId ? `&reference=${encodeURIComponent(referenceId)}` : ""}` : "/orders?checkout=complete",
             );
           },
           1200,
