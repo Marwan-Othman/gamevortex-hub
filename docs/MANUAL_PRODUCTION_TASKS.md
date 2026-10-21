@@ -105,3 +105,17 @@
 - [ ] Refund policy review.
 - [ ] Data retention policy review.
 - [ ] Account deletion policy review.
+
+## J. GameVortex AI Trading — Live funds remain blocked
+
+- [ ] Configure the monitor secret consistently: Vercel `CRON_SECRET` and GitHub Actions secret `GAMEVORTEX_CRON_SECRET`; never commit either value.
+- [ ] Confirm the scheduled monitor workflow authenticates and completes its read/reconciliation steps after secret configuration. A successful build alone does not verify the cron path.
+
+- [ ] The owner wallet funding bridge is an internal database transfer only; it does not fund Binance or Bybit.
+- [ ] Before permitting funding from the site wallet, reconcile the complete USD wallet transaction ledger sum against the current wallet balance; non-USD history must block the transfer.
+- [ ] Do not treat a matching latest ledger row as sufficient proof of the full historical balance.
+- [ ] Implement a verified exchange funding/transfer rail with provider-side references and idempotent reconciliation.
+- [ ] Implement verified proceeds transfer back from the exchange and reconcile provider balances, transfer records, fees, and the GameVortex owner wallet.
+- [ ] Keep live execution blocked until both funding and proceeds transfer are independently verified end-to-end.
+- [ ] Implement and test native linked/OCO protection for Bybit before enabling Bybit live execution.
+- [ ] Run testnet/failure drills and verify that no real orders or money transfers occur during validation.

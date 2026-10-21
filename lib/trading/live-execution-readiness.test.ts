@@ -58,6 +58,7 @@ const input: LiveExecutionReadinessInput = {
   riskApproved: true,
   emergencyStopActive: false,
   withdrawalsDisabled: true,
+  walletAccountingReady: false,
   amountUsd: 10,
   symbol: "TEST",
   entryPrice: 100,
@@ -79,7 +80,7 @@ describe("evaluateLiveExecutionReadiness", () => {
 
   it("validates the full protected-exit sequence without network calls", () => {
     const result = evaluateLiveExecutionReadiness(
-      { ...input, liveTradingEnabled: true, credentialsConfigured: true },
+      { ...input, liveTradingEnabled: true, credentialsConfigured: true, walletAccountingReady: true },
       adapter,
     );
     expect(result.ready).toBe(true);
@@ -98,9 +99,19 @@ describe("evaluateLiveExecutionReadiness", () => {
 
   it("keeps the $1 minimum while leaving the upper bound to risk controls", () => {
     const result = evaluateLiveExecutionReadiness(
-      { ...input, amountUsd: 100000, liveTradingEnabled: true, credentialsConfigured: true },
+      { ...input, amountUsd: 100000, liveTradingEnabled: true, credentialsConfigured: true, walletAccountingReady: true },
       adapter,
     );
     expect(result.ready).toBe(true);
   });
+  it("blocks readiness until wallet funding and settlement are verified", () => {
+    const result = evaluateLiveExecutionReadiness(
+      { ...input, liveTradingEnabled: true, credentialsConfigured: true, walletAccountingReady: false },
+      adapter,
+    );
+    expect(result.ready).toBe(false);
+    expect(result.reasons).toContain("LIVE_TRADING_ACCOUNTING_NOT_READY");
+    expect(result.protectedExit).toBeNull();
+  });
+
 });

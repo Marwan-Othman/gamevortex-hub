@@ -53,12 +53,15 @@ const ERROR_TEXT: Record<string, string> = {
   INVALID_LIVE_ORDER_TAKE_PROFIT: "Take Profit لازم يكون بين 0.2% و50%.",
   LIVE_OWNER_ACK_REQUIRED: "لازم تؤكد الإقرار قبل التجهيز.",
   GAMEVORTEX_LIVE_TRADING_DISABLED: "التداول الحقيقي مغلق: GAMEVORTEX_LIVE_TRADING_ENABLED مش true.",
+  LIVE_TRADING_ACCOUNTING_NOT_READY:
+    "التداول الحقيقي موقوف حاليًا: ربط تمويل محفظة الموقع بحساب Binance والتسوية النهائية لم يُتحقق منهما بعد. لا تعِد المحاولة ولا تغيّر مفاتيح API لتجاوز القفل.",
+
   LIVE_RISK_CONFIG_REQUIRED: "احفظ إعدادات Risk Manager أولاً.",
   LIVE_MARKET_DATA_UNAVAILABLE: "ما قدرت أجيب بيانات سوق كافية لهذا الرمز.",
   LIVE_WALLET_MODE_REQUIRES_WHOLE_USD: "وضع المحفظة يحتاج مبلغ بدولارات صحيحة.",
-  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر من رصيد المنصة معطل أمنيًا؛ استخدم Trading Allocation.",
+  LIVE_DIRECT_FUNDING_DISABLED: "التداول المباشر معطل أمنيًا. تخصيص المحفظة وحده لا يسمح بالتداول؛ بوابة المحاسبة ما زالت تمنع التنفيذ حتى التحقق من التمويل والتسوية.",
   TRADING_ALLOCATION_REQUIRED:
-    "ما في تخصيص من المحفظة بنفس المبلغ. إما خصّص من المحفظة، أو فعّل GAMEVORTEX_LIVE_DIRECT_FUNDING=true لاستخدام رصيدك على Binance.",
+    "لا يوجد تخصيص داخلي مطابق لمبلغ الصفقة. لا تستخدم رصيد Binance المباشر لتجاوز هذا الشرط؛ التداول الحقيقي موقوف حتى اكتمال جسر التمويل والتسوية والتحقق منهما.",
   BINANCE_LIVE_INSUFFICIENT_BALANCE: "رصيد USDT الحر على Binance أقل من مبلغ الصفقة.",
   BINANCE_LIVE_MIN_NOTIONAL: "المبلغ أقل من الحد الأدنى للصفقة عند Binance لهذا الرمز.",
   BINANCE_LIVE_API_CREDENTIALS_REQUIRED: "مفاتيح Binance الحقيقية غير مضافة.",
