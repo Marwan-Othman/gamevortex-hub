@@ -25,11 +25,23 @@ async function readJson(response: Response) {
 }
 
 type Wallet = { balance: string | number; pendingBalance: string | number } | null;
-type Tx = { id: string; type: string; amount: string | number; balanceAfter: string | number; currency: string; createdAt: string };
+type Tx = { id: string; type: string; amount: string | number; balanceAfter: string | number; currency: string; referenceType?: string | null; referenceId?: string | null; createdAt: string };
 
 function money(value: string | number | null | undefined) {
   const amount = Number(value || 0);
   return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+}
+
+function transactionLabel(tx: Tx) {
+  if (tx.type === "DEPOSIT") return "إيداع أموال";
+  if (tx.type === "WITHDRAWAL") return "سحب أموال";
+  if (tx.type === "PURCHASE") return "شراء من المتجر";
+  if (tx.type === "REFUND") return "استرداد";
+  if (tx.type === "ADJUSTMENT" && tx.referenceType === "TRADING_FUNDING") {
+    return "تحويل إلى رصيد المالك للتداول الداخلي";
+  }
+  if (tx.type === "ADJUSTMENT") return "تعديل رصيد";
+  return tx.type;
 }
 
 export default function WalletClient() {
@@ -40,15 +52,18 @@ export default function WalletClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState<"checking" | "confirmed" | "pending" | null>(null);
 
-  async function load() {
+  async function load(): Promise<{ wallet: Wallet; transactions: Tx[] } | null> {
     try {
       const response = await fetch("/api/wallet/transactions", { cache: "no-store" });
       const data = await readJson(response);
       if (response.ok && data) {
+        const nextTransactions = Array.isArray(data.transactions) ? data.transactions as Tx[] : [];
         setWallet(data.wallet);
-        setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
+        setTransactions(nextTransactions);
         setNeedsLogin(false);
+        return { wallet: data.wallet, transactions: nextTransactions };
       } else if (response.status === 401) {
         setNeedsLogin(true);
         setMessage(friendly("UNAUTHORIZED"));
@@ -60,9 +75,42 @@ export default function WalletClient() {
     } finally {
       setReady(true);
     }
+    return null;
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void load();
+
+    const params = new URLSearchParams(window.location.search);
+    const depositReference = params.get("reference");
+    if (params.get("checkout") !== "complete" || !depositReference) {
+      return () => { cancelled = true; };
+    }
+
+    setCheckoutStatus("checking");
+    let attempts = 0;
+    let timer: number | undefined;
+    const poll = async () => {
+      attempts += 1;
+      const data = await load();
+      if (cancelled) return;
+      const settled = data?.transactions.some((tx) => tx.referenceId === depositReference && tx.type === "DEPOSIT");
+      if (settled) {
+        setCheckoutStatus("confirmed");
+        if (timer !== undefined) window.clearInterval(timer);
+      } else if (attempts >= 12) {
+        setCheckoutStatus("pending");
+        if (timer !== undefined) window.clearInterval(timer);
+      }
+    };
+    timer = window.setInterval(() => { void poll(); }, 5000);
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, []);
 
   async function deposit() {
     if (loading) return;
@@ -106,6 +154,9 @@ export default function WalletClient() {
         <p className="muted">MONEY WALLET</p>
         <h1>المحفظة المالية</h1>
         <p>رصيد الأموال منفصل عن نقاط GameVortex. يُضاف الرصيد من الخادم فقط بعد التحقق من اكتمال الدفع لدى مزود الدفع، مع استخدام Webhook للتحديثات والاستردادات.</p>
+        {checkoutStatus === "checking" && <p role="status" className="muted">تم الرجوع من الدفع؛ يجري التحقق من وصول الإيداع وتحديث الرصيد تلقائيًا.</p>}
+        {checkoutStatus === "confirmed" && <p role="status" className="muted">تم تأكيد الإيداع وظهر في سجل المحفظة.</p>}
+        {checkoutStatus === "pending" && <p role="status" className="muted">لم يصل تأكيد الإيداع بعد. لا تُعد الدفع؛ افحص الرصيد المعلّق وسجل المعاملات ثم تواصل مع الدعم إذا استمرت الحالة.</p>}
       </section>
 
       <section className="grid gv-wallet-grid">
@@ -138,11 +189,12 @@ export default function WalletClient() {
 
       <section className="glass card" style={{ marginTop: 18 }}>
         <h2>سجل المحفظة</h2>
+        <p className="muted">تحويل «التداول الداخلي» ينقل الرصيد بين دفاتر GameVortex فقط؛ لا يعني تحويل الأموال إلى Binance أو Bybit.</p>
         {!ready ? <p className="muted">جارٍ التحميل…</p> : !transactions.length ? <p className="muted">لا توجد معاملات مالية بعد.</p> : (
           <div style={{ overflowX: "auto" }}>
             <table className="gv-wallet-table">
               <thead><tr><th style={{ textAlign: "right", padding: 10 }}>النوع</th><th style={{ textAlign: "right", padding: 10 }}>المبلغ</th><th style={{ textAlign: "right", padding: 10 }}>الرصيد بعد</th><th style={{ textAlign: "right", padding: 10 }}>التاريخ</th></tr></thead>
-              <tbody>{transactions.map((tx) => <tr key={tx.id}><td style={{ padding: 10 }}>{tx.type}</td><td style={{ padding: 10 }}>{Number(tx.amount) >= 0 ? "+" : ""}{money(tx.amount)} {tx.currency}</td><td style={{ padding: 10 }}>{money(tx.balanceAfter)} {tx.currency}</td><td style={{ padding: 10 }}>{new Date(tx.createdAt).toLocaleString("ar")}</td></tr>)}</tbody>
+              <tbody>{transactions.map((tx) => <tr key={tx.id}><td style={{ padding: 10 }}>{transactionLabel(tx)}</td><td style={{ padding: 10 }}>{Number(tx.amount) >= 0 ? "+" : ""}{money(tx.amount)} {tx.currency}</td><td style={{ padding: 10 }}>{money(tx.balanceAfter)} {tx.currency}</td><td style={{ padding: 10 }}>{new Date(tx.createdAt).toLocaleString("ar")}</td></tr>)}</tbody>
             </table>
           </div>
         )}
