@@ -31,7 +31,7 @@ describe("orderSaleProblem", () => {
   it("refuses withdrawn, unverified or unsupported products", () => {
     expect(orderSaleProblem([item({ active: false })], "USD")).toBe("ORDER_ITEM_NOT_AVAILABLE_FOR_SALE");
     expect(orderSaleProblem([item({ supplierVerified: false })], "USD")).toBe("ORDER_ITEM_NOT_AVAILABLE_FOR_SALE");
-    expect(orderSaleProblem([item({ kind: "GIFT_CARD" })], "USD")).toBe("ORDER_ITEM_NOT_AVAILABLE_FOR_SALE");
+    expect(orderSaleProblem([item({ kind: "GIFT_CARD" })], "USD")).toBeNull();
     expect(orderSaleProblem([item({ deliveryType: "MANUAL" })], "USD")).toBe("ORDER_ITEM_NOT_AVAILABLE_FOR_SALE");
     expect(orderSaleProblem([item({ game: { published: false, sourceStatus: "VERIFIED" } })], "USD")).toBe("ORDER_ITEM_NOT_AVAILABLE_FOR_SALE");
     expect(orderSaleProblem([item({ game: { published: true, sourceStatus: "NEEDS_SOURCE" } })], "USD")).toBe("ORDER_ITEM_NOT_AVAILABLE_FOR_SALE");

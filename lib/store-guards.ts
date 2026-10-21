@@ -1,10 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-/**
- * Store rules shared by order creation, wallet checkout, card checkout and refunds.
- * The pure checks have no database access so they can be unit tested.
- */
-
+/** Shared store policy for order creation, checkout, delivery and refunds. */
 export type StoreErrorCode =
   | "ORDER_ITEM_NOT_AVAILABLE_FOR_SALE"
   | "ORDER_PRICE_CHANGED"
@@ -12,7 +8,6 @@ export type StoreErrorCode =
   | "FREE_PRODUCT_ALREADY_CLAIMED"
   | "FREE_PRODUCT_QUANTITY_LIMIT";
 
-/** Every store error that means "your request conflicts with the current state" (HTTP 409). */
 export const STORE_CONFLICT_ERRORS: ReadonlySet<string> = new Set<StoreErrorCode>([
   "ORDER_ITEM_NOT_AVAILABLE_FOR_SALE",
   "ORDER_PRICE_CHANGED",
@@ -35,18 +30,14 @@ export type SaleCheckItem = {
 
 const VERIFIED_GAME_SOURCES = new Set(["VERIFIED", "OFFICIAL_SOURCE"]);
 
-/**
- * An order is created at one moment and paid later. Before money moves, every item must still be
- * on sale (published, verified, supported type) and still cost what the order says, otherwise a
- * stale pending order could be paid at an old price, or for a product that was withdrawn.
- */
+/** Both game keys and gift cards deliver a one-time code, never an account or manual transfer. */
 export function orderSaleProblem(items: readonly SaleCheckItem[], orderCurrency: string): StoreErrorCode | null {
   for (const item of items) {
     const { product } = item;
     const sellable =
       product.active &&
       product.supplierVerified &&
-      product.kind === "GAME_KEY" &&
+      (product.kind === "GAME_KEY" || product.kind === "GIFT_CARD") &&
       product.deliveryType === "CODE" &&
       product.game.published &&
       VERIFIED_GAME_SOURCES.has(product.game.sourceStatus);
@@ -58,7 +49,6 @@ export function orderSaleProblem(items: readonly SaleCheckItem[], orderCurrency:
   return null;
 }
 
-/** A free product can be claimed once per user and only one copy at a time. */
 export function isFreeProduct(priceCents: number): boolean {
   return priceCents === 0;
 }
@@ -66,7 +56,6 @@ export function isFreeProduct(priceCents: number): boolean {
 type EntitlementReader = Pick<Prisma.TransactionClient, "entitlement">;
 type OrderItemReader = Pick<Prisma.TransactionClient, "orderItem" | "entitlement">;
 
-/** Games the user already owns (active, not refunded) among the given ones. */
 export async function ownedGameIds(client: EntitlementReader, userId: string, gameIds: readonly string[]): Promise<Set<string>> {
   if (!gameIds.length) return new Set();
   const rows = await client.entitlement.findMany({
@@ -77,9 +66,8 @@ export async function ownedGameIds(client: EntitlementReader, userId: string, ga
 }
 
 /**
- * Revokes the access granted by refunded order items. Access is per game (one Entitlement per
- * user and game, pointing at the first purchase), so when the user still has another valid
- * purchase of the same game, access moves to that purchase instead of being lost.
+ * Only refunded GAME_KEY purchases may revoke a game entitlement. A gift card is grouped under
+ * a catalog game, but that relationship never grants nor revokes ownership of the game.
  */
 export async function revokeEntitlementsForRefund(
   client: OrderItemReader,
@@ -88,15 +76,16 @@ export async function revokeEntitlementsForRefund(
 ): Promise<void> {
   if (!refundedItemIds.length) return;
   const ids = [...refundedItemIds];
-
   const refunded = await client.orderItem.findMany({
-    where: { id: { in: ids } },
-    select: { product: { select: { gameId: true } } },
+    where: { id: { in: ids }, product: { kind: "GAME_KEY" } },
+    select: { id: true, product: { select: { gameId: true } } },
   });
+  const gameItemIds = refunded.map((item) => item.id);
   const gameIds = Array.from(new Set(refunded.map((item) => item.product.gameId)));
+  if (!gameItemIds.length) return;
 
   await client.entitlement.updateMany({
-    where: { userId, gameId: { in: gameIds }, revokedAt: null, orderItemId: { in: ids } },
+    where: { userId, gameId: { in: gameIds }, revokedAt: null, orderItemId: { in: gameItemIds } },
     data: { revokedAt: new Date() },
   });
 
@@ -104,7 +93,7 @@ export async function revokeEntitlementsForRefund(
     const other = await client.orderItem.findFirst({
       where: {
         id: { notIn: ids },
-        product: { gameId },
+        product: { kind: "GAME_KEY", gameId },
         order: { userId, status: "COMPLETED", paymentStatus: { in: ["SUCCEEDED", "NOT_REQUIRED"] } },
       },
       orderBy: { order: { createdAt: "asc" } },
