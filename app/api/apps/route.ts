@@ -39,7 +39,13 @@ export async function GET(request: NextRequest) {
     ]);
     return NextResponse.json({ success: true, data: data.map(toPublicContent), pagination: { page, limit, total, pages: Math.ceil(total / limit), sort } });
   } catch (error) {
-    console.error("GET /api/apps", error);
-    return NextResponse.json({ success: false, error: "Failed to load apps" }, { status: 500 });
+    // Keep database credentials, hosts and Prisma internals out of public responses and raw logs.
+    console.error("GET /api/apps failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return NextResponse.json(
+      { success: false, error: "APP_CATALOG_UNAVAILABLE" },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } },
+    );
   }
 }
