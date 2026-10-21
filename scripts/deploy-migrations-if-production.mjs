@@ -40,7 +40,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 
   const delay = retryDelayMs[attempt - 1] ?? retryDelayMs.at(-1);
   console.warn(
-    `Prisma migration deployment hit a transient database/advisory-lock timeout. Retrying in ${delay}ms; no migration was marked successful by this wrapper.`,
+    `Prisma migration deployment hit a transient database/advisory-lock timeout. Retrying in ${delay}ms; Prisma's migration ledger will prevent completed migrations from being reapplied.`,
   );
   await new Promise((resolve) => setTimeout(resolve, delay));
 }
