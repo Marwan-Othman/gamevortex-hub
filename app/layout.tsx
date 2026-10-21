@@ -11,6 +11,7 @@ import "./redesign.css";
 import "./public-ui.css";
 import "./mobile.css";
 import "./refresh-2026.css";
+import "./refresh-2026-fixes.css";
 
 const fontBody = IBM_Plex_Sans_Arabic({ subsets: ["arabic", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-body", display: "swap" });
 
@@ -53,23 +54,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const savedLanguage = cookieStore.get("selectedLanguage")?.value;
-  const locale = savedLanguage === "en" ? "en" : "ar";
-  const dir = locale === "ar" ? "rtl" : "ltr";
+  const locale = cookieStore.get("gv-locale")?.value ?? "ar";
 
   return (
-    <html lang={locale} dir={dir} className={`${fontBody.variable}`}>
+    <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"} className={fontBody.variable}>
       <body>
-        <LocaleProvider locale={locale}>
+        <LocaleProvider initialLocale={locale}>
           <SiteHeader />
-
-          <PwaRegister />
-
           <main className="gv-app-main">{children}</main>
-
-          <MobileBottomNav />
-
           <SiteFooter />
+          <MobileBottomNav />
+          <PwaRegister />
         </LocaleProvider>
       </body>
     </html>
