@@ -54,17 +54,23 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const locale = cookieStore.get("gv-locale")?.value ?? "ar";
+  const savedLanguage = cookieStore.get("selectedLanguage")?.value;
+  const locale = savedLanguage === "en" ? "en" : "ar";
+  const dir = locale === "ar" ? "rtl" : "ltr";
 
   return (
-    <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"} className={fontBody.variable}>
+    <html lang={locale} dir={dir} className={`${fontBody.variable}`}>
       <body>
-        <LocaleProvider initialLocale={locale}>
+        <LocaleProvider locale={locale}>
           <SiteHeader />
-          <main className="gv-app-main">{children}</main>
-          <SiteFooter />
-          <MobileBottomNav />
+
           <PwaRegister />
+
+          <main className="gv-app-main">{children}</main>
+
+          <MobileBottomNav />
+
+          <SiteFooter />
         </LocaleProvider>
       </body>
     </html>
