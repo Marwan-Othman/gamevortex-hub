@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, publicErrorCode, userRouteError } from "@/lib/api";
+import { guardMutation, userRouteError } from "@/lib/api";
 import { ConfiguredPaymentProvider } from "@/lib/payments";
 
 export const runtime = "nodejs";
@@ -140,8 +140,9 @@ async function createDeposit(user: { id: string }, input: z.infer<typeof schema>
 
     return NextResponse.json({ ok: true, deposit: publicDeposit(updated), checkoutUrl: payment.checkoutUrl || null, status: payment.status }, { status: 201 });
   } catch (error) {
-
-
+    // A provider timeout or transport failure does not prove that no payment was created.
+    // Keep the deposit PENDING and its amount reserved; retries use the same deposit ID as
+    // the provider idempotency key. Never release funds or mark FAILED without reconciliation.
     return NextResponse.json({
       error: providerPaymentCreated ? "DEPOSIT_PERSISTENCE_PENDING" : "DEPOSIT_PROVIDER_OUTCOME_UNKNOWN",
     }, { status: 502 });
