@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const DEPOSIT_ATTEMPT_STORAGE_KEY = "gamevortex.wallet.deposit-attempt.v1";
+type DepositAttempt = { amountCents: number; idempotencyKey: string; depositId?: string };
 
 const ERRORS: Record<string, string> = {
   UNAUTHORIZED: "سجّل الدخول لعرض محفظتك.",
   WALLET_LOAD_FAILED: "تعذّر تحميل المحفظة. حاول مجددًا بعد قليل.",
   DEPOSIT_FAILED: "تعذّر إنشاء طلب الإضافة. تحقق من حالة المحفظة قبل إعادة المحاولة.",
-  DEPOSIT_PERSISTENCE_PENDING: "تعذّر حفظ تأكيد طلب الدفع، وقد يكون مزوّد الدفع أنشأ الطلب بالفعل. لا تُعد الدفع الآن؛ حدّث المحفظة وتحقق من سجل المعاملات أو تواصل مع الدعم.",
+  DEPOSIT_PERSISTENCE_PENDING: "قد يكون مزوّد الدفع أنشأ الطلب لكن تعذّر حفظ مرجعه. لا تبدأ طلبًا جديدًا؛ أعد المحاولة بالمبلغ نفسه كي يُستخدم مفتاح الطلب نفسه، أو تواصل مع الدعم إذا استمرت المشكلة.",
+  DEPOSIT_PROVIDER_OUTCOME_UNKNOWN: "لم نتمكن من تأكيد نتيجة طلب الدفع. قد يكون مزوّد الدفع أنشأه بالفعل؛ لا تغيّر المبلغ ولا تنشئ طلبًا جديدًا. أعد المحاولة بالمبلغ نفسه أو تحقق من سجل المحفظة وتواصل مع الدعم.",
   IDEMPOTENCY_CONFLICT: "يوجد طلب إضافة سابق مرتبط بمبلغ مختلف. لا تكرر الدفع؛ حدّث المحفظة وتحقق من سجل المعاملات أولًا.",
   RATE_LIMITED: "محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.",
   NETWORK: "تعذّر الاتصال بالخادم. تحقق من الإنترنت وأعد المحاولة.",
@@ -55,6 +59,7 @@ export default function WalletClient() {
   const [ready, setReady] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [checkoutStatus, setCheckoutStatus] = useState<"checking" | "confirmed" | "pending" | null>(null);
+  const depositAttemptRef = useRef<DepositAttempt | null>(null);
 
   async function load(): Promise<{ wallet: Wallet; transactions: Tx[] } | null> {
     try {
@@ -99,6 +104,14 @@ export default function WalletClient() {
       if (cancelled) return;
       const settled = data?.transactions.some((tx) => tx.referenceId === depositReference && tx.type === "DEPOSIT");
       if (settled) {
+        try {
+          const rawAttempt = window.sessionStorage.getItem(DEPOSIT_ATTEMPT_STORAGE_KEY);
+          const attempt = rawAttempt ? JSON.parse(rawAttempt) as DepositAttempt : null;
+          if (attempt?.depositId === depositReference) {
+            window.sessionStorage.removeItem(DEPOSIT_ATTEMPT_STORAGE_KEY);
+            depositAttemptRef.current = null;
+          }
+        } catch { /* Session storage may be unavailable; wallet state remains authoritative. */ }
         setCheckoutStatus("confirmed");
         if (timer !== undefined) window.clearInterval(timer);
       } else if (attempts >= 12) {
@@ -121,6 +134,19 @@ export default function WalletClient() {
       setMessage("الحد الأدنى للإضافة هو $1.00");
       return;
     }
+    let attempt = depositAttemptRef.current;
+    try {
+      const stored = window.sessionStorage.getItem(DEPOSIT_ATTEMPT_STORAGE_KEY);
+      if (stored) attempt = JSON.parse(stored) as DepositAttempt;
+    } catch { /* Fall back to the in-memory attempt when storage is unavailable. */ }
+    if (attempt && attempt.amountCents !== cents) {
+      setMessage("يوجد طلب شحن سابق لم تُحسم نتيجته. لا تغيّر المبلغ ولا تبدأ طلبًا جديدًا قبل التحقق من سجل المحفظة أو التواصل مع الدعم.");
+      return;
+    }
+    if (!attempt) attempt = { amountCents: cents, idempotencyKey: crypto.randomUUID() };
+    depositAttemptRef.current = attempt;
+    try { window.sessionStorage.setItem(DEPOSIT_ATTEMPT_STORAGE_KEY, JSON.stringify(attempt)); } catch { /* In-memory fallback. */ }
+
     setLoading(true);
     setMessage(null);
     try {
@@ -129,6 +155,7 @@ export default function WalletClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents: cents,
+          idempotencyKey: attempt.idempotencyKey,
         }),
       });
       const data = await readJson(response);
@@ -137,6 +164,11 @@ export default function WalletClient() {
         throw new Error("UNAUTHORIZED");
       }
       if (!response.ok || !data) throw new Error(data?.error || "DEPOSIT_FAILED");
+      if (data.deposit?.id) {
+        attempt.depositId = data.deposit.id;
+        depositAttemptRef.current = attempt;
+        try { window.sessionStorage.setItem(DEPOSIT_ATTEMPT_STORAGE_KEY, JSON.stringify(attempt)); } catch { /* In-memory fallback. */ }
+      }
       if (data.checkoutUrl) {
         window.location.assign(data.checkoutUrl);
         return;
