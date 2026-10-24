@@ -556,25 +556,27 @@ describe("POST /api/wallet/deposit", () => {
     expect(h.walletTx.wallet.update).toHaveBeenCalledTimes(1);
   });
 
-  it("provider failure: 502 with a fixed code, the deposit is marked FAILED and the pending balance is released", async () => {
+  it("provider failure: unknown outcome keeps the deposit pending and never releases reserved funds", async () => {
     h.wallet.createPayment.mockRejectedValue(new Error(`Stripe 500: invalid key ${FAKE_SECRET}`));
     const response = await deposit({ amountCents: 1000, idempotencyKey: "idem-key-1" });
     const text = await response.text();
 
     expect(response.status).toBe(502);
-    expect(text).toContain("DEPOSIT_CREATE_FAILED");
+    expect(text).toContain("DEPOSIT_PROVIDER_OUTCOME_UNKNOWN");
     expect(text).not.toContain(FAKE_SECRET);
-    expect(h.walletTx.walletDeposit.update).toHaveBeenCalledWith({ where: { id: "dep_1" }, data: { status: "FAILED" } });
-    const release = h.walletTx.wallet.update.mock.calls.at(-1)?.[0].data.pendingBalance.decrement;
-    expect(String(release)).toBe("10");
+    expect(h.walletTx.walletDeposit.update).not.toHaveBeenCalled();
+    expect(h.walletTx.wallet.update).toHaveBeenCalledTimes(1);
+    expect(h.walletTx.wallet.update.mock.calls[0][0].data.pendingBalance.increment).toBeDefined();
+    expect(h.walletTx.wallet.update.mock.calls[0][0].data.pendingBalance.decrement).toBeUndefined();
   });
 
-  it("provider failure: the pending balance is never released below what is actually pending", async () => {
+  it("provider timeout: reserved balance remains untouched until reconciliation", async () => {
     h.wallet.createPayment.mockRejectedValue(new Error("boom"));
     h.walletTx.wallet.findUniqueOrThrow.mockResolvedValue({ id: "wallet_1", pendingBalance: new Prisma.Decimal("4") });
     await deposit({ amountCents: 1000, idempotencyKey: "idem-key-1" });
-    const release = h.walletTx.wallet.update.mock.calls.at(-1)?.[0].data.pendingBalance.decrement;
-    expect(String(release)).toBe("4");
+    expect(h.walletTx.wallet.update).toHaveBeenCalledTimes(1);
+    expect(h.walletTx.wallet.update.mock.calls[0][0].data.pendingBalance.increment).toBeDefined();
+    expect(h.walletTx.wallet.update.mock.calls[0][0].data.pendingBalance.decrement).toBeUndefined();
   });
 
   it("provider failure: if saving the provider id fails AFTER the payment exists, nothing is rolled back (it may still be paid)", async () => {

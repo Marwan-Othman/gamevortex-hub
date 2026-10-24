@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { guardMutation, publicErrorCode, userRouteError } from "@/lib/api";
+import { guardMutation, userRouteError } from "@/lib/api";
 import { ConfiguredPaymentProvider } from "@/lib/payments";
 
 export const runtime = "nodejs";
@@ -140,47 +140,11 @@ async function createDeposit(user: { id: string }, input: z.infer<typeof schema>
 
     return NextResponse.json({ ok: true, deposit: publicDeposit(updated), checkoutUrl: payment.checkoutUrl || null, status: payment.status }, { status: 201 });
   } catch (error) {
-    if (!providerPaymentCreated) {
-      await db.$transaction(async (transaction) => {
-        // Lock the deposit so this rollback cannot race a provider webhook.
-        await transaction.$queryRaw(
-          Prisma.sql`SELECT "id" FROM "WalletDeposit" WHERE "id" = ${deposit.id} FOR UPDATE`,
-        );
-        const current = await transaction.walletDeposit.findUnique({
-          where: { id: deposit.id },
-          select: { id: true, userId: true, amountCents: true, status: true, providerPaymentId: true },
-        });
-        // A deposit that already has a provider payment may still be paid, and
-        // anything no longer PENDING is already settled. Leave both alone.
-        if (!current || current.status !== "PENDING" || current.providerPaymentId) return;
-
-        const wallet = await transaction.wallet.findUnique({
-          where: { userId: current.userId },
-        });
-        if (wallet) {
-          await transaction.$queryRaw(
-            Prisma.sql`SELECT "id" FROM "Wallet" WHERE "id" = ${wallet.id} FOR UPDATE`,
-          );
-          const locked = await transaction.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-          const amount = new Prisma.Decimal(current.amountCents).div(100);
-          const release = locked.pendingBalance.lt(amount) ? locked.pendingBalance : amount;
-          if (release.gt(0)) {
-            await transaction.wallet.update({
-              where: { id: wallet.id },
-              data: { pendingBalance: { decrement: release } },
-            });
-          }
-        }
-
-        await transaction.walletDeposit.update({
-          where: { id: current.id },
-          data: { status: "FAILED" },
-        });
-      }).catch(() => undefined);
-    }
-
+    // A provider timeout or transport failure does not prove that no payment was created.
+    // Keep the deposit PENDING and its amount reserved; retries use the same deposit ID as
+    // the provider idempotency key. Never release funds or mark FAILED without reconciliation.
     return NextResponse.json({
-      error: providerPaymentCreated ? "DEPOSIT_PERSISTENCE_PENDING" : publicErrorCode(error, "DEPOSIT_CREATE_FAILED"),
+      error: providerPaymentCreated ? "DEPOSIT_PERSISTENCE_PENDING" : "DEPOSIT_PROVIDER_OUTCOME_UNKNOWN",
     }, { status: 502 });
   }
 }
